@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key> <string>Vincent</string>
+  <key>CFBundleDisplayName</key> <string>Vincent</string>
+  <key>CFBundleIdentifier</key> <string>@VINCENT_BUNDLE_IDENTIFIER@</string>
+  <key>CFBundleVersion</key> <string>@VINCENT_VERSION@</string>
+  <key>CFBundleShortVersionString</key> <string>@VINCENT_VERSION@</string>
+  <key>LSApplicationCategoryType</key> <string>@VINCENT_CATEGORY@</string>
+  <key>NSHighResolutionCapable</key> <true/>
+  <key>NSPrincipalClass</key> <string>NSApplication</string>
+</dict>
+</plist>
