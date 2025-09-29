@@ -90,6 +90,68 @@ qt_add_executable(Vincent
 #    별도 라이브러리를 만들어 아래에서 링크할 수 있음
 add_subdirectory(App)
 
+# 10-a) QML 모듈 연결(한 스코프 안에서 실행해야 Xcode에서 안정적으로 동작)
+set(_vincent_qml_dir "${CMAKE_SOURCE_DIR}/App/qml")
+if(CMAKE_GENERATOR STREQUAL "Xcode")
+    set(QT_COPY_QML_FILES_OLD_WAY ON)
+endif()
+
+qt_add_qml_module(Vincent
+    URI Vincent
+    VERSION 1.0
+    QML_FILES
+        App/qml/Main.qml
+        App/qml/PainterCanvasPage.qml
+        App/qml/CanvasToolBar.qml
+        App/qml/DrawingSurface.qml
+)
+
+# qmltyperegistrar가 비어있는 메타타입 파일을 읽고 실패하지 않도록 보장
+get_target_property(_vincent_binary_dir Vincent BINARY_DIR)
+get_property(_vincent_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(_vincent_multi_config)
+    foreach(_vincent_config IN LISTS CMAKE_CONFIGURATION_TYPES)
+        string(TOLOWER "${_vincent_config}" _vincent_config_lower)
+        string(TOLOWER "Vincent_${_vincent_config}" _vincent_target_lower)
+        set(_vincent_meta_dir "${_vincent_binary_dir}/${_vincent_config}/meta_types")
+        set(_vincent_meta_file "${_vincent_meta_dir}/qt6${_vincent_target_lower}_metatypes.json")
+        file(MAKE_DIRECTORY "${_vincent_meta_dir}")
+        if(EXISTS "${_vincent_meta_file}")
+            file(SIZE "${_vincent_meta_file}" _vincent_meta_size)
+            if(_vincent_meta_size EQUAL 0)
+                file(WRITE "${_vincent_meta_file}" "[]\n")
+            endif()
+        else()
+            file(WRITE "${_vincent_meta_file}" "[]\n")
+        endif()
+    endforeach()
+else()
+    if(CMAKE_BUILD_TYPE)
+        string(TOLOWER "Vincent_${CMAKE_BUILD_TYPE}" _vincent_target_lower)
+    else()
+        string(TOLOWER "Vincent" _vincent_target_lower)
+    endif()
+    set(_vincent_meta_dir "${_vincent_binary_dir}/meta_types")
+    set(_vincent_meta_file "${_vincent_meta_dir}/qt6${_vincent_target_lower}_metatypes.json")
+    file(MAKE_DIRECTORY "${_vincent_meta_dir}")
+    if(EXISTS "${_vincent_meta_file}")
+        file(SIZE "${_vincent_meta_file}" _vincent_meta_size)
+        if(_vincent_meta_size EQUAL 0)
+            file(WRITE "${_vincent_meta_file}" "[]\n")
+        endif()
+    else()
+        file(WRITE "${_vincent_meta_file}" "[]\n")
+    endif()
+endif()
+unset(_vincent_meta_dir)
+unset(_vincent_meta_file)
+unset(_vincent_meta_size)
+unset(_vincent_binary_dir)
+unset(_vincent_multi_config)
+unset(_vincent_config)
+unset(_vincent_config_lower)
+unset(_vincent_target_lower)
+
 # 10) 링크 일괄 지정(단일 호출로 정리)
 target_link_libraries(Vincent
         PRIVATE
@@ -110,6 +172,24 @@ if(APPLE)
     set(VINCENT_CATEGORY "public.app-category.graphics-design")
     set(VINCENT_VERSION "0.1.0")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+
+    set(CMAKE_XCODE_GENERATE_SCHEME ON CACHE BOOL "Generate Xcode schemes" FORCE)
+    set(CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH "${CMAKE_CURRENT_BINARY_DIR}/DerivedData" CACHE STRING "Xcode DerivedData output directory" FORCE)
+    if(NOT CMAKE_TRY_COMPILE_PLATFORM_VARIABLES)
+        set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH)
+    elseif(NOT CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MATCHES "(^|;)CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH($|;)")
+        list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH)
+    endif()
+
+    set(VINCENT_DEVELOPMENT_TEAM "GRWGSK8RDF" CACHE STRING "Apple Developer Team ID used for code signing")
+    set(VINCENT_CODE_SIGN_IDENTITY "Apple Distribution" CACHE STRING "Code signing identity for Vincent")
+    set(VINCENT_CODE_SIGN_STYLE "Automatic" CACHE STRING "Xcode code-sign style (Automatic or Manual)")
+    set(VINCENT_PROVISIONING_PROFILE_SPECIFIER "" CACHE STRING "Provisioning profile specifier for archive builds")
+    set(VINCENT_ENABLE_HARDENED_RUNTIME ON CACHE BOOL "Enable hardened runtime for macOS builds")
+
+    if(VINCENT_PROVISIONING_PROFILE_SPECIFIER AND VINCENT_CODE_SIGN_STYLE STREQUAL "Automatic")
+        set(VINCENT_CODE_SIGN_STYLE "Manual" CACHE STRING "Xcode code-sign style (Automatic or Manual)" FORCE)
+    endif()
 
     # 아이콘(.icns)을 번들 Resources에 포함
     set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
@@ -142,6 +222,12 @@ if(APPLE)
         set_source_files_properties("${_vincent_entitlements}" PROPERTIES GENERATED TRUE)
     endif()
 
+    if(VINCENT_ENABLE_HARDENED_RUNTIME)
+        set(_vincent_hardened_runtime YES)
+    else()
+        set(_vincent_hardened_runtime NO)
+    endif()
+
     set_target_properties(Vincent PROPERTIES
             MACOSX_BUNDLE TRUE
             MACOSX_BUNDLE_INFO_PLIST "${_vincent_info_plist}"
@@ -152,12 +238,66 @@ if(APPLE)
 
             XCODE_ATTRIBUTE_INFOPLIST_FILE "${_vincent_info_plist}"
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${VINCENT_BUNDLE_IDENTIFIER}"
-            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "GRWGSK8RDF"
-            XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
-            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Distribution"
+            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${VINCENT_DEVELOPMENT_TEAM}"
+            XCODE_ATTRIBUTE_CODE_SIGN_STYLE "${VINCENT_CODE_SIGN_STYLE}"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${VINCENT_CODE_SIGN_IDENTITY}"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[sdk=macosx*] "${VINCENT_CODE_SIGN_IDENTITY}"
             XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${_vincent_entitlements}"
+            XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME "${_vincent_hardened_runtime}"
+            XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${VINCENT_VERSION}"
+            XCODE_ATTRIBUTE_MARKETING_VERSION "${VINCENT_VERSION}"
+            XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}"
             XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
     )
+
+    if(VINCENT_PROVISIONING_PROFILE_SPECIFIER)
+        set_target_properties(Vincent PROPERTIES
+                XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER "${VINCENT_PROVISIONING_PROFILE_SPECIFIER}"
+        )
+    endif()
+
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+        if(CMAKE_CONFIGURATION_TYPES)
+            set(_vincent_xcode_configs ${CMAKE_CONFIGURATION_TYPES})
+        elseif(CMAKE_BUILD_TYPE)
+            set(_vincent_xcode_configs ${CMAKE_BUILD_TYPE})
+        else()
+            set(_vincent_xcode_configs)
+        endif()
+
+        foreach(_vincent_config IN LISTS _vincent_xcode_configs)
+            if(_vincent_config STREQUAL "")
+                continue()
+            endif()
+            string(TOUPPER "${_vincent_config}" _vincent_config_upper)
+            if(_vincent_config_upper STREQUAL "RELEASE")
+                continue()
+            endif()
+
+            set(_vincent_codesign_debug "XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[config=${_vincent_config}]")
+            set(_vincent_codesign_debug_sdk "XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[sdk=macosx*][config=${_vincent_config}]")
+            set(_vincent_runtime_debug "XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME[config=${_vincent_config}]")
+
+            set_target_properties(Vincent PROPERTIES
+                    ${_vincent_codesign_debug} "-"
+                    ${_vincent_codesign_debug_sdk} "-"
+                    ${_vincent_runtime_debug} "NO"
+            )
+        endforeach()
+
+        unset(_vincent_xcode_configs)
+    endif()
+
+    unset(_vincent_hardened_runtime)
+
+    if(QT6_IS_SHARED_LIBS_BUILD)
+        qt_generate_deploy_qml_app_script(
+                TARGET Vincent
+                OUTPUT_SCRIPT Vincent_deploy_script
+                MACOS_BUNDLE_POST_BUILD
+                NO_UNSUPPORTED_PLATFORM_ERROR
+        )
+    endif()
 endif()
 
 # 12) Qt의 MANUAL_FINALIZATION 사용 시 마무리

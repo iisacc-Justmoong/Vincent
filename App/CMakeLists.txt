@@ -26,44 +26,6 @@ target_sources(Vincent PRIVATE
         resources.qrc
 )
 
-qt_add_qml_module(Vincent
-    URI Vincent
-    VERSION 1.0
-    QML_FILES
-        qml/Main.qml
-        qml/PainterCanvasPage.qml
-        qml/CanvasToolBar.qml
-        qml/DrawingSurface.qml
+target_include_directories(Vincent PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-# Ensure the qmltyperegistrar always sees a valid (non-empty) metatypes.json.
-get_target_property(_vincent_binary_dir Vincent BINARY_DIR)
-get_property(_vincent_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(_vincent_multi_config)
-    foreach(_vincent_config IN LISTS CMAKE_CONFIGURATION_TYPES)
-        string(TOLOWER "${_vincent_config}" _vincent_config_lower)
-        string(TOLOWER "Vincent_${_vincent_config}" _vincent_target_lower)
-        set(_vincent_meta_dir "${_vincent_binary_dir}/${_vincent_config}/meta_types")
-        set(_vincent_meta_file "${_vincent_meta_dir}/qt6${_vincent_target_lower}_metatypes.json")
-        if(EXISTS "${_vincent_meta_file}")
-            file(SIZE "${_vincent_meta_file}" _vincent_meta_size)
-            if(_vincent_meta_size EQUAL 0)
-                file(WRITE "${_vincent_meta_file}" "[]\n")
-            endif()
-        endif()
-    endforeach()
-else()
-    if(CMAKE_BUILD_TYPE)
-        string(TOLOWER "Vincent_${CMAKE_BUILD_TYPE}" _vincent_target_lower)
-    else()
-        string(TOLOWER "Vincent" _vincent_target_lower)
-    endif()
-    set(_vincent_meta_dir "${_vincent_binary_dir}/meta_types")
-    set(_vincent_meta_file "${_vincent_meta_dir}/qt6${_vincent_target_lower}_metatypes.json")
-    if(EXISTS "${_vincent_meta_file}")
-        file(SIZE "${_vincent_meta_file}" _vincent_meta_size)
-        if(_vincent_meta_size EQUAL 0)
-            file(WRITE "${_vincent_meta_file}" "[]\n")
-        endif()
-    endif()
-endif()
