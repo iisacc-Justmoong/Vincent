@@ -48,7 +48,7 @@ Customize `packaging/macos/Vincent.entitlements` if the app needs additional cap
 ```bash
 codesign --force --options runtime \
   --entitlements packaging/macos/Vincent.entitlements \
-  --sign "Apple Distribution: Your Company" \
+  --sign "Apple Distribution: MUYEONG YUN (5U49ST9XZH)" \
   dist/Vincent.app
 ```
 Then validate the signature:
@@ -62,7 +62,7 @@ If `spctl` warns about missing the hardened runtime, make sure `--options runtim
 ```bash
 productbuild \
   --component dist/Vincent.app /Applications \
-  --sign "Apple Installer: Your Company" \
+  --sign "Apple Installer: MUYEONG YUN (5U49ST9XZH)" \
   dist/Vincent.pkg
 ```
 This produces the installer payload required by App Store Connect. Keep the `.pkg` under 4 GB.
