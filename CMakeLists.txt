@@ -1,26 +1,26 @@
 cmake_minimum_required(VERSION 3.24)
-project(Vincent VERSION 0.1 LANGUAGES CXX)
+project(Vincent VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# macOS 최소 타겟 고정
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+
+# Qt 경로 힌트(선택)
 if(DEFINED Qt6_DIR AND EXISTS "${Qt6_DIR}")
     list(PREPEND CMAKE_MODULE_PATH "${Qt6_DIR}")
 endif()
 
-# WrapOpenGL을 모듈 방식으로 우선 탐색(FindWrapOpenGL.cmake)
+# OpenGL 래퍼 탐색
 find_package(WrapOpenGL QUIET MODULE)
-
-# 필요 시 대체: 타깃이 아직 없으면 직접 만들어 제공
 if(NOT TARGET WrapOpenGL::WrapOpenGL)
-    # 1) 표준 OpenGL 패키지 시도
     find_package(OpenGL QUIET)
     if(TARGET OpenGL::GL)
         add_library(WrapOpenGL::WrapOpenGL INTERFACE IMPORTED)
         target_link_libraries(WrapOpenGL::WrapOpenGL INTERFACE OpenGL::GL)
     elseif(APPLE)
-        # 2) macOS 프레임워크 직결(구형이지만 호환성용으로 충분)
         find_library(_APPLE_OPENGL_FRAMEWORK OpenGL)
         if(_APPLE_OPENGL_FRAMEWORK)
             add_library(WrapOpenGL::WrapOpenGL INTERFACE IMPORTED)
@@ -30,15 +30,13 @@ if(NOT TARGET WrapOpenGL::WrapOpenGL)
     endif()
 endif()
 
-# 3) Craft 환경(CRAFTROOT) 우선 검색 경로 정리: 존재할 때만 선두에 삽입
+# Craft 환경 우선 검색
 if(DEFINED ENV{CRAFTROOT})
     set(_craft_prefix "$ENV{CRAFTROOT}")
-    # 이미 포함되었으면 중복 삽입 방지
     list(FIND CMAKE_PREFIX_PATH "${_craft_prefix}" _craft_index)
     if(_craft_index EQUAL -1)
         list(PREPEND CMAKE_PREFIX_PATH "${_craft_prefix}")
     endif()
-    # Qt6_DIR 힌트(선택)
     if(NOT DEFINED Qt6_DIR)
         set(_craft_qt_dir "$ENV{CRAFTROOT}/lib/cmake/Qt6")
         if(EXISTS "${_craft_qt_dir}/Qt6Config.cmake")
@@ -50,63 +48,49 @@ if(DEFINED ENV{CRAFTROOT})
     unset(_craft_prefix)
 endif()
 
-# 4) 요구 버전 선언
+# 요구 버전
 set(QT_MIN_VERSION "6.8.0")
 set(KF_MIN_VERSION "6.0.0")
 
-# 5) ECM/KF6 기본 설정 로드(ECM 먼저)
+# ECM/KF6
 find_package(ECM ${KF_MIN_VERSION} REQUIRED NO_MODULE)
-set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+list(PREPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 
-# 6) Qt6/KF6 탐색을 타깃·매크로 사용보다 먼저 수행
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS
-        Core
-        Qml
-        Quick
-        QuickControls2
-)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
-        Kirigami
-        I18n
-        Svg
-        Config
-)
+# Qt6/KF6
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2)
+find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS Kirigami I18n Svg Config)
 find_package(KF6KirigamiPlatform ${KF_MIN_VERSION} REQUIRED)
 
-# 7) 표준 Qt 프로젝트 설정(가용성 확보 후 호출)
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
-# 8) 실행 타깃 생성
+# 실행 타깃
 qt_add_executable(Vincent
         MANUAL_FINALIZATION
         MACOSX_BUNDLE
 )
 
-# 9) 하위 디렉터리(예: App)에서 소스/리소스를 타깃에 추가하거나
-#    별도 라이브러리를 만들어 아래에서 링크할 수 있음
+# 소스 추가(하위 디렉터리에서 타깃에 파일을 attach)
 add_subdirectory(App)
 
-# 10-a) QML 모듈 연결(한 스코프 안에서 실행해야 Xcode에서 안정적으로 동작)
-set(_vincent_qml_dir "${CMAKE_SOURCE_DIR}/App/qml")
+# QML 모듈
 if(CMAKE_GENERATOR STREQUAL "Xcode")
     set(QT_COPY_QML_FILES_OLD_WAY ON)
 endif()
-
 qt_add_qml_module(Vincent
-    URI Vincent
-    VERSION 1.0
-    QML_FILES
+        URI Vincent
+        VERSION 1.0
+        QML_FILES
         App/qml/Main.qml
         App/qml/PainterCanvasPage.qml
         App/qml/CanvasToolBar.qml
         App/qml/DrawingSurface.qml
 )
 
-# qmltyperegistrar가 비어있는 메타타입 파일을 읽고 실패하지 않도록 보장
+# qmltyperegistrar 빈 메타타입 안전장치
 get_target_property(_vincent_binary_dir Vincent BINARY_DIR)
 get_property(_vincent_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(_vincent_multi_config)
@@ -143,166 +127,69 @@ else()
         file(WRITE "${_vincent_meta_file}" "[]\n")
     endif()
 endif()
-unset(_vincent_meta_dir)
-unset(_vincent_meta_file)
-unset(_vincent_meta_size)
-unset(_vincent_binary_dir)
-unset(_vincent_multi_config)
-unset(_vincent_config)
-unset(_vincent_config_lower)
-unset(_vincent_target_lower)
+#unset(_vincent_meta_dir _vincent_meta_file _vincent_meta_size _vincent_binary_dir _vincent_multi_config _vincent_config _vincent_config_lower _vincent_target_lower)
 
-# 10) 링크 일괄 지정(단일 호출로 정리)
-target_link_libraries(Vincent
-        PRIVATE
-        Qt6::Core
-        Qt6::Qml
-        Qt6::Quick
-        Qt6::QuickControls2
-        KF6::Kirigami
-        KF6::I18n
-        KF6::Svg
-        KF6::KirigamiPlatform
-        KF6::ConfigCore
+# 링크
+target_link_libraries(Vincent PRIVATE
+        Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2
+        KF6::Kirigami KF6::I18n KF6::Svg KF6::KirigamiPlatform KF6::ConfigCore
 )
 
-# 11) macOS 번들·코드사인 속성
-if(APPLE)
-    set(VINCENT_BUNDLE_IDENTIFIER "com.iisacc.vincent.app")
-    set(VINCENT_CATEGORY "public.app-category.graphics-design")
-    set(VINCENT_VERSION "0.1.0")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
-
-    set(CMAKE_XCODE_GENERATE_SCHEME ON CACHE BOOL "Generate Xcode schemes" FORCE)
-    set(CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH "${CMAKE_CURRENT_BINARY_DIR}/DerivedData" CACHE STRING "Xcode DerivedData output directory" FORCE)
-    if(NOT CMAKE_TRY_COMPILE_PLATFORM_VARIABLES)
-        set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH)
-    elseif(NOT CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MATCHES "(^|;)CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH($|;)")
-        list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES CMAKE_XCODE_ATTRIBUTE_DERIVED_DATA_PATH)
-    endif()
-
-    set(VINCENT_DEVELOPMENT_TEAM "GRWGSK8RDF" CACHE STRING "Apple Developer Team ID used for code signing")
-    set(VINCENT_CODE_SIGN_IDENTITY "Apple Distribution" CACHE STRING "Code signing identity for Vincent")
-    set(VINCENT_CODE_SIGN_STYLE "Automatic" CACHE STRING "Xcode code-sign style (Automatic or Manual)")
-    set(VINCENT_PROVISIONING_PROFILE_SPECIFIER "" CACHE STRING "Provisioning profile specifier for archive builds")
-    set(VINCENT_ENABLE_HARDENED_RUNTIME ON CACHE BOOL "Enable hardened runtime for macOS builds")
-
-    if(VINCENT_PROVISIONING_PROFILE_SPECIFIER AND VINCENT_CODE_SIGN_STYLE STREQUAL "Automatic")
-        set(VINCENT_CODE_SIGN_STYLE "Manual" CACHE STRING "Xcode code-sign style (Automatic or Manual)" FORCE)
-    endif()
-
-    # 아이콘(.icns)을 번들 Resources에 포함
-    set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
-    get_filename_component(_vincent_icon_abs "${VINCENT_APP_ICON}" ABSOLUTE)
-    get_filename_component(_vincent_icon_name_we "${_vincent_icon_abs}" NAME_WE)
-    if(EXISTS "${_vincent_icon_abs}")
-        target_sources(Vincent PRIVATE "${_vincent_icon_abs}")
-        set_source_files_properties("${_vincent_icon_abs}" PROPERTIES
-                MACOSX_PACKAGE_LOCATION "Resources")
-    endif()
-
-    # Info.plist를 빌드 트리로 복사(토큰 대체)하여 Xcode가 참조할 수 있도록 함
-    set(_vincent_info_plist "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
-    configure_file(
-            "${CMAKE_SOURCE_DIR}/mac/Info.plist.in"
-            "${_vincent_info_plist}"
-            @ONLY
-    )
-    set_source_files_properties("${_vincent_info_plist}" PROPERTIES GENERATED TRUE)
-
-    # Entitlements는 템플릿을 그대로 복사하여 Xcode가 코드사인 단계에서 사용하게 한다
-    set(_vincent_entitlements_source "${CMAKE_SOURCE_DIR}/mac/Vincent.entitlements")
-    if(NOT EXISTS "${_vincent_entitlements_source}")
-        set(_vincent_entitlements_source "${CMAKE_SOURCE_DIR}/packaging/macos/Vincent.entitlements")
-    endif()
-    set(_vincent_entitlements "")
-    if(EXISTS "${_vincent_entitlements_source}")
-        set(_vincent_entitlements "${CMAKE_CURRENT_BINARY_DIR}/Vincent.entitlements")
-        configure_file("${_vincent_entitlements_source}" "${_vincent_entitlements}" COPYONLY)
-        set_source_files_properties("${_vincent_entitlements}" PROPERTIES GENERATED TRUE)
-    endif()
-
-    if(VINCENT_ENABLE_HARDENED_RUNTIME)
-        set(_vincent_hardened_runtime YES)
-    else()
-        set(_vincent_hardened_runtime NO)
-    endif()
-
-    set_target_properties(Vincent PROPERTIES
-            MACOSX_BUNDLE TRUE
-            MACOSX_BUNDLE_INFO_PLIST "${_vincent_info_plist}"
-            MACOSX_BUNDLE_ICON_FILE "${_vincent_icon_name_we}"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "${VINCENT_BUNDLE_IDENTIFIER}"
-            MACOSX_BUNDLE_BUNDLE_VERSION "${VINCENT_VERSION}"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "${VINCENT_VERSION}"
-
-            XCODE_ATTRIBUTE_INFOPLIST_FILE "${_vincent_info_plist}"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${VINCENT_BUNDLE_IDENTIFIER}"
-            XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${VINCENT_DEVELOPMENT_TEAM}"
-            XCODE_ATTRIBUTE_CODE_SIGN_STYLE "${VINCENT_CODE_SIGN_STYLE}"
-            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${VINCENT_CODE_SIGN_IDENTITY}"
-            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[sdk=macosx*] "${VINCENT_CODE_SIGN_IDENTITY}"
-            XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${_vincent_entitlements}"
-            XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME "${_vincent_hardened_runtime}"
-            XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "${VINCENT_VERSION}"
-            XCODE_ATTRIBUTE_MARKETING_VERSION "${VINCENT_VERSION}"
-            XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}"
-            XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
-    )
-
-    if(VINCENT_PROVISIONING_PROFILE_SPECIFIER)
-        set_target_properties(Vincent PROPERTIES
-                XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER "${VINCENT_PROVISIONING_PROFILE_SPECIFIER}"
-        )
-    endif()
-
-    if(CMAKE_GENERATOR STREQUAL "Xcode")
-        if(CMAKE_CONFIGURATION_TYPES)
-            set(_vincent_xcode_configs ${CMAKE_CONFIGURATION_TYPES})
-        elseif(CMAKE_BUILD_TYPE)
-            set(_vincent_xcode_configs ${CMAKE_BUILD_TYPE})
-        else()
-            set(_vincent_xcode_configs)
-        endif()
-
-        foreach(_vincent_config IN LISTS _vincent_xcode_configs)
-            if(_vincent_config STREQUAL "")
-                continue()
-            endif()
-            string(TOUPPER "${_vincent_config}" _vincent_config_upper)
-            if(_vincent_config_upper STREQUAL "RELEASE")
-                continue()
-            endif()
-
-            set(_vincent_codesign_debug "XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[config=${_vincent_config}]")
-            set(_vincent_codesign_debug_sdk "XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[sdk=macosx*][config=${_vincent_config}]")
-            set(_vincent_runtime_debug "XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME[config=${_vincent_config}]")
-
-            set_target_properties(Vincent PROPERTIES
-                    ${_vincent_codesign_debug} "-"
-                    ${_vincent_codesign_debug_sdk} "-"
-                    ${_vincent_runtime_debug} "NO"
-            )
-        endforeach()
-
-        unset(_vincent_xcode_configs)
-    endif()
-
-    unset(_vincent_hardened_runtime)
-
-    if(QT6_IS_SHARED_LIBS_BUILD)
-        qt_generate_deploy_qml_app_script(
-                TARGET Vincent
-                OUTPUT_SCRIPT Vincent_deploy_script
-                MACOS_BUNDLE_POST_BUILD
-                NO_UNSUPPORTED_PLATFORM_ERROR
-        )
-    endif()
+set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
+get_filename_component(_vincent_icon_abs "${VINCENT_APP_ICON}" ABSOLUTE)
+get_filename_component(_vincent_icon_name_we "${_vincent_icon_abs}" NAME_WE)
+if(EXISTS "${_vincent_icon_abs}")
+    target_sources(Vincent PRIVATE "${_vincent_icon_abs}")
+    set_source_files_properties("${_vincent_icon_abs}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
-# 12) Qt의 MANUAL_FINALIZATION 사용 시 마무리
+# 번들 식별자 및 Info.plist 연결
+set(BUNDLE_ID "com.iisacc.app.vincent.painter")
+set(MAC_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist") # 소스 트리의 쓰기 가능한 plist
+set_target_properties(Vincent PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${BUNDLE_ID}"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${BUNDLE_ID}"
+)
+
+# 설치 규칙: /Applications/Vincent.app
+install(TARGETS Vincent BUNDLE DESTINATION "Applications")
+
+# CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
+set(CPACK_GENERATOR "productbuild")
+set(CPACK_PACKAGE_NAME "Vincent")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Darwin")
+
+# 설치 경로: .app을 /Applications로 설치
+set(CPACK_PACKAGING_INSTALL_PREFIX "/")  # 루트 기준
+set(CPACK_PRODUCTBUILD_INSTALLER_DIRECTORY "/") # 내부적으로 사용
+set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources")
+
+# 식별자
+set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.app.vincent.painter")
+
+# 서명 신원: pkgbuild와 productbuild 모두 지정
+set(CPACK_PKGBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+set(CPACK_PRODUCTBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+
+# 단일 컴포넌트로 .app을 패키지화
+set(CPACK_COMPONENTS_ALL Runtime)
+set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "Vincent")
+set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent Application")
+set(CPACK_COMPONENT_RUNTIME_REQUIRED TRUE)
+set(CPACK_COMPONENT_RUNTIME_DEPENDS "")
+
+set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
+set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
+set(CPACK_BUNDLE_NAME "Vincent")
+set(CPACK_BUNDLE_APPLE_CERT_APP "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+
+include(CPack)
+
+# Qt의 수동 마무리 훅
 qt_finalize_executable(Vincent)
 
-install(TARGETS Vincent ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
-
+# 패키징·서명과 무관한 KF6 기본 요약
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
