@@ -62,8 +62,7 @@ include(FeatureSummary)
 
 # Qt6/KF6
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS Kirigami I18n Svg Config)
-find_package(KF6KirigamiPlatform ${KF_MIN_VERSION} REQUIRED)
+find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n Svg Config)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
@@ -132,26 +131,31 @@ endif()
 # 링크
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2
-        KF6::Kirigami KF6::I18n KF6::Svg KF6::KirigamiPlatform KF6::ConfigCore
+        KF6::I18n KF6::Svg KF6::ConfigCore
 )
 
 set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
 get_filename_component(_vincent_icon_abs "${VINCENT_APP_ICON}" ABSOLUTE)
-get_filename_component(_vincent_icon_name_we "${_vincent_icon_abs}" NAME_WE)
 if(EXISTS "${_vincent_icon_abs}")
+    get_filename_component(_vincent_icon_name "${_vincent_icon_abs}" NAME)
     target_sources(Vincent PRIVATE "${_vincent_icon_abs}")
     set_source_files_properties("${_vincent_icon_abs}" PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources")
+    set(_vincent_icon_bundle_name "${_vincent_icon_name}")
 endif()
 
 # 번들 식별자 및 Info.plist 연결
-set(BUNDLE_ID "com.iisacc.app.vincent.painter")
+set(BUNDLE_ID "com.iisacc.app.vincent")
 set(MAC_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist") # 소스 트리의 쓰기 가능한 plist
 set_target_properties(Vincent PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
         MACOSX_BUNDLE_GUI_IDENTIFIER "${BUNDLE_ID}"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${BUNDLE_ID}"
 )
+
+if(DEFINED _vincent_icon_bundle_name)
+    set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${_vincent_icon_bundle_name}")
+endif()
 
 # 설치 규칙: /Applications/Vincent.app
 install(TARGETS Vincent BUNDLE DESTINATION "Applications")
@@ -168,7 +172,7 @@ set(CPACK_PRODUCTBUILD_INSTALLER_DIRECTORY "/") # 내부적으로 사용
 set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources")
 
 # 식별자
-set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.app.vincent.painter")
+set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.app.vincent")
 
 # 서명 신원: pkgbuild와 productbuild 모두 지정
 set(CPACK_PKGBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")

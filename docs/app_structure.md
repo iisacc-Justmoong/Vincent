@@ -15,7 +15,7 @@ No other product source directories are present at this time.
 The project relies on KDE's Extra CMake Modules (ECM) paired with Qt 6 and KDE Frameworks 6.
 
 1. The root `CMakeLists.txt` ensures Craft-provided prefixes take priority when `CRAFTROOT` is set. It then configures ECM, KDE install paths, and compiler settings before adding the `App/` subdirectory.
-2. `App/CMakeLists.txt` locates the runtime dependencies: `Qt6::Quick`, `Qt6::QuickControls2`, `KF6::Kirigami2`, `KF6::I18n`, and `KF6::KirigamiPlatform`.
+2. `App/CMakeLists.txt` ties the sources to the `Vincent` target while the root file links against `Qt6::Quick`, `Qt6::QuickControls2`, and the remaining KDE pieces (`KF6::I18n`, `KF6::Svg`, `KF6::Config`).
 3. A single executable target, `Vincent`, is defined around `App/main.cpp`.
 4. `qt_add_qml_module` registers the `Vincent` QML module version 1.0, exposing the components under `App/qml/` to the QML engine at runtime.
 5. macOS-specific blocks adjust OpenGL discovery so Qt Quick works even when SDK headers are missing from the default search paths.
@@ -34,27 +34,25 @@ No additional C++ types or singletons are registered; all UI and interaction log
 
 ### `Main.qml`
 
-- Declares the root `Kirigami.ApplicationWindow` with fixed initial dimensions and title.
+- Declares a `Controls.ApplicationWindow` with fixed initial dimensions and title.
 - Stores a reference to the active canvas page for cross-component coordination.
-- Initializes the `pageStack` with `PainterCanvasPage` and exposes the page instance via the `pageReady` signal.
+- Instantiates `PainterCanvasPage` as the lone content item and exposes the page instance via the `pageReady` signal.
 
 ### `PainterCanvasPage.qml`
 
-- Extends `Kirigami.Page` to host the main drawing surface.
+- Extends `Controls.Page` to host the main drawing surface.
 - Maintains the user-facing state (`brushColor`, `brushSize`, `toolMode`, and color `palette`).
 - Emits `pageReady` when the component loads to let `Main.qml` grab a pointer.
 - Provides imperative helpers (`newCanvas`, `clearCanvas`, `saveCanvasAs`, `openImage`, `adjustBrush`) that wrap the lower-level `DrawingSurface` API.
 - Instantiates the `CanvasToolBar` as the page header and wires its signals back into the page state.
 - Hosts the `DrawingSurface` inside a `Rectangle`, forwarding brush parameters and listening for scroll-wheel-driven size changes.
-- Includes a floating Kirigami menu button that opens the global drawer when available.
 
 ### `CanvasToolBar.qml`
 
-- Implements a hybrid toolbar/global drawer using Qt Quick Controls and Kirigami.
+- Implements the horizontal toolbar purely with Qt Quick Controls.
 - Exposes signals for high-level actions (new, open, save, clear) and tool adjustments (brush size, tool selection, palette picks).
 - Provides `Dialogs.FileDialog` instances for open/save flows, including extension inference when a filename lacks a suffix.
 - Presents quick-access buttons, tool toggles, a size slider with increment/decrement buttons, and a color palette repeater that highlights the active swatch.
-- Exposes the `Kirigami.GlobalDrawer` via `globalDrawer` for external visibility toggling.
 
 ### `DrawingSurface.qml`
 
@@ -82,4 +80,3 @@ No additional C++ types or singletons are registered; all UI and interaction log
 - Introduce C++ back-end helpers (e.g., document models, command stacks) if the painting logic outgrows the QML-only approach.
 - Add automated tests under `tests/` once non-trivial logic (such as file handling) gains more edge cases.
 - Expand documentation with user-facing guides (tool descriptions, keyboard shortcuts) alongside this structural overview.
-

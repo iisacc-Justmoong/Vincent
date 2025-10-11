@@ -2,28 +2,35 @@ import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Dialogs as Dialogs
 import QtQuick.Layouts
-import org.kde.kirigami 2.20 as Kirigami
 import org.kde.ksvg as KSvg
-
 
 Controls.ToolBar {
     id: toolbar
+
+    readonly property int spacingSmall: 8
+    readonly property int spacingMedium: 12
+    readonly property int spacingLarge: 16
+    readonly property int iconSizeMedium: 24
 
     property real brushSize: 2
     property color currentColor: "#1a1a1a"
     property var palette: []
     property string currentTool: "brush"
 
-    signal newCanvasRequested()
-    signal clearCanvasRequested()
+    signal newCanvasRequested
+    signal clearCanvasRequested
     signal openRequested(string fileUrl)
     signal saveRequested(string fileUrl)
     signal brushSizeChangeRequested(real size)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
 
-    function openFileDialog() { openDialog.open() }
-    function openSaveDialog() { saveDialog.open() }
+    function openFileDialog() {
+        openDialog.open();
+    }
+    function openSaveDialog() {
+        saveDialog.open();
+    }
 
     Dialogs.FileDialog {
         id: openDialog
@@ -31,10 +38,10 @@ Controls.ToolBar {
         fileMode: Dialogs.FileDialog.OpenFile
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif)")]
         onAccepted: {
-            const selected = openDialog.selectedFile || openDialog.fileUrl
-            const urlString = selected ? selected.toString() : ""
+            const selected = openDialog.selectedFile || openDialog.fileUrl;
+            const urlString = selected ? selected.toString() : "";
             if (urlString.length) {
-                toolbar.openRequested(urlString)
+                toolbar.openRequested(urlString);
             }
         }
     }
@@ -43,49 +50,45 @@ Controls.ToolBar {
         id: saveDialog
         title: qsTr("Save Image As")
         fileMode: Dialogs.FileDialog.SaveFile
-        nameFilters: [
-            qsTr("PNG Image (*.png)"),
-            qsTr("JPEG Image (*.jpg *.jpeg)"),
-            qsTr("Bitmap Image (*.bmp)")
-        ]
+        nameFilters: [qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)")]
         onAccepted: {
-            const selected = saveDialog.selectedFile || saveDialog.fileUrl
-            var urlString = selected ? selected.toString() : ""
+            const selected = saveDialog.selectedFile || saveDialog.fileUrl;
+            var urlString = selected ? selected.toString() : "";
             if (!urlString.length) {
-                return
+                return;
             }
 
             if (!urlString.includes('.')) {
                 if (urlString.endsWith('/')) {
-                    urlString += 'canvas'
+                    urlString += 'canvas';
                 }
-                const suffix = saveDialog.selectedNameFilter.toLowerCase()
+                const suffix = saveDialog.selectedNameFilter.toLowerCase();
                 if (suffix.indexOf('jpeg') !== -1 || suffix.indexOf('jpg') !== -1) {
-                    urlString += '.jpg'
+                    urlString += '.jpg';
                 } else if (suffix.indexOf('bmp') !== -1) {
-                    urlString += '.bmp'
+                    urlString += '.bmp';
                 } else {
-                    urlString += '.png'
+                    urlString += '.png';
                 }
             }
 
-            toolbar.saveRequested(urlString)
+            toolbar.saveRequested(urlString);
         }
     }
 
     contentItem: RowLayout {
-        spacing: Kirigami.Units.mediumSpacing
+        spacing: toolbar.spacingMedium
 
         Controls.ToolButton {
             id: newButton
-            readonly property int actionIconSize: Kirigami.Units.iconSizes.smallMedium
+            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("New")
             Accessible.name: text
             onClicked: toolbar.newCanvasRequested()
 
             contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
+                spacing: toolbar.spacingSmall
 
                 KSvg.SvgItem {
                     implicitWidth: newButton.actionIconSize
@@ -103,14 +106,14 @@ Controls.ToolBar {
 
         Controls.ToolButton {
             id: openButton
-            readonly property int actionIconSize: Kirigami.Units.iconSizes.smallMedium
+            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Open")
             Accessible.name: text
             onClicked: toolbar.openFileDialog()
 
             contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
+                spacing: toolbar.spacingSmall
 
                 KSvg.SvgItem {
                     implicitWidth: openButton.actionIconSize
@@ -128,14 +131,14 @@ Controls.ToolBar {
 
         Controls.ToolButton {
             id: saveButton
-            readonly property int actionIconSize: Kirigami.Units.iconSizes.smallMedium
+            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Save")
             Accessible.name: text
             onClicked: toolbar.openSaveDialog()
 
             contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
+                spacing: toolbar.spacingSmall
 
                 KSvg.SvgItem {
                     implicitWidth: saveButton.actionIconSize
@@ -153,14 +156,14 @@ Controls.ToolBar {
 
         Controls.ToolButton {
             id: clearButton
-            readonly property int actionIconSize: Kirigami.Units.iconSizes.smallMedium
+            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Clear")
             Accessible.name: text
             onClicked: toolbar.clearCanvasRequested()
 
             contentItem: RowLayout {
-                spacing: Kirigami.Units.smallSpacing
+                spacing: toolbar.spacingSmall
 
                 KSvg.SvgItem {
                     implicitWidth: clearButton.actionIconSize
@@ -176,16 +179,18 @@ Controls.ToolBar {
             }
         }
 
-        Kirigami.Separator {
+        Rectangle {
             visible: true
             Layout.fillHeight: true
+            width: 1
+            color: Qt.rgba(0, 0, 0, 0.2)
         }
 
         RowLayout {
-            spacing: Kirigami.Units.smallSpacing
+            spacing: toolbar.spacingSmall
 
             Controls.ToolButton {
-                readonly property int toolIconSize: Kirigami.Units.iconSizes.smallMedium
+                readonly property int toolIconSize: toolbar.iconSizeMedium
 
                 checkable: true
                 checked: toolbar.currentTool === "brush"
@@ -201,7 +206,7 @@ Controls.ToolBar {
             }
 
             Controls.ToolButton {
-                readonly property int toolIconSize: Kirigami.Units.iconSizes.smallMedium
+                readonly property int toolIconSize: toolbar.iconSizeMedium
 
                 checkable: true
                 checked: toolbar.currentTool === "eraser"
@@ -217,9 +222,11 @@ Controls.ToolBar {
             }
         }
 
-        Kirigami.Separator {
+        Rectangle {
             visible: true
             Layout.fillHeight: true
+            width: 1
+            color: Qt.rgba(0, 0, 0, 0.2)
         }
 
         Controls.Label {
@@ -228,7 +235,7 @@ Controls.ToolBar {
         }
 
         RowLayout {
-            spacing: Kirigami.Units.smallSpacing
+            spacing: toolbar.spacingSmall
 
             Controls.Slider {
                 id: sizeSlider
@@ -239,7 +246,7 @@ Controls.ToolBar {
                 onMoved: toolbar.brushSizeChangeRequested(value)
                 onValueChanged: {
                     if (pressed || activeFocus) {
-                        toolbar.brushSizeChangeRequested(value)
+                        toolbar.brushSizeChangeRequested(value);
                     }
                 }
             }
@@ -264,7 +271,9 @@ Controls.ToolBar {
             width: 120
         }
 
-        Item { Layout.fillWidth: true } //For Fixed Layout
+        Item {
+            Layout.fillWidth: true
+        } //For Fixed Layout
 
         Repeater {
             model: toolbar.palette
@@ -276,7 +285,7 @@ Controls.ToolBar {
                 radius: 4
                 color: swatchColor
                 border.width: toolbar.currentColor === swatchColor ? 2 : 1
-                border.color: toolbar.currentColor === swatchColor ? Kirigami.Theme.highlightColor : "#e0e0e0"
+                border.color: toolbar.currentColor === swatchColor ? Qt.application.palette.highlight : "#e0e0e0"
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -297,6 +306,5 @@ Controls.ToolBar {
                 }
             }
         }
-
     }
 }
