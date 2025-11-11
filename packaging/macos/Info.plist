@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.iisacc.app.vincent</string>
+  <string>com.iisacc.app.vincent.painter</string>
 
   <key>CFBundleName</key>
   <string>Vincent</string>
