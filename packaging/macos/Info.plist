@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.iisacc.app.vincent.painter</string>
+  <string>com.iisacc.vincent.painter</string>
 
   <key>CFBundleName</key>
   <string>Vincent</string>
@@ -11,11 +11,8 @@
   <key>CFBundleDisplayName</key>
   <string>Vincent</string>
 
-  <key>CFBundleIconFile</key>
-  <string>icon.icns</string>
-
   <key>CFBundleIconName</key>
-  <string>icon</string>
+  <string>AppIcon</string>
 
   <key>CFBundleExecutable</key>
   <string>Vincent</string>
