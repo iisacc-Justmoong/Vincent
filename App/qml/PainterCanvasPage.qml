@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import "."
 
@@ -9,6 +8,7 @@ Controls.Page {
     readonly property int spacingSmall: 8
     readonly property int spacingMedium: 12
     readonly property int spacingLarge: 16
+    padding: 0
 
     readonly property var defaultPalette: [
         {
@@ -86,48 +86,52 @@ Controls.Page {
         drawingSurface.loadImage(fileUrl);
     }
 
-    header: CanvasToolBar {
-        id: canvasToolBar
-        brushSize: painterPage.brushSize
-        currentColor: painterPage.brushColor
-        currentTool: painterPage.toolMode
-        palette: painterPage.colorPalette
-        onNewCanvasRequested: painterPage.newCanvas()
-        onClearCanvasRequested: painterPage.clearCanvas()
-        onBrushSizeChangeRequested: function (size) {
-            painterPage.brushSize = size;
-        }
-        onColorPicked: function (swatchColor) {
-            painterPage.setBrushColor(swatchColor);
-        }
-        onToolSelected: function (tool) {
-            painterPage.toolMode = tool;
-        }
-        onSaveRequested: function (fileUrl) {
-            painterPage.saveCanvasAs(fileUrl);
-        }
-        onOpenRequested: function (fileUrl) {
-            painterPage.openImage(fileUrl);
-        }
-    }
-
-    ColumnLayout {
+    Item {
         anchors.fill: parent
-        spacing: 0
 
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+            anchors.fill: parent
             color: painterPage.palette.window
 
             DrawingSurface {
                 id: drawingSurface
                 anchors.fill: parent
-                anchors.margins: painterPage.spacingLarge
                 brushColor: painterPage.brushColor
                 brushSize: painterPage.brushSize
                 toolMode: painterPage.toolMode
                 onBrushDeltaRequested: painterPage.adjustBrush(delta)
+            }
+        }
+
+        CanvasToolBar {
+            id: canvasToolBar
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.topMargin: painterPage.spacingSmall
+            anchors.leftMargin: painterPage.spacingSmall
+            anchors.rightMargin: painterPage.spacingSmall
+            z: 10
+            brushSize: painterPage.brushSize
+            currentColor: painterPage.brushColor
+            currentTool: painterPage.toolMode
+            palette: painterPage.colorPalette
+            onNewCanvasRequested: painterPage.newCanvas()
+            onClearCanvasRequested: painterPage.clearCanvas()
+            onBrushSizeChangeRequested: function (size) {
+                painterPage.brushSize = size;
+            }
+            onColorPicked: function (swatchColor) {
+                painterPage.setBrushColor(swatchColor);
+            }
+            onToolSelected: function (tool) {
+                painterPage.toolMode = tool;
+            }
+            onSaveRequested: function (fileUrl) {
+                painterPage.saveCanvasAs(fileUrl);
+            }
+            onOpenRequested: function (fileUrl) {
+                painterPage.openImage(fileUrl);
             }
         }
     }

@@ -5,6 +5,9 @@ import QtQuick.Layouts
 
 Controls.ToolBar {
     id: toolbar
+    background: Item {}
+    layer.enabled: true
+    layer.smooth: true
 
     readonly property int spacingSmall: 8
     readonly property int spacingMedium: 12
@@ -15,6 +18,7 @@ Controls.ToolBar {
     property color currentColor: "#1a1a1a"
     property var palette: []
     property string currentTool: "brush"
+    readonly property color accentColor: (palette && palette.highlight !== undefined) ? palette.highlight : "#2d89ef"
 
     signal newCanvasRequested
     signal clearCanvasRequested
@@ -34,40 +38,42 @@ Controls.ToolBar {
     component ToolbarButton: Controls.ToolButton {
         id: control
         property url iconSource
-        property bool showText: true
         property int iconSize: toolbar.iconSizeMedium
         property int iconBoxSize: toolbar.iconSizeMedium
-        property int contentSpacing: toolbar.spacingSmall
+        property string tooltipText: ""
 
+        hoverEnabled: true
         padding: toolbar.spacingSmall
+        implicitWidth: iconBoxSize + padding * 2
+        implicitHeight: iconBoxSize + padding * 2
 
-        contentItem: RowLayout {
-            spacing: control.showText ? control.contentSpacing : 0
-            Layout.alignment: Qt.AlignVCenter
+        contentItem: Item {
+            implicitWidth: control.iconBoxSize
+            implicitHeight: control.iconBoxSize
 
-            Item {
-                width: control.iconBoxSize
-                height: control.iconBoxSize
-                Layout.alignment: Qt.AlignVCenter
-
-                Image {
-                    anchors.centerIn: parent
-                    width: control.iconSize
-                    height: control.iconSize
-                    source: control.iconSource
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-            }
-
-            Controls.Label {
-                text: control.text
-                Layout.alignment: Qt.AlignVCenter
-                visible: control.showText
-                Layout.preferredWidth: control.showText ? implicitWidth : 0
-                Layout.preferredHeight: control.showText ? implicitHeight : 0
+            Image {
+                anchors.centerIn: parent
+                width: control.iconSize
+                height: control.iconSize
+                source: control.iconSource
+                fillMode: Image.PreserveAspectFit
+                smooth: true
             }
         }
+
+        background: Rectangle {
+            anchors.fill: parent
+            radius: toolbar.spacingLarge
+            color: control.checked || control.pressed
+                ? Qt.rgba(0, 0, 0, 0.15)
+                : (control.hovered ? Qt.rgba(0, 0, 0, 0.08) : Qt.rgba(255, 255, 255, 0.05))
+            border.width: control.checked ? 1 : 0
+            border.color: toolbar.accentColor
+        }
+
+        Controls.ToolTip.visible: control.hovered && Controls.ToolTip.text.length > 0
+        Controls.ToolTip.delay: 300
+        Controls.ToolTip.text: control.tooltipText.length ? control.tooltipText : control.text
     }
 
     Dialogs.FileDialog {
@@ -114,157 +120,216 @@ Controls.ToolBar {
         }
     }
 
-    contentItem: RowLayout {
-        spacing: toolbar.spacingMedium
-
-        ToolbarButton {
-            id: newButton
-
-            text: qsTr("New")
-            iconSource: "qrc:/../resources/icons/new.svg"
-            Accessible.name: text
-            onClicked: toolbar.newCanvasRequested()
-        }
-
-        ToolbarButton {
-            id: openButton
-
-            text: qsTr("Open")
-            iconSource: "qrc:/../resources/icons/open.svg"
-            Accessible.name: text
-            onClicked: toolbar.openFileDialog()
-        }
-
-        ToolbarButton {
-            id: saveButton
-
-            text: qsTr("Save")
-            iconSource: "qrc:/../resources/icons/save.svg"
-            Accessible.name: text
-            onClicked: toolbar.openSaveDialog()
-        }
-
-        ToolbarButton {
-            id: clearButton
-
-            text: qsTr("Clear")
-            iconSource: "qrc:/../resources/icons/clear.svg"
-            Accessible.name: text
-            onClicked: toolbar.clearCanvasRequested()
-        }
+    contentItem: Item {
+        id: toolbarContent
+        anchors.fill: parent
+        implicitHeight: toolbarLayout.implicitHeight + toolbar.spacingSmall * 4
+        implicitWidth: toolbarLayout.implicitWidth + toolbar.spacingSmall * 4
 
         Rectangle {
-            visible: true
-            Layout.fillHeight: true
-            width: 1
-            color: Qt.rgba(0, 0, 0, 0.2)
+            id: floatingBackground
+            anchors.fill: parent
+            anchors.leftMargin: toolbar.spacingSmall
+            anchors.rightMargin: toolbar.spacingSmall
+            anchors.topMargin: toolbar.spacingSmall
+            anchors.bottomMargin: toolbar.spacingSmall
+            radius: toolbar.spacingLarge * 1.5
+            color: Qt.rgba(26 / 255, 26 / 255, 26 / 255, 1.0)
+            border.width: 1
+            border.color: Qt.rgba(255, 255, 255, 0.08)
+        }
+
+        MouseArea {
+            id: toolbarEventBlocker
+            anchors.fill: floatingBackground
+            z: -1
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            onPressed: mouse.accepted = true
+            onPositionChanged: mouse.accepted = true
+            onReleased: mouse.accepted = true
+            onCanceled: mouse.accepted = true
+            onWheel: wheel.accepted = true
         }
 
         RowLayout {
-            spacing: toolbar.spacingSmall
+            id: toolbarLayout
+            z: 1
+            anchors.fill: floatingBackground
+            anchors.margins: toolbar.spacingSmall
+            spacing: toolbar.spacingMedium
 
             ToolbarButton {
-                checkable: true
-                checked: toolbar.currentTool === "brush"
-                iconSource: "qrc:/../resources/icons/brush.svg"
-                showText: false
-                Accessible.name: qsTr("Brush tool")
-                onClicked: toolbar.toolSelected("brush")
+                id: newButton
+                iconSource: "qrc:/../resources/icons/new.svg"
+                tooltipText: qsTr("New canvas")
+                Accessible.name: tooltipText
+                onClicked: toolbar.newCanvasRequested()
             }
 
             ToolbarButton {
-                checkable: true
-                checked: toolbar.currentTool === "eraser"
-                iconSource: "qrc:/../resources/icons/eraser.svg"
-                showText: false
-                Accessible.name: qsTr("Eraser tool")
-                onClicked: toolbar.toolSelected("eraser")
+                id: openButton
+                iconSource: "qrc:/../resources/icons/open.svg"
+                tooltipText: qsTr("Open image")
+                Accessible.name: tooltipText
+                onClicked: toolbar.openFileDialog()
             }
-        }
 
-        Rectangle {
-            visible: true
-            Layout.fillHeight: true
-            width: 1
-            color: Qt.rgba(0, 0, 0, 0.2)
-        }
+            ToolbarButton {
+                id: saveButton
+                iconSource: "qrc:/../resources/icons/save.svg"
+                tooltipText: qsTr("Save image")
+                Accessible.name: tooltipText
+                onClicked: toolbar.openSaveDialog()
+            }
 
-        Controls.Label {
-            text: qsTr("Brush")
-            font.bold: true
-        }
+            ToolbarButton {
+                id: clearButton
+                iconSource: "qrc:/../resources/icons/clear.svg"
+                tooltipText: qsTr("Clear canvas")
+                Accessible.name: tooltipText
+                onClicked: toolbar.clearCanvasRequested()
+            }
 
-        RowLayout {
-            spacing: toolbar.spacingSmall
+            Rectangle {
+                width: 1
+                Layout.preferredHeight: 32
+                Layout.alignment: Qt.AlignVCenter
+                color: Qt.rgba(255, 255, 255, 0.12)
+            }
 
-            Controls.Slider {
-                id: sizeSlider
-                from: 1
-                to: 48
-                Layout.preferredWidth: 160
-                value: toolbar.brushSize
-                onMoved: toolbar.brushSizeChangeRequested(value)
-                onValueChanged: {
-                    if (pressed || activeFocus) {
-                        toolbar.brushSizeChangeRequested(value);
-                    }
+            RowLayout {
+                spacing: toolbar.spacingSmall
+                Layout.alignment: Qt.AlignVCenter
+
+                ToolbarButton {
+                    checkable: true
+                    checked: toolbar.currentTool === "brush"
+                    iconSource: "qrc:/../resources/icons/brush.svg"
+                    tooltipText: qsTr("Brush tool")
+                    Accessible.name: tooltipText
+                    onClicked: toolbar.toolSelected("brush")
+                }
+
+                ToolbarButton {
+                    checkable: true
+                    checked: toolbar.currentTool === "eraser"
+                    iconSource: "qrc:/../resources/icons/eraser.svg"
+                    tooltipText: qsTr("Eraser tool")
+                    Accessible.name: tooltipText
+                    onClicked: toolbar.toolSelected("eraser")
                 }
             }
 
-            ToolbarButton {
-                iconSource: "qrc:/../resources/icons/zoom-in.svg"
-                showText: false
-                onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
-                Accessible.name: qsTr("Increase brush size")
+            Rectangle {
+                width: 1
+                Layout.preferredHeight: 32
+                Layout.alignment: Qt.AlignVCenter
+                color: Qt.rgba(255, 255, 255, 0.12)
             }
 
-            ToolbarButton {
-                iconSource: "qrc:/../resources/icons/zoom-out.svg"
-                showText: false
-                onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
-                Accessible.name: qsTr("Decrease brush size")
-            }
-        }
-
-        Controls.Label {
-            text: qsTr("%1 px").arg(Math.round(toolbar.brushSize))
-            width: 120
-        }
-
-        Item {
-            Layout.fillWidth: true
-        } //For Fixed Layout
-
-        Repeater {
-            model: toolbar.palette
-            delegate: Rectangle {
-                readonly property color swatchColor: modelData.color
-                readonly property string swatchLabel: modelData.name ?? ""
-                width: 28
-                height: 28
-                radius: 4
-                color: swatchColor
-                border.width: toolbar.currentColor === swatchColor ? 2 : 1
-                border.color: toolbar.currentColor === swatchColor
-                    ? ((toolbar.palette && toolbar.palette.highlight !== undefined) ? toolbar.palette.highlight : "#2d89ef")
-                    : "#e0e0e0"
+            Rectangle {
+                id: brushPreview
+                width: 44
+                height: 44
+                radius: 22
+                color: Qt.rgba(255, 255, 255, 0.04)
+                border.width: 1
+                border.color: Qt.rgba(255, 255, 255, 0.15)
+                Layout.alignment: Qt.AlignVCenter
 
                 Rectangle {
+                    readonly property real normalized: (toolbar.brushSize - 1) / 47
+                    width: 8 + normalized * 24
+                    height: width
+                    radius: width / 2
+                    color: toolbar.currentColor
                     anchors.centerIn: parent
-                    width: parent.width - 12
-                    height: parent.height - 12
-                    visible: swatchColor === "#ffffff"
-                    color: "transparent"
-                    border.color: "#b0b0b0"
-                    border.width: 1
+                    border.width: toolbar.currentColor === "#ffffff" ? 1 : 0
+                    border.color: Qt.rgba(0, 0, 0, 0.25)
+                }
+            }
+
+            RowLayout {
+                spacing: toolbar.spacingSmall
+                Layout.alignment: Qt.AlignVCenter
+
+                Controls.Slider {
+                    id: sizeSlider
+                    from: 1
+                    to: 48
+                    Layout.preferredWidth: 160
+                    value: toolbar.brushSize
+                    hoverEnabled: true
+                    Accessible.name: qsTr("Brush size")
+                    onMoved: toolbar.brushSizeChangeRequested(value)
+                    onValueChanged: {
+                        if (pressed || activeFocus) {
+                            toolbar.brushSizeChangeRequested(value);
+                        }
+                    }
+                    Controls.ToolTip.visible: hovered || pressed
+                    Controls.ToolTip.text: qsTr("%1 px").arg(Math.round(value))
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: toolbar.colorPicked(swatchColor)
-                    Accessible.name: swatchLabel.length ? swatchLabel : qsTr("Brush color")
+                ToolbarButton {
+                    iconSource: "qrc:/../resources/icons/zoom-in.svg"
+                    tooltipText: qsTr("Increase brush size")
+                    Accessible.name: tooltipText
+                    onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
+                }
+
+                ToolbarButton {
+                    iconSource: "qrc:/../resources/icons/zoom-out.svg"
+                    tooltipText: qsTr("Decrease brush size")
+                    Accessible.name: tooltipText
+                    onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
+                }
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                id: paletteRow
+                spacing: toolbar.spacingSmall
+                Layout.alignment: Qt.AlignVCenter
+
+                Repeater {
+                    model: toolbar.palette
+                    delegate: Rectangle {
+                        readonly property color swatchColor: modelData.color
+                        readonly property string swatchLabel: modelData.name ?? ""
+                        width: 28
+                        height: 28
+                        radius: 4
+                        color: swatchColor
+                        border.width: toolbar.currentColor === swatchColor ? 2 : 1
+                        border.color: toolbar.currentColor === swatchColor
+                            ? toolbar.accentColor
+                            : "#e0e0e0"
+                        Layout.preferredWidth: width
+                        Layout.preferredHeight: height
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width - 12
+                            height: parent.height - 12
+                            visible: swatchColor === "#ffffff"
+                            color: "transparent"
+                            border.color: "#b0b0b0"
+                            border.width: 1
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: toolbar.colorPicked(swatchColor)
+                            Accessible.name: swatchLabel.length ? swatchLabel : qsTr("Brush color")
+                        }
+                    }
                 }
             }
         }
