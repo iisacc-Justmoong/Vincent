@@ -50,19 +50,13 @@ endif()
 
 # 요구 버전
 set(QT_MIN_VERSION "6.8.0")
-set(KF_MIN_VERSION "6.0.0")
 
-# ECM/KF6
-find_package(ECM ${KF_MIN_VERSION} REQUIRED NO_MODULE)
-list(PREPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
-include(KDEInstallDirs)
-include(KDECMakeSettings)
-include(KDECompilerSettings NO_POLICY_SCOPE)
+# 기본 설치 경로 및 요약
+include(GNUInstallDirs)
 include(FeatureSummary)
 
-# Qt6/KF6
+# Qt6
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n Svg Config)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
@@ -131,7 +125,6 @@ endif()
 # 링크
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
-        KF6::I18n KF6::Svg KF6::ConfigCore
 )
 
 set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
@@ -162,7 +155,7 @@ install(TARGETS Vincent BUNDLE DESTINATION "Applications")
 
 # Linux install target (runtime binary)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    install(TARGETS Vincent RUNTIME DESTINATION ${KDE_INSTALL_BINDIR})
+    install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
@@ -206,5 +199,5 @@ include(CPack)
 # Qt의 수동 마무리 훅
 qt_finalize_executable(Vincent)
 
-# 패키징·서명과 무관한 KF6 기본 요약
+# 패키징·서명과 무관한 기본 요약
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)

@@ -1,6 +1,6 @@
 # Vincent macOS App Store Packaging Guide
 
-This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant package. It assumes you are working on macOS with an active Apple Developer account and that the Qt/KF dependencies referenced in the repository README are already installed.
+This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant package. It assumes you are working on macOS with an active Apple Developer account and that the Qt dependencies referenced in the repository README are already installed.
 
 ## 1. Prerequisites
 - Apple Developer Program membership with access to App Store Connect.
@@ -25,7 +25,7 @@ The cache variable `VINCENT_BUNDLE_IDENTIFIER` (declared in the root `CMakeLists
 ## 3. Stage the App Bundle
 The built app lives under `build-release/Vincent.app`. Copy it to a staging directory (for example, `dist/Vincent.app`) so you can safely run deployment tools without touching your build tree.
 
-## 4. Embed Qt and KDE Frameworks
+## 4. Embed Qt Frameworks
 Run `macdeployqt` in App Store mode to embed the required Qt frameworks and QML plugins:
 ```bash
 macdeployqt dist/Vincent.app \

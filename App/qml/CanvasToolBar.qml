@@ -31,6 +31,45 @@ Controls.ToolBar {
         saveDialog.open();
     }
 
+    component ToolbarButton: Controls.ToolButton {
+        id: control
+        property url iconSource
+        property bool showText: true
+        property int iconSize: toolbar.iconSizeMedium
+        property int iconBoxSize: toolbar.iconSizeMedium
+        property int contentSpacing: toolbar.spacingSmall
+
+        padding: toolbar.spacingSmall
+
+        contentItem: RowLayout {
+            spacing: control.showText ? control.contentSpacing : 0
+            Layout.alignment: Qt.AlignVCenter
+
+            Item {
+                width: control.iconBoxSize
+                height: control.iconBoxSize
+                Layout.alignment: Qt.AlignVCenter
+
+                Image {
+                    anchors.centerIn: parent
+                    width: control.iconSize
+                    height: control.iconSize
+                    source: control.iconSource
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                }
+            }
+
+            Controls.Label {
+                text: control.text
+                Layout.alignment: Qt.AlignVCenter
+                visible: control.showText
+                Layout.preferredWidth: control.showText ? implicitWidth : 0
+                Layout.preferredHeight: control.showText ? implicitHeight : 0
+            }
+        }
+    }
+
     Dialogs.FileDialog {
         id: openDialog
         title: qsTr("Open Image")
@@ -78,112 +117,40 @@ Controls.ToolBar {
     contentItem: RowLayout {
         spacing: toolbar.spacingMedium
 
-        Controls.ToolButton {
+        ToolbarButton {
             id: newButton
-            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("New")
+            iconSource: "qrc:/../resources/icons/new.svg"
             Accessible.name: text
             onClicked: toolbar.newCanvasRequested()
-
-            contentItem: RowLayout {
-                spacing: toolbar.spacingSmall
-
-                Image {
-                    width: newButton.actionIconSize
-                    height: newButton.actionIconSize
-                    source: "qrc:/../resources/icons/new.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-
-                Controls.Label {
-                    text: newButton.text
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
         }
 
-        Controls.ToolButton {
+        ToolbarButton {
             id: openButton
-            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Open")
+            iconSource: "qrc:/../resources/icons/open.svg"
             Accessible.name: text
             onClicked: toolbar.openFileDialog()
-
-            contentItem: RowLayout {
-                spacing: toolbar.spacingSmall
-
-                Image {
-                    width: openButton.actionIconSize
-                    height: openButton.actionIconSize
-                    source: "qrc:/../resources/icons/open.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-
-                Controls.Label {
-                    text: openButton.text
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
         }
 
-        Controls.ToolButton {
+        ToolbarButton {
             id: saveButton
-            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Save")
+            iconSource: "qrc:/../resources/icons/save.svg"
             Accessible.name: text
             onClicked: toolbar.openSaveDialog()
-
-            contentItem: RowLayout {
-                spacing: toolbar.spacingSmall
-
-                Image {
-                    width: saveButton.actionIconSize
-                    height: saveButton.actionIconSize
-                    source: "qrc:/../resources/icons/save.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-
-                Controls.Label {
-                    text: saveButton.text
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
         }
 
-        Controls.ToolButton {
+        ToolbarButton {
             id: clearButton
-            readonly property int actionIconSize: toolbar.iconSizeMedium
 
             text: qsTr("Clear")
+            iconSource: "qrc:/../resources/icons/clear.svg"
             Accessible.name: text
             onClicked: toolbar.clearCanvasRequested()
-
-            contentItem: RowLayout {
-                spacing: toolbar.spacingSmall
-
-                Image {
-                    width: clearButton.actionIconSize
-                    height: clearButton.actionIconSize
-                    source: "qrc:/../resources/icons/clear.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-
-                Controls.Label {
-                    text: clearButton.text
-                    horizontalAlignment: Text.AlignLeft
-                    verticalAlignment: Text.AlignVCenter
-                }
-            }
         }
 
         Rectangle {
@@ -196,40 +163,22 @@ Controls.ToolBar {
         RowLayout {
             spacing: toolbar.spacingSmall
 
-            Controls.ToolButton {
-                readonly property int toolIconSize: toolbar.iconSizeMedium
-
+            ToolbarButton {
                 checkable: true
                 checked: toolbar.currentTool === "brush"
-                display: Controls.AbstractButton.IconOnly
+                iconSource: "qrc:/../resources/icons/brush.svg"
+                showText: false
                 Accessible.name: qsTr("Brush tool")
                 onClicked: toolbar.toolSelected("brush")
-
-                contentItem: Image {
-                    width: parent.toolIconSize
-                    height: parent.toolIconSize
-                    source: "qrc:/../resources/icons/brush.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
             }
 
-            Controls.ToolButton {
-                readonly property int toolIconSize: toolbar.iconSizeMedium
-
+            ToolbarButton {
                 checkable: true
                 checked: toolbar.currentTool === "eraser"
-                display: Controls.AbstractButton.IconOnly
+                iconSource: "qrc:/../resources/icons/eraser.svg"
+                showText: false
                 Accessible.name: qsTr("Eraser tool")
                 onClicked: toolbar.toolSelected("eraser")
-
-                contentItem: Image {
-                    width: parent.toolIconSize
-                    height: parent.toolIconSize
-                    source: "qrc:/../resources/icons/eraser.svg"
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
             }
         }
 
@@ -262,16 +211,16 @@ Controls.ToolBar {
                 }
             }
 
-            Controls.ToolButton {
-                icon.name: "zoom-in"
-                display: Controls.AbstractButton.IconOnly
+            ToolbarButton {
+                iconSource: "qrc:/../resources/icons/zoom-in.svg"
+                showText: false
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
                 Accessible.name: qsTr("Increase brush size")
             }
 
-            Controls.ToolButton {
-                icon.name: "zoom-out"
-                display: Controls.AbstractButton.IconOnly
+            ToolbarButton {
+                iconSource: "qrc:/../resources/icons/zoom-out.svg"
+                showText: false
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
                 Accessible.name: qsTr("Decrease brush size")
             }

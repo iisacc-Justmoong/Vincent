@@ -4,7 +4,7 @@ This document captures the current architecture of Vincent as observed in the re
 
 ## Top-Level Layout
 
-- `CMakeLists.txt` (root) – bootstraps ECM/KF, applies common KDE settings, and delegates to the application sources in `App/`.
+- `CMakeLists.txt` (root) – bootstraps the Qt build, configures install paths, and delegates to the application sources in `App/`.
 - `App/` – contains all C++ and QML code for the application bundle.
 - `build/`, `cmake-build-debug/` – out-of-source build trees (ignored in project description, but important to keep generated artifacts isolated).
 
@@ -12,14 +12,14 @@ No other product source directories are present at this time.
 
 ## Build System Overview
 
-The project relies on KDE's Extra CMake Modules (ECM) paired with Qt 6 and KDE Frameworks 6.
+The project relies on CMake and Qt 6 modules.
 
-1. The root `CMakeLists.txt` ensures Craft-provided prefixes take priority when `CRAFTROOT` is set. It then configures ECM, KDE install paths, and compiler settings before adding the `App/` subdirectory.
-2. `App/CMakeLists.txt` ties the sources to the `Vincent` target while the root file links against `Qt6::Quick`, `Qt6::QuickControls2`, and the remaining KDE pieces (`KF6::I18n`, `KF6::Svg`, `KF6::Config`).
+1. The root `CMakeLists.txt` ensures Craft-provided prefixes take priority when `CRAFTROOT` is set. It configures GNU install paths before adding the `App/` subdirectory.
+2. `App/CMakeLists.txt` ties the sources to the `Vincent` target while the root file links against the Qt stack (`Qt6::Core`, `Qt6::Qml`, `Qt6::Quick`, `Qt6::QuickControls2`, `Qt6::Svg`).
 3. A single executable target, `Vincent`, is defined around `App/main.cpp`.
 4. `qt_add_qml_module` registers the `Vincent` QML module version 1.0, exposing the components under `App/qml/` to the QML engine at runtime.
 5. macOS-specific blocks adjust OpenGL discovery so Qt Quick works even when SDK headers are missing from the default search paths.
-6. The executable links privately against the Qt/KF targets and is installed via the standard KDE install macro set.
+6. The executable links privately against the Qt targets and is installed via standard GNU install dir settings.
 
 ## Runtime Entry Point (`App/main.cpp`)
 
