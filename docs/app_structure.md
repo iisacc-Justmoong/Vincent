@@ -6,6 +6,7 @@ This document captures the current architecture of Vincent as observed in the re
 
 - `CMakeLists.txt` (root) – bootstraps the Qt build, configures install paths, and delegates to the application sources in `App/`.
 - `App/` – contains all C++ and QML code for the application bundle.
+- `resources/` – SVG icons and design assets consumed by the QML UI.
 - `build/`, `cmake-build-debug/` – out-of-source build trees (ignored in project description, but important to keep generated artifacts isolated).
 
 No other product source directories are present at this time.
@@ -20,6 +21,7 @@ The project relies on CMake and Qt 6 modules.
 4. `qt_add_qml_module` registers the `Vincent` QML module version 1.0, exposing the components under `App/qml/` to the QML engine at runtime.
 5. macOS-specific blocks adjust OpenGL discovery so Qt Quick works even when SDK headers are missing from the default search paths.
 6. The executable links privately against the Qt targets and is installed via standard GNU install dir settings.
+7. CPack is configured for macOS productbuild packaging and a Linux TGZ package.
 
 ## Runtime Entry Point (`App/main.cpp`)
 
@@ -50,6 +52,7 @@ No additional C++ types or singletons are registered; all UI and interaction log
 ### `CanvasToolBar.qml`
 
 - Implements the horizontal toolbar purely with Qt Quick Controls.
+- Defines a local `ToolbarButton` component so every button shares the same icon slot, spacing, and padding rules.
 - Exposes signals for high-level actions (new, open, save, clear) and tool adjustments (brush size, tool selection, palette picks).
 - Provides `Dialogs.FileDialog` instances for open/save flows, including extension inference when a filename lacks a suffix.
 - Presents quick-access buttons, tool toggles, a size slider with increment/decrement buttons, and a color palette repeater that highlights the active swatch.

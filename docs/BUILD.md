@@ -1,6 +1,6 @@
-# Vincent macOS App Store Packaging Guide
+# Vincent Packaging Guide
 
-This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant package. It assumes you are working on macOS with an active Apple Developer account and that the Qt dependencies referenced in the repository README are already installed.
+This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant macOS package, plus the Linux TGZ package. It assumes you have the Qt dependencies referenced in the repository README installed.
 
 ## 1. Prerequisites
 - Apple Developer Program membership with access to App Store Connect.
@@ -9,18 +9,17 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
   - **Apple Installer** (or legacy *3rd Party Mac Developer Installer*).
 - A macOS App Store provisioning profile that matches your bundle identifier.
 - Xcode command-line tools (`xcode-select --install`) and Transporter from the Mac App Store.
-- Qt toolchain available in your `PATH` so that `macdeployqt` is callable.
+- Qt toolchain (Core, Qml, Quick, QuickControls2, Svg) available in your `PATH` so that `macdeployqt` is callable.
 
 ## 2. Configure the Release Build
 ```bash
 cmake -S . -B build-release \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-  -DVINCENT_BUNDLE_IDENTIFIER=com.yourcompany.vincent
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 cmake --build build-release --target Vincent
 ```
-The cache variable `VINCENT_BUNDLE_IDENTIFIER` (declared in the root `CMakeLists.txt`) feeds the bundle ID into the generated `Info.plist`. Adjust the deployment target if you need to support newer or older macOS releases.
+If you need a different bundle identifier, update `BUNDLE_ID` in `CMakeLists.txt` before configuring. Adjust the deployment target if you need to support newer or older macOS releases.
 
 ## 3. Stage the App Bundle
 The built app lives under `build-release/Vincent.app`. Copy it to a staging directory (for example, `dist/Vincent.app`) so you can safely run deployment tools without touching your build tree.
@@ -83,3 +82,11 @@ This produces the installer payload required by App Store Connect. Keep the `.pk
 - Leverage `plutil -p` to inspect `Info.plist` after `macdeployqt` runs.
 - If Transporter rejects the upload due to missing `LC_VERSION_MIN_MACOSX`, make sure `CMAKE_OSX_DEPLOYMENT_TARGET` is set at configure time.
 - Should you require notarization for outside-the-store distribution, rerun codesigning with the same entitlements and submit via `xcrun notarytool`; App Store submissions do not need separate notarization.
+
+## Linux Build and Packaging
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --build build --target package
+```
+The TGZ archive is written to the build directory as `Vincent-<version>-Linux.tar.gz`. If you prefer an installed tree, run `cmake --install build --prefix <path>`.
