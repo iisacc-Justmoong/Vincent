@@ -13,7 +13,6 @@ Controls.ApplicationWindow {
 
     header: Controls.ToolBar {
         id: mainToolBar
-        contentHeight: implicitHeight
 
         background: Rectangle {
             color: window.palette.window

@@ -61,7 +61,7 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 
 # Qt6/KF6
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2)
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
 find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS I18n Svg Config)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
@@ -130,7 +130,7 @@ endif()
 
 # 링크
 target_link_libraries(Vincent PRIVATE
-        Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2
+        Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
         KF6::I18n KF6::Svg KF6::ConfigCore
 )
 
@@ -159,6 +159,11 @@ endif()
 
 # 설치 규칙: /Applications/Vincent.app
 install(TARGETS Vincent BUNDLE DESTINATION "Applications")
+
+# Linux install target (runtime binary)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(TARGETS Vincent RUNTIME DESTINATION ${KDE_INSTALL_BINDIR})
+endif()
 
 # CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
 set(CPACK_GENERATOR "productbuild")
@@ -189,6 +194,12 @@ set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
 set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
 set(CPACK_BUNDLE_NAME "Vincent")
 set(CPACK_BUNDLE_APPLE_CERT_APP "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Linux")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+endif()
 
 include(CPack)
 

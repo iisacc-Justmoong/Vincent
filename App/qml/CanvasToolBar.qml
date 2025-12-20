@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Dialogs as Dialogs
 import QtQuick.Layouts
-import org.kde.ksvg as KSvg
 
 Controls.ToolBar {
     id: toolbar
@@ -90,10 +89,12 @@ Controls.ToolBar {
             contentItem: RowLayout {
                 spacing: toolbar.spacingSmall
 
-                KSvg.SvgItem {
-                    implicitWidth: newButton.actionIconSize
-                    implicitHeight: newButton.actionIconSize
-                    imagePath: "qrc:/../resources/icons/new.svg"
+                Image {
+                    width: newButton.actionIconSize
+                    height: newButton.actionIconSize
+                    source: "qrc:/../resources/icons/new.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Controls.Label {
@@ -115,10 +116,12 @@ Controls.ToolBar {
             contentItem: RowLayout {
                 spacing: toolbar.spacingSmall
 
-                KSvg.SvgItem {
-                    implicitWidth: openButton.actionIconSize
-                    implicitHeight: openButton.actionIconSize
-                    imagePath: "qrc:/../resources/icons/open.svg"
+                Image {
+                    width: openButton.actionIconSize
+                    height: openButton.actionIconSize
+                    source: "qrc:/../resources/icons/open.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Controls.Label {
@@ -140,10 +143,12 @@ Controls.ToolBar {
             contentItem: RowLayout {
                 spacing: toolbar.spacingSmall
 
-                KSvg.SvgItem {
-                    implicitWidth: saveButton.actionIconSize
-                    implicitHeight: saveButton.actionIconSize
-                    imagePath: "qrc:/../resources/icons/save.svg"
+                Image {
+                    width: saveButton.actionIconSize
+                    height: saveButton.actionIconSize
+                    source: "qrc:/../resources/icons/save.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Controls.Label {
@@ -165,10 +170,12 @@ Controls.ToolBar {
             contentItem: RowLayout {
                 spacing: toolbar.spacingSmall
 
-                KSvg.SvgItem {
-                    implicitWidth: clearButton.actionIconSize
-                    implicitHeight: clearButton.actionIconSize
-                    imagePath: "qrc:/../resources/icons/clear.svg"
+                Image {
+                    width: clearButton.actionIconSize
+                    height: clearButton.actionIconSize
+                    source: "qrc:/../resources/icons/clear.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 Controls.Label {
@@ -198,10 +205,12 @@ Controls.ToolBar {
                 Accessible.name: qsTr("Brush tool")
                 onClicked: toolbar.toolSelected("brush")
 
-                contentItem: KSvg.SvgItem {
-                    implicitWidth: parent.toolIconSize
-                    implicitHeight: parent.toolIconSize
-                    imagePath: "qrc:/../resources/icons/brush.svg"
+                contentItem: Image {
+                    width: parent.toolIconSize
+                    height: parent.toolIconSize
+                    source: "qrc:/../resources/icons/brush.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
             }
 
@@ -214,10 +223,12 @@ Controls.ToolBar {
                 Accessible.name: qsTr("Eraser tool")
                 onClicked: toolbar.toolSelected("eraser")
 
-                contentItem: KSvg.SvgItem {
-                    implicitWidth: parent.toolIconSize
-                    implicitHeight: parent.toolIconSize
-                    imagePath: "qrc:/../resources/icons/eraser.svg"
+                contentItem: Image {
+                    width: parent.toolIconSize
+                    height: parent.toolIconSize
+                    source: "qrc:/../resources/icons/eraser.svg"
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
             }
         }
@@ -285,7 +296,9 @@ Controls.ToolBar {
                 radius: 4
                 color: swatchColor
                 border.width: toolbar.currentColor === swatchColor ? 2 : 1
-                border.color: toolbar.currentColor === swatchColor ? Qt.application.palette.highlight : "#e0e0e0"
+                border.color: toolbar.currentColor === swatchColor
+                    ? ((toolbar.palette && toolbar.palette.highlight !== undefined) ? toolbar.palette.highlight : "#2d89ef")
+                    : "#e0e0e0"
 
                 Rectangle {
                     anchors.centerIn: parent
