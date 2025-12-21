@@ -3,6 +3,7 @@
         <file alias="clear.svg">../resources/UIIcons/clear.svg</file>
         <file alias="brush.svg">../resources/UIIcons/brush.svg</file>
         <file alias="eraser.svg">../resources/UIIcons/eraser.svg</file>
+        <file alias="grab.svg">../resources/UIIcons/grab.svg</file>
         <file alias="new.svg">../resources/UIIcons/new.svg</file>
         <file alias="open.svg">../resources/UIIcons/open.svg</file>
         <file alias="save.svg">../resources/UIIcons/save.svg</file>

@@ -84,6 +84,9 @@ CMakeLists.txt.user*
 /build-xcode
 
 bundling.sh
-/resources
+/resources/*
+!/resources/UIIcons/
+!/resources/UIIcons/**
+resources/UIIcons/.DS_Store
 /dist
 /packaging

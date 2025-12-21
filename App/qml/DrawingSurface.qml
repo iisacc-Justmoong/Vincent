@@ -12,15 +12,16 @@ Rectangle {
     property var strokes: []
     property var currentStroke: null
     property string toolMode: "brush"
-    property string backgroundSource: ""
+    property string importedImageSource: ""
+    property bool importedImageReady: false
+    readonly property bool hasImportedImage: importedImageReady
 
     signal brushDeltaRequested(int delta)
 
     function newCanvas() {
         strokes = []
         currentStroke = null
-        backgroundSource = ""
-        backgroundDisplay.source = ""
+        surface.clearImportedImage()
         paintCanvas.requestPaint()
     }
 
@@ -29,11 +30,14 @@ Rectangle {
         if (!sourceUrl) {
             return
         }
-        backgroundSource = sourceUrl
-        backgroundDisplay.source = sourceUrl
+        importedImageReady = false
+        importedImageNode.originalWidth = 0
+        importedImageNode.originalHeight = 0
+        importedImageNode.scaleFactor = 1.0
+        importedImageNode.x = 0
+        importedImageNode.y = 0
+        importedImageSource = sourceUrl
         currentStroke = null
-        strokes = []
-        paintCanvas.loadImage(sourceUrl)
         paintCanvas.requestPaint()
     }
 
@@ -45,18 +49,30 @@ Rectangle {
         return paintCanvas.save(path)
     }
 
-    Image {
-        id: backgroundDisplay
-        anchors.fill: parent
-        source: surface.backgroundSource
-        fillMode: Image.Stretch
-        visible: source.length > 0
-        onStatusChanged: {
-            if (status === Image.Ready && source.length > 0) {
-                paintCanvas.loadImage(source)
-                paintCanvas.requestPaint()
-            }
+    function clearImportedImage() {
+        importedImageSource = ""
+        importedImageReady = false
+        importedImageNode.originalWidth = 0
+        importedImageNode.originalHeight = 0
+        importedImageNode.scaleFactor = 1.0
+        importedImageNode.x = 0
+        importedImageNode.y = 0
+        paintCanvas.requestPaint()
+    }
+
+    function resetImportedImagePlacement() {
+        if (importedImageNode.originalWidth <= 0 || importedImageNode.originalHeight <= 0) {
+            return
         }
+        const fitScale = Math.min(
+                    surface.width / importedImageNode.originalWidth,
+                    surface.height / importedImageNode.originalHeight,
+                    1)
+        importedImageNode.scaleFactor = fitScale
+        importedImageNode.x = (surface.width - importedImageNode.width) / 2
+        importedImageNode.y = (surface.height - importedImageNode.height) / 2
+        importedImageReady = true
+        paintCanvas.requestPaint()
     }
 
     Canvas {
@@ -70,8 +86,8 @@ Rectangle {
             ctx.fillStyle = "#ffffff"
             ctx.fillRect(0, 0, width, height)
 
-            if (surface.backgroundSource && surface.backgroundSource.length) {
-                ctx.drawImage(surface.backgroundSource, 0, 0, width, height)
+            if (surface.hasImportedImage && importedImage.status === Image.Ready) {
+                ctx.drawImage(importedImage, importedImageNode.x, importedImageNode.y, importedImageNode.width, importedImageNode.height)
             }
 
             ctx.lineCap = "round"
@@ -104,14 +120,113 @@ Rectangle {
         }
     }
 
+    Item {
+        id: importedImageLayer
+        anchors.fill: parent
+        visible: surface.hasImportedImage
+        enabled: surface.toolMode === "grab"
+        z: 2
+
+        HoverHandler {
+            acceptedDevices: PointerDevice.Mouse
+            cursorShape: surface.toolMode === "grab"
+                ? (imageDragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                : Qt.ArrowCursor
+        }
+
+        Item {
+            id: importedImageNode
+            property real originalWidth: 0
+            property real originalHeight: 0
+            property real scaleFactor: 1.0
+            width: originalWidth > 0 ? originalWidth * scaleFactor : 0
+            height: originalHeight > 0 ? originalHeight * scaleFactor : 0
+            visible: originalWidth > 0 && originalHeight > 0
+
+            Image {
+                id: importedImage
+                anchors.fill: parent
+                source: surface.importedImageSource
+                asynchronous: true
+                smooth: true
+                fillMode: Image.Stretch
+                opacity: surface.toolMode === "grab" ? 0.25 : 0
+                visible: status === Image.Ready
+                onStatusChanged: {
+                    if (status === Image.Ready) {
+                        importedImageNode.originalWidth = implicitWidth
+                        importedImageNode.originalHeight = implicitHeight
+                        surface.resetImportedImagePlacement()
+                    } else {
+                        surface.importedImageReady = false
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                visible: surface.toolMode === "grab"
+                color: "transparent"
+                border.color: Qt.rgba(255, 255, 255, 0.35)
+                border.width: 1
+            }
+
+            DragHandler {
+                id: imageDragHandler
+                target: importedImageNode
+                acceptedButtons: Qt.LeftButton
+                enabled: surface.hasImportedImage && surface.toolMode === "grab"
+                onTranslationChanged: paintCanvas.requestPaint()
+                onActiveChanged: {
+                    if (!active) {
+                        paintCanvas.requestPaint()
+                    }
+                }
+            }
+
+            WheelHandler {
+                acceptedModifiers: Qt.ControlModifier
+                enabled: surface.hasImportedImage && surface.toolMode === "grab"
+                onWheel: {
+                    if (importedImageNode.originalWidth <= 0) {
+                        return
+                    }
+                    const factor = wheel.angleDelta.y > 0 ? 1.1 : 0.9
+                    const newScale = Math.max(0.1, Math.min(5, importedImageNode.scaleFactor * factor))
+                    if (newScale === importedImageNode.scaleFactor) {
+                        return
+                    }
+                    const centerX = importedImageNode.x + importedImageNode.width / 2
+                    const centerY = importedImageNode.y + importedImageNode.height / 2
+                    importedImageNode.scaleFactor = newScale
+                    importedImageNode.x = centerX - importedImageNode.width / 2
+                    importedImageNode.y = centerY - importedImageNode.height / 2
+                    paintCanvas.requestPaint()
+                }
+            }
+        }
+    }
+
     onStrokesChanged: paintCanvas.requestPaint()
 
     MouseArea {
         anchors.fill: parent
+        z: 3
         hoverEnabled: true
+        acceptedButtons: Qt.LeftButton
+        visible: surface.toolMode !== "grab"
+        enabled: visible
         cursorShape: surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
 
         onPressed: function(mouse) {
+            if (surface.toolMode === "grab") {
+                mouse.accepted = false
+                return
+            }
+            if (mouse.button !== Qt.LeftButton) {
+                mouse.accepted = false
+                return
+            }
             var colorValue
             if (surface.toolMode === "eraser") {
                 colorValue = "#ffffff"
@@ -130,6 +245,10 @@ Rectangle {
         }
 
         onPositionChanged: function(mouse) {
+            if (surface.toolMode === "grab") {
+                mouse.accepted = false
+                return
+            }
             if (!surface.currentStroke) {
                 return
             }
@@ -138,6 +257,14 @@ Rectangle {
         }
 
         onReleased: function(mouse) {
+            if (surface.toolMode === "grab") {
+                mouse.accepted = false
+                return
+            }
+            if (mouse.button !== Qt.LeftButton) {
+                mouse.accepted = false
+                return
+            }
             if (!surface.currentStroke) {
                 return
             }
@@ -149,6 +276,10 @@ Rectangle {
         onCanceled: surface.currentStroke = null
 
         onWheel: function(wheel) {
+            if (wheel.modifiers === Qt.ControlModifier) {
+                wheel.accepted = false
+                return
+            }
             surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1)
         }
     }

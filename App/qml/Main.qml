@@ -4,8 +4,12 @@ import "."
 
 Controls.ApplicationWindow {
     id: window
-    width: 1080
-    height: 720
+    readonly property int initialWidth: 1080
+    readonly property int initialHeight: 720
+    width: initialWidth
+    height: initialHeight
+    minimumWidth: initialWidth
+    minimumHeight: initialHeight
     visible: true
     title: qsTr("Vincent")
 
