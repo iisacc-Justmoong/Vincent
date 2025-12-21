@@ -26,6 +26,9 @@ Rectangle {
     property int shiftHoldCount: 0
     property var imageElementRegistry: ({})
     property var selectedImageItem: null
+    property var undoStack: []
+    readonly property int maxUndoSteps: 64
+    property bool transformUndoCaptured: false
 
     function findImageIndexById(imageId) {
         if (imageId === -1) {
@@ -104,6 +107,95 @@ Rectangle {
         surface.notifySelectionOverlay();
     }
 
+    function cloneStrokes(src) {
+        var result = [];
+        for (var i = 0; i < src.length; ++i) {
+            var stroke = src[i];
+            if (!stroke) {
+                continue;
+            }
+            var clonedStroke = {
+                color: stroke.color,
+                size: stroke.size,
+                erase: stroke.erase === true,
+                points: []
+            };
+            for (var j = 0; j < stroke.points.length; ++j) {
+                var pt = stroke.points[j];
+                clonedStroke.points.push({ x: pt.x, y: pt.y });
+            }
+            result.push(clonedStroke);
+        }
+        return result;
+    }
+
+    function cloneImages() {
+        var result = [];
+        for (var i = 0; i < imageModel.count; ++i) {
+            var entry = imageModel.get(i);
+            result.push({
+                imageId: entry.imageId,
+                source: entry.source,
+                x: entry.x,
+                y: entry.y,
+                originalWidth: entry.originalWidth,
+                originalHeight: entry.originalHeight,
+                scaleX: entry.scaleX,
+                scaleY: entry.scaleY,
+                ready: entry.ready
+            });
+        }
+        return result;
+    }
+
+    function pushUndoState() {
+        var snapshot = {
+            strokes: cloneStrokes(surface.strokes),
+            images: cloneImages(),
+            selectedImageId: surface.selectedImageId
+        };
+        surface.undoStack.push(snapshot);
+        if (surface.undoStack.length > surface.maxUndoSteps) {
+            surface.undoStack.shift();
+        }
+    }
+
+    function applySnapshot(snapshot) {
+        var restoredStrokes = [];
+        for (var i = 0; i < snapshot.strokes.length; ++i) {
+            restoredStrokes.push(snapshot.strokes[i]);
+        }
+        surface.strokes = restoredStrokes;
+
+        imageModel.clear();
+        for (var j = 0; j < snapshot.images.length; ++j) {
+            imageModel.append(snapshot.images[j]);
+        }
+
+        surface.selectedImageId = snapshot.selectedImageId !== undefined ? snapshot.selectedImageId : -1;
+        surface.updateSelectedImageItem();
+        surface.freeTransformActive = false;
+        surface.freeTransformSnapshot = {};
+        surface.transformUndoCaptured = false;
+        surface.notifySelectionOverlay();
+        paintCanvas.requestPaint();
+    }
+
+    function undo() {
+        if (!surface.undoStack.length) {
+            return;
+        }
+        var snapshot = surface.undoStack.pop();
+        surface.applySnapshot(snapshot);
+    }
+
+    function beginTransformUndoCapture() {
+        if (!surface.transformUndoCaptured) {
+            surface.pushUndoState();
+            surface.transformUndoCaptured = true;
+        }
+    }
+
     signal brushDeltaRequested(int delta)
 
     function updateConstrainAspectState() {
@@ -113,6 +205,7 @@ Rectangle {
     Component.onCompleted: surface.forceActiveFocus()
 
     function newCanvas() {
+        surface.pushUndoState()
         strokes = []
         currentStroke = null
         imageModel.clear()
@@ -128,6 +221,7 @@ Rectangle {
         if (!sourceUrl) {
             return
         }
+        surface.pushUndoState()
         currentStroke = null
         var newId = ++surface.imageIdCounter
         imageModel.append({
@@ -172,6 +266,7 @@ Rectangle {
         if (index === -1) {
             return
         }
+        surface.pushUndoState()
         var entry = imageModel.get(index)
         if (entry) {
             surface.unregisterImageElement(entry.imageId)
@@ -253,6 +348,7 @@ Rectangle {
         }
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
+        surface.transformUndoCaptured = false
         surface.updateConstrainAspectState()
         paintCanvas.requestPaint()
     }
@@ -285,6 +381,7 @@ Rectangle {
         }
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
+        surface.transformUndoCaptured = false
         surface.updateConstrainAspectState()
         paintCanvas.requestPaint()
     }
@@ -681,6 +778,7 @@ Rectangle {
                             acceptedButtons: Qt.LeftButton
                             onActiveChanged: {
                                 if (active) {
+                                    surface.beginTransformUndoCapture()
                                     startX = selectionOverlay.x
                                     startY = selectionOverlay.y
                                     startWidth = selectionOverlay.width
@@ -709,6 +807,7 @@ Rectangle {
 
                 onActiveChanged: {
                     if (active) {
+                        surface.beginTransformUndoCapture()
                         startX = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.x : selectionOverlay.x
                         startY = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.y : selectionOverlay.y
                         if (!surface.freeTransformActive) {
@@ -734,6 +833,7 @@ Rectangle {
                     if (!surface.freeTransformActive) {
                         surface.startFreeTransform()
                     }
+                    surface.beginTransformUndoCapture()
                     const factor = wheel.angleDelta.y > 0 ? 1.1 : 0.9
                     const newWidth = selectionOverlay.width * factor
                     const newHeight = selectionOverlay.height * factor
@@ -767,6 +867,7 @@ Rectangle {
                 return
             }
             var colorValue
+            surface.pushUndoState()
             var isEraser = surface.toolMode === "eraser"
             if (isEraser) {
                 colorValue = "#000000"
@@ -864,6 +965,12 @@ Rectangle {
         enabled: surface.freeTransformActive
         sequences: [ "Esc" ]
         onActivated: surface.cancelFreeTransform()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: StandardKey.Undo
+        onActivated: surface.undo()
     }
 
     Shortcut {
