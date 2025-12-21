@@ -308,4 +308,5 @@ Controls.Page {
             onFreeTransformRequested: painterPage.toggleFreeTransformMode()
         }
     }
+
 }

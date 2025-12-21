@@ -335,6 +335,15 @@ Controls.ToolBar {
                         Accessible.name: tooltipText
                         onClicked: toolbar.toolSelected("grab")
                     }
+
+                    ToolbarButton {
+                        checkable: true
+                        checked: toolbar.currentTool === "text"
+                        iconSource: "qrc:/../resources/icons/text.svg"
+                        tooltipText: qsTr("Text tool")
+                        Accessible.name: tooltipText
+                        onClicked: toolbar.toolSelected("text")
+                    }
                 }
 
                 ToolbarDivider { }
