@@ -27,12 +27,74 @@ Controls.ToolBar {
     signal brushSizeChangeRequested(real size)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
+    signal freeTransformRequested
 
     function openFileDialog() {
         openDialog.open();
     }
     function openSaveDialog() {
         saveDialog.open();
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: StandardKey.New
+        onActivated: toolbar.newCanvasRequested()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: StandardKey.Open
+        onActivated: toolbar.openFileDialog()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: StandardKey.Save
+        onActivated: toolbar.openSaveDialog()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: [Qt.platform.os === "osx" ? "Meta+Shift+K" : "Ctrl+Shift+K"]
+        onActivated: toolbar.clearCanvasRequested()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: [Qt.platform.os === "osx" ? "Meta+T" : "Ctrl+T"]
+        enabled: toolbar.currentTool === "grab"
+        onActivated: toolbar.freeTransformRequested()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "B"
+        onActivated: toolbar.toolSelected("brush")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "E"
+        onActivated: toolbar.toolSelected("eraser")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "H"
+        onActivated: toolbar.toolSelected("grab")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "]"
+        onActivated: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: "["
+        onActivated: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
     }
 
     component ToolbarButton: Controls.ToolButton {
@@ -43,7 +105,7 @@ Controls.ToolBar {
         property string tooltipText: ""
 
         hoverEnabled: true
-        padding: toolbar.spacingSmall
+        padding: Math.max(2, Math.round(toolbar.spacingSmall / 2))
         implicitWidth: iconBoxSize + padding * 2
         implicitHeight: iconBoxSize + padding * 2
 
@@ -63,7 +125,7 @@ Controls.ToolBar {
 
         background: Rectangle {
             anchors.fill: parent
-            radius: toolbar.spacingLarge
+            radius: 6
             color: control.checked || control.pressed
                 ? Qt.rgba(0, 0, 0, 0.15)
                 : (control.hovered ? Qt.rgba(0, 0, 0, 0.08) : Qt.rgba(255, 255, 255, 0.05))
@@ -87,17 +149,17 @@ Controls.ToolBar {
         property color swatchColor: "#ffffff"
         property string swatchLabel: ""
 
-        width: 28
-        height: 28
-        radius: 4
+        width: 20
+        height: 20
+        radius: 6
         color: swatchColor
         border.width: toolbar.currentColor === swatchColor ? 2 : 1
         border.color: toolbar.currentColor === swatchColor ? toolbar.accentColor : "#e0e0e0"
 
         Rectangle {
             anchors.centerIn: parent
-            width: parent.width - 12
-            height: parent.height - 12
+            width: parent.width - 8
+            height: parent.height - 8
             visible: swatchColor === "#ffffff"
             color: "transparent"
             border.color: "#b0b0b0"
@@ -170,7 +232,7 @@ Controls.ToolBar {
             anchors.rightMargin: toolbar.spacingSmall
             anchors.topMargin: toolbar.spacingSmall
             anchors.bottomMargin: toolbar.spacingSmall
-            radius: toolbar.spacingLarge * 1.5
+            radius: 12
             color: Qt.rgba(26 / 255, 26 / 255, 26 / 255, 1.0)
             border.width: 1
             border.color: Qt.rgba(255, 255, 255, 0.08)
@@ -279,9 +341,9 @@ Controls.ToolBar {
 
                 Rectangle {
                     id: brushPreview
-                    width: 44
-                    height: 44
-                    radius: 22
+                    width: 36
+                    height: 36
+                    radius: 18
                     color: Qt.rgba(255, 255, 255, 0.04)
                     border.width: 1
                     border.color: Qt.rgba(255, 255, 255, 0.15)
@@ -289,7 +351,7 @@ Controls.ToolBar {
 
                     Rectangle {
                         readonly property real normalized: (toolbar.brushSize - 1) / 47
-                        width: 8 + normalized * 24
+                        width: 6 + normalized * 20
                         height: width
                         radius: width / 2
                         color: toolbar.currentColor
@@ -350,8 +412,8 @@ Controls.ToolBar {
                 anchors.topMargin: toolbar.spacingSmall
                 anchors.bottomMargin: toolbar.spacingSmall
                 anchors.rightMargin: toolbar.spacingSmall
-                width: Math.min(paletteRow.implicitWidth, Math.max(160, parent.width * 0.35))
-                clip: true
+                width: paletteRow.implicitWidth
+                clip: false
 
                 Row {
                     id: paletteRow

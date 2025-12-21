@@ -4,8 +4,8 @@ import "."
 
 Controls.ApplicationWindow {
     id: window
-    readonly property int initialWidth: 1080
-    readonly property int initialHeight: 720
+    readonly property int initialWidth: 1400
+    readonly property int initialHeight: 880
     width: initialWidth
     height: initialHeight
     minimumWidth: initialWidth

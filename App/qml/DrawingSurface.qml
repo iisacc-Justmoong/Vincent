@@ -6,22 +6,120 @@ Rectangle {
     radius: 6
     border.color: "#d0d0d0"
     border.width: 1
+    focus: true
 
     property color brushColor: "#1a1a1a"
     property real brushSize: 2
     property var strokes: []
     property var currentStroke: null
     property string toolMode: "brush"
-    property string importedImageSource: ""
-    property bool importedImageReady: false
-    readonly property bool hasImportedImage: importedImageReady
+    ListModel {
+        id: imageModel
+    }
+
+    property int imageIdCounter: 0
+    property int selectedImageId: -1
+    readonly property bool hasImportedImage: imageModel.count > 0
+    property bool freeTransformActive: false
+    property var freeTransformSnapshot: ({})
+    property bool constrainAspect: false
+    property int shiftHoldCount: 0
+    property var imageElementRegistry: ({})
+    property var selectedImageItem: null
+
+    function findImageIndexById(imageId) {
+        if (imageId === -1) {
+            return -1;
+        }
+        for (var i = 0; i < imageModel.count; ++i) {
+            var entry = imageModel.get(i);
+            if (entry && entry.imageId === imageId) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function notifySelectionOverlay() {
+        if (selectionOverlay) {
+            selectionOverlay.refreshSelectionState();
+        }
+    }
+
+    function selectedImageIndex() {
+        return findImageIndexById(surface.selectedImageId);
+    }
+
+    function selectedImageData() {
+        var index = surface.selectedImageIndex();
+        return index >= 0 ? imageModel.get(index) : null;
+    }
+
+    function updateSelectedImageItem() {
+        var item = surface.imageElementRegistry[surface.selectedImageId]
+        surface.selectedImageItem = item ? item : null
+        surface.notifySelectionOverlay()
+    }
+
+    function selectImage(imageId) {
+        var idx = findImageIndexById(imageId);
+        if (idx === -1) {
+            surface.selectedImageId = -1;
+            surface.freeTransformActive = false;
+            surface.freeTransformSnapshot = {};
+            surface.updateSelectedImageItem();
+            surface.notifySelectionOverlay();
+            return;
+        }
+        if (idx !== imageModel.count - 1) {
+            imageModel.move(idx, imageModel.count - 1, 1);
+            idx = imageModel.count - 1;
+        }
+        surface.selectedImageId = imageId;
+        surface.updateSelectedImageItem();
+        surface.freeTransformActive = false;
+        surface.freeTransformSnapshot = {};
+        if (surface.toolMode === "grab") {
+            surface.startFreeTransform();
+        }
+        surface.notifySelectionOverlay();
+    }
+
+    function registerImageElement(imageId, element) {
+        if (!element) {
+            return;
+        }
+        surface.imageElementRegistry[imageId] = element;
+        if (imageId === surface.selectedImageId) {
+            surface.updateSelectedImageItem();
+        }
+        surface.notifySelectionOverlay();
+    }
+
+    function unregisterImageElement(imageId) {
+        if (surface.imageElementRegistry[imageId]) {
+            delete surface.imageElementRegistry[imageId];
+            surface.updateSelectedImageItem();
+        }
+        surface.notifySelectionOverlay();
+    }
 
     signal brushDeltaRequested(int delta)
+
+    function updateConstrainAspectState() {
+        surface.constrainAspect = surface.freeTransformActive && surface.shiftHoldCount > 0
+    }
+
+    Component.onCompleted: surface.forceActiveFocus()
 
     function newCanvas() {
         strokes = []
         currentStroke = null
-        surface.clearImportedImage()
+        imageModel.clear()
+        surface.selectedImageId = -1
+        surface.imageElementRegistry = ({})
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
         paintCanvas.requestPaint()
     }
 
@@ -30,14 +128,22 @@ Rectangle {
         if (!sourceUrl) {
             return
         }
-        importedImageReady = false
-        importedImageNode.originalWidth = 0
-        importedImageNode.originalHeight = 0
-        importedImageNode.scaleFactor = 1.0
-        importedImageNode.x = 0
-        importedImageNode.y = 0
-        importedImageSource = sourceUrl
         currentStroke = null
+        var newId = ++surface.imageIdCounter
+        imageModel.append({
+            imageId: newId,
+            source: sourceUrl,
+            x: 0,
+            y: 0,
+            originalWidth: 0,
+            originalHeight: 0,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            ready: false
+        })
+        surface.selectImage(newId)
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
         paintCanvas.requestPaint()
     }
 
@@ -46,49 +152,164 @@ Rectangle {
         if (!path) {
             return false
         }
-        return paintCanvas.save(path)
+
+        var overlayWasVisible = selectionOverlay.visible
+        selectionOverlay.visible = false
+        var grabResult = surface.grabToImage(function(result) {
+            result.saveToFile(path)
+            selectionOverlay.visible = overlayWasVisible
+        })
+
+        if (!grabResult) {
+            selectionOverlay.visible = overlayWasVisible
+        }
+
+        return grabResult
     }
 
     function clearImportedImage() {
-        importedImageSource = ""
-        importedImageReady = false
-        importedImageNode.originalWidth = 0
-        importedImageNode.originalHeight = 0
-        importedImageNode.scaleFactor = 1.0
-        importedImageNode.x = 0
-        importedImageNode.y = 0
+        var index = surface.selectedImageIndex()
+        if (index === -1) {
+            return
+        }
+        var entry = imageModel.get(index)
+        if (entry) {
+            surface.unregisterImageElement(entry.imageId)
+        }
+        imageModel.remove(index)
+        surface.selectedImageId = imageModel.count > 0 ? imageModel.get(imageModel.count - 1).imageId : -1
+        surface.updateSelectedImageItem()
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
+        if (surface.selectedImageId !== -1 && surface.toolMode === "grab") {
+            surface.startFreeTransform()
+        }
+        surface.notifySelectionOverlay()
         paintCanvas.requestPaint()
     }
 
-    function resetImportedImagePlacement() {
-        if (importedImageNode.originalWidth <= 0 || importedImageNode.originalHeight <= 0) {
+    function resetImagePlacement(imageId) {
+        var index = surface.findImageIndexById(imageId)
+        if (index === -1) {
+            return
+        }
+        var entry = imageModel.get(index)
+        if (!entry || entry.originalWidth <= 0 || entry.originalHeight <= 0) {
             return
         }
         const fitScale = Math.min(
-                    surface.width / importedImageNode.originalWidth,
-                    surface.height / importedImageNode.originalHeight,
+                    surface.width / entry.originalWidth,
+                    surface.height / entry.originalHeight,
                     1)
-        importedImageNode.scaleFactor = fitScale
-        importedImageNode.x = (surface.width - importedImageNode.width) / 2
-        importedImageNode.y = (surface.height - importedImageNode.height) / 2
-        importedImageReady = true
+        var width = entry.originalWidth * fitScale
+        var height = entry.originalHeight * fitScale
+        imageModel.setProperty(index, "scaleX", fitScale)
+        imageModel.setProperty(index, "scaleY", fitScale)
+        imageModel.setProperty(index, "x", (surface.width - width) / 2)
+        imageModel.setProperty(index, "y", (surface.height - height) / 2)
+        imageModel.setProperty(index, "ready", true)
+        surface.freeTransformActive = false
         paintCanvas.requestPaint()
+        if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
+            surface.startFreeTransform()
+        }
+        surface.notifySelectionOverlay()
+    }
+
+    onToolModeChanged: {
+        if (toolMode === "grab") {
+            surface.startFreeTransform()
+        } else if (surface.freeTransformActive) {
+            surface.commitFreeTransform()
+        }
+    }
+
+    onFreeTransformActiveChanged: surface.updateConstrainAspectState()
+
+    function startFreeTransform() {
+        var index = surface.selectedImageIndex()
+        if (index === -1 || surface.freeTransformActive) {
+            return
+        }
+        var entry = imageModel.get(index)
+        if (!entry || !entry.ready) {
+            return
+        }
+        surface.freeTransformSnapshot = {
+            imageId: entry.imageId,
+            x: entry.x,
+            y: entry.y,
+            scaleX: entry.scaleX,
+            scaleY: entry.scaleY
+        }
+        surface.freeTransformActive = true
+        surface.updateConstrainAspectState()
+        paintCanvas.requestPaint()
+    }
+
+    function commitFreeTransform() {
+        if (!surface.freeTransformActive) {
+            return
+        }
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
+        surface.updateConstrainAspectState()
+        paintCanvas.requestPaint()
+    }
+
+    function cancelFreeTransform() {
+        if (!surface.freeTransformActive) {
+            return
+        }
+        var index = surface.selectedImageIndex()
+        if (index === -1) {
+            surface.freeTransformActive = false
+            surface.freeTransformSnapshot = {}
+            surface.updateConstrainAspectState()
+            return
+        }
+        var snapshot = surface.freeTransformSnapshot
+        if (snapshot && snapshot.imageId === surface.selectedImageId) {
+            if (snapshot.x !== undefined) {
+                imageModel.setProperty(index, "x", snapshot.x)
+            }
+            if (snapshot.y !== undefined) {
+                imageModel.setProperty(index, "y", snapshot.y)
+            }
+            if (snapshot.scaleX !== undefined) {
+                imageModel.setProperty(index, "scaleX", snapshot.scaleX)
+            }
+            if (snapshot.scaleY !== undefined) {
+                imageModel.setProperty(index, "scaleY", snapshot.scaleY)
+            }
+        }
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
+        surface.updateConstrainAspectState()
+        paintCanvas.requestPaint()
+    }
+
+    function toggleFreeTransformMode() {
+        if (!surface.hasImportedImage || surface.selectedImageIndex() === -1) {
+            return
+        }
+        if (!surface.freeTransformActive) {
+            surface.startFreeTransform()
+        } else {
+            surface.commitFreeTransform()
+        }
     }
 
     Canvas {
         id: paintCanvas
         anchors.fill: parent
         renderTarget: Canvas.Image
+        z: 10
+        enabled: false
 
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = "#ffffff"
-            ctx.fillRect(0, 0, width, height)
-
-            if (surface.hasImportedImage && importedImage.status === Image.Ready) {
-                ctx.drawImage(importedImage, importedImageNode.x, importedImageNode.y, importedImageNode.width, importedImageNode.height)
-            }
 
             ctx.lineCap = "round"
             ctx.lineJoin = "round"
@@ -98,6 +319,12 @@ Rectangle {
                 if (!stroke || stroke.points.length === 0) {
                     continue
                 }
+                ctx.save()
+                if (stroke.erase) {
+                    ctx.globalCompositeOperation = "destination-out"
+                } else {
+                    ctx.globalCompositeOperation = "source-over"
+                }
 
                 if (stroke.points.length === 1) {
                     var point = stroke.points[0]
@@ -105,6 +332,7 @@ Rectangle {
                     ctx.fillStyle = stroke.color
                     ctx.arc(point.x, point.y, stroke.size / 2, 0, Math.PI * 2)
                     ctx.fill()
+                    ctx.restore()
                     continue
                 }
 
@@ -116,96 +344,407 @@ Rectangle {
                     ctx.lineTo(stroke.points[j].x, stroke.points[j].y)
                 }
                 ctx.stroke()
+                ctx.restore()
             }
         }
     }
 
     Item {
-        id: importedImageLayer
+        id: imageLayer
         anchors.fill: parent
         visible: surface.hasImportedImage
-        enabled: surface.toolMode === "grab"
-        z: 2
+        z: 5
 
-        HoverHandler {
-            acceptedDevices: PointerDevice.Mouse
-            cursorShape: surface.toolMode === "grab"
-                ? (imageDragHandler.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
-                : Qt.ArrowCursor
+        Repeater {
+            id: imageRepeater
+            model: imageModel
+
+            delegate: Image {
+                id: imageDisplay
+                property int modelIndex: index
+                property int delegateImageId: model.imageId
+                x: model.x
+                y: model.y
+                width: model.originalWidth > 0 ? model.originalWidth * model.scaleX : 0
+                height: model.originalHeight > 0 ? model.originalHeight * model.scaleY : 0
+                visible: model.ready
+                smooth: true
+                asynchronous: true
+                fillMode: Image.Stretch
+                opacity: 1
+                source: model.source
+
+                Component.onCompleted: surface.registerImageElement(delegateImageId, imageDisplay)
+                Component.onDestruction: surface.unregisterImageElement(delegateImageId)
+
+                onStatusChanged: {
+                    if (status === Image.Ready && !model.ready) {
+                        imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
+                        imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
+                        surface.resetImagePlacement(delegateImageId)
+                    }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    enabled: surface.toolMode === "grab"
+                    onTapped: {
+                        surface.selectImage(delegateImageId)
+                    }
+                }
+            }
         }
 
         Item {
-            id: importedImageNode
-            property real originalWidth: 0
-            property real originalHeight: 0
-            property real scaleFactor: 1.0
-            width: originalWidth > 0 ? originalWidth * scaleFactor : 0
-            height: originalHeight > 0 ? originalHeight * scaleFactor : 0
-            visible: originalWidth > 0 && originalHeight > 0
+            id: selectionOverlay
+            z: 10
+            property int selectedIndex: -1
+            property var currentEntry: null
+            property var selectedItem: null
+            property real minSize: 24
 
-            Image {
-                id: importedImage
-                anchors.fill: parent
-                source: surface.importedImageSource
-                asynchronous: true
-                smooth: true
-                fillMode: Image.Stretch
-                opacity: surface.toolMode === "grab" ? 0.25 : 0
-                visible: status === Image.Ready
-                onStatusChanged: {
-                    if (status === Image.Ready) {
-                        importedImageNode.originalWidth = implicitWidth
-                        importedImageNode.originalHeight = implicitHeight
-                        surface.resetImportedImagePlacement()
+            function refreshSelectionState() {
+                selectedIndex = surface.findImageIndexById(surface.selectedImageId)
+                currentEntry = selectedIndex >= 0 ? imageModel.get(selectedIndex) : null
+                selectedItem = surface.selectedImageItem
+            }
+
+            Component.onCompleted: refreshSelectionState()
+
+            Connections {
+                target: surface
+                function onSelectedImageIdChanged() {
+                    selectionOverlay.refreshSelectionState()
+                }
+                function onSelectedImageItemChanged() {
+                    selectionOverlay.refreshSelectionState()
+                }
+            }
+
+            Connections {
+                target: imageModel
+                function onDataChanged() {
+                    selectionOverlay.refreshSelectionState()
+                }
+                function onCountChanged() {
+                    selectionOverlay.refreshSelectionState()
+                }
+            }
+
+            visible: selectedItem && currentEntry && currentEntry.ready && (surface.toolMode === "grab" || surface.freeTransformActive)
+            x: selectedItem ? selectedItem.x : 0
+            y: selectedItem ? selectedItem.y : 0
+            width: selectedItem ? selectedItem.width : 0
+            height: selectedItem ? selectedItem.height : 0
+
+            function updateGeometry(newX, newY, newWidth, newHeight) {
+                if (!currentEntry || selectedIndex < 0 || currentEntry.originalWidth <= 0 || currentEntry.originalHeight <= 0) {
+                    return
+                }
+                imageModel.setProperty(selectedIndex, "x", newX)
+                imageModel.setProperty(selectedIndex, "y", newY)
+                imageModel.setProperty(selectedIndex, "scaleX", newWidth / currentEntry.originalWidth)
+                imageModel.setProperty(selectedIndex, "scaleY", newHeight / currentEntry.originalHeight)
+                paintCanvas.requestPaint()
+            }
+
+            function moveSelection(newX, newY) {
+                if (!currentEntry || selectedIndex < 0) {
+                    return
+                }
+                imageModel.setProperty(selectedIndex, "x", newX)
+                imageModel.setProperty(selectedIndex, "y", newY)
+                paintCanvas.requestPaint()
+            }
+
+            function handleTransform(role, dx, dy, startRect) {
+                if (!currentEntry || selectedIndex < 0) {
+                    return
+                }
+                var startLeft = startRect.x
+                var startTop = startRect.y
+                var startRight = startRect.x + startRect.w
+                var startBottom = startRect.y + startRect.h
+
+                var newLeft = startLeft
+                var newTop = startTop
+                var newRight = startRight
+                var newBottom = startBottom
+
+                switch (role) {
+                case "topLeft":
+                    newLeft = startLeft + dx
+                    newTop = startTop + dy
+                    break
+                case "top":
+                    newTop = startTop + dy
+                    break
+                case "topRight":
+                    newRight = startRight + dx
+                    newTop = startTop + dy
+                    break
+                case "right":
+                    newRight = startRight + dx
+                    break
+                case "bottomRight":
+                    newRight = startRight + dx
+                    newBottom = startBottom + dy
+                    break
+                case "bottom":
+                    newBottom = startBottom + dy
+                    break
+                case "bottomLeft":
+                    newLeft = startLeft + dx
+                    newBottom = startBottom + dy
+                    break
+                case "left":
+                    newLeft = startLeft + dx
+                    break
+                default:
+                    break
+                }
+
+                var minWidth = Math.max(minSize, 8)
+                var minHeight = Math.max(minSize, 8)
+                var maxWidth = surface.width * 4
+                var maxHeight = surface.height * 4
+
+                var width = newRight - newLeft
+                if (width < minWidth) {
+                    if (role === "left" || role === "topLeft" || role === "bottomLeft") {
+                        newLeft = newRight - minWidth
                     } else {
-                        surface.importedImageReady = false
+                        newRight = newLeft + minWidth
+                    }
+                } else if (width > maxWidth) {
+                    if (role === "left" || role === "topLeft" || role === "bottomLeft") {
+                        newLeft = newRight - maxWidth
+                    } else {
+                        newRight = newLeft + maxWidth
                     }
                 }
+
+                var height = newBottom - newTop
+                if (height < minHeight) {
+                    if (role === "top" || role === "topLeft" || role === "topRight") {
+                        newTop = newBottom - minHeight
+                    } else {
+                        newBottom = newTop + minHeight
+                    }
+                } else if (height > maxHeight) {
+                    if (role === "top" || role === "topLeft" || role === "topRight") {
+                        newTop = newBottom - maxHeight
+                    } else {
+                        newBottom = newTop + maxHeight
+                    }
+                }
+
+                var startWidth = startRect.w
+                var startHeight = startRect.h
+
+                if (surface.constrainAspect && startWidth > 0 && startHeight > 0) {
+                    var centerX = startLeft + startWidth / 2
+                    var centerY = startTop + startHeight / 2
+                    var minScale = Math.max(minWidth / startWidth, minHeight / startHeight)
+                    var maxScale = Math.min(maxWidth / startWidth, maxHeight / startHeight)
+                    var scaleCandidate = 1
+
+                    if (role === "left" || role === "right") {
+                        scaleCandidate = (newRight - newLeft) / startWidth
+                    } else if (role === "top" || role === "bottom") {
+                        scaleCandidate = (newBottom - newTop) / startHeight
+                    } else {
+                        var scaleX = (newRight - newLeft) / startWidth
+                        var scaleY = (newBottom - newTop) / startHeight
+                        scaleCandidate = Math.max(Math.abs(scaleX), Math.abs(scaleY))
+                    }
+
+                    scaleCandidate = Math.max(minScale, Math.min(maxScale, Math.abs(scaleCandidate)))
+                    var constrainedWidth = startWidth * scaleCandidate
+                    var constrainedHeight = startHeight * scaleCandidate
+
+                    switch (role) {
+                    case "topLeft":
+                        newRight = startRight
+                        newBottom = startBottom
+                        newLeft = newRight - constrainedWidth
+                        newTop = newBottom - constrainedHeight
+                        break
+                    case "topRight":
+                        newLeft = startLeft
+                        newBottom = startBottom
+                        newRight = newLeft + constrainedWidth
+                        newTop = newBottom - constrainedHeight
+                        break
+                    case "bottomRight":
+                        newLeft = startLeft
+                        newTop = startTop
+                        newRight = newLeft + constrainedWidth
+                        newBottom = newTop + constrainedHeight
+                        break
+                    case "bottomLeft":
+                        newRight = startRight
+                        newTop = startTop
+                        newLeft = newRight - constrainedWidth
+                        newBottom = newTop + constrainedHeight
+                        break
+                    case "left":
+                        newRight = startRight
+                        newLeft = newRight - constrainedWidth
+                        newTop = centerY - constrainedHeight / 2
+                        newBottom = centerY + constrainedHeight / 2
+                        break
+                    case "right":
+                        newLeft = startLeft
+                        newRight = newLeft + constrainedWidth
+                        newTop = centerY - constrainedHeight / 2
+                        newBottom = centerY + constrainedHeight / 2
+                        break
+                    case "top":
+                        newBottom = startBottom
+                        newTop = newBottom - constrainedHeight
+                        newLeft = centerX - constrainedWidth / 2
+                        newRight = centerX + constrainedWidth / 2
+                        break
+                    case "bottom":
+                        newTop = startTop
+                        newBottom = newTop + constrainedHeight
+                        newLeft = centerX - constrainedWidth / 2
+                        newRight = centerX + constrainedWidth / 2
+                        break
+                    default:
+                        break
+                    }
+                }
+
+                var finalWidth = newRight - newLeft
+                var finalHeight = newBottom - newTop
+                updateGeometry(newLeft, newTop, finalWidth, finalHeight)
             }
 
             Rectangle {
                 anchors.fill: parent
-                visible: surface.toolMode === "grab"
+                visible: selectionOverlay.visible
                 color: "transparent"
-                border.color: Qt.rgba(255, 255, 255, 0.35)
-                border.width: 1
+                border.color: surface.freeTransformActive ? Qt.rgba(88 / 255, 161 / 255, 234 / 255, 0.9) : Qt.rgba(255, 255, 255, 0.35)
+                border.width: surface.freeTransformActive ? 2 : 1
+            }
+
+            HoverHandler {
+                acceptedDevices: PointerDevice.Mouse
+                cursorShape: surface.toolMode === "grab"
+                    ? (selectionDrag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+                    : Qt.ArrowCursor
+            }
+
+            Item {
+                id: overlayHandles
+                anchors.fill: parent
+                visible: surface.freeTransformActive
+                readonly property real handleSize: 12
+
+                Repeater {
+                    model: [
+                        { role: "topLeft", xFactor: 0, yFactor: 0, cursor: Qt.SizeFDiagCursor },
+                        { role: "top", xFactor: 0.5, yFactor: 0, cursor: Qt.SizeVerCursor },
+                        { role: "topRight", xFactor: 1, yFactor: 0, cursor: Qt.SizeBDiagCursor },
+                        { role: "right", xFactor: 1, yFactor: 0.5, cursor: Qt.SizeHorCursor },
+                        { role: "bottomRight", xFactor: 1, yFactor: 1, cursor: Qt.SizeFDiagCursor },
+                        { role: "bottom", xFactor: 0.5, yFactor: 1, cursor: Qt.SizeVerCursor },
+                        { role: "bottomLeft", xFactor: 0, yFactor: 1, cursor: Qt.SizeBDiagCursor },
+                        { role: "left", xFactor: 0, yFactor: 0.5, cursor: Qt.SizeHorCursor }
+                    ]
+
+                    delegate: Rectangle {
+                        width: overlayHandles.handleSize
+                        height: overlayHandles.handleSize
+                        radius: 2
+                        color: "#ffffff"
+                        border.color: "#1a1a1a"
+                        antialiasing: true
+                        visible: surface.freeTransformActive
+                        x: modelData.xFactor * parent.width - width / 2
+                        y: modelData.yFactor * parent.height - height / 2
+
+                        property real startX: 0
+                        property real startY: 0
+                        property real startWidth: 0
+                        property real startHeight: 0
+
+                        HoverHandler {
+                            cursorShape: modelData.cursor
+                        }
+
+                        DragHandler {
+                            target: null
+                            enabled: surface.freeTransformActive
+                            acceptedButtons: Qt.LeftButton
+                            onActiveChanged: {
+                                if (active) {
+                                    startX = selectionOverlay.x
+                                    startY = selectionOverlay.y
+                                    startWidth = selectionOverlay.width
+                                    startHeight = selectionOverlay.height
+                                }
+                            }
+                            onTranslationChanged: {
+                                selectionOverlay.handleTransform(
+                                            modelData.role,
+                                            translation.x,
+                                            translation.y,
+                                            { x: startX, y: startY, w: startWidth, h: startHeight })
+                            }
+                        }
+                    }
+                }
             }
 
             DragHandler {
-                id: imageDragHandler
-                target: importedImageNode
+                id: selectionDrag
+                target: null
+                enabled: selectionOverlay.visible && surface.toolMode === "grab"
                 acceptedButtons: Qt.LeftButton
-                enabled: surface.hasImportedImage && surface.toolMode === "grab"
-                onTranslationChanged: paintCanvas.requestPaint()
+                property real startX: 0
+                property real startY: 0
+
                 onActiveChanged: {
-                    if (!active) {
-                        paintCanvas.requestPaint()
+                    if (active) {
+                        startX = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.x : selectionOverlay.x
+                        startY = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.y : selectionOverlay.y
+                        if (!surface.freeTransformActive) {
+                            surface.startFreeTransform()
+                        }
+                    } else if (surface.freeTransformActive) {
+                        surface.commitFreeTransform()
                     }
+                }
+
+                onTranslationChanged: {
+                    selectionOverlay.moveSelection(startX + translation.x, startY + translation.y)
                 }
             }
 
             WheelHandler {
                 acceptedModifiers: Qt.ControlModifier
-                enabled: surface.hasImportedImage && surface.toolMode === "grab"
+                enabled: selectionOverlay.visible
                 onWheel: {
-                    if (importedImageNode.originalWidth <= 0) {
+                    if (!selectionOverlay.currentEntry || selectionOverlay.currentEntry.originalWidth <= 0) {
                         return
+                    }
+                    if (!surface.freeTransformActive) {
+                        surface.startFreeTransform()
                     }
                     const factor = wheel.angleDelta.y > 0 ? 1.1 : 0.9
-                    const newScale = Math.max(0.1, Math.min(5, importedImageNode.scaleFactor * factor))
-                    if (newScale === importedImageNode.scaleFactor) {
-                        return
-                    }
-                    const centerX = importedImageNode.x + importedImageNode.width / 2
-                    const centerY = importedImageNode.y + importedImageNode.height / 2
-                    importedImageNode.scaleFactor = newScale
-                    importedImageNode.x = centerX - importedImageNode.width / 2
-                    importedImageNode.y = centerY - importedImageNode.height / 2
-                    paintCanvas.requestPaint()
+                    const newWidth = selectionOverlay.width * factor
+                    const newHeight = selectionOverlay.height * factor
+                    const centerX = selectionOverlay.x + selectionOverlay.width / 2
+                    const centerY = selectionOverlay.y + selectionOverlay.height / 2
+                    selectionOverlay.updateGeometry(centerX - newWidth / 2, centerY - newHeight / 2, newWidth, newHeight)
                 }
             }
         }
     }
+
 
     onStrokesChanged: paintCanvas.requestPaint()
 
@@ -228,15 +767,17 @@ Rectangle {
                 return
             }
             var colorValue
-            if (surface.toolMode === "eraser") {
-                colorValue = "#ffffff"
+            var isEraser = surface.toolMode === "eraser"
+            if (isEraser) {
+                colorValue = "#000000"
             } else {
                 colorValue = typeof surface.brushColor === "string" ? surface.brushColor : surface.brushColor.toString()
             }
             surface.currentStroke = {
                 color: colorValue,
                 size: surface.brushSize,
-                points: [ { x: mouse.x, y: mouse.y } ]
+                points: [ { x: mouse.x, y: mouse.y } ],
+                erase: isEraser
             }
             var updated = surface.strokes.slice()
             updated.push(surface.currentStroke)
@@ -282,6 +823,61 @@ Rectangle {
             }
             surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1)
         }
+    }
+
+    Keys.onPressed: {
+        if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
+            surface.shiftHoldCount = surface.shiftHoldCount + 1
+            surface.updateConstrainAspectState()
+            event.accepted = true
+            return
+        }
+        event.accepted = false
+    }
+
+    Keys.onReleased: {
+        if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
+            surface.shiftHoldCount = Math.max(0, surface.shiftHoldCount - 1)
+            surface.updateConstrainAspectState()
+            event.accepted = true
+            return
+        }
+        event.accepted = false
+    }
+
+    onActiveFocusChanged: {
+        if (!activeFocus && surface.shiftHoldCount > 0) {
+            surface.shiftHoldCount = 0
+            surface.updateConstrainAspectState()
+        }
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: surface.freeTransformActive
+        sequences: [ "Return", "Enter" ]
+        onActivated: surface.commitFreeTransform()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: surface.freeTransformActive
+        sequences: [ "Esc" ]
+        onActivated: surface.cancelFreeTransform()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: surface.hasImportedImage
+        sequence: StandardKey.Delete
+        onActivated: surface.clearImportedImage()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: surface.hasImportedImage
+        sequence: "Backspace"
+        onActivated: surface.clearImportedImage()
     }
 
     function normalizeUrl(fileUrl) {
