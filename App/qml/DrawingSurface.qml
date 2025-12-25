@@ -27,6 +27,7 @@ Rectangle {
     property var imageElementRegistry: ({})
     property var selectedImageItem: null
     property var undoStack: []
+    property var redoStack: []
     readonly property int maxUndoSteps: 64
     property bool transformUndoCaptured: false
 
@@ -148,16 +149,21 @@ Rectangle {
         return result;
     }
 
-    function pushUndoState() {
-        var snapshot = {
+    function captureSnapshot() {
+        return {
             strokes: cloneStrokes(surface.strokes),
             images: cloneImages(),
             selectedImageId: surface.selectedImageId
         };
+    }
+
+    function pushUndoState() {
+        var snapshot = surface.captureSnapshot();
         surface.undoStack.push(snapshot);
         if (surface.undoStack.length > surface.maxUndoSteps) {
             surface.undoStack.shift();
         }
+        surface.redoStack = [];
     }
 
     function applySnapshot(snapshot) {
@@ -186,7 +192,25 @@ Rectangle {
         if (!surface.undoStack.length) {
             return;
         }
+        var currentSnapshot = surface.captureSnapshot();
         var snapshot = surface.undoStack.pop();
+        surface.redoStack.push(currentSnapshot);
+        if (surface.redoStack.length > surface.maxUndoSteps) {
+            surface.redoStack.shift();
+        }
+        surface.applySnapshot(snapshot);
+    }
+
+    function redo() {
+        if (!surface.redoStack.length) {
+            return;
+        }
+        var currentSnapshot = surface.captureSnapshot();
+        var snapshot = surface.redoStack.pop();
+        surface.undoStack.push(currentSnapshot);
+        if (surface.undoStack.length > surface.maxUndoSteps) {
+            surface.undoStack.shift();
+        }
         surface.applySnapshot(snapshot);
     }
 
@@ -1194,6 +1218,12 @@ Rectangle {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Undo
         onActivated: surface.undo()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequence: StandardKey.Redo
+        onActivated: surface.redo()
     }
 
     Shortcut {
