@@ -12,6 +12,12 @@ Rectangle {
     property real brushSize: 2
     property var strokes: []
     property var currentStroke: null
+    property bool fullRedrawPending: true
+    property bool appendStrokePending: false
+    property bool paintScheduled: false
+    property int lastPaintedStrokeIndex: -1
+    property int lastPaintedPointCount: 0
+    readonly property real minPointDistance: Math.max(0.5, brushSize * 0.05)
     property string toolMode: "brush"
     ListModel {
         id: imageModel
@@ -185,7 +191,6 @@ Rectangle {
         surface.transformUndoCaptured = false;
         surface.notifySelectionOverlay();
         surface.cancelTextEntry();
-        paintCanvas.requestPaint();
     }
 
     function undo() {
@@ -227,7 +232,80 @@ Rectangle {
         surface.constrainAspect = surface.freeTransformActive && surface.shiftHoldCount > 0
     }
 
-    Component.onCompleted: surface.forceActiveFocus()
+    function schedulePaint(fullRedraw) {
+        if (fullRedraw) {
+            surface.fullRedrawPending = true
+        }
+        if (surface.paintScheduled) {
+            return
+        }
+        surface.paintScheduled = true
+        Qt.callLater(function () {
+            surface.paintScheduled = false
+            paintCanvas.requestPaint()
+        })
+    }
+
+    function appendStrokePoint(pointX, pointY) {
+        if (!surface.currentStroke) {
+            return false
+        }
+        var points = surface.currentStroke.points
+        if (!points.length) {
+            points.push({ x: pointX, y: pointY })
+            return true
+        }
+        var lastPoint = points[points.length - 1]
+        var dx = pointX - lastPoint.x
+        var dy = pointY - lastPoint.y
+        var minDistance = surface.minPointDistance
+        if (dx * dx + dy * dy < minDistance * minDistance) {
+            return false
+        }
+        points.push({ x: pointX, y: pointY })
+        return true
+    }
+
+    function drawStroke(ctx, stroke, startIndex) {
+        if (!stroke || !stroke.points || stroke.points.length === 0) {
+            return
+        }
+        var points = stroke.points
+        var pointCount = points.length
+        var start = startIndex !== undefined ? startIndex : 0
+        if (start < 0) {
+            start = 0
+        }
+        if (start >= pointCount) {
+            return
+        }
+
+        ctx.globalCompositeOperation = stroke.erase ? "destination-out" : "source-over"
+
+        if (pointCount === 1 && start === 0) {
+            var point = points[0]
+            ctx.beginPath()
+            ctx.fillStyle = stroke.color
+            ctx.arc(point.x, point.y, stroke.size / 2, 0, Math.PI * 2)
+            ctx.fill()
+            return
+        }
+
+        ctx.beginPath()
+        ctx.strokeStyle = stroke.color
+        ctx.lineWidth = stroke.size
+        var moveIndex = start > 0 ? start - 1 : 0
+        ctx.moveTo(points[moveIndex].x, points[moveIndex].y)
+        for (var i = Math.max(1, start); i < pointCount; ++i) {
+            ctx.lineTo(points[i].x, points[i].y)
+        }
+        ctx.stroke()
+    }
+
+    Component.onCompleted: {
+        surface.forceActiveFocus()
+        surface.schedulePaint(true)
+    }
 
     function newCanvas() {
         surface.pushUndoState()
@@ -239,7 +317,6 @@ Rectangle {
         surface.imageElementRegistry = ({})
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
-        paintCanvas.requestPaint()
     }
 
     function loadImage(fileUrl) {
@@ -265,7 +342,6 @@ Rectangle {
         surface.selectImage(newId)
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
-        paintCanvas.requestPaint()
     }
 
     function saveToFile(fileUrl) {
@@ -311,7 +387,6 @@ Rectangle {
             surface.startFreeTransform()
         }
         surface.notifySelectionOverlay()
-        paintCanvas.requestPaint()
     }
 
     function resetImagePlacement(imageId) {
@@ -335,7 +410,6 @@ Rectangle {
         imageModel.setProperty(index, "y", (surface.height - height) / 2)
         imageModel.setProperty(index, "ready", true)
         surface.freeTransformActive = false
-        paintCanvas.requestPaint()
         if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
             surface.startFreeTransform()
         }
@@ -384,7 +458,6 @@ Rectangle {
                 ready: true
             })
             surface.selectImage(newId)
-            paintCanvas.requestPaint()
         }
         textRasterizer.textValue = textValue
         textRasterizer.requestPaint()
@@ -454,7 +527,6 @@ Rectangle {
         }
         surface.freeTransformActive = true
         surface.updateConstrainAspectState()
-        paintCanvas.requestPaint()
     }
 
     function commitFreeTransform() {
@@ -465,7 +537,6 @@ Rectangle {
         surface.freeTransformSnapshot = {}
         surface.transformUndoCaptured = false
         surface.updateConstrainAspectState()
-        paintCanvas.requestPaint()
     }
 
     function cancelFreeTransform() {
@@ -498,7 +569,6 @@ Rectangle {
         surface.freeTransformSnapshot = {}
         surface.transformUndoCaptured = false
         surface.updateConstrainAspectState()
-        paintCanvas.requestPaint()
     }
 
     function toggleFreeTransformMode() {
@@ -521,42 +591,47 @@ Rectangle {
 
         onPaint: {
             var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-
             ctx.lineCap = "round"
             ctx.lineJoin = "round"
 
-            for (var i = 0; i < surface.strokes.length; ++i) {
-                var stroke = surface.strokes[i]
-                if (!stroke || stroke.points.length === 0) {
-                    continue
+            if (surface.fullRedrawPending) {
+                ctx.clearRect(0, 0, width, height)
+                for (var i = 0; i < surface.strokes.length; ++i) {
+                    surface.drawStroke(ctx, surface.strokes[i], 0)
                 }
-                ctx.save()
-                if (stroke.erase) {
-                    ctx.globalCompositeOperation = "destination-out"
+                surface.fullRedrawPending = false
+                if (surface.strokes.length > 0) {
+                    surface.lastPaintedStrokeIndex = surface.strokes.length - 1
+                    var lastStroke = surface.strokes[surface.lastPaintedStrokeIndex]
+                    surface.lastPaintedPointCount = lastStroke ? lastStroke.points.length : 0
                 } else {
-                    ctx.globalCompositeOperation = "source-over"
+                    surface.lastPaintedStrokeIndex = -1
+                    surface.lastPaintedPointCount = 0
                 }
+                return
+            }
 
-                if (stroke.points.length === 1) {
-                    var point = stroke.points[0]
-                    ctx.beginPath()
-                    ctx.fillStyle = stroke.color
-                    ctx.arc(point.x, point.y, stroke.size / 2, 0, Math.PI * 2)
-                    ctx.fill()
-                    ctx.restore()
-                    continue
-                }
+            var strokeCount = surface.strokes.length
+            if (!strokeCount) {
+                return
+            }
 
-                ctx.beginPath()
-                ctx.strokeStyle = stroke.color
-                ctx.lineWidth = stroke.size
-                ctx.moveTo(stroke.points[0].x, stroke.points[0].y)
-                for (var j = 1; j < stroke.points.length; ++j) {
-                    ctx.lineTo(stroke.points[j].x, stroke.points[j].y)
+            if (strokeCount - 1 > surface.lastPaintedStrokeIndex) {
+                for (var s = surface.lastPaintedStrokeIndex + 1; s < strokeCount; ++s) {
+                    surface.drawStroke(ctx, surface.strokes[s], 0)
                 }
-                ctx.stroke()
-                ctx.restore()
+                surface.lastPaintedStrokeIndex = strokeCount - 1
+                var appendedStroke = surface.strokes[surface.lastPaintedStrokeIndex]
+                surface.lastPaintedPointCount = appendedStroke ? appendedStroke.points.length : 0
+                return
+            }
+
+            if (surface.lastPaintedStrokeIndex >= 0) {
+                var stroke = surface.strokes[surface.lastPaintedStrokeIndex]
+                if (stroke && stroke.points && stroke.points.length > surface.lastPaintedPointCount) {
+                    surface.drawStroke(ctx, stroke, surface.lastPaintedPointCount)
+                    surface.lastPaintedPointCount = stroke.points.length
+                }
             }
         }
     }
@@ -703,7 +778,6 @@ Rectangle {
                 imageModel.setProperty(selectedIndex, "y", newY)
                 imageModel.setProperty(selectedIndex, "scaleX", newWidth / currentEntry.originalWidth)
                 imageModel.setProperty(selectedIndex, "scaleY", newHeight / currentEntry.originalHeight)
-                paintCanvas.requestPaint()
             }
 
             function moveSelection(newX, newY) {
@@ -712,7 +786,6 @@ Rectangle {
                 }
                 imageModel.setProperty(selectedIndex, "x", newX)
                 imageModel.setProperty(selectedIndex, "y", newY)
-                paintCanvas.requestPaint()
             }
 
             function handleTransform(role, dx, dy, startRect) {
@@ -1071,7 +1144,14 @@ Rectangle {
     }
 
 
-    onStrokesChanged: paintCanvas.requestPaint()
+    onStrokesChanged: {
+        if (surface.appendStrokePending) {
+            surface.appendStrokePending = false
+            surface.schedulePaint(false)
+            return
+        }
+        surface.schedulePaint(true)
+    }
 
     MouseArea {
         anchors.fill: parent
@@ -1119,10 +1199,8 @@ Rectangle {
                 points: [ { x: mouse.x, y: mouse.y } ],
                 erase: isEraser
             }
-            var updated = surface.strokes.slice()
-            updated.push(surface.currentStroke)
-            surface.strokes = updated
-            paintCanvas.requestPaint()
+            surface.appendStrokePending = true
+            surface.strokes = surface.strokes.concat([surface.currentStroke])
         }
 
         onPositionChanged: function(mouse) {
@@ -1137,8 +1215,9 @@ Rectangle {
             if (!surface.currentStroke) {
                 return
             }
-            surface.currentStroke.points.push({ x: mouse.x, y: mouse.y })
-            paintCanvas.requestPaint()
+            if (surface.appendStrokePoint(mouse.x, mouse.y)) {
+                surface.schedulePaint(false)
+            }
         }
 
         onReleased: function(mouse) {
@@ -1157,9 +1236,10 @@ Rectangle {
             if (!surface.currentStroke) {
                 return
             }
-            surface.currentStroke.points.push({ x: mouse.x, y: mouse.y })
+            if (surface.appendStrokePoint(mouse.x, mouse.y)) {
+                surface.schedulePaint(false)
+            }
             surface.currentStroke = null
-            paintCanvas.requestPaint()
         }
 
         onCanceled: surface.currentStroke = null

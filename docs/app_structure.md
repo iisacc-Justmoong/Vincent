@@ -6,6 +6,7 @@ This document captures the current architecture of Vincent as observed in the re
 
 - `CMakeLists.txt` (root) – bootstraps the Qt build, configures install paths, and delegates to the application sources in `App/`.
 - `App/` – contains all C++ and QML code for the application bundle.
+- `App/paletteutils.h`, `App/paletteutils.cpp` – palette ordering helper exposed to QML as a singleton.
 - `resources/` – SVG icons and design assets consumed by the QML UI.
 - `build/`, `cmake-build-debug/` – out-of-source build trees (ignored in project description, but important to keep generated artifacts isolated).
 
@@ -26,11 +27,12 @@ The project relies on CMake and Qt 6 modules.
 ## Runtime Entry Point (`App/main.cpp`)
 
 - Creates the `QGuiApplication` instance that hosts the Qt Quick scene graph.
+- Registers the `PaletteUtils` singleton in the `Vincent` QML module for palette computation.
 - Configures a `QQmlApplicationEngine` and augments its import paths when `CRAFTROOT` exposes prebuilt QML modules.
 - Connects `objectCreationFailed` to `QCoreApplication::exit(-1)` for fail-fast behavior if the QML scene cannot load.
 - Loads the `Vincent` QML module's `Main` component and starts the event loop.
 
-No additional C++ types or singletons are registered; all UI and interaction logic lives in QML.
+All UI and interaction logic lives in QML, with palette calculation delegated to the C++ helper.
 
 ## QML Module Layout (`App/qml/`)
 
@@ -44,6 +46,7 @@ No additional C++ types or singletons are registered; all UI and interaction log
 
 - Extends `Controls.Page` to host the main drawing surface.
 - Maintains the user-facing state (`brushColor`, `brushSize`, `toolMode`, and color `palette`).
+- Computes the default palette by calling `PaletteUtils.buildDefaultPalette` instead of running JavaScript sorting logic.
 - Emits `pageReady` when the component loads to let `Main.qml` grab a pointer.
 - Provides imperative helpers (`newCanvas`, `clearCanvas`, `saveCanvasAs`, `openImage`, `adjustBrush`) that wrap the lower-level `DrawingSurface` API.
 - Instantiates the `CanvasToolBar` as the page header and wires its signals back into the page state.
@@ -69,9 +72,10 @@ No additional C++ types or singletons are registered; all UI and interaction log
 
 1. The C++ entry point loads `Vincent.Main` and hands off control to QML.
 2. `Main.qml` instantiates `PainterCanvasPage`, which centralizes application state and owns the drawing surface.
-3. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage` methods, which then mutate page state or invoke `DrawingSurface` methods.
-4. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, ensuring interactive updates.
-5. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface` for persistence or background loading.
+3. `PainterCanvasPage` requests the ordered color palette from the `PaletteUtils` singleton.
+4. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage` methods, which then mutate page state or invoke `DrawingSurface` methods.
+5. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, ensuring interactive updates.
+6. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface` for persistence or background loading.
 
 ## Notable Platform Considerations
 
@@ -80,6 +84,6 @@ No additional C++ types or singletons are registered; all UI and interaction log
 
 ## Opportunities for Extension
 
-- Introduce C++ back-end helpers (e.g., document models, command stacks) if the painting logic outgrows the QML-only approach.
+- Extend the C++ back-end (e.g., document models, command stacks) if the painting logic outgrows the QML-only approach.
 - Add automated tests under `tests/` once non-trivial logic (such as file handling) gains more edge cases.
 - Expand documentation with user-facing guides (tool descriptions, keyboard shortcuts) alongside this structural overview.

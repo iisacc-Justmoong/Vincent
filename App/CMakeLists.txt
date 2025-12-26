@@ -23,6 +23,8 @@ target_sources(Vincent PRIVATE
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h
+        paletteutils.cpp
+        paletteutils.h
         resources.qrc
 )
 
