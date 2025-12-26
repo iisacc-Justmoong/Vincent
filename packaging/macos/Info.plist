@@ -11,8 +11,8 @@
   <key>CFBundleDisplayName</key>
   <string>Vincent</string>
 
-  <key>CFBundleIconName</key>
-  <string>AppIcon</string>
+  <key>CFBundleIconFile</key>
+  <string>icon.icns</string>
 
   <key>CFBundleExecutable</key>
   <string>Vincent</string>
