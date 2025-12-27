@@ -1,35 +1,32 @@
-# Vincent
+# Vincent 2.0
 
-Vincent is a Qt 6 QML painting app.
+Vincent 2.0 is a minimalist painting app built with Qt 6.
 
-## Requirements
-- CMake 3.24+
-- Qt 6.8+ modules: Core, Qml, Quick, QuickControls2, Svg
-- A C++ compiler compatible with Qt 6
+## System Requirements
+- macOS 12 or later (Apple Silicon or Intel)
+- Linux builds are available when provided by the release page
 
-If Qt is installed in a non-standard path, set `CMAKE_PREFIX_PATH` or `Qt6_DIR` before configuring.
+## Install (macOS)
+1. Download `Vincent-2.0.0.pkg` from the latest release.
+2. Double-click the installer and follow the prompts to install Vincent 2.0 in Applications.
+3. Open Vincent 2.0 from Launchpad or the Applications folder.
 
-## Build
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-```
+## Install (macOS .app bundle)
+1. Download `Vincent 2.0.app` from the release assets.
+2. Drag it into the Applications folder.
+3. Open Vincent 2.0 and allow any prompts to access files you select.
 
-## Run
-- Linux: `./build/bin/Vincent`
-- macOS: `./build/Vincent.app/Contents/MacOS/Vincent`
+## Install (Linux)
+1. Download the `Vincent-2.0.0-Linux.tar.gz` release archive.
+2. Extract it and run the `Vincent` binary inside the extracted folder.
 
-## Packaging
-- Linux (TGZ via CPack): `cmake --build build --target package`
-- macOS App Store packaging: see `docs/BUILD.md`
+## Features at a Glance
+- Brush, eraser, grab, and text tools
+- Quick color palette and brush size controls
+- Save canvases to PNG
 
-## Tests
-There are no automated tests yet.
-
-## Missing Paint Features
-Vincent intentionally keeps the feature set minimal. The current QML implementation lacks several capabilities that even a basic paint program is expected to provide:
-
-- **Fill and shape tools are absent.** `App/qml/CanvasToolBar.qml` only wires up brush, eraser, grab, and text toggles, so there is no fill bucket or line/rectangle/ellipse primitive drawing workflow.
-- **Brush strokes cannot be re-selected.** Once a stroke is rasterized inside `App/qml/DrawingSurface.qml` it becomes part of the flattened canvas and cannot be moved, scaled, cropped, or duplicated; the grab/free-transform overlay only works for imported bitmap/text elements.
-- **Color choice is fixed to the built-in palette.** The palette assembled in `App/qml/PainterCanvasPage.qml` is the only way to pick colors—there is no eyedropper, custom color dialog, or numeric color entry.
-- **Canvas size and export settings are rigid.** The canvas always matches the window-backed `DrawingSurface`, and `saveToFile()` simply captures that buffer, so you cannot set an explicit resolution, crop the canvas, or export with transparency/background options inside the app.
+## Known Limitations
+- No shape tools or fill bucket yet
+- Strokes are rasterized and cannot be re-selected
+- Palette is fixed to the built-in colors
+- Canvas size follows the window size

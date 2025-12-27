@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls as Controls
-import Vincent 1.0
+import Vincent 2.0
 import "."
 
 Controls.Page {

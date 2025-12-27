@@ -1,6 +1,6 @@
-# Vincent Application Structure
+# Vincent 2.0 Application Structure
 
-This document captures the current architecture of Vincent as observed in the repository. It describes how the project is laid out, how the build system is wired, and how the runtime pieces cooperate to deliver the painting experience.
+This document captures the current architecture of Vincent 2.0 as observed in the repository. It describes how the project is laid out, how the build system is wired, and how the runtime pieces cooperate to deliver the painting experience.
 
 ## Top-Level Layout
 
@@ -19,7 +19,7 @@ The project relies on CMake and Qt 6 modules.
 1. The root `CMakeLists.txt` ensures Craft-provided prefixes take priority when `CRAFTROOT` is set. It configures GNU install paths before adding the `App/` subdirectory.
 2. `App/CMakeLists.txt` ties the sources to the `Vincent` target while the root file links against the Qt stack (`Qt6::Core`, `Qt6::Qml`, `Qt6::Quick`, `Qt6::QuickControls2`, `Qt6::Svg`).
 3. A single executable target, `Vincent`, is defined around `App/main.cpp`.
-4. `qt_add_qml_module` registers the `Vincent` QML module version 1.0, exposing the components under `App/qml/` to the QML engine at runtime.
+4. `qt_add_qml_module` registers the `Vincent` QML module version 2.0, exposing the components under `App/qml/` to the QML engine at runtime.
 5. macOS-specific blocks adjust OpenGL discovery so Qt Quick works even when SDK headers are missing from the default search paths.
 6. The executable links privately against the Qt targets and is installed via standard GNU install dir settings.
 7. CPack is configured for macOS productbuild packaging and a Linux TGZ package.

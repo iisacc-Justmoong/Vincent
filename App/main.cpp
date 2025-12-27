@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
     qmlRegisterSingletonType<PaletteUtils>(
         "Vincent",
-        1,
+        2,
         0,
         "PaletteUtils",
         [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject * {
