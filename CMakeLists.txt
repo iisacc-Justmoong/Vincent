@@ -147,7 +147,7 @@ set_target_properties(Vincent PROPERTIES
 )
 
 if(APPLE)
-    set_target_properties(Vincent PROPERTIES OUTPUT_NAME "Vincent 2.0")
+    set_target_properties(Vincent PROPERTIES OUTPUT_NAME "Vincent")
 endif()
 
 if(DEFINED _vincent_icon_bundle_name)
@@ -164,8 +164,8 @@ endif()
 
 # CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
 set(CPACK_GENERATOR "productbuild")
-set(CPACK_PACKAGE_NAME "Vincent 2.0")
-set(CPACK_PACKAGE_VERSION "2.0.0")
+set(CPACK_PACKAGE_NAME "Vincent")
+set(CPACK_PACKAGE_VERSION "2.0.1")
 set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}")
 
 # 설치 경로: .app을 /Applications로 설치
@@ -182,14 +182,14 @@ set(CPACK_PRODUCTBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZ
 
 # 단일 컴포넌트로 .app을 패키지화
 set(CPACK_COMPONENTS_ALL Runtime)
-set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "Vincent 2.0")
+set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "Vincent")
 set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent 2.0 Application")
 set(CPACK_COMPONENT_RUNTIME_REQUIRED TRUE)
 set(CPACK_COMPONENT_RUNTIME_DEPENDS "")
 
 set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
 set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
-set(CPACK_BUNDLE_NAME "Vincent 2.0")
+set(CPACK_BUNDLE_NAME "Vincent")
 set(CPACK_BUNDLE_APPLE_CERT_APP "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

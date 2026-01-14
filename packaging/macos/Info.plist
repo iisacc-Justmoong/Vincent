@@ -6,16 +6,16 @@
   <string>com.iisacc.vincent.painter</string>
 
   <key>CFBundleName</key>
-  <string>Vincent 2.0</string>
+  <string>Vincent</string>
 
   <key>CFBundleDisplayName</key>
-  <string>Vincent 2.0</string>
+  <string>Vincent</string>
 
   <key>CFBundleIconFile</key>
   <string>icon.icns</string>
 
   <key>CFBundleExecutable</key>
-  <string>Vincent 2.0</string>
+  <string>Vincent</string>
 
   <key>CFBundlePackageType</key>
   <string>APPL</string>
