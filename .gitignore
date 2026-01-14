@@ -90,3 +90,6 @@ bundling.sh
 resources/UIIcons/.DS_Store
 /dist
 /packaging
+packaging.sh
+dist.sh
+bundling.sh
