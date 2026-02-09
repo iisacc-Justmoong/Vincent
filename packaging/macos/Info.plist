@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.iisacc.vincent.painter</string>
+  <string>@BUNDLE_ID@</string>
 
   <key>CFBundleName</key>
   <string>Vincent</string>
@@ -21,10 +21,10 @@
   <string>APPL</string>
 
   <key>CFBundleShortVersionString</key>
-  <string>2.1.0</string>
+  <string>@PROJECT_VERSION@</string>
 
   <key>CFBundleVersion</key>
-  <string>201</string>
+  <string>@VINCENT_BUNDLE_VERSION@</string>
 
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.graphics-design</string>
@@ -36,6 +36,6 @@
   <string>NSApplication</string>
 
   <key>LSMinimumSystemVersion</key>
-  <string>12.0</string>
+  <string>@VINCENT_MIN_MACOS_VERSION@</string>
 </dict>
 </plist>

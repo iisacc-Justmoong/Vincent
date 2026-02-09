@@ -1,12 +1,35 @@
 cmake_minimum_required(VERSION 3.24)
 project(Vincent VERSION 2.1.0 LANGUAGES CXX)
 
+set(BUNDLE_ID "com.iisacc.vincent.painter")
+set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
+# QML import minor는 API revision 없이는 0으로 유지하는 편이 안전하다.
+set(VINCENT_QML_MODULE_MINOR "0")
+set(VINCENT_QML_MODULE_VERSION "${VINCENT_QML_MODULE_MAJOR}.${VINCENT_QML_MODULE_MINOR}")
+set(VINCENT_MIN_MACOS_VERSION "12.0")
+
+math(EXPR _vincent_default_bundle_version
+        "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
+set(_vincent_bundle_version_default "${_vincent_default_bundle_version}")
+if(DEFINED ENV{VINCENT_BUNDLE_VERSION} AND NOT "$ENV{VINCENT_BUNDLE_VERSION}" STREQUAL "")
+    set(_vincent_bundle_version_default "$ENV{VINCENT_BUNDLE_VERSION}")
+endif()
+set(VINCENT_BUNDLE_VERSION "${_vincent_bundle_version_default}" CACHE STRING "CFBundleVersion (numeric build number)")
+if(NOT VINCENT_BUNDLE_VERSION MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "VINCENT_BUNDLE_VERSION must be numeric (example: 20100)")
+endif()
+message(STATUS "Vincent versions: marketing=${PROJECT_VERSION}, bundle=${VINCENT_BUNDLE_VERSION}, qml=${VINCENT_QML_MODULE_VERSION}")
+unset(_vincent_bundle_version_default)
+unset(_vincent_default_bundle_version)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # macOS 최소 타겟 고정
-set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${VINCENT_MIN_MACOS_VERSION}" CACHE STRING "Minimum macOS version" FORCE)
+endif()
 
 # Qt 경로 힌트(선택)
 if(DEFINED Qt6_DIR AND EXISTS "${Qt6_DIR}")
@@ -75,7 +98,7 @@ if(CMAKE_GENERATOR STREQUAL "Xcode")
 endif()
 qt_add_qml_module(Vincent
         URI Vincent
-        VERSION 2.1
+        VERSION ${VINCENT_QML_MODULE_VERSION}
         QML_FILES
         App/qml/Main.qml
         App/qml/PainterCanvasPage.qml
@@ -138,12 +161,15 @@ if(EXISTS "${_vincent_icon_abs}")
 endif()
 
 # 번들 식별자 및 Info.plist 연결
-set(BUNDLE_ID "com.iisacc.vincent.painter")
-set(MAC_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist") # 소스 트리의 쓰기 가능한 plist
+set(MAC_INFO_PLIST_TEMPLATE "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist")
+set(MAC_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/VincentInfo.plist")
+configure_file("${MAC_INFO_PLIST_TEMPLATE}" "${MAC_INFO_PLIST}" @ONLY)
 set_target_properties(Vincent PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
         MACOSX_BUNDLE_GUI_IDENTIFIER "${BUNDLE_ID}"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${BUNDLE_ID}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${VINCENT_BUNDLE_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 
 if(APPLE)
@@ -154,19 +180,26 @@ if(DEFINED _vincent_icon_bundle_name)
     set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${_vincent_icon_bundle_name}")
 endif()
 
-# 설치 규칙: /Applications/Vincent 2.1.0.app
-install(TARGETS Vincent BUNDLE DESTINATION "Applications")
+# 설치 규칙: /Applications/Vincent.app
+install(TARGETS Vincent BUNDLE DESTINATION "Applications" COMPONENT Runtime)
 
 # Linux install target (runtime binary)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
+endif()
+
+# CPack install 단계에서 Qt 런타임을 함께 배치해 패키지를 독립 실행 가능 상태로 만든다.
+if(APPLE)
+    install(CODE
+            "include(\"${QT_DEPLOY_SUPPORT}\")\nqt6_deploy_runtime_dependencies(\n    EXECUTABLE \"Applications/Vincent.app\"\n    DEPLOY_TOOL_OPTIONS \"-qmldir=${CMAKE_SOURCE_DIR}/App/qml\"\n)\n"
+            COMPONENT Runtime)
 endif()
 
 # CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
 set(CPACK_GENERATOR "productbuild")
 set(CPACK_PACKAGE_NAME "Vincent")
-set(CPACK_PACKAGE_VERSION "2.1.0")
-set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-build${VINCENT_BUNDLE_VERSION}")
 
 # 설치 경로: .app을 /Applications로 설치
 set(CPACK_PACKAGING_INSTALL_PREFIX "/")  # 루트 기준
@@ -176,21 +209,26 @@ set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources"
 # 식별자
 set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.vincent.painter")
 
-# 서명 신원: pkgbuild와 productbuild 모두 지정
-set(CPACK_PKGBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
-set(CPACK_PRODUCTBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+# 서명 신원: 기본은 무서명으로 두고, 필요한 경우에만 명시한다.
+set(VINCENT_CPACK_SIGNING_IDENTITY "" CACHE STRING "Installer signing identity for CPack productbuild/pkgbuild")
+if(VINCENT_CPACK_SIGNING_IDENTITY)
+    set(CPACK_PKGBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
+    set(CPACK_PRODUCTBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
+endif()
 
 # 단일 컴포넌트로 .app을 패키지화
 set(CPACK_COMPONENTS_ALL Runtime)
 set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "Vincent")
-set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent 2.1.0 Application")
+set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent ${PROJECT_VERSION} Application")
 set(CPACK_COMPONENT_RUNTIME_REQUIRED TRUE)
 set(CPACK_COMPONENT_RUNTIME_DEPENDS "")
 
 set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
 set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
 set(CPACK_BUNDLE_NAME "Vincent")
-set(CPACK_BUNDLE_APPLE_CERT_APP "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
+if(VINCENT_CPACK_SIGNING_IDENTITY)
+    set(CPACK_BUNDLE_APPLE_CERT_APP "${VINCENT_CPACK_SIGNING_IDENTITY}")
+endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR "TGZ")

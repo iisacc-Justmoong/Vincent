@@ -1,8 +1,8 @@
 #include <QDir>
 #include <QGuiApplication>
 #include <QIcon>
-#include <QJSEngine>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQmlEngine>
 
 #include "paletteutils.h"
@@ -13,17 +13,8 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
-    qmlRegisterSingletonType<PaletteUtils>(
-        "Vincent",
-        2,
-        0,
-        "PaletteUtils",
-        [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject * {
-            Q_UNUSED(scriptEngine)
-            return new PaletteUtils(engine);
-        });
-
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("PaletteUtils", new PaletteUtils(&engine));
     const auto craftRoot = QString::fromLocal8Bit(qgetenv("CRAFTROOT"));
 
     if (!craftRoot.isEmpty()) {
