@@ -94,3 +94,4 @@ packaging.sh
 dist.sh
 bundling.sh
 build.sh
+/build.sh

@@ -2,14 +2,14 @@ import QtQuick
 
 Rectangle {
     id: surface
-    color: "white"
-    radius: 6
-    border.color: "#d0d0d0"
-    border.width: 1
+    color: "transparent"
     focus: true
+    clip: true
 
     property color brushColor: "#1a1a1a"
     property real brushSize: 2
+    property int canvasWidth: 1
+    property int canvasHeight: 1
     property var strokes: []
     property var currentStroke: null
     property bool fullRedrawPending: true
@@ -37,6 +37,94 @@ Rectangle {
     readonly property int maxUndoSteps: 64
     property bool transformUndoCaptured: false
     readonly property bool textEntryActive: textInputOverlay.visible
+    property bool externalDragHasSupportedImage: false
+
+    function updateCanvasSizeFromViewport() {
+        surface.canvasWidth = Math.max(1, Math.round(surface.width))
+        surface.canvasHeight = Math.max(1, Math.round(surface.height))
+    }
+
+    function clearDocumentState() {
+        surface.cancelTextEntry()
+        surface.strokes = []
+        surface.currentStroke = null
+        imageModel.clear()
+        surface.selectedImageId = -1
+        surface.imageElementRegistry = ({})
+        surface.freeTransformActive = false
+        surface.freeTransformSnapshot = {}
+        surface.transformUndoCaptured = false
+        surface.updateSelectedImageItem()
+        surface.notifySelectionOverlay()
+        surface.schedulePaint(true)
+    }
+
+    function isSupportedImageUrl(fileUrl) {
+        if (!fileUrl) {
+            return false
+        }
+        var urlString = fileUrl.toString().toLowerCase()
+        var pathOnly = urlString.split("?")[0].split("#")[0]
+        return pathOnly.endsWith(".png")
+            || pathOnly.endsWith(".jpg")
+            || pathOnly.endsWith(".jpeg")
+            || pathOnly.endsWith(".bmp")
+            || pathOnly.endsWith(".gif")
+            || pathOnly.endsWith(".webp")
+            || pathOnly.endsWith(".tif")
+            || pathOnly.endsWith(".tiff")
+    }
+
+    function extractImageUrlsFromDrop(event) {
+        var result = []
+        function appendIfSupported(candidate) {
+            if (!candidate) {
+                return
+            }
+            var normalized = normalizeUrl(candidate)
+            if (!normalized || !surface.isSupportedImageUrl(normalized)) {
+                return
+            }
+            for (var i = 0; i < result.length; ++i) {
+                if (result[i] === normalized) {
+                    return
+                }
+            }
+            result.push(normalized)
+        }
+
+        if (event && event.hasUrls && event.urls) {
+            for (var index = 0; index < event.urls.length; ++index) {
+                appendIfSupported(event.urls[index].toString())
+            }
+        }
+
+        if (!result.length && event && event.hasText && event.text) {
+            var textLines = event.text.split(/\r?\n/)
+            for (var lineIndex = 0; lineIndex < textLines.length; ++lineIndex) {
+                var line = textLines[lineIndex].trim()
+                if (!line.length || line.startsWith("#")) {
+                    continue
+                }
+                appendIfSupported(line)
+            }
+        }
+
+        return result
+    }
+
+    function importDroppedImages(urls) {
+        if (!urls || !urls.length) {
+            return false
+        }
+        surface.pushUndoState()
+        for (var i = 0; i < urls.length; ++i) {
+            surface.loadImage(urls[i], {
+                skipUndo: true
+            })
+        }
+        return true
+    }
 
     function findImageIndexById(imageId) {
         if (imageId === -1) {
@@ -188,6 +276,8 @@ Rectangle {
 
     function captureSnapshot() {
         return {
+            canvasWidth: surface.canvasWidth,
+            canvasHeight: surface.canvasHeight,
             strokes: cloneStrokes(surface.strokes),
             images: cloneImages(),
             selectedImageId: surface.selectedImageId
@@ -204,6 +294,10 @@ Rectangle {
     }
 
     function applySnapshot(snapshot) {
+        if (snapshot.canvasWidth !== undefined && snapshot.canvasHeight !== undefined) {
+            surface.canvasWidth = Math.max(1, Math.round(snapshot.canvasWidth))
+            surface.canvasHeight = Math.max(1, Math.round(snapshot.canvasHeight))
+        }
         var restoredStrokes = [];
         for (var i = 0; i < snapshot.strokes.length; ++i) {
             restoredStrokes.push(snapshot.strokes[i]);
@@ -258,9 +352,15 @@ Rectangle {
     }
 
     signal brushDeltaRequested(int delta)
+    signal toolShortcutRequested(string tool)
+    signal freeTransformShortcutRequested
 
     function updateConstrainAspectState() {
         surface.constrainAspect = surface.freeTransformActive && surface.shiftHoldCount > 0
+    }
+
+    function isShiftModifierActive(modifiers) {
+        return (modifiers & Qt.ShiftModifier) !== 0
     }
 
     function schedulePaint(fullRedraw) {
@@ -334,28 +434,32 @@ Rectangle {
     }
 
     Component.onCompleted: {
+        surface.updateCanvasSizeFromViewport()
+        Qt.callLater(surface.updateCanvasSizeFromViewport)
         surface.forceActiveFocus()
         surface.schedulePaint(true)
     }
 
     function newCanvas() {
         surface.pushUndoState()
-        surface.cancelTextEntry()
-        strokes = []
-        currentStroke = null
-        imageModel.clear()
-        surface.selectedImageId = -1
-        surface.imageElementRegistry = ({})
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
+        surface.updateCanvasSizeFromViewport()
+        surface.clearDocumentState()
     }
 
-    function loadImage(fileUrl) {
+    function clearCanvas() {
+        surface.pushUndoState()
+        surface.clearDocumentState()
+    }
+
+    function loadImage(fileUrl, options) {
         var sourceUrl = normalizeUrl(fileUrl)
         if (!sourceUrl) {
             return
         }
-        surface.pushUndoState()
+        var shouldSkipUndo = options && options.skipUndo === true
+        if (!shouldSkipUndo) {
+            surface.pushUndoState()
+        }
         surface.cancelTextEntry()
         currentStroke = null
         var newId = ++surface.imageIdCounter
@@ -385,7 +489,7 @@ Rectangle {
         var textOverlayWasVisible = textInputOverlay.visible
         selectionOverlay.visible = false
         textInputOverlay.visible = false
-        var grabResult = surface.grabToImage(function(result) {
+        var grabResult = canvasContainer.grabToImage(function(result) {
             result.saveToFile(path)
             selectionOverlay.visible = overlayWasVisible
             textInputOverlay.visible = textOverlayWasVisible
@@ -430,15 +534,15 @@ Rectangle {
             return
         }
         const fitScale = Math.min(
-                    surface.width / entry.originalWidth,
-                    surface.height / entry.originalHeight,
+                    surface.canvasWidth / entry.originalWidth,
+                    surface.canvasHeight / entry.originalHeight,
                     1)
         var width = entry.originalWidth * fitScale
         var height = entry.originalHeight * fitScale
         imageModel.setProperty(index, "scaleX", fitScale)
         imageModel.setProperty(index, "scaleY", fitScale)
-        imageModel.setProperty(index, "x", (surface.width - width) / 2)
-        imageModel.setProperty(index, "y", (surface.height - height) / 2)
+        imageModel.setProperty(index, "x", (surface.canvasWidth - width) / 2)
+        imageModel.setProperty(index, "y", (surface.canvasHeight - height) / 2)
         imageModel.setProperty(index, "ready", true)
         surface.freeTransformActive = false
         if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
@@ -469,10 +573,10 @@ Rectangle {
         textRasterizer.height = height
         textRasterizer.fontSize = fontPx
         textRasterizer.textColor = surface.brushColor
-        var targetX = posX !== undefined ? posX : (surface.width - width) / 2
-        var targetY = posY !== undefined ? posY : (surface.height - height) / 2
-        targetX = Math.max(0, Math.min(surface.width - width, targetX))
-        targetY = Math.max(0, Math.min(surface.height - height, targetY))
+        var targetX = posX !== undefined ? posX : (surface.canvasWidth - width) / 2
+        var targetY = posY !== undefined ? posY : (surface.canvasHeight - height) / 2
+        targetX = Math.max(0, Math.min(surface.canvasWidth - width, targetX))
+        targetY = Math.max(0, Math.min(surface.canvasHeight - height, targetY))
         textRasterizer.targetX = targetX
         textRasterizer.targetY = targetY
         textRasterizer.completion = function (dataUrl, renderedWidth, renderedHeight, finalX, finalY) {
@@ -496,12 +600,12 @@ Rectangle {
 
     function startTextEntry(x, y) {
         textInputOverlay.fontPixelSize = Math.max(12, surface.brushSize * 2)
-        var width = Math.min(320, surface.width)
-        var height = Math.min(140, surface.height)
+        var width = Math.min(320, surface.canvasWidth)
+        var height = Math.min(140, surface.canvasHeight)
         textInputOverlay.overlayWidth = width
         textInputOverlay.overlayHeight = height
-        textInputOverlay.targetX = Math.max(0, Math.min(surface.width - width, x))
-        textInputOverlay.targetY = Math.max(0, Math.min(surface.height - height, y))
+        textInputOverlay.targetX = Math.max(0, Math.min(surface.canvasWidth - width, x))
+        textInputOverlay.targetY = Math.max(0, Math.min(surface.canvasHeight - height, y))
         textEntryEdit.text = ""
         textInputOverlay.visible = true
         textEntryEdit.forceActiveFocus()
@@ -613,8 +717,71 @@ Rectangle {
         }
     }
 
+    Rectangle {
+        id: canvasContainer
+        anchors.centerIn: parent
+        width: surface.canvasWidth
+        height: surface.canvasHeight
+        radius: 6
+        color: "white"
+        border.color: "#d0d0d0"
+        border.width: 1
+        clip: true
+    }
+
+    Rectangle {
+        parent: canvasContainer
+        anchors.fill: parent
+        z: 25
+        visible: externalDropArea.containsDrag
+        color: surface.externalDragHasSupportedImage
+            ? Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.16)
+            : Qt.rgba(220 / 255, 60 / 255, 60 / 255, 0.16)
+        border.width: 2
+        border.color: surface.externalDragHasSupportedImage ? "#2d89ef" : "#dc3c3c"
+
+        Text {
+            anchors.centerIn: parent
+            text: surface.externalDragHasSupportedImage
+                ? qsTr("Drop image to import")
+                : qsTr("Unsupported file type")
+            color: "#1a1a1a"
+            font.pixelSize: 18
+            font.bold: true
+        }
+    }
+
+    DropArea {
+        id: externalDropArea
+        parent: canvasContainer
+        anchors.fill: parent
+        z: 30
+        onEntered: function (drag) {
+            var urls = surface.extractImageUrlsFromDrop(drag)
+            surface.externalDragHasSupportedImage = urls.length > 0
+            drag.accepted = surface.externalDragHasSupportedImage
+        }
+        onPositionChanged: function (drag) {
+            if (!surface.externalDragHasSupportedImage) {
+                var urls = surface.extractImageUrlsFromDrop(drag)
+                surface.externalDragHasSupportedImage = urls.length > 0
+            }
+            drag.accepted = surface.externalDragHasSupportedImage
+        }
+        onDropped: function (drop) {
+            var urls = surface.extractImageUrlsFromDrop(drop)
+            var imported = surface.importDroppedImages(urls)
+            drop.accepted = imported
+            surface.externalDragHasSupportedImage = false
+        }
+        onExited: {
+            surface.externalDragHasSupportedImage = false
+        }
+    }
+
     Canvas {
         id: paintCanvas
+        parent: canvasContainer
         anchors.fill: parent
         renderTarget: Canvas.Image
         z: 10
@@ -715,8 +882,10 @@ Rectangle {
 
     Item {
         id: imageLayer
+        parent: canvasContainer
         anchors.fill: parent
         visible: surface.hasImportedImage
+        clip: true
         z: 5
 
         Repeater {
@@ -843,7 +1012,7 @@ Rectangle {
                 imageModel.setProperty(selectedIndex, "y", newY)
             }
 
-            function handleTransform(role, dx, dy, startRect) {
+            function handleTransform(role, dx, dy, startRect, forceConstrainAspect) {
                 if (!currentEntry || selectedIndex < 0) {
                     return
                 }
@@ -892,8 +1061,8 @@ Rectangle {
 
                 var minWidth = Math.max(minSize, 8)
                 var minHeight = Math.max(minSize, 8)
-                var maxWidth = surface.width * 4
-                var maxHeight = surface.height * 4
+                var maxWidth = surface.canvasWidth * 4
+                var maxHeight = surface.canvasHeight * 4
 
                 var width = newRight - newLeft
                 if (width < minWidth) {
@@ -928,7 +1097,11 @@ Rectangle {
                 var startWidth = startRect.w
                 var startHeight = startRect.h
 
-                if (surface.constrainAspect && startWidth > 0 && startHeight > 0) {
+                var constrainAspectNow = forceConstrainAspect === undefined
+                    ? surface.constrainAspect
+                    : forceConstrainAspect
+
+                if (constrainAspectNow && startWidth > 0 && startHeight > 0) {
                     var centerX = startLeft + startWidth / 2
                     var centerY = startTop + startHeight / 2
                     var minScale = Math.max(minWidth / startWidth, minHeight / startHeight)
@@ -1068,6 +1241,7 @@ Rectangle {
                             property real startPointerSceneY: 0
                             onActiveChanged: {
                                 if (active) {
+                                    surface.forceActiveFocus()
                                     surface.beginTransformUndoCapture()
                                     startX = selectionOverlay.x
                                     startY = selectionOverlay.y
@@ -1080,11 +1254,13 @@ Rectangle {
                             onTranslationChanged: {
                                 var deltaX = centroid.scenePosition.x - startPointerSceneX
                                 var deltaY = centroid.scenePosition.y - startPointerSceneY
+                                var keepAspect = surface.isShiftModifierActive(centroid.modifiers) || surface.constrainAspect
                                 selectionOverlay.handleTransform(
                                             modelData.role,
                                             deltaX,
                                             deltaY,
-                                            { x: startX, y: startY, w: startWidth, h: startHeight })
+                                            { x: startX, y: startY, w: startWidth, h: startHeight },
+                                            keepAspect)
                             }
                         }
                     }
@@ -1103,6 +1279,7 @@ Rectangle {
 
                 onActiveChanged: {
                     if (active) {
+                        surface.forceActiveFocus()
                         surface.beginTransformUndoCapture()
                         startX = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.x : selectionOverlay.x
                         startY = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.y : selectionOverlay.y
@@ -1147,6 +1324,7 @@ Rectangle {
 
     Item {
         id: textInputOverlay
+        parent: canvasContainer
         property real targetX: 0
         property real targetY: 0
         property real fontPixelSize: 24
@@ -1220,6 +1398,7 @@ Rectangle {
     }
 
     MouseArea {
+        parent: canvasContainer
         anchors.fill: parent
         z: 3
         hoverEnabled: true
@@ -1319,7 +1498,7 @@ Rectangle {
         }
     }
 
-    Keys.onPressed: {
+    Keys.onPressed: function (event) {
         if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
             surface.shiftHoldCount = surface.shiftHoldCount + 1
             surface.updateConstrainAspectState()
@@ -1329,7 +1508,7 @@ Rectangle {
         event.accepted = false
     }
 
-    Keys.onReleased: {
+    Keys.onReleased: function (event) {
         if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
             surface.shiftHoldCount = Math.max(0, surface.shiftHoldCount - 1)
             surface.updateConstrainAspectState()
@@ -1344,6 +1523,58 @@ Rectangle {
             surface.shiftHoldCount = 0
             surface.updateConstrainAspectState()
         }
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "B", "ㅠ" ]
+        onActivated: surface.toolShortcutRequested("brush")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "E", "ㄷ" ]
+        onActivated: surface.toolShortcutRequested("eraser")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "V", "ㅍ" ]
+        onActivated: surface.toolShortcutRequested("grab")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "T", "ㅅ" ]
+        onActivated: surface.toolShortcutRequested("text")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "[" ]
+        onActivated: surface.brushDeltaRequested(-1)
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [ "]" ]
+        onActivated: surface.brushDeltaRequested(1)
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        enabled: !textInputOverlay.visible
+        sequences: [
+            Qt.platform.os === "osx" ? "Meta+T" : "Ctrl+T",
+            Qt.platform.os === "osx" ? "Meta+ㅅ" : "Ctrl+ㅅ"
+        ]
+        onActivated: surface.freeTransformShortcutRequested()
     }
 
     Shortcut {

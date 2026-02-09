@@ -18,9 +18,12 @@ Controls.ToolBar {
     property color currentColor: "#1a1a1a"
     property var palette: []
     property string currentTool: "brush"
-    property bool textInputActive: false
     readonly property bool dialogActive: openDialog.visible || saveDialog.visible
-    readonly property bool toolShortcutsEnabled: !toolbar.textInputActive && !toolbar.dialogActive
+    readonly property string modifierKeyLabel: Qt.platform.os === "osx" ? "Cmd" : "Ctrl"
+    readonly property string shortcutNew: modifierKeyLabel + "+N"
+    readonly property string shortcutOpen: modifierKeyLabel + "+O"
+    readonly property string shortcutSave: modifierKeyLabel + "+S"
+    readonly property string shortcutClear: modifierKeyLabel + "+Shift+K"
     readonly property color accentColor: (palette && palette.highlight !== undefined) ? palette.highlight : "#2d89ef"
 
     signal newCanvasRequested
@@ -90,61 +93,13 @@ Controls.ToolBar {
         onActivated: toolbar.clearCanvasRequested()
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [Qt.platform.os === "osx" ? "Meta+T" : "Ctrl+T"]
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.freeTransformRequested()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "B"
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.toolSelected("brush")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "E"
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.toolSelected("eraser")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "V"
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.toolSelected("grab")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "T"
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.toolSelected("text")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "]"
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: "["
-        enabled: toolbar.toolShortcutsEnabled
-        onActivated: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
-    }
-
     component ToolbarButton: Controls.ToolButton {
         id: control
         property url iconSource
         property int iconSize: toolbar.iconSizeMedium
         property int iconBoxSize: toolbar.iconSizeMedium
         property string tooltipText: ""
+        property string shortcutText: ""
 
         hoverEnabled: true
         padding: Math.max(2, Math.round(toolbar.spacingSmall / 2))
@@ -177,7 +132,15 @@ Controls.ToolBar {
 
         Controls.ToolTip.visible: control.hovered && Controls.ToolTip.text.length > 0
         Controls.ToolTip.delay: 300
-        Controls.ToolTip.text: control.tooltipText.length ? control.tooltipText : control.text
+        Controls.ToolTip.text: {
+            const baseText = control.tooltipText.length ? control.tooltipText : control.text;
+            if (!baseText.length) {
+                return "";
+            }
+            return control.shortcutText.length
+                ? qsTr("%1 (%2)").arg(baseText).arg(control.shortcutText)
+                : baseText;
+        }
     }
 
     component ToolbarDivider: Rectangle {
@@ -308,6 +271,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/new.svg"
                         tooltipText: qsTr("New canvas")
+                        shortcutText: toolbar.shortcutNew
                         Accessible.name: tooltipText
                         onClicked: toolbar.newCanvasRequested()
                     }
@@ -315,6 +279,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/open.svg"
                         tooltipText: qsTr("Open image")
+                        shortcutText: toolbar.shortcutOpen
                         Accessible.name: tooltipText
                         onClicked: toolbar.openFileDialog()
                     }
@@ -322,6 +287,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/save.svg"
                         tooltipText: qsTr("Save image")
+                        shortcutText: toolbar.shortcutSave
                         Accessible.name: tooltipText
                         onClicked: toolbar.openSaveDialog()
                     }
@@ -329,6 +295,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/clear.svg"
                         tooltipText: qsTr("Clear canvas")
+                        shortcutText: toolbar.shortcutClear
                         Accessible.name: tooltipText
                         onClicked: toolbar.clearCanvasRequested()
                     }
@@ -346,6 +313,7 @@ Controls.ToolBar {
                         checked: toolbar.currentTool === "brush"
                         iconSource: "qrc:/../resources/icons/brush.svg"
                         tooltipText: qsTr("Brush tool")
+                        shortcutText: "B"
                         Accessible.name: tooltipText
                         onClicked: toolbar.toolSelected("brush")
                     }
@@ -355,6 +323,7 @@ Controls.ToolBar {
                         checked: toolbar.currentTool === "eraser"
                         iconSource: "qrc:/../resources/icons/eraser.svg"
                         tooltipText: qsTr("Eraser tool")
+                        shortcutText: "E"
                         Accessible.name: tooltipText
                         onClicked: toolbar.toolSelected("eraser")
                     }
@@ -364,6 +333,7 @@ Controls.ToolBar {
                         checked: toolbar.currentTool === "grab"
                         iconSource: "qrc:/../resources/icons/grab.svg"
                         tooltipText: qsTr("Grab tool")
+                        shortcutText: "V"
                         Accessible.name: tooltipText
                         onClicked: toolbar.toolSelected("grab")
                     }
@@ -373,6 +343,7 @@ Controls.ToolBar {
                         checked: toolbar.currentTool === "text"
                         iconSource: "qrc:/../resources/icons/text.svg"
                         tooltipText: qsTr("Text tool")
+                        shortcutText: "T"
                         Accessible.name: tooltipText
                         onClicked: toolbar.toolSelected("text")
                     }
@@ -430,6 +401,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/zoom-in.svg"
                         tooltipText: qsTr("Increase brush size")
+                        shortcutText: "]"
                         Accessible.name: tooltipText
                         onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
                     }
@@ -437,6 +409,7 @@ Controls.ToolBar {
                     ToolbarButton {
                         iconSource: "qrc:/../resources/icons/zoom-out.svg"
                         tooltipText: qsTr("Decrease brush size")
+                        shortcutText: "["
                         Accessible.name: tooltipText
                         onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
                     }
