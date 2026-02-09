@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(Vincent VERSION 2.0.0 LANGUAGES CXX)
+project(Vincent VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -75,7 +75,7 @@ if(CMAKE_GENERATOR STREQUAL "Xcode")
 endif()
 qt_add_qml_module(Vincent
         URI Vincent
-        VERSION 2.0
+        VERSION 2.1
         QML_FILES
         App/qml/Main.qml
         App/qml/PainterCanvasPage.qml
@@ -154,7 +154,7 @@ if(DEFINED _vincent_icon_bundle_name)
     set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${_vincent_icon_bundle_name}")
 endif()
 
-# 설치 규칙: /Applications/Vincent 2.0.app
+# 설치 규칙: /Applications/Vincent 2.1.0.app
 install(TARGETS Vincent BUNDLE DESTINATION "Applications")
 
 # Linux install target (runtime binary)
@@ -165,7 +165,7 @@ endif()
 # CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
 set(CPACK_GENERATOR "productbuild")
 set(CPACK_PACKAGE_NAME "Vincent")
-set(CPACK_PACKAGE_VERSION "2.0.1")
+set(CPACK_PACKAGE_VERSION "2.1.0")
 set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}")
 
 # 설치 경로: .app을 /Applications로 설치
@@ -183,7 +183,7 @@ set(CPACK_PRODUCTBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZ
 # 단일 컴포넌트로 .app을 패키지화
 set(CPACK_COMPONENTS_ALL Runtime)
 set(CPACK_COMPONENT_RUNTIME_DISPLAY_NAME "Vincent")
-set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent 2.0 Application")
+set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent 2.1.0 Application")
 set(CPACK_COMPONENT_RUNTIME_REQUIRED TRUE)
 set(CPACK_COMPONENT_RUNTIME_DEPENDS "")
 

@@ -11,7 +11,7 @@ Controls.ApplicationWindow {
     minimumWidth: initialWidth
     minimumHeight: initialHeight
     visible: true
-    title: qsTr("Vincent 2.0")
+    title: qsTr("Vincent 2.1.0")
 
     property var canvasPage: null
 
