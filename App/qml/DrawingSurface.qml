@@ -36,6 +36,7 @@ Rectangle {
     property var redoStack: []
     readonly property int maxUndoSteps: 64
     property bool transformUndoCaptured: false
+    readonly property bool textEntryActive: textInputOverlay.visible
 
     function findImageIndexById(imageId) {
         if (imageId === -1) {
@@ -65,8 +66,30 @@ Rectangle {
         return index >= 0 ? imageModel.get(index) : null;
     }
 
+    function findImageElementById(imageId) {
+        if (imageId === -1 || !imageRepeater || imageRepeater.count <= 0) {
+            return null
+        }
+        for (var i = 0; i < imageRepeater.count; ++i) {
+            var item = imageRepeater.itemAt(i)
+            if (item && item.delegateImageId === imageId) {
+                return item
+            }
+        }
+        return null
+    }
+
     function updateSelectedImageItem() {
         var item = surface.imageElementRegistry[surface.selectedImageId]
+        if (item && item.delegateImageId !== surface.selectedImageId) {
+            item = null
+        }
+        if (!item) {
+            item = surface.findImageElementById(surface.selectedImageId)
+            if (item) {
+                surface.imageElementRegistry[surface.selectedImageId] = item
+            }
+        }
         surface.selectedImageItem = item ? item : null
         surface.notifySelectionOverlay()
     }
@@ -87,6 +110,7 @@ Rectangle {
         }
         surface.selectedImageId = imageId;
         surface.updateSelectedImageItem();
+        Qt.callLater(surface.updateSelectedImageItem);
         surface.freeTransformActive = false;
         surface.freeTransformSnapshot = {};
         if (surface.toolMode === "grab") {
@@ -106,12 +130,19 @@ Rectangle {
         surface.notifySelectionOverlay();
     }
 
-    function unregisterImageElement(imageId) {
-        if (surface.imageElementRegistry[imageId]) {
-            delete surface.imageElementRegistry[imageId];
-            surface.updateSelectedImageItem();
+    function unregisterImageElement(imageId, element) {
+        if (imageId === undefined || imageId === null) {
+            return;
         }
-        surface.notifySelectionOverlay();
+        var current = surface.imageElementRegistry[imageId]
+        if (!current) {
+            return;
+        }
+        if (element && current !== element) {
+            return;
+        }
+        delete surface.imageElementRegistry[imageId];
+        surface.updateSelectedImageItem();
     }
 
     function cloneStrokes(src) {
@@ -694,8 +725,8 @@ Rectangle {
 
             delegate: Image {
                 id: imageDisplay
-                property int modelIndex: index
                 property int delegateImageId: model.imageId
+                property int registeredImageId: -1
                 x: model.x
                 y: model.y
                 width: model.originalWidth > 0 ? model.originalWidth * model.scaleX : 0
@@ -707,15 +738,39 @@ Rectangle {
                 opacity: 1
                 source: model.source
 
-                Component.onCompleted: surface.registerImageElement(delegateImageId, imageDisplay)
-                Component.onDestruction: surface.unregisterImageElement(delegateImageId)
+                Component.onCompleted: {
+                    registeredImageId = delegateImageId
+                    surface.registerImageElement(registeredImageId, imageDisplay)
+                }
+
+                onDelegateImageIdChanged: {
+                    if (registeredImageId === delegateImageId) {
+                        return
+                    }
+                    if (registeredImageId !== -1) {
+                        surface.unregisterImageElement(registeredImageId, imageDisplay)
+                    }
+                    registeredImageId = delegateImageId
+                    surface.registerImageElement(registeredImageId, imageDisplay)
+                }
+
+                Component.onDestruction: surface.unregisterImageElement(registeredImageId, imageDisplay)
 
                 onStatusChanged: {
-                    if (status === Image.Ready && !model.ready) {
-                        imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
-                        imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
-                        surface.resetImagePlacement(delegateImageId)
+                    if (status !== Image.Ready) {
+                        return
                     }
+                    var modelIndex = surface.findImageIndexById(delegateImageId)
+                    if (modelIndex === -1) {
+                        return
+                    }
+                    var entry = imageModel.get(modelIndex)
+                    if (!entry || entry.ready) {
+                        return
+                    }
+                    imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
+                    imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
+                    surface.resetImagePlacement(delegateImageId)
                 }
 
                 TapHandler {
@@ -997,11 +1052,6 @@ Rectangle {
                         x: modelData.xFactor * parent.width - width / 2
                         y: modelData.yFactor * parent.height - height / 2
 
-                        property real startX: 0
-                        property real startY: 0
-                        property real startWidth: 0
-                        property real startHeight: 0
-
                         HoverHandler {
                             cursorShape: modelData.cursor
                         }
@@ -1010,6 +1060,12 @@ Rectangle {
                             target: null
                             enabled: surface.freeTransformActive
                             acceptedButtons: Qt.LeftButton
+                            property real startX: 0
+                            property real startY: 0
+                            property real startWidth: 0
+                            property real startHeight: 0
+                            property real startPointerSceneX: 0
+                            property real startPointerSceneY: 0
                             onActiveChanged: {
                                 if (active) {
                                     surface.beginTransformUndoCapture()
@@ -1017,13 +1073,17 @@ Rectangle {
                                     startY = selectionOverlay.y
                                     startWidth = selectionOverlay.width
                                     startHeight = selectionOverlay.height
+                                    startPointerSceneX = centroid.scenePosition.x
+                                    startPointerSceneY = centroid.scenePosition.y
                                 }
                             }
                             onTranslationChanged: {
+                                var deltaX = centroid.scenePosition.x - startPointerSceneX
+                                var deltaY = centroid.scenePosition.y - startPointerSceneY
                                 selectionOverlay.handleTransform(
                                             modelData.role,
-                                            translation.x,
-                                            translation.y,
+                                            deltaX,
+                                            deltaY,
                                             { x: startX, y: startY, w: startWidth, h: startHeight })
                             }
                         }
@@ -1038,12 +1098,16 @@ Rectangle {
                 acceptedButtons: Qt.LeftButton
                 property real startX: 0
                 property real startY: 0
+                property real startPointerSceneX: 0
+                property real startPointerSceneY: 0
 
                 onActiveChanged: {
                     if (active) {
                         surface.beginTransformUndoCapture()
                         startX = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.x : selectionOverlay.x
                         startY = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.y : selectionOverlay.y
+                        startPointerSceneX = centroid.scenePosition.x
+                        startPointerSceneY = centroid.scenePosition.y
                         if (!surface.freeTransformActive) {
                             surface.startFreeTransform()
                         }
@@ -1053,7 +1117,9 @@ Rectangle {
                 }
 
                 onTranslationChanged: {
-                    selectionOverlay.moveSelection(startX + translation.x, startY + translation.y)
+                    var deltaX = centroid.scenePosition.x - startPointerSceneX
+                    var deltaY = centroid.scenePosition.y - startPointerSceneY
+                    selectionOverlay.moveSelection(startX + deltaX, startY + deltaY)
                 }
             }
 

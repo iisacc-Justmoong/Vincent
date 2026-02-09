@@ -161,6 +161,7 @@ Controls.Page {
             brushSize: painterPage.brushSize
             currentColor: painterPage.brushColor
             currentTool: painterPage.toolMode
+            textInputActive: drawingSurface.textEntryActive
             palette: painterPage.colorPalette
             onNewCanvasRequested: painterPage.newCanvas()
             onClearCanvasRequested: painterPage.clearCanvas()

@@ -18,6 +18,9 @@ Controls.ToolBar {
     property color currentColor: "#1a1a1a"
     property var palette: []
     property string currentTool: "brush"
+    property bool textInputActive: false
+    readonly property bool dialogActive: openDialog.visible || saveDialog.visible
+    readonly property bool toolShortcutsEnabled: !toolbar.textInputActive && !toolbar.dialogActive
     readonly property color accentColor: (palette && palette.highlight !== undefined) ? palette.highlight : "#2d89ef"
 
     signal newCanvasRequested
@@ -36,64 +39,103 @@ Controls.ToolBar {
         saveDialog.open();
     }
 
+    function selectedDialogFileUrl(dialog) {
+        const selected = dialog.selectedFile;
+        return selected ? selected.toString() : "";
+    }
+
+    function hasPathExtension(urlString) {
+        const pathOnly = urlString.split("?")[0].split("#")[0];
+        const lastSlashIndex = pathOnly.lastIndexOf("/");
+        const fileName = lastSlashIndex >= 0 ? pathOnly.substring(lastSlashIndex + 1) : pathOnly;
+        return fileName.lastIndexOf(".") > 0;
+    }
+
+    function defaultSaveExtension(nameFilter) {
+        const suffix = (nameFilter || "").toLowerCase();
+        if (suffix.indexOf("jpeg") !== -1 || suffix.indexOf("jpg") !== -1) {
+            return ".jpg";
+        }
+        if (suffix.indexOf("bmp") !== -1) {
+            return ".bmp";
+        }
+        return ".png";
+    }
+
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.New
+        enabled: !toolbar.dialogActive
         onActivated: toolbar.newCanvasRequested()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Open
+        enabled: !toolbar.dialogActive
         onActivated: toolbar.openFileDialog()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Save
+        enabled: !toolbar.dialogActive
         onActivated: toolbar.openSaveDialog()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequences: [Qt.platform.os === "osx" ? "Meta+Shift+K" : "Ctrl+Shift+K"]
+        enabled: !toolbar.dialogActive
         onActivated: toolbar.clearCanvasRequested()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequences: [Qt.platform.os === "osx" ? "Meta+T" : "Ctrl+T"]
-        enabled: toolbar.currentTool === "grab"
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.freeTransformRequested()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: "B"
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.toolSelected("brush")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: "E"
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.toolSelected("eraser")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequence: "H"
+        sequence: "V"
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.toolSelected("grab")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
+        sequence: "T"
+        enabled: toolbar.toolShortcutsEnabled
+        onActivated: toolbar.toolSelected("text")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
         sequence: "]"
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: "["
+        enabled: toolbar.toolShortcutsEnabled
         onActivated: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
     }
 
@@ -181,8 +223,7 @@ Controls.ToolBar {
         fileMode: Dialogs.FileDialog.OpenFile
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif)")]
         onAccepted: {
-            const selected = openDialog.selectedFile || openDialog.fileUrl;
-            const urlString = selected ? selected.toString() : "";
+            const urlString = toolbar.selectedDialogFileUrl(openDialog);
             if (urlString.length) {
                 toolbar.openRequested(urlString);
             }
@@ -195,24 +236,16 @@ Controls.ToolBar {
         fileMode: Dialogs.FileDialog.SaveFile
         nameFilters: [qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)")]
         onAccepted: {
-            const selected = saveDialog.selectedFile || saveDialog.fileUrl;
-            var urlString = selected ? selected.toString() : "";
+            var urlString = toolbar.selectedDialogFileUrl(saveDialog);
             if (!urlString.length) {
                 return;
             }
 
-            if (!urlString.includes('.')) {
+            if (!toolbar.hasPathExtension(urlString)) {
                 if (urlString.endsWith('/')) {
                     urlString += 'canvas';
                 }
-                const suffix = saveDialog.selectedNameFilter.toLowerCase();
-                if (suffix.indexOf('jpeg') !== -1 || suffix.indexOf('jpg') !== -1) {
-                    urlString += '.jpg';
-                } else if (suffix.indexOf('bmp') !== -1) {
-                    urlString += '.bmp';
-                } else {
-                    urlString += '.png';
-                }
+                urlString += toolbar.defaultSaveExtension(saveDialog.selectedNameFilter);
             }
 
             toolbar.saveRequested(urlString);
@@ -241,14 +274,13 @@ Controls.ToolBar {
         MouseArea {
             id: toolbarEventBlocker
             anchors.fill: floatingBackground
-            z: -1
+            z: 0
             acceptedButtons: Qt.AllButtons
             hoverEnabled: true
-            onPressed: mouse.accepted = true
-            onPositionChanged: mouse.accepted = true
-            onReleased: mouse.accepted = true
-            onCanceled: mouse.accepted = true
-            onWheel: wheel.accepted = true
+            onPressed: function (mouse) { mouse.accepted = true; }
+            onPositionChanged: function (mouse) { mouse.accepted = true; }
+            onReleased: function (mouse) { mouse.accepted = true; }
+            onWheel: function (wheel) { wheel.accepted = true; }
         }
 
         Item {
@@ -350,8 +382,10 @@ Controls.ToolBar {
 
                 Rectangle {
                     id: brushPreview
-                    width: 36
-                    height: 36
+                    implicitWidth: 36
+                    implicitHeight: 36
+                    Layout.preferredWidth: implicitWidth
+                    Layout.preferredHeight: implicitHeight
                     radius: 18
                     color: Qt.rgba(255, 255, 255, 0.04)
                     border.width: 1

@@ -138,7 +138,7 @@ if(EXISTS "${_vincent_icon_abs}")
 endif()
 
 # 번들 식별자 및 Info.plist 연결
-set(BUNDLE_ID "com.iisacc.app.vincent")
+set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(MAC_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist") # 소스 트리의 쓰기 가능한 plist
 set_target_properties(Vincent PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
@@ -174,7 +174,7 @@ set(CPACK_PRODUCTBUILD_INSTALLER_DIRECTORY "/") # 내부적으로 사용
 set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources")
 
 # 식별자
-set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.app.vincent")
+set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.vincent.painter")
 
 # 서명 신원: pkgbuild와 productbuild 모두 지정
 set(CPACK_PKGBUILD_IDENTITY_NAME "Apple Distribution: MUYEONG YUN (5U49ST9XZH)")
