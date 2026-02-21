@@ -16,7 +16,6 @@ LV.ApplicationWindow {
     windowDragHandleEnabled: false
     navigationEnabled: false
     autoAttachRuntimeEvents: true
-    title: qsTr("Vincent 2.1.0")
 
     property var canvasPage: null
 
