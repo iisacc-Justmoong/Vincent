@@ -98,16 +98,6 @@ Item {
         onActivated: toolbar.clearCanvasRequested()
     }
 
-    component ToolbarIconButton: LV.IconButton {
-        id: control
-        property string tooltipText: ""
-        property string shortcutText: ""
-        property bool active: false
-
-        iconSize: 20
-        tone: active ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-    }
-
     component ToolbarDivider: Rectangle {
         width: 1
         Layout.preferredHeight: 32
@@ -229,35 +219,35 @@ Item {
             spacing: toolbar.spacingSmall
             Layout.alignment: Qt.AlignVCenter
 
-            ToolbarIconButton {
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
                 iconName: "addFile"
-                tooltipText: qsTr("New canvas")
-                shortcutText: toolbar.shortcutNew
-                Accessible.name: tooltipText
+                Accessible.name: qsTr("New canvas")
                 onClicked: toolbar.newCanvasRequested()
             }
 
-            ToolbarIconButton {
-                iconName: "open"
-                tooltipText: qsTr("Open image")
-                shortcutText: toolbar.shortcutOpen
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "virtualFolder"
+                Accessible.name: qsTr("Open image")
                 onClicked: toolbar.openFileDialog()
             }
 
-            ToolbarIconButton {
-                iconName: "save"
-                tooltipText: qsTr("Save image")
-                shortcutText: toolbar.shortcutSave
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "imageClassification"
+                Accessible.name: qsTr("Save image")
                 onClicked: toolbar.openSaveDialog()
             }
 
-            ToolbarIconButton {
-                iconName: "delete"
-                tooltipText: qsTr("Clear canvas")
-                shortcutText: toolbar.shortcutClear
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "general  delete"
+                Accessible.name: qsTr("Clear canvas")
                 onClicked: toolbar.clearCanvasRequested()
             }
         }
@@ -269,39 +259,35 @@ Item {
             spacing: toolbar.spacingSmall
             Layout.alignment: Qt.AlignVCenter
 
-            ToolbarIconButton {
-                active: toolbar.currentTool === "brush"
-                iconName: "edit"
-                tooltipText: qsTr("Brush tool")
-                shortcutText: "B"
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                iconName: "rendererKit"
+                Accessible.name: qsTr("Brush tool")
                 onClicked: toolbar.toolSelected("brush")
             }
 
-            ToolbarIconButton {
-                active: toolbar.currentTool === "eraser"
-                iconName: "clearOutputs"
-                tooltipText: qsTr("Eraser tool")
-                shortcutText: "E"
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                iconName: "eraser"
+                Accessible.name: qsTr("Eraser tool")
                 onClicked: toolbar.toolSelected("eraser")
             }
 
-            ToolbarIconButton {
-                active: toolbar.currentTool === "grab"
-                iconName: "selectAll"
-                tooltipText: qsTr("Grab tool")
-                shortcutText: "V"
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: toolbar.currentTool === "grab" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                iconName: "general  locate"
+                Accessible.name: qsTr("Grab tool")
                 onClicked: toolbar.toolSelected("grab")
             }
 
-            ToolbarIconButton {
-                active: toolbar.currentTool === "text"
-                iconName: "text"
-                tooltipText: qsTr("Text tool")
-                shortcutText: "T"
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: toolbar.currentTool === "text" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                iconName: "textGeneration"
+                Accessible.name: qsTr("Text tool")
                 onClicked: toolbar.toolSelected("text")
             }
         }
@@ -337,19 +323,19 @@ Item {
                 }
             }
 
-            ToolbarIconButton {
-                iconName: "zoomOut"
-                tooltipText: qsTr("Decrease brush size")
-                shortcutText: "["
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "image  zoomOut"
+                Accessible.name: qsTr("Decrease brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
             }
 
-            ToolbarIconButton {
-                iconName: "zoomIn"
-                tooltipText: qsTr("Increase brush size")
-                shortcutText: "]"
-                Accessible.name: tooltipText
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "image  zoomIn"
+                Accessible.name: qsTr("Increase brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
             }
 

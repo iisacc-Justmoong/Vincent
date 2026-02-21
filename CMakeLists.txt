@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(Vincent VERSION 2.1.0 LANGUAGES CXX)
+project(Vincent VERSION 2.2.0 LANGUAGES CXX)
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
