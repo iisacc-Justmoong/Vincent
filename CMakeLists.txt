@@ -71,6 +71,17 @@ if(DEFINED ENV{CRAFTROOT})
     unset(_craft_prefix)
 endif()
 
+# 로컬 LVRS 설치 경로 힌트(.local) 우선 반영
+set(_vincent_lvrs_prefix "$ENV{HOME}/.local/LVRS")
+if(EXISTS "${_vincent_lvrs_prefix}/LVRSConfig.cmake")
+    list(FIND CMAKE_PREFIX_PATH "${_vincent_lvrs_prefix}" _vincent_lvrs_index)
+    if(_vincent_lvrs_index EQUAL -1)
+        list(PREPEND CMAKE_PREFIX_PATH "${_vincent_lvrs_prefix}")
+    endif()
+    unset(_vincent_lvrs_index)
+endif()
+unset(_vincent_lvrs_prefix)
+
 # 요구 버전
 set(QT_MIN_VERSION "6.8.0")
 
@@ -80,6 +91,7 @@ include(FeatureSummary)
 
 # Qt6
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
+find_package(LVRS CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
@@ -149,6 +161,12 @@ endif()
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
 )
+
+# LVRS QML 모듈 링크 및 import 경로/정적 플러그인 자동 처리
+set_target_properties(Vincent PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+lvrs_configure_qml_app(Vincent NO_PLATFORM_RUNTIME_TARGETS)
 
 set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
 get_filename_component(_vincent_icon_abs "${VINCENT_APP_ICON}" ABSOLUTE)

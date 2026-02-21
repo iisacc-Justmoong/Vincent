@@ -1,8 +1,8 @@
 import QtQuick
-import QtQuick.Controls as Controls
+import LVRS 1.0 as LV
 import "."
 
-Controls.ApplicationWindow {
+LV.ApplicationWindow {
     id: window
     readonly property int initialWidth: 1400
     readonly property int initialHeight: 880
@@ -11,18 +11,13 @@ Controls.ApplicationWindow {
     minimumWidth: initialWidth
     minimumHeight: initialHeight
     visible: true
+    windowColor: LV.Theme.window
+    windowDragHandleEnabled: false
+    navigationEnabled: false
+    autoAttachRuntimeEvents: true
     title: qsTr("Vincent 2.1.0")
 
     property var canvasPage: null
-
-    header: Controls.ToolBar {
-        id: mainToolBar
-
-        background: Rectangle {
-            color: window.palette.window
-            border.width: 0
-        }
-    }
 
     PainterCanvasPage {
         id: painterPage

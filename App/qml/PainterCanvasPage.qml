@@ -1,14 +1,13 @@
 import QtQuick
-import QtQuick.Controls as Controls
+import LVRS 1.0 as LV
 import "."
 
-Controls.Page {
+Item {
     id: painterPage
 
-    readonly property int spacingSmall: 8
-    readonly property int spacingMedium: 12
-    readonly property int spacingLarge: 16
-    padding: 0
+    readonly property int spacingSmall: LV.Theme.gap8
+    readonly property int spacingMedium: LV.Theme.gap12
+    readonly property int spacingLarge: LV.Theme.gap16
 
     readonly property var primaryPalette: [
         {
@@ -136,7 +135,7 @@ Controls.Page {
 
         Rectangle {
             anchors.fill: parent
-            color: painterPage.palette.window
+            color: LV.Theme.window
 
             DrawingSurface {
                 id: drawingSurface

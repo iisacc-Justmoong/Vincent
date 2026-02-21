@@ -1,41 +1,72 @@
 #include <QDir>
-#include <QGuiApplication>
-#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QQmlEngine>
+#include <QSet>
+#include <QStringList>
+
+#include <backend/runtime/appentry.h>
 
 #include "paletteutils.h"
 
-extern "C" void mac_unifyTitlebar(QWindow *qw);
+namespace {
 
-int main(int argc, char *argv[])
+QStringList collectCandidateImportPaths()
 {
-    QGuiApplication app(argc, argv);
+    QStringList candidateImportPaths;
 
-    QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("PaletteUtils", new PaletteUtils(&engine));
-    const auto craftRoot = QString::fromLocal8Bit(qgetenv("CRAFTROOT"));
-
+    const QString craftRoot = QString::fromLocal8Bit(qgetenv("CRAFTROOT"));
     if (!craftRoot.isEmpty()) {
-        const QStringList candidateImportPaths = {
+        candidateImportPaths << QStringList{
             craftRoot + QStringLiteral("/qml"),
             craftRoot + QStringLiteral("/lib/qml")
         };
-        for (const QString &importPath : candidateImportPaths) {
-            if (QDir(importPath).exists()) {
-                engine.addImportPath(importPath);
-            }
-        }
     }
 
-    QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::objectCreationFailed,
-        &app,
-        []() { QCoreApplication::exit(-1); },
-        Qt::QueuedConnection);
-    engine.loadFromModule("Vincent", "Main");
+    const QString lvrsHostPrefix = QString::fromLocal8Bit(qgetenv("LVRS_HOST_PREFIX"));
+    if (!lvrsHostPrefix.isEmpty()) {
+        candidateImportPaths << (lvrsHostPrefix + QStringLiteral("/lib/qt6/qml"));
+    }
 
-    return app.exec();
+    const QString homePath = QDir::homePath();
+    candidateImportPaths << QStringList{
+        homePath + QStringLiteral("/.local/LVRS/platforms/macos/lib/qt6/qml"),
+        homePath + QStringLiteral("/.local/LVRS/platforms/linux/lib/qt6/qml"),
+        homePath + QStringLiteral("/.local/LVRS/platforms/windows/lib/qt6/qml")
+    };
+
+    return candidateImportPaths;
+}
+
+void configureEngineImports(QQmlApplicationEngine &engine)
+{
+    const QStringList candidateImportPaths = collectCandidateImportPaths();
+
+    QSet<QString> dedupedImportPaths;
+    for (const QString &importPath : candidateImportPaths) {
+        if (importPath.isEmpty() || dedupedImportPaths.contains(importPath)) {
+            continue;
+        }
+
+        dedupedImportPaths.insert(importPath);
+        if (QDir(importPath).exists()) {
+            engine.addImportPath(importPath);
+        }
+    }
+}
+
+} // namespace
+
+int main(int argc, char *argv[])
+{
+    lvrs::QmlAppLaunchSpec launchSpec;
+    launchSpec.bootstrap.applicationName = QStringLiteral("Vincent");
+    launchSpec.bootstrap.quickStyleName = QStringLiteral("Basic");
+    launchSpec.moduleUri = QStringLiteral("Vincent");
+    launchSpec.rootObject = QStringLiteral("Main");
+    launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
+        engine.rootContext()->setContextProperty("PaletteUtils", new PaletteUtils(&engine));
+        configureEngineImports(engine);
+    };
+
+    return lvrs::runBootstrappedQmlApp(argc, argv, launchSpec);
 }
