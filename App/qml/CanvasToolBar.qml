@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as Controls
 import QtQuick.Dialogs as Dialogs
 import QtQuick.Layouts
 import LVRS 1.0 as LV
@@ -67,29 +68,6 @@ Item {
             return ".bmp"
         }
         return ".png"
-    }
-
-    function clampBrushSize(rawValue) {
-        const numericValue = Number(rawValue)
-        if (!Number.isFinite(numericValue)) {
-            return -1
-        }
-        return Math.max(1, Math.min(48, Math.round(numericValue)))
-    }
-
-    function requestBrushSize(rawValue) {
-        const clampedValue = clampBrushSize(rawValue)
-        if (clampedValue < 0) {
-            return
-        }
-        brushSizeChangeRequested(clampedValue)
-    }
-
-    onBrushSizeChanged: {
-        const normalized = String(Math.round(toolbar.brushSize))
-        if (sizeField && !sizeField.activeFocus && sizeField.text !== normalized) {
-            sizeField.text = normalized
-        }
     }
 
     Shortcut {
@@ -252,7 +230,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/new.svg"
+                iconName: "addFile"
                 tooltipText: qsTr("New canvas")
                 shortcutText: toolbar.shortcutNew
                 Accessible.name: tooltipText
@@ -260,7 +238,7 @@ Item {
             }
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/open.svg"
+                iconName: "open"
                 tooltipText: qsTr("Open image")
                 shortcutText: toolbar.shortcutOpen
                 Accessible.name: tooltipText
@@ -268,7 +246,7 @@ Item {
             }
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/save.svg"
+                iconName: "save"
                 tooltipText: qsTr("Save image")
                 shortcutText: toolbar.shortcutSave
                 Accessible.name: tooltipText
@@ -276,7 +254,7 @@ Item {
             }
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/clear.svg"
+                iconName: "delete"
                 tooltipText: qsTr("Clear canvas")
                 shortcutText: toolbar.shortcutClear
                 Accessible.name: tooltipText
@@ -293,7 +271,7 @@ Item {
 
             ToolbarIconButton {
                 active: toolbar.currentTool === "brush"
-                iconSource: "qrc:/../resources/icons/brush.svg"
+                iconName: "edit"
                 tooltipText: qsTr("Brush tool")
                 shortcutText: "B"
                 Accessible.name: tooltipText
@@ -302,7 +280,7 @@ Item {
 
             ToolbarIconButton {
                 active: toolbar.currentTool === "eraser"
-                iconSource: "qrc:/../resources/icons/eraser.svg"
+                iconName: "clearOutputs"
                 tooltipText: qsTr("Eraser tool")
                 shortcutText: "E"
                 Accessible.name: tooltipText
@@ -311,7 +289,7 @@ Item {
 
             ToolbarIconButton {
                 active: toolbar.currentTool === "grab"
-                iconSource: "qrc:/../resources/icons/grab.svg"
+                iconName: "selectAll"
                 tooltipText: qsTr("Grab tool")
                 shortcutText: "V"
                 Accessible.name: tooltipText
@@ -320,7 +298,7 @@ Item {
 
             ToolbarIconButton {
                 active: toolbar.currentTool === "text"
-                iconSource: "qrc:/../resources/icons/text.svg"
+                iconName: "text"
                 tooltipText: qsTr("Text tool")
                 shortcutText: "T"
                 Accessible.name: tooltipText
@@ -360,7 +338,7 @@ Item {
             }
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/zoom-out.svg"
+                iconName: "zoomOut"
                 tooltipText: qsTr("Decrease brush size")
                 shortcutText: "["
                 Accessible.name: tooltipText
@@ -368,36 +346,60 @@ Item {
             }
 
             ToolbarIconButton {
-                iconSource: "qrc:/../resources/icons/zoom-in.svg"
+                iconName: "zoomIn"
                 tooltipText: qsTr("Increase brush size")
                 shortcutText: "]"
                 Accessible.name: tooltipText
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
             }
 
-            LV.InputField {
-                id: sizeField
-                width: 64
-                placeholderText: qsTr("px")
-                selectByMouse: true
-                validator: IntValidator {
-                    bottom: 1
-                    top: 48
-                }
-                onTextEdited: function (value) {
-                    if (value.length > 0) {
-                        toolbar.requestBrushSize(value)
+            Controls.Slider {
+                id: sizeSlider
+                from: 1
+                to: 48
+                Layout.preferredWidth: 160
+                orientation: Qt.Horizontal
+                value: toolbar.brushSize
+                hoverEnabled: true
+                Accessible.name: qsTr("Brush size")
+                onMoved: toolbar.brushSizeChangeRequested(value)
+                onValueChanged: {
+                    if (pressed || activeFocus) {
+                        toolbar.brushSizeChangeRequested(value)
                     }
                 }
-                onAccepted: function (value) {
-                    toolbar.requestBrushSize(value)
-                    text = String(Math.round(toolbar.brushSize))
-                }
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        toolbar.requestBrushSize(text)
-                        text = String(Math.round(toolbar.brushSize))
+                Controls.ToolTip.visible: hovered || pressed
+                Controls.ToolTip.text: qsTr("%1 px").arg(Math.round(value))
+
+                background: Rectangle {
+                    x: sizeSlider.leftPadding
+                    y: sizeSlider.topPadding + (sizeSlider.availableHeight - height) / 2
+                    width: sizeSlider.availableWidth
+                    height: 4
+                    radius: 2
+                    color: Qt.rgba(255, 255, 255, 0.20)
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, Math.min(parent.width, sizeSlider.position * parent.width))
+                        height: parent.height
+                        radius: parent.radius
+                        color: LV.Theme.primary
                     }
+                }
+
+                handle: Rectangle {
+                    x: sizeSlider.leftPadding + (sizeSlider.availableWidth - width) * sizeSlider.position
+                    y: sizeSlider.topPadding + (sizeSlider.availableHeight - height) / 2
+                    implicitWidth: 12
+                    implicitHeight: 12
+                    radius: 6
+                    color: sizeSlider.pressed ? LV.Theme.primary : "#f2f4f7"
+                    border.width: 1
+                    border.color: sizeSlider.pressed
+                        ? Qt.rgba(255, 255, 255, 0.28)
+                        : Qt.rgba(0, 0, 0, 0.38)
                 }
             }
         }
@@ -427,7 +429,4 @@ Item {
         }
     }
 
-    Component.onCompleted: {
-        sizeField.text = String(Math.round(toolbar.brushSize))
-    }
 }

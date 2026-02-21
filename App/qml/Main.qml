@@ -12,6 +12,7 @@ LV.ApplicationWindow {
     minimumHeight: initialHeight
     visible: true
     windowColor: LV.Theme.window
+    solidChrome: false
     windowDragHandleEnabled: false
     navigationEnabled: false
     autoAttachRuntimeEvents: true
