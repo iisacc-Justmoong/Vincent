@@ -22,15 +22,16 @@ Vincent 2.2.1 is a minimalist painting app built with Qt 6.
 
 ## Features at a Glance
 - Pressure-sensitive size and opacity for stylus brush and eraser strokes
-- PSD import that rasterizes the document composite into an editable image layer
+- PSD import that can split document layers into separate in-app layers while capturing PSD metadata at import time
 - Brush, eraser, grab, and text tools
+- Layer panel for selecting imported layers and toggling visibility
 - Quick color palette and brush size controls
 - Save canvases to PNG
 
 ## Testing
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target tests_brushengine
+cmake --build build --target tests_brushengine tests_imageimport
 ctest --test-dir build --output-on-failure
 ```
 
@@ -39,3 +40,4 @@ ctest --test-dir build --output-on-failure
 - Strokes are rasterized and cannot be re-selected
 - Palette is fixed to the built-in colors
 - Canvas size follows the window size
+- PSD blend modes are preserved as metadata, but rendering currently uses standard alpha compositing

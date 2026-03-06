@@ -1,4 +1,5 @@
 import QtQuick
+import LVRS 1.0 as LV
 
 Rectangle {
     id: surface
@@ -23,6 +24,7 @@ Rectangle {
     }
 
     property int imageIdCounter: 0
+    property var imageImportMetadataStore: ({})
     property int selectedImageId: -1
     readonly property bool hasImportedImage: imageModel.count > 0
     property bool freeTransformActive: false
@@ -37,6 +39,8 @@ Rectangle {
     property bool transformUndoCaptured: false
     readonly property bool textEntryActive: textInputOverlay.visible
     property bool externalDragHasSupportedImage: false
+    readonly property int layerPanelWidth: 220
+    readonly property int layerPanelTopMargin: 96
 
     function updateCanvasSizeFromViewport() {
         surface.canvasWidth = Math.max(1, Math.round(surface.width))
@@ -48,6 +52,7 @@ Rectangle {
         surface.strokes = []
         surface.currentStroke = null
         imageModel.clear()
+        surface.imageImportMetadataStore = ({})
         surface.selectedImageId = -1
         surface.imageElementRegistry = ({})
         surface.freeTransformActive = false
@@ -138,7 +143,74 @@ Rectangle {
 
     function selectedImageData() {
         var index = surface.selectedImageIndex();
-        return index >= 0 ? imageModel.get(index) : null;
+        if (index < 0) {
+            return null;
+        }
+        var entry = imageModel.get(index);
+        if (!entry) {
+            return null;
+        }
+        var result = {};
+        for (var key in entry) {
+            result[key] = entry[key];
+        }
+        result.importMetadata = surface.imageImportMetadata(entry.imageId);
+        return result;
+    }
+
+    function defaultImportedLayerName(metadata, fallbackIndex) {
+        if (metadata && metadata.psdLayer && metadata.psdLayer.name) {
+            return metadata.psdLayer.name
+        }
+        if (metadata && metadata.fileName) {
+            return metadata.fileName
+        }
+        return qsTr("Layer %1").arg(fallbackIndex)
+    }
+
+    function documentFitTransform(documentWidth, documentHeight) {
+        var safeWidth = Math.max(1, documentWidth !== undefined ? documentWidth : surface.canvasWidth)
+        var safeHeight = Math.max(1, documentHeight !== undefined ? documentHeight : surface.canvasHeight)
+        var scale = Math.min(surface.canvasWidth / safeWidth, surface.canvasHeight / safeHeight, 1)
+        return {
+            scale: scale,
+            offsetX: (surface.canvasWidth - safeWidth * scale) / 2,
+            offsetY: (surface.canvasHeight - safeHeight * scale) / 2
+        }
+    }
+
+    function appendImportedImageEntry(entryData) {
+        var newId = ++surface.imageIdCounter
+        imageModel.append({
+            imageId: newId,
+            source: entryData.source !== undefined ? entryData.source : "",
+            x: entryData.x !== undefined ? entryData.x : 0,
+            y: entryData.y !== undefined ? entryData.y : 0,
+            originalWidth: entryData.originalWidth !== undefined ? entryData.originalWidth : 0,
+            originalHeight: entryData.originalHeight !== undefined ? entryData.originalHeight : 0,
+            scaleX: entryData.scaleX !== undefined ? entryData.scaleX : 1.0,
+            scaleY: entryData.scaleY !== undefined ? entryData.scaleY : 1.0,
+            ready: entryData.ready === true,
+            layerName: entryData.layerName !== undefined
+                ? entryData.layerName
+                : surface.defaultImportedLayerName(entryData.importMetadata, newId),
+            layerVisible: entryData.layerVisible !== false,
+            layerOpacity: entryData.layerOpacity !== undefined ? entryData.layerOpacity : 1.0,
+            blendModeKey: entryData.blendModeKey !== undefined ? entryData.blendModeKey : ""
+        })
+        if (entryData.importMetadata !== undefined) {
+            surface.storeImageImportMetadata(newId, entryData.importMetadata)
+        }
+        return newId
+    }
+
+    function setLayerVisibility(imageId, layerVisible) {
+        var index = surface.findImageIndexById(imageId)
+        if (index === -1) {
+            return
+        }
+        imageModel.setProperty(index, "layerVisible", layerVisible)
+        surface.notifySelectionOverlay()
     }
 
     function findImageElementById(imageId) {
@@ -178,10 +250,6 @@ Rectangle {
             surface.updateSelectedImageItem();
             surface.notifySelectionOverlay();
             return;
-        }
-        if (idx !== imageModel.count - 1) {
-            imageModel.move(idx, imageModel.count - 1, 1);
-            idx = imageModel.count - 1;
         }
         surface.selectedImageId = imageId;
         surface.updateSelectedImageItem();
@@ -262,10 +330,54 @@ Rectangle {
                 originalHeight: entry.originalHeight,
                 scaleX: entry.scaleX,
                 scaleY: entry.scaleY,
-                ready: entry.ready
+                ready: entry.ready,
+                layerName: entry.layerName,
+                layerVisible: entry.layerVisible,
+                layerOpacity: entry.layerOpacity,
+                blendModeKey: entry.blendModeKey
             });
         }
         return result;
+    }
+
+    function cloneMetadata(value) {
+        if (value === undefined || value === null) {
+            return ({})
+        }
+        return JSON.parse(JSON.stringify(value))
+    }
+
+    function cloneImageImportMetadataStore() {
+        return surface.cloneMetadata(surface.imageImportMetadataStore)
+    }
+
+    function imageImportMetadata(imageId) {
+        if (imageId === undefined || imageId === null || imageId === -1) {
+            return ({})
+        }
+        var metadata = surface.imageImportMetadataStore[imageId]
+        return metadata !== undefined ? surface.cloneMetadata(metadata) : ({})
+    }
+
+    function storeImageImportMetadata(imageId, metadata) {
+        if (imageId === undefined || imageId === null || imageId === -1) {
+            return
+        }
+        var nextStore = surface.cloneImageImportMetadataStore()
+        nextStore[imageId] = surface.cloneMetadata(metadata)
+        surface.imageImportMetadataStore = nextStore
+    }
+
+    function removeImageImportMetadata(imageId) {
+        if (imageId === undefined || imageId === null || imageId === -1) {
+            return
+        }
+        if (surface.imageImportMetadataStore[imageId] === undefined) {
+            return
+        }
+        var nextStore = surface.cloneImageImportMetadataStore()
+        delete nextStore[imageId]
+        surface.imageImportMetadataStore = nextStore
     }
 
     function captureSnapshot() {
@@ -274,6 +386,7 @@ Rectangle {
             canvasHeight: surface.canvasHeight,
             strokes: cloneStrokes(surface.strokes),
             images: cloneImages(),
+            imageImportMetadataStore: cloneImageImportMetadataStore(),
             selectedImageId: surface.selectedImageId
         };
     }
@@ -302,6 +415,9 @@ Rectangle {
         for (var j = 0; j < snapshot.images.length; ++j) {
             imageModel.append(snapshot.images[j]);
         }
+        surface.imageImportMetadataStore = snapshot.imageImportMetadataStore !== undefined
+                ? surface.cloneMetadata(snapshot.imageImportMetadataStore)
+                : ({})
 
         surface.selectedImageId = snapshot.selectedImageId !== undefined ? snapshot.selectedImageId : -1;
         surface.updateSelectedImageItem();
@@ -569,15 +685,49 @@ Rectangle {
             return
         }
         var sourceUrl = preparedImport.source
+        var importMetadata = preparedImport.metadata !== undefined ? preparedImport.metadata : ({})
+        var importedLayers = preparedImport.layers !== undefined ? preparedImport.layers : []
         var shouldSkipUndo = options && options.skipUndo === true
         if (!shouldSkipUndo) {
             surface.pushUndoState()
         }
         surface.cancelTextEntry()
         currentStroke = null
-        var newId = ++surface.imageIdCounter
-        imageModel.append({
-            imageId: newId,
+
+        if (importedLayers.length) {
+            var psdMetadata = importMetadata.psd !== undefined ? importMetadata.psd : ({})
+            var fit = surface.documentFitTransform(psdMetadata.width, psdMetadata.height)
+            var selectedLayerId = -1
+            for (var layerIndex = importedLayers.length - 1; layerIndex >= 0; --layerIndex) {
+                var layer = importedLayers[layerIndex]
+                var layerWidth = layer.width !== undefined ? layer.width : 0
+                var layerHeight = layer.height !== undefined ? layer.height : 0
+                var layerMetadata = layer.metadata !== undefined ? layer.metadata : importMetadata
+                selectedLayerId = surface.appendImportedImageEntry({
+                    source: layer.source,
+                    x: fit.offsetX + (layer.x !== undefined ? layer.x : 0) * fit.scale,
+                    y: fit.offsetY + (layer.y !== undefined ? layer.y : 0) * fit.scale,
+                    originalWidth: layerWidth,
+                    originalHeight: layerHeight,
+                    scaleX: fit.scale,
+                    scaleY: fit.scale,
+                    ready: layerWidth > 0 && layerHeight > 0,
+                    layerName: layer.name !== undefined ? layer.name : surface.defaultImportedLayerName(layerMetadata, layerIndex + 1),
+                    layerVisible: layer.visible !== false,
+                    layerOpacity: layer.opacity !== undefined ? layer.opacity : 1.0,
+                    blendModeKey: layer.blendModeKey !== undefined ? layer.blendModeKey : "",
+                    importMetadata: layerMetadata
+                })
+            }
+            if (selectedLayerId !== -1) {
+                surface.selectImage(selectedLayerId)
+            }
+            surface.freeTransformActive = false
+            surface.freeTransformSnapshot = {}
+            return
+        }
+
+        var newId = surface.appendImportedImageEntry({
             source: sourceUrl,
             x: 0,
             y: 0,
@@ -585,7 +735,11 @@ Rectangle {
             originalHeight: 0,
             scaleX: 1.0,
             scaleY: 1.0,
-            ready: false
+            ready: false,
+            layerName: surface.defaultImportedLayerName(importMetadata, imageModel.count + 1),
+            layerVisible: true,
+            layerOpacity: 1.0,
+            importMetadata: importMetadata
         })
         surface.selectImage(newId)
         surface.freeTransformActive = false
@@ -625,6 +779,7 @@ Rectangle {
         var entry = imageModel.get(index)
         if (entry) {
             surface.unregisterImageElement(entry.imageId)
+            surface.removeImageImportMetadata(entry.imageId)
         }
         imageModel.remove(index)
         surface.selectedImageId = imageModel.count > 0 ? imageModel.get(imageModel.count - 1).imageId : -1
@@ -693,9 +848,7 @@ Rectangle {
         textRasterizer.targetX = targetX
         textRasterizer.targetY = targetY
         textRasterizer.completion = function (dataUrl, renderedWidth, renderedHeight, finalX, finalY) {
-            var newId = ++surface.imageIdCounter
-            imageModel.append({
-                imageId: newId,
+            var newId = surface.appendImportedImageEntry({
                 source: dataUrl,
                 x: finalX,
                 y: finalY,
@@ -703,7 +856,10 @@ Rectangle {
                 originalHeight: renderedHeight,
                 scaleX: 1.0,
                 scaleY: 1.0,
-                ready: true
+                ready: true,
+                layerName: qsTr("Text"),
+                layerVisible: true,
+                layerOpacity: 1.0
             })
             surface.selectImage(newId)
         }
@@ -895,6 +1051,146 @@ Rectangle {
         }
     }
 
+    Rectangle {
+        id: layerPanel
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: surface.layerPanelTopMargin
+        anchors.rightMargin: 16
+        width: surface.layerPanelWidth
+        height: Math.min(parent.height - surface.layerPanelTopMargin - 16, layerPanelContent.implicitHeight + 20)
+        radius: 12
+        color: LV.Theme.panelBackground03
+        border.width: 1
+        border.color: Qt.rgba(255, 255, 255, 0.10)
+        visible: imageModel.count > 0
+        z: 40
+
+        Column {
+            id: layerPanelContent
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 10
+
+            Text {
+                text: qsTr("Layers")
+                color: "#f5f7fa"
+                font.pixelSize: 14
+                font.bold: true
+            }
+
+            Flickable {
+                id: layerFlickable
+                width: parent.width
+                height: Math.max(48, layerPanel.height - 56)
+                contentWidth: width
+                contentHeight: layerListColumn.height
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                Column {
+                    id: layerListColumn
+                    width: layerFlickable.width
+                    spacing: 6
+
+                    Repeater {
+                        model: imageModel.count
+
+                        delegate: Rectangle {
+                            id: layerRow
+                            readonly property int modelIndex: imageModel.count - 1 - index
+                            readonly property var entry: modelIndex >= 0 ? imageModel.get(modelIndex) : null
+                            readonly property bool selected: entry && entry.imageId === surface.selectedImageId
+                            width: layerListColumn.width
+                            height: 44
+                            radius: 10
+                            color: selected ? Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.22) : Qt.rgba(255, 255, 255, 0.04)
+                            border.width: 1
+                            border.color: selected ? "#2d89ef" : Qt.rgba(255, 255, 255, 0.08)
+                            opacity: entry && entry.layerVisible === false ? 0.6 : 1.0
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (layerRow.entry) {
+                                        surface.selectImage(layerRow.entry.imageId)
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: visibilityChip
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 28
+                                height: 28
+                                radius: 8
+                                color: layerRow.entry && layerRow.entry.layerVisible === false
+                                    ? Qt.rgba(255, 255, 255, 0.08)
+                                    : Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.20)
+                                border.width: 1
+                                border.color: layerRow.entry && layerRow.entry.layerVisible === false
+                                    ? Qt.rgba(255, 255, 255, 0.10)
+                                    : "#2d89ef"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: layerRow.entry && layerRow.entry.layerVisible === false ? qsTr("Off") : qsTr("On")
+                                    color: "#f5f7fa"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (layerRow.entry) {
+                                            surface.setLayerVisibility(layerRow.entry.imageId, layerRow.entry.layerVisible === false)
+                                        }
+                                        mouse.accepted = true
+                                    }
+                                }
+                            }
+
+                            Column {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 46
+                                anchors.right: parent.right
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: layerRow.entry ? layerRow.entry.layerName : ""
+                                    color: "#f5f7fa"
+                                    font.pixelSize: 12
+                                    font.bold: layerRow.selected
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: layerRow.entry
+                                        ? (layerRow.entry.blendModeKey && layerRow.entry.blendModeKey.length
+                                            ? layerRow.entry.blendModeKey
+                                            : qsTr("Normal"))
+                                        : ""
+                                    color: Qt.rgba(245 / 255, 247 / 255, 250 / 255, 0.70)
+                                    font.pixelSize: 10
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Canvas {
         id: paintCanvas
         parent: canvasContainer
@@ -1016,11 +1312,11 @@ Rectangle {
                 y: model.y
                 width: model.originalWidth > 0 ? model.originalWidth * model.scaleX : 0
                 height: model.originalHeight > 0 ? model.originalHeight * model.scaleY : 0
-                visible: model.ready
+                visible: model.ready && (model.layerVisible !== false)
                 smooth: true
                 asynchronous: true
                 fillMode: Image.Stretch
-                opacity: 1
+                opacity: model.layerOpacity !== undefined ? model.layerOpacity : 1
                 source: model.source
 
                 Component.onCompleted: {
@@ -1060,7 +1356,7 @@ Rectangle {
 
                 TapHandler {
                     acceptedButtons: Qt.LeftButton
-                    enabled: surface.toolMode === "grab"
+                    enabled: surface.toolMode === "grab" && imageDisplay.visible
                     onTapped: {
                         surface.selectImage(delegateImageId)
                     }
@@ -1104,7 +1400,11 @@ Rectangle {
                 }
             }
 
-            visible: selectedItem && currentEntry && currentEntry.ready && (surface.toolMode === "grab" || surface.freeTransformActive)
+            visible: selectedItem
+                && currentEntry
+                && currentEntry.ready
+                && currentEntry.layerVisible !== false
+                && (surface.toolMode === "grab" || surface.freeTransformActive)
             x: selectedItem ? selectedItem.x : 0
             y: selectedItem ? selectedItem.y : 0
             width: selectedItem ? selectedItem.width : 0

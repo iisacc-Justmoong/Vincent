@@ -67,12 +67,14 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ### `DrawingSurface.qml`
 
 - Renders the actual canvas within a rounded `Rectangle`.
-- Manages drawing state (`strokes`, `currentStroke`, imported images, and undo/redo snapshots) and tool behavior.
+- Manages drawing state (`strokes`, `currentStroke`, imported images, import metadata storage, and undo/redo snapshots) and tool behavior.
 - Uses `PointHandler` for stylus and mouse stroke capture, enabling pressure-sensitive brush sampling by default when a pen device reports pressure.
 - Stores each stroke as a sequence of sampled points that carry normalized pressure, resolved brush diameter, and resolved opacity.
 - Uses a `Canvas` element to batch-render all strokes; variable-width strokes are rasterized by interpolated stamp placement rather than fixed-width `lineTo()` segments, and each stamp carries its own alpha.
 - Supports eraser mode through pressure-sensitive `destination-out` compositing strength, wheel-based brush size adjustments via the `brushDeltaRequested` signal, and optional background image loading.
-- Routes all opened or dropped images through `ImageImport`, so PSD documents are decoded into flattened raster layers before the existing image-placement workflow runs.
+- Routes all opened or dropped images through `ImageImport`, so PSD documents can arrive either as a flattened raster fallback or as multiple positioned image layers.
+- Stores per-image import metadata in the canvas state keyed by imported image ID, allowing PSD header details to remain attached to the in-app document state from the moment of import.
+- Preserves imported image stacking order during selection and exposes a right-side layer panel for selecting layers and toggling visibility without reordering the canvas stack.
 - Normalizes file URLs for loading and saving, ensuring compatibility with both `file://` URIs and bare paths.
 
 ### `BrushEngine` (`App/brushengine.*`)
@@ -86,7 +88,9 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 - Accepts local file paths or URLs from QML and keeps the image import decision in one place.
 - Passes already-supported raster formats through unchanged.
 - Decodes PSD composite image data directly in C++ for 8-bit and 16-bit grayscale, indexed, RGB, and CMYK documents when the merged image uses raw or RLE compression.
-- Writes decoded PSD results into a cache PNG so the existing `Image`-based canvas workflow can treat them like ordinary imported images.
+- Extracts PSD document metadata during import, including dimensions, channel/depth information, color mode, compression mode, alpha presence, and decoded layer-count hints.
+- Parses PSD layer records and layer channel image data for raw and RLE-compressed layers, then writes each decoded layer into a cache PNG with per-layer metadata such as name, bounds, opacity, visibility, and blend mode key.
+- Writes decoded PSD results into cache PNGs so the existing `Image`-based canvas workflow can treat both composite fallbacks and individual PSD layers like ordinary imported images.
 
 ## Data Flow & Interaction Summary
 
@@ -95,7 +99,7 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 3. `PainterCanvasPage` requests the ordered color palette from the `PaletteUtils` singleton.
 4. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage` methods, which then mutate page state or invoke `DrawingSurface` methods.
 5. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, and `BrushEngine` converts stylus pressure into the final per-sample stroke width and opacity.
-6. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface`; `ImageImport` either forwards the original raster URL or rasterizes PSD into a cache PNG before the image is added to the canvas.
+6. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface`; `ImageImport` either forwards the original raster URL, returns multiple positioned PSD layers, or falls back to a rasterized PSD composite before the image data is added to the canvas.
 
 ## Notable Platform Considerations
 
@@ -105,5 +109,5 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ## Testing Surface
 
 - `tests/tst_brushengine.cpp` validates the pressure-to-size and pressure-to-opacity curves, sample smoothing, append heuristics, and stamp-density calculations of the brush engine with Qt Test.
-- `tests/tst_imageimport.cpp` validates PSD support detection, passthrough import for standard rasters, and PSD composite decoding for both raw and RLE-compressed fixtures.
+- `tests/tst_imageimport.cpp` validates PSD support detection, passthrough import for standard rasters, PSD metadata extraction, PSD composite decoding for both raw and RLE-compressed fixtures, and multi-layer PSD extraction into separate cached images.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

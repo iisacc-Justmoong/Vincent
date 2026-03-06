@@ -1,12 +1,14 @@
 #include "imageimport.h"
 
 #include <QByteArray>
+#include <QBuffer>
 #include <QCryptographicHash>
 #include <QDataStream>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QImage>
 #include <QImageReader>
 #include <QIODevice>
@@ -38,11 +40,114 @@ struct PsdHeader
     quint16 colorMode = 0;
 };
 
+struct PsdLayerChannelInfo
+{
+    qint16 id = 0;
+    quint32 dataLength = 0;
+};
+
+struct PsdLayerRecord
+{
+    qint32 top = 0;
+    qint32 left = 0;
+    qint32 bottom = 0;
+    qint32 right = 0;
+    QVector<PsdLayerChannelInfo> channels;
+    QString name;
+    QString blendModeKey;
+    quint8 opacity = 255;
+    quint8 clipping = 0;
+    quint8 flags = 0;
+};
+
+struct PsdDecodedLayer
+{
+    QString name;
+    qint32 top = 0;
+    qint32 left = 0;
+    qint32 width = 0;
+    qint32 height = 0;
+    QString blendModeKey;
+    qreal opacity = 1.0;
+    bool visible = true;
+    QImage image;
+};
+
 constexpr quint16 kPsdVersion = 1;
 constexpr quint16 kColorModeGrayscale = 1;
 constexpr quint16 kColorModeIndexed = 2;
 constexpr quint16 kColorModeRgb = 3;
 constexpr quint16 kColorModeCmyk = 4;
+
+QString colorModeName(quint16 colorMode)
+{
+    switch (colorMode) {
+    case kColorModeGrayscale:
+        return QStringLiteral("Grayscale");
+    case kColorModeIndexed:
+        return QStringLiteral("Indexed");
+    case kColorModeRgb:
+        return QStringLiteral("RGB");
+    case kColorModeCmyk:
+        return QStringLiteral("CMYK");
+    default:
+        return QStringLiteral("Unknown");
+    }
+}
+
+QString compressionName(quint16 compression)
+{
+    switch (compression) {
+    case 0:
+        return QStringLiteral("raw");
+    case 1:
+        return QStringLiteral("rle");
+    case 2:
+        return QStringLiteral("zip");
+    case 3:
+        return QStringLiteral("zip-prediction");
+    default:
+        return QStringLiteral("unknown");
+    }
+}
+
+QString blendModeName(const QString &blendModeKey)
+{
+    if (blendModeKey == QStringLiteral("norm")) {
+        return QStringLiteral("Normal");
+    }
+    if (blendModeKey == QStringLiteral("mul ")) {
+        return QStringLiteral("Multiply");
+    }
+    if (blendModeKey == QStringLiteral("scrn")) {
+        return QStringLiteral("Screen");
+    }
+    if (blendModeKey == QStringLiteral("over")) {
+        return QStringLiteral("Overlay");
+    }
+    if (blendModeKey == QStringLiteral("dark")) {
+        return QStringLiteral("Darken");
+    }
+    if (blendModeKey == QStringLiteral("lite")) {
+        return QStringLiteral("Lighten");
+    }
+    return blendModeKey.isEmpty() ? QStringLiteral("Unknown") : blendModeKey;
+}
+
+bool psdCompositeHasAlpha(const PsdHeader &header)
+{
+    switch (header.colorMode) {
+    case kColorModeGrayscale:
+    case kColorModeIndexed:
+        return header.channels > 1;
+    case kColorModeRgb:
+        return header.channels > 3;
+    case kColorModeCmyk:
+        return header.channels > 4;
+    default:
+        return false;
+    }
+}
 
 InputReference resolveInputReference(const QString &fileUrl)
 {
@@ -104,6 +209,48 @@ QSet<QString> supportedRasterSuffixes()
     return suffixes;
 }
 
+QVariantMap buildBasicImportMetadata(const InputReference &ref, const QFileInfo &fileInfo, const QString &kind)
+{
+    QVariantMap metadata{
+        {QStringLiteral("kind"), kind},
+        {QStringLiteral("originalSource"), ref.sourceUrl},
+        {QStringLiteral("originalSuffix"), ref.suffix},
+        {QStringLiteral("importedAtUtc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
+    };
+
+    if (fileInfo.exists()) {
+        metadata.insert(QStringLiteral("fileName"), fileInfo.fileName());
+        metadata.insert(QStringLiteral("filePath"), fileInfo.absoluteFilePath());
+        metadata.insert(QStringLiteral("fileSize"), fileInfo.size());
+    }
+
+    return metadata;
+}
+
+QVariantMap buildPsdLayerMetadata(const QVariantMap &baseMetadata,
+                                  const QVariantMap &psdMetadata,
+                                  const PsdDecodedLayer &layer,
+                                  int layerIndex)
+{
+    QVariantMap metadata = baseMetadata;
+    metadata.insert(QStringLiteral("kind"), QStringLiteral("psd-layer"));
+    metadata.insert(QStringLiteral("psd"), psdMetadata);
+    metadata.insert(QStringLiteral("psdLayer"),
+                    QVariantMap{
+                        {QStringLiteral("index"), layerIndex},
+                        {QStringLiteral("name"), layer.name},
+                        {QStringLiteral("x"), layer.left},
+                        {QStringLiteral("y"), layer.top},
+                        {QStringLiteral("width"), layer.width},
+                        {QStringLiteral("height"), layer.height},
+                        {QStringLiteral("opacity"), layer.opacity},
+                        {QStringLiteral("visible"), layer.visible},
+                        {QStringLiteral("blendModeKey"), layer.blendModeKey},
+                        {QStringLiteral("blendMode"), blendModeName(layer.blendModeKey)}
+                    });
+    return metadata;
+}
+
 bool readExact(QIODevice &device, char *data, qint64 size)
 {
     return device.read(data, size) == size;
@@ -130,6 +277,16 @@ bool skipExact(QIODevice &device, qint64 size)
     }
 
     return device.seek(device.pos() + size);
+}
+
+bool readByte(QIODevice &device, quint8 &value)
+{
+    char byte = '\0';
+    if (!readExact(device, &byte, 1)) {
+        return false;
+    }
+    value = static_cast<quint8>(byte);
+    return true;
 }
 
 quint8 sampleToByte(const QByteArray &channelData, qsizetype sampleIndex, quint16 depth)
@@ -244,6 +401,541 @@ bool readSectionLength(QIODevice &device, quint32 &length, QString &error)
         error = QStringLiteral("PSD section length is truncated.");
         return false;
     }
+    return true;
+}
+
+int parseLayerCount(const QByteArray &layerMaskInfoData)
+{
+    if (layerMaskInfoData.size() < 6) {
+        return 0;
+    }
+
+    QBuffer buffer;
+    buffer.setData(layerMaskInfoData);
+    buffer.open(QIODevice::ReadOnly);
+
+    QDataStream stream(&buffer);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    quint32 layerInfoLength = 0;
+    stream >> layerInfoLength;
+    if (stream.status() != QDataStream::Ok || layerInfoLength < 2) {
+        return 0;
+    }
+
+    if (layerInfoLength > static_cast<quint32>(layerMaskInfoData.size() - 4)) {
+        return 0;
+    }
+
+    qint16 rawLayerCount = 0;
+    stream >> rawLayerCount;
+    if (stream.status() != QDataStream::Ok) {
+        return 0;
+    }
+
+    return std::abs(rawLayerCount);
+}
+
+QString decodeUnicodeLayerName(const QByteArray &blockData)
+{
+    if (blockData.size() < 4) {
+        return {};
+    }
+
+    QBuffer buffer;
+    buffer.setData(blockData);
+    buffer.open(QIODevice::ReadOnly);
+
+    QDataStream stream(&buffer);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    quint32 characterCount = 0;
+    stream >> characterCount;
+    if (stream.status() != QDataStream::Ok) {
+        return {};
+    }
+
+    if (characterCount > static_cast<quint32>((blockData.size() - 4) / 2)) {
+        return {};
+    }
+
+    QString result;
+    result.reserve(static_cast<int>(characterCount));
+    for (quint32 index = 0; index < characterCount; ++index) {
+        quint16 codeUnit = 0;
+        stream >> codeUnit;
+        if (stream.status() != QDataStream::Ok) {
+            return {};
+        }
+        result.append(QChar(codeUnit));
+    }
+
+    return result;
+}
+
+bool readPascalString(QIODevice &device, int paddedTo, QString &value, QString &error)
+{
+    quint8 length = 0;
+    if (!readByte(device, length)) {
+        error = QStringLiteral("PSD layer name is truncated.");
+        return false;
+    }
+
+    QByteArray bytes;
+    bytes.resize(length);
+    if (length > 0 && !readExact(device, bytes.data(), length)) {
+        error = QStringLiteral("PSD layer name is truncated.");
+        return false;
+    }
+
+    value = QString::fromLatin1(bytes);
+
+    const int consumed = 1 + static_cast<int>(length);
+    const int padding = (paddedTo - (consumed % paddedTo)) % paddedTo;
+    if (padding > 0 && !skipExact(device, padding)) {
+        error = QStringLiteral("PSD layer name padding is truncated.");
+        return false;
+    }
+
+    return true;
+}
+
+bool parseLayerExtraData(const QByteArray &extraData, QString &layerName, QString &error)
+{
+    QBuffer buffer;
+    buffer.setData(extraData);
+    buffer.open(QIODevice::ReadOnly);
+
+    quint32 layerMaskDataLength = 0;
+    if (!readSectionLength(buffer, layerMaskDataLength, error) || !skipExact(buffer, layerMaskDataLength)) {
+        error = QStringLiteral("PSD layer mask extra data is truncated.");
+        return false;
+    }
+
+    quint32 layerBlendingRangesLength = 0;
+    if (!readSectionLength(buffer, layerBlendingRangesLength, error) || !skipExact(buffer, layerBlendingRangesLength)) {
+        error = QStringLiteral("PSD layer blending ranges are truncated.");
+        return false;
+    }
+
+    if (!readPascalString(buffer, 4, layerName, error)) {
+        return false;
+    }
+
+    while (buffer.bytesAvailable() >= 12) {
+        char signature[4];
+        char key[4];
+        if (!readExact(buffer, signature, sizeof(signature)) || !readExact(buffer, key, sizeof(key))) {
+            error = QStringLiteral("PSD additional layer info is truncated.");
+            return false;
+        }
+
+        quint32 blockLength = 0;
+        if (!readSectionLength(buffer, blockLength, error)) {
+            return false;
+        }
+
+        QByteArray blockData;
+        blockData.resize(blockLength);
+        if (blockLength > 0 && !readExact(buffer, blockData.data(), blockLength)) {
+            error = QStringLiteral("PSD additional layer info is truncated.");
+            return false;
+        }
+
+        const QByteArray keyBytes(key, sizeof(key));
+        if (keyBytes == QByteArrayLiteral("luni")) {
+            const QString unicodeName = decodeUnicodeLayerName(blockData);
+            if (!unicodeName.isEmpty()) {
+                layerName = unicodeName;
+            }
+        }
+
+        if ((blockLength % 2) == 1 && buffer.bytesAvailable() > 0 && !skipExact(buffer, 1)) {
+            error = QStringLiteral("PSD additional layer info padding is truncated.");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool isRenderableLayerChannel(quint16 colorMode, qint16 channelId)
+{
+    if (channelId == -1) {
+        return true;
+    }
+
+    switch (colorMode) {
+    case kColorModeGrayscale:
+    case kColorModeIndexed:
+        return channelId == 0;
+    case kColorModeRgb:
+        return channelId >= 0 && channelId <= 2;
+    case kColorModeCmyk:
+        return channelId >= 0 && channelId <= 3;
+    default:
+        return false;
+    }
+}
+
+bool decodePsdChannelChunk(const QByteArray &chunkData,
+                           qint32 width,
+                           qint32 height,
+                           quint16 depth,
+                           QByteArray &decodedData,
+                           QString &error)
+{
+    if (chunkData.size() < 2) {
+        error = QStringLiteral("PSD layer channel chunk is truncated.");
+        return false;
+    }
+
+    const qsizetype bytesPerSample = depth / 8;
+    const qsizetype rowByteCount = static_cast<qsizetype>(width) * bytesPerSample;
+    const qsizetype expectedSize = rowByteCount * static_cast<qsizetype>(height);
+    const quint16 compression = qFromBigEndian<quint16>(reinterpret_cast<const uchar *>(chunkData.constData()));
+    const QByteArray payload = chunkData.mid(2);
+
+    if (compression == 0) {
+        if (payload.size() < expectedSize) {
+            error = QStringLiteral("PSD raw layer channel data is truncated.");
+            return false;
+        }
+        decodedData = payload.left(expectedSize);
+        return true;
+    }
+
+    if (compression != 1) {
+        error = QStringLiteral("Only raw and RLE-compressed PSD layers are supported.");
+        return false;
+    }
+
+    QBuffer buffer;
+    buffer.setData(payload);
+    buffer.open(QIODevice::ReadOnly);
+
+    QDataStream stream(&buffer);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    QVector<quint16> rowLengths(height);
+    for (qint32 row = 0; row < height; ++row) {
+        stream >> rowLengths[row];
+        if (stream.status() != QDataStream::Ok) {
+            error = QStringLiteral("PSD layer RLE row table is truncated.");
+            return false;
+        }
+    }
+
+    QByteArray bytes;
+    bytes.reserve(expectedSize);
+    for (qint32 row = 0; row < height; ++row) {
+        QByteArray encodedRow;
+        encodedRow.resize(rowLengths[row]);
+        if (rowLengths[row] > 0 && !readExact(buffer, encodedRow.data(), encodedRow.size())) {
+            error = QStringLiteral("PSD layer RLE data is truncated.");
+            return false;
+        }
+
+        const QByteArray decodedRow = decodePackBitsRow(encodedRow, rowByteCount);
+        if (decodedRow.isEmpty() && rowByteCount > 0) {
+            error = QStringLiteral("PSD layer RLE row could not be decoded.");
+            return false;
+        }
+        bytes.append(decodedRow);
+    }
+
+    if (bytes.size() != expectedSize) {
+        error = QStringLiteral("PSD layer channel size is invalid.");
+        return false;
+    }
+
+    decodedData = bytes;
+    return true;
+}
+
+QImage composePsdLayerImage(const PsdHeader &header,
+                            const QByteArray &colorModeData,
+                            const QHash<qint16, QByteArray> &channelData,
+                            qint32 width,
+                            qint32 height,
+                            QString &error)
+{
+    QImage image(width, height, QImage::Format_ARGB32);
+    if (image.isNull()) {
+        error = QStringLiteral("PSD layer image could not be allocated.");
+        return {};
+    }
+
+    auto sampleLayerChannel = [&](qint16 channelId, qsizetype sampleIndex, quint8 defaultValue, bool *present) {
+        const auto it = channelData.constFind(channelId);
+        if (it == channelData.constEnd()) {
+            if (present) {
+                *present = false;
+            }
+            return defaultValue;
+        }
+        if (present) {
+            *present = true;
+        }
+        return sampleToByte(it.value(), sampleIndex, header.depth);
+    };
+
+    for (qint32 y = 0; y < height; ++y) {
+        for (qint32 x = 0; x < width; ++x) {
+            const qsizetype sampleIndex = static_cast<qsizetype>(y) * static_cast<qsizetype>(width) + static_cast<qsizetype>(x);
+            quint8 red = 0;
+            quint8 green = 0;
+            quint8 blue = 0;
+            quint8 alpha = 255;
+
+            switch (header.colorMode) {
+            case kColorModeGrayscale: {
+                bool hasGray = false;
+                const quint8 gray = sampleLayerChannel(0, sampleIndex, 0, &hasGray);
+                if (!hasGray) {
+                    error = QStringLiteral("PSD grayscale layer is missing a gray channel.");
+                    return {};
+                }
+                red = gray;
+                green = gray;
+                blue = gray;
+                alpha = sampleLayerChannel(-1, sampleIndex, 255, nullptr);
+                break;
+            }
+            case kColorModeIndexed: {
+                bool hasIndex = false;
+                const quint8 paletteIndex = sampleLayerChannel(0, sampleIndex, 0, &hasIndex);
+                if (!hasIndex) {
+                    error = QStringLiteral("PSD indexed layer is missing an index channel.");
+                    return {};
+                }
+                if (colorModeData.size() < 768) {
+                    error = QStringLiteral("PSD indexed layer palette is missing.");
+                    return {};
+                }
+                red = static_cast<quint8>(colorModeData.at(paletteIndex));
+                green = static_cast<quint8>(colorModeData.at(256 + paletteIndex));
+                blue = static_cast<quint8>(colorModeData.at(512 + paletteIndex));
+                alpha = sampleLayerChannel(-1, sampleIndex, 255, nullptr);
+                break;
+            }
+            case kColorModeRgb: {
+                bool hasRed = false;
+                bool hasGreen = false;
+                bool hasBlue = false;
+                red = sampleLayerChannel(0, sampleIndex, 0, &hasRed);
+                green = sampleLayerChannel(1, sampleIndex, 0, &hasGreen);
+                blue = sampleLayerChannel(2, sampleIndex, 0, &hasBlue);
+                if (!hasRed || !hasGreen || !hasBlue) {
+                    error = QStringLiteral("PSD RGB layer is missing color channels.");
+                    return {};
+                }
+                alpha = sampleLayerChannel(-1, sampleIndex, 255, nullptr);
+                break;
+            }
+            case kColorModeCmyk: {
+                bool hasCyan = false;
+                bool hasMagenta = false;
+                bool hasYellow = false;
+                bool hasBlack = false;
+                const qreal cyan = sampleLayerChannel(0, sampleIndex, 0, &hasCyan) / 255.0;
+                const qreal magenta = sampleLayerChannel(1, sampleIndex, 0, &hasMagenta) / 255.0;
+                const qreal yellow = sampleLayerChannel(2, sampleIndex, 0, &hasYellow) / 255.0;
+                const qreal black = sampleLayerChannel(3, sampleIndex, 0, &hasBlack) / 255.0;
+                if (!hasCyan || !hasMagenta || !hasYellow || !hasBlack) {
+                    error = QStringLiteral("PSD CMYK layer is missing color channels.");
+                    return {};
+                }
+                red = static_cast<quint8>(std::round(255.0 * (1.0 - cyan) * (1.0 - black)));
+                green = static_cast<quint8>(std::round(255.0 * (1.0 - magenta) * (1.0 - black)));
+                blue = static_cast<quint8>(std::round(255.0 * (1.0 - yellow) * (1.0 - black)));
+                alpha = sampleLayerChannel(-1, sampleIndex, 255, nullptr);
+                break;
+            }
+            default:
+                error = QStringLiteral("Unsupported PSD color mode.");
+                return {};
+            }
+
+            image.setPixelColor(x, y, QColor(red, green, blue, alpha));
+        }
+    }
+
+    return image;
+}
+
+bool parsePsdLayers(const QByteArray &layerMaskInfoData,
+                    const PsdHeader &header,
+                    const QByteArray &colorModeData,
+                    QVector<PsdDecodedLayer> &layers,
+                    QString &error)
+{
+    if (layerMaskInfoData.size() < 4) {
+        return true;
+    }
+
+    QBuffer layerMaskBuffer;
+    layerMaskBuffer.setData(layerMaskInfoData);
+    layerMaskBuffer.open(QIODevice::ReadOnly);
+
+    quint32 layerInfoLength = 0;
+    if (!readSectionLength(layerMaskBuffer, layerInfoLength, error)) {
+        return false;
+    }
+
+    if (layerInfoLength == 0) {
+        return true;
+    }
+
+    if (layerInfoLength > static_cast<quint32>(layerMaskInfoData.size() - 4)) {
+        error = QStringLiteral("PSD layer info length is invalid.");
+        return false;
+    }
+
+    QByteArray layerInfoData;
+    layerInfoData.resize(layerInfoLength);
+    if (!readExact(layerMaskBuffer, layerInfoData.data(), layerInfoLength)) {
+        error = QStringLiteral("PSD layer info is truncated.");
+        return false;
+    }
+
+    QBuffer layerInfoBuffer;
+    layerInfoBuffer.setData(layerInfoData);
+    layerInfoBuffer.open(QIODevice::ReadOnly);
+
+    QDataStream stream(&layerInfoBuffer);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    qint16 rawLayerCount = 0;
+    stream >> rawLayerCount;
+    if (stream.status() != QDataStream::Ok) {
+        error = QStringLiteral("PSD layer count is truncated.");
+        return false;
+    }
+
+    const int layerCount = std::abs(rawLayerCount);
+    QVector<PsdLayerRecord> records;
+    records.reserve(layerCount);
+
+    for (int layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
+        PsdLayerRecord record;
+        qint16 channelCount = 0;
+        stream >> record.top >> record.left >> record.bottom >> record.right >> channelCount;
+        if (stream.status() != QDataStream::Ok) {
+            error = QStringLiteral("PSD layer record is truncated.");
+            return false;
+        }
+
+        if (channelCount < 0) {
+            error = QStringLiteral("PSD layer channel count is invalid.");
+            return false;
+        }
+
+        record.channels.reserve(channelCount);
+        for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
+            PsdLayerChannelInfo channelInfo;
+            stream >> channelInfo.id >> channelInfo.dataLength;
+            if (stream.status() != QDataStream::Ok) {
+                error = QStringLiteral("PSD layer channel table is truncated.");
+                return false;
+            }
+            record.channels.push_back(channelInfo);
+        }
+
+        char blendSignature[4];
+        char blendModeKey[4];
+        if (!readExact(layerInfoBuffer, blendSignature, sizeof(blendSignature))
+            || !readExact(layerInfoBuffer, blendModeKey, sizeof(blendModeKey))) {
+            error = QStringLiteral("PSD layer blend mode record is truncated.");
+            return false;
+        }
+
+        record.blendModeKey = QString::fromLatin1(blendModeKey, sizeof(blendModeKey));
+        if (QByteArray(blendSignature, sizeof(blendSignature)) != QByteArrayLiteral("8BIM")) {
+            error = QStringLiteral("PSD layer blend mode signature is invalid.");
+            return false;
+        }
+
+        if (!readByte(layerInfoBuffer, record.opacity)
+            || !readByte(layerInfoBuffer, record.clipping)
+            || !readByte(layerInfoBuffer, record.flags)) {
+            error = QStringLiteral("PSD layer display attributes are truncated.");
+            return false;
+        }
+
+        quint8 filler = 0;
+        if (!readByte(layerInfoBuffer, filler)) {
+            error = QStringLiteral("PSD layer filler byte is truncated.");
+            return false;
+        }
+
+        quint32 extraDataLength = 0;
+        if (!readSectionLength(layerInfoBuffer, extraDataLength, error)) {
+            return false;
+        }
+
+        QByteArray extraData;
+        extraData.resize(extraDataLength);
+        if (extraDataLength > 0 && !readExact(layerInfoBuffer, extraData.data(), extraDataLength)) {
+            error = QStringLiteral("PSD layer extra data is truncated.");
+            return false;
+        }
+
+        if (!parseLayerExtraData(extraData, record.name, error)) {
+            return false;
+        }
+
+        records.push_back(record);
+    }
+
+    for (int layerIndex = 0; layerIndex < records.size(); ++layerIndex) {
+        const PsdLayerRecord &record = records.at(layerIndex);
+        const qint32 layerWidth = std::max<qint32>(0, record.right - record.left);
+        const qint32 layerHeight = std::max<qint32>(0, record.bottom - record.top);
+
+        QHash<qint16, QByteArray> decodedChannels;
+        for (const PsdLayerChannelInfo &channelInfo : record.channels) {
+            QByteArray chunkData;
+            chunkData.resize(channelInfo.dataLength);
+            if (channelInfo.dataLength > 0 && !readExact(layerInfoBuffer, chunkData.data(), channelInfo.dataLength)) {
+                error = QStringLiteral("PSD layer channel data is truncated.");
+                return false;
+            }
+
+            if (layerWidth <= 0 || layerHeight <= 0 || !isRenderableLayerChannel(header.colorMode, channelInfo.id)) {
+                continue;
+            }
+
+            QByteArray decodedData;
+            if (!decodePsdChannelChunk(chunkData, layerWidth, layerHeight, header.depth, decodedData, error)) {
+                return false;
+            }
+            decodedChannels.insert(channelInfo.id, decodedData);
+        }
+
+        if (layerWidth <= 0 || layerHeight <= 0) {
+            continue;
+        }
+
+        PsdDecodedLayer layer;
+        layer.name = record.name.isEmpty()
+            ? QStringLiteral("Layer %1").arg(layerIndex + 1)
+            : record.name;
+        layer.top = record.top;
+        layer.left = record.left;
+        layer.width = layerWidth;
+        layer.height = layerHeight;
+        layer.blendModeKey = record.blendModeKey;
+        layer.opacity = static_cast<qreal>(record.opacity) / 255.0;
+        layer.visible = (record.flags & 0x02) == 0;
+        layer.image = composePsdLayerImage(header, colorModeData, decodedChannels, layerWidth, layerHeight, error);
+        if (layer.image.isNull()) {
+            return false;
+        }
+
+        layers.push_back(layer);
+    }
+
     return true;
 }
 
@@ -409,7 +1101,86 @@ QImage composePsdImage(const PsdHeader &header,
     return image;
 }
 
-QImage loadPsdComposite(const QString &filePath, QString &error)
+bool inspectPsdDocument(const QString &filePath,
+                        QVariantMap &metadata,
+                        QVector<PsdDecodedLayer> &layers,
+                        QString &error)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        error = QStringLiteral("PSD file could not be opened.");
+        return false;
+    }
+
+    PsdHeader header;
+    if (!readPsdHeader(file, header, error)) {
+        return false;
+    }
+
+    quint32 colorModeDataLength = 0;
+    if (!readSectionLength(file, colorModeDataLength, error)) {
+        return false;
+    }
+
+    QByteArray colorModeData;
+    colorModeData.resize(colorModeDataLength);
+    if (colorModeDataLength > 0 && !readExact(file, colorModeData.data(), colorModeDataLength)) {
+        error = QStringLiteral("PSD color mode data is truncated.");
+        return false;
+    }
+
+    quint32 imageResourcesLength = 0;
+    if (!readSectionLength(file, imageResourcesLength, error) || !skipExact(file, imageResourcesLength)) {
+        error = QStringLiteral("PSD image resources are truncated.");
+        return false;
+    }
+
+    quint32 layerMaskInfoLength = 0;
+    if (!readSectionLength(file, layerMaskInfoLength, error)) {
+        return false;
+    }
+
+    QByteArray layerMaskInfoData;
+    layerMaskInfoData.resize(layerMaskInfoLength);
+    if (layerMaskInfoLength > 0 && !readExact(file, layerMaskInfoData.data(), layerMaskInfoLength)) {
+        error = QStringLiteral("PSD layer and mask info is truncated.");
+        return false;
+    }
+
+    if (!parsePsdLayers(layerMaskInfoData, header, colorModeData, layers, error)) {
+        return false;
+    }
+
+    QDataStream stream(&file);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    quint16 compression = 0;
+    stream >> compression;
+    if (stream.status() != QDataStream::Ok) {
+        error = QStringLiteral("PSD compression field is truncated.");
+        return false;
+    }
+
+    metadata = {
+        {QStringLiteral("version"), static_cast<int>(header.version)},
+        {QStringLiteral("width"), static_cast<int>(header.width)},
+        {QStringLiteral("height"), static_cast<int>(header.height)},
+        {QStringLiteral("channels"), static_cast<int>(header.channels)},
+        {QStringLiteral("depth"), static_cast<int>(header.depth)},
+        {QStringLiteral("colorMode"), colorModeName(header.colorMode)},
+        {QStringLiteral("compression"), compressionName(compression)},
+        {QStringLiteral("layerCount"), parseLayerCount(layerMaskInfoData)},
+        {QStringLiteral("importedLayerCount"), layers.size()},
+        {QStringLiteral("hasAlpha"), psdCompositeHasAlpha(header)},
+        {QStringLiteral("colorModeDataBytes"), static_cast<qint64>(colorModeDataLength)},
+        {QStringLiteral("imageResourcesBytes"), static_cast<qint64>(imageResourcesLength)},
+        {QStringLiteral("layerMaskInfoBytes"), static_cast<qint64>(layerMaskInfoLength)}
+    };
+
+    return true;
+}
+
+QImage loadPsdComposite(const QString &filePath, QVariantMap &metadata, QString &error)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -441,7 +1212,13 @@ QImage loadPsdComposite(const QString &filePath, QString &error)
     }
 
     quint32 layerMaskInfoLength = 0;
-    if (!readSectionLength(file, layerMaskInfoLength, error) || !skipExact(file, layerMaskInfoLength)) {
+    if (!readSectionLength(file, layerMaskInfoLength, error)) {
+        return {};
+    }
+
+    QByteArray layerMaskInfoData;
+    layerMaskInfoData.resize(layerMaskInfoLength);
+    if (layerMaskInfoLength > 0 && !readExact(file, layerMaskInfoData.data(), layerMaskInfoLength)) {
         error = QStringLiteral("PSD layer and mask info is truncated.");
         return {};
     }
@@ -461,7 +1238,44 @@ QImage loadPsdComposite(const QString &filePath, QString &error)
         return {};
     }
 
+    metadata = {
+        {QStringLiteral("version"), static_cast<int>(header.version)},
+        {QStringLiteral("width"), static_cast<int>(header.width)},
+        {QStringLiteral("height"), static_cast<int>(header.height)},
+        {QStringLiteral("channels"), static_cast<int>(header.channels)},
+        {QStringLiteral("depth"), static_cast<int>(header.depth)},
+        {QStringLiteral("colorMode"), colorModeName(header.colorMode)},
+        {QStringLiteral("compression"), compressionName(compression)},
+        {QStringLiteral("layerCount"), parseLayerCount(layerMaskInfoData)},
+        {QStringLiteral("hasAlpha"), psdCompositeHasAlpha(header)},
+        {QStringLiteral("colorModeDataBytes"), static_cast<qint64>(colorModeDataLength)},
+        {QStringLiteral("imageResourcesBytes"), static_cast<qint64>(imageResourcesLength)},
+        {QStringLiteral("layerMaskInfoBytes"), static_cast<qint64>(layerMaskInfoLength)}
+    };
+
     return composePsdImage(header, colorModeData, channelData, error);
+}
+
+bool saveImageAsPng(const QImage &image, const QString &targetPath, QString &error)
+{
+    QSaveFile outputFile(targetPath);
+    if (!outputFile.open(QIODevice::WriteOnly)) {
+        error = QStringLiteral("Rasterized PSD cache file could not be opened.");
+        return false;
+    }
+
+    if (!image.save(&outputFile, "PNG")) {
+        outputFile.cancelWriting();
+        error = QStringLiteral("Rasterized PSD cache file could not be written.");
+        return false;
+    }
+
+    if (!outputFile.commit()) {
+        error = QStringLiteral("Rasterized PSD cache file could not be finalized.");
+        return false;
+    }
+
+    return true;
 }
 
 QString defaultCacheDirectory()
@@ -518,6 +1332,9 @@ QVariantMap ImageImport::prepareImageImport(const QString &fileUrl)
         return failureResult(QStringLiteral("Image path is empty."));
     }
 
+    const QFileInfo sourceInfo(ref.localPath);
+    QVariantMap metadata = buildBasicImportMetadata(ref, sourceInfo, QStringLiteral("raster"));
+
     if (!supportsImageFile(fileUrl)) {
         return failureResult(QStringLiteral("Unsupported image format."));
     }
@@ -526,7 +1343,8 @@ QVariantMap ImageImport::prepareImageImport(const QString &fileUrl)
         return {
             {QStringLiteral("ok"), true},
             {QStringLiteral("source"), ref.sourceUrl},
-            {QStringLiteral("error"), QString()}
+            {QStringLiteral("error"), QString()},
+            {QStringLiteral("metadata"), metadata}
         };
     }
 
@@ -534,15 +1352,15 @@ QVariantMap ImageImport::prepareImageImport(const QString &fileUrl)
         return failureResult(QStringLiteral("PSD import requires a local file."));
     }
 
-    const QFileInfo sourceInfo(ref.localPath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         return failureResult(QStringLiteral("PSD file does not exist."));
     }
 
     QString error;
-    const QImage image = loadPsdComposite(ref.localPath, error);
-    if (image.isNull()) {
-        return failureResult(error.isEmpty() ? QStringLiteral("PSD could not be decoded.") : error);
+    QVariantMap psdMetadata;
+    QVector<PsdDecodedLayer> psdLayers;
+    if (!inspectPsdDocument(ref.localPath, psdMetadata, psdLayers, error)) {
+        return failureResult(error.isEmpty() ? QStringLiteral("PSD could not be inspected.") : error);
     }
 
     QDir cacheDir(m_cacheDirectory);
@@ -550,25 +1368,61 @@ QVariantMap ImageImport::prepareImageImport(const QString &fileUrl)
         return failureResult(QStringLiteral("Import cache directory could not be created."));
     }
 
-    const QString targetPath = cacheDir.filePath(cacheKeyForFile(ref.localPath) + QStringLiteral(".png"));
-    QSaveFile outputFile(targetPath);
-    if (!outputFile.open(QIODevice::WriteOnly)) {
-        return failureResult(QStringLiteral("Rasterized PSD cache file could not be opened."));
+    const QString baseCacheKey = cacheKeyForFile(ref.localPath);
+    metadata.insert(QStringLiteral("kind"), QStringLiteral("psd"));
+    metadata.insert(QStringLiteral("psd"), psdMetadata);
+
+    if (!psdLayers.isEmpty()) {
+        QVariantList layerPayloads;
+        layerPayloads.reserve(psdLayers.size());
+
+        for (int index = 0; index < psdLayers.size(); ++index) {
+            const PsdDecodedLayer &layer = psdLayers.at(index);
+            QString layerError;
+            const QString layerPath = cacheDir.filePath(baseCacheKey + QStringLiteral("-layer-%1.png").arg(index));
+            if (!saveImageAsPng(layer.image, layerPath, layerError)) {
+                return failureResult(layerError);
+            }
+
+            layerPayloads.push_back(QVariantMap{
+                {QStringLiteral("source"), QUrl::fromLocalFile(layerPath).toString()},
+                {QStringLiteral("x"), layer.left},
+                {QStringLiteral("y"), layer.top},
+                {QStringLiteral("width"), layer.width},
+                {QStringLiteral("height"), layer.height},
+                {QStringLiteral("name"), layer.name},
+                {QStringLiteral("opacity"), layer.opacity},
+                {QStringLiteral("visible"), layer.visible},
+                {QStringLiteral("blendModeKey"), layer.blendModeKey},
+                {QStringLiteral("metadata"), buildPsdLayerMetadata(metadata, psdMetadata, layer, index)}
+            });
+        }
+
+        return {
+            {QStringLiteral("ok"), true},
+            {QStringLiteral("source"), QString()},
+            {QStringLiteral("error"), QString()},
+            {QStringLiteral("metadata"), metadata},
+            {QStringLiteral("layers"), layerPayloads}
+        };
     }
 
-    if (!image.save(&outputFile, "PNG")) {
-        outputFile.cancelWriting();
-        return failureResult(QStringLiteral("Rasterized PSD cache file could not be written."));
+    QVariantMap compositeMetadata;
+    const QImage image = loadPsdComposite(ref.localPath, compositeMetadata, error);
+    if (image.isNull()) {
+        return failureResult(error.isEmpty() ? QStringLiteral("PSD could not be decoded.") : error);
     }
 
-    if (!outputFile.commit()) {
-        return failureResult(QStringLiteral("Rasterized PSD cache file could not be finalized."));
+    const QString targetPath = cacheDir.filePath(baseCacheKey + QStringLiteral(".png"));
+    if (!saveImageAsPng(image, targetPath, error)) {
+        return failureResult(error);
     }
 
     return {
         {QStringLiteral("ok"), true},
         {QStringLiteral("source"), QUrl::fromLocalFile(targetPath).toString()},
-        {QStringLiteral("error"), QString()}
+        {QStringLiteral("error"), QString()},
+        {QStringLiteral("metadata"), metadata}
     };
 }
 
