@@ -20,6 +20,8 @@ if(APPLE)
 endif()
 
 target_sources(Vincent PRIVATE
+        brushengine.cpp
+        brushengine.h
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h

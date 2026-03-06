@@ -6,6 +6,7 @@
 
 #include <backend/runtime/appentry.h>
 
+#include "brushengine.h"
 #include "paletteutils.h"
 
 namespace {
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
     launchSpec.moduleUri = QStringLiteral("Vincent");
     launchSpec.rootObject = QStringLiteral("Main");
     launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
+        engine.rootContext()->setContextProperty("BrushEngine", new BrushEngine(&engine));
         engine.rootContext()->setContextProperty("PaletteUtils", new PaletteUtils(&engine));
         configureEngineImports(engine);
     };

@@ -8,6 +8,8 @@ set(VINCENT_QML_MODULE_MINOR "0")
 set(VINCENT_QML_MODULE_VERSION "${VINCENT_QML_MODULE_MAJOR}.${VINCENT_QML_MODULE_MINOR}")
 set(VINCENT_MIN_MACOS_VERSION "12.0")
 
+include(CTest)
+
 math(EXPR _vincent_default_bundle_version
         "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
 set(_vincent_bundle_version_default "${_vincent_default_bundle_version}")
@@ -91,6 +93,9 @@ include(FeatureSummary)
 
 # Qt6
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
+if(BUILD_TESTING)
+    find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Test)
+endif()
 find_package(LVRS CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
@@ -204,6 +209,10 @@ install(TARGETS Vincent BUNDLE DESTINATION "Applications" COMPONENT Runtime)
 # Linux install target (runtime binary)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
+endif()
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
 endif()
 
 # CPack install 단계에서 Qt 런타임을 함께 배치해 패키지를 독립 실행 가능 상태로 만든다.

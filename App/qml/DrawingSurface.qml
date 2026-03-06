@@ -17,7 +17,6 @@ Rectangle {
     property bool paintScheduled: false
     property int lastPaintedStrokeIndex: -1
     property int lastPaintedPointCount: 0
-    readonly property real minPointDistance: Math.max(0.5, brushSize * 0.05)
     property string toolMode: "brush"
     ListModel {
         id: imageModel
@@ -244,11 +243,18 @@ Rectangle {
                 color: stroke.color,
                 size: stroke.size,
                 erase: stroke.erase === true,
+                pressureSensitive: stroke.pressureSensitive === true,
                 points: []
             };
             for (var j = 0; j < stroke.points.length; ++j) {
                 var pt = stroke.points[j];
-                clonedStroke.points.push({ x: pt.x, y: pt.y });
+                clonedStroke.points.push({
+                    x: pt.x,
+                    y: pt.y,
+                    pressure: pt.pressure !== undefined ? pt.pressure : 1.0,
+                    size: pt.size !== undefined ? pt.size : stroke.size,
+                    opacity: pt.opacity !== undefined ? pt.opacity : (pt.pressure !== undefined ? pt.pressure : 1.0)
+                });
             }
             result.push(clonedStroke);
         }
@@ -377,24 +383,111 @@ Rectangle {
         })
     }
 
-    function appendStrokePoint(pointX, pointY) {
+    function currentStrokeColor() {
+        if (surface.toolMode === "eraser") {
+            return "#000000"
+        }
+        return typeof surface.brushColor === "string" ? surface.brushColor : surface.brushColor.toString()
+    }
+
+    function strokePointSize(point, fallbackSize) {
+        if (point && point.size !== undefined) {
+            return point.size
+        }
+        return fallbackSize
+    }
+
+    function strokePointOpacity(point) {
+        if (point && point.opacity !== undefined) {
+            return point.opacity
+        }
+        if (point && point.pressure !== undefined) {
+            return point.pressure
+        }
+        return 1.0
+    }
+
+    function createStrokePoint(pointX, pointY, rawPressure, pressureSensitive) {
+        var baseSize = surface.currentStroke ? surface.currentStroke.size : surface.brushSize
+        var pointSize = BrushEngine.sampleSize(baseSize, rawPressure, pressureSensitive)
+        var pointOpacity = BrushEngine.resolvedOpacity(rawPressure, pressureSensitive)
+        if (surface.currentStroke && surface.currentStroke.points.length) {
+            var lastPoint = surface.currentStroke.points[surface.currentStroke.points.length - 1]
+            var previousSize = surface.strokePointSize(lastPoint, baseSize)
+            var previousOpacity = surface.strokePointOpacity(lastPoint)
+            pointSize = BrushEngine.smoothedSampleSize(previousSize, pointSize)
+            pointOpacity = BrushEngine.smoothedSampleOpacity(previousOpacity, pointOpacity)
+        }
+        return {
+            x: pointX,
+            y: pointY,
+            pressure: BrushEngine.resolvedPressure(rawPressure, pressureSensitive),
+            size: pointSize,
+            opacity: pointOpacity
+        }
+    }
+
+    function beginStroke(pointX, pointY, rawPressure, pressureSensitive) {
+        if (surface.toolMode !== "brush" && surface.toolMode !== "eraser") {
+            return
+        }
+        surface.pushUndoState()
+        surface.currentStroke = {
+            color: surface.currentStrokeColor(),
+            size: surface.brushSize,
+            points: [surface.createStrokePoint(pointX, pointY, rawPressure, pressureSensitive)],
+            erase: surface.toolMode === "eraser",
+            pressureSensitive: pressureSensitive
+        }
+        surface.appendStrokePending = true
+        surface.strokes = surface.strokes.concat([surface.currentStroke])
+    }
+
+    function appendStrokePoint(pointX, pointY, rawPressure, pressureSensitive) {
         if (!surface.currentStroke) {
             return false
         }
         var points = surface.currentStroke.points
+        var nextPoint = surface.createStrokePoint(pointX, pointY, rawPressure, pressureSensitive)
         if (!points.length) {
-            points.push({ x: pointX, y: pointY })
+            points.push(nextPoint)
             return true
         }
         var lastPoint = points[points.length - 1]
-        var dx = pointX - lastPoint.x
-        var dy = pointY - lastPoint.y
-        var minDistance = surface.minPointDistance
-        if (dx * dx + dy * dy < minDistance * minDistance) {
+        if (!BrushEngine.shouldAppendPoint(
+                    lastPoint.x,
+                    lastPoint.y,
+                    surface.strokePointSize(lastPoint, surface.currentStroke.size),
+                    surface.strokePointOpacity(lastPoint),
+                    nextPoint.x,
+                    nextPoint.y,
+                    nextPoint.size,
+                    nextPoint.opacity,
+                    surface.currentStroke.size)) {
             return false
         }
-        points.push({ x: pointX, y: pointY })
+        points.push(nextPoint)
         return true
+    }
+
+    function endStroke(pointX, pointY, rawPressure, pressureSensitive) {
+        if (!surface.currentStroke) {
+            return
+        }
+        if (surface.appendStrokePoint(pointX, pointY, rawPressure, pressureSensitive)) {
+            surface.schedulePaint(false)
+        }
+        surface.currentStroke = null
+    }
+
+    function drawStamp(ctx, pointX, pointY, diameter, opacity) {
+        if (diameter <= 0 || opacity <= 0) {
+            return
+        }
+        ctx.globalAlpha = opacity
+        ctx.beginPath()
+        ctx.arc(pointX, pointY, diameter / 2, 0, Math.PI * 2)
+        ctx.fill()
     }
 
     function drawStroke(ctx, stroke, startIndex) {
@@ -411,26 +504,56 @@ Rectangle {
             return
         }
 
+        ctx.save()
         ctx.globalCompositeOperation = stroke.erase ? "destination-out" : "source-over"
+        ctx.fillStyle = stroke.color
 
         if (pointCount === 1 && start === 0) {
             var point = points[0]
-            ctx.beginPath()
-            ctx.fillStyle = stroke.color
-            ctx.arc(point.x, point.y, stroke.size / 2, 0, Math.PI * 2)
-            ctx.fill()
+            surface.drawStamp(
+                        ctx,
+                        point.x,
+                        point.y,
+                        surface.strokePointSize(point, stroke.size),
+                        surface.strokePointOpacity(point))
+            ctx.restore()
             return
         }
 
-        ctx.beginPath()
-        ctx.strokeStyle = stroke.color
-        ctx.lineWidth = stroke.size
-        var moveIndex = start > 0 ? start - 1 : 0
-        ctx.moveTo(points[moveIndex].x, points[moveIndex].y)
-        for (var i = Math.max(1, start); i < pointCount; ++i) {
-            ctx.lineTo(points[i].x, points[i].y)
+        if (start === 0) {
+            surface.drawStamp(
+                        ctx,
+                        points[0].x,
+                        points[0].y,
+                        surface.strokePointSize(points[0], stroke.size),
+                        surface.strokePointOpacity(points[0]))
         }
-        ctx.stroke()
+
+        var beginIndex = Math.max(1, start)
+        for (var i = beginIndex; i < pointCount; ++i) {
+            var previousPoint = points[i - 1]
+            var currentPoint = points[i]
+            var previousSize = surface.strokePointSize(previousPoint, stroke.size)
+            var currentSize = surface.strokePointSize(currentPoint, stroke.size)
+            var previousOpacity = surface.strokePointOpacity(previousPoint)
+            var currentOpacity = surface.strokePointOpacity(currentPoint)
+            var stamps = BrushEngine.stampCount(
+                        previousPoint.x,
+                        previousPoint.y,
+                        previousSize,
+                        currentPoint.x,
+                        currentPoint.y,
+                        currentSize)
+            for (var step = 1; step <= stamps; ++step) {
+                var t = step / stamps
+                var stampX = previousPoint.x + (currentPoint.x - previousPoint.x) * t
+                var stampY = previousPoint.y + (currentPoint.y - previousPoint.y) * t
+                var stampSize = previousSize + (currentSize - previousSize) * t
+                var stampOpacity = previousOpacity + (currentOpacity - previousOpacity) * t
+                surface.drawStamp(ctx, stampX, stampY, stampSize, stampOpacity)
+            }
+        }
+        ctx.restore()
     }
 
     Component.onCompleted: {
@@ -632,6 +755,9 @@ Rectangle {
     }
 
     onToolModeChanged: {
+        if (surface.currentStroke) {
+            surface.currentStroke = null
+        }
         if (toolMode !== "text" && textInputOverlay.visible) {
             surface.cancelTextEntry()
         }
@@ -1397,12 +1523,73 @@ Rectangle {
         surface.schedulePaint(true)
     }
 
+    PointHandler {
+        id: stylusStrokeHandler
+        parent: canvasContainer
+        acceptedPointerTypes: PointerDevice.Pen | PointerDevice.Eraser
+        enabled: surface.toolMode === "brush" || surface.toolMode === "eraser"
+        target: null
+
+        onActiveChanged: {
+            if (active) {
+                surface.forceActiveFocus()
+                surface.beginStroke(point.position.x, point.position.y, point.pressure, true)
+            } else {
+                surface.endStroke(point.position.x, point.position.y, point.pressure, true)
+            }
+        }
+
+        onPointChanged: {
+            if (!active) {
+                return
+            }
+            if (!surface.currentStroke) {
+                surface.beginStroke(point.position.x, point.position.y, point.pressure, true)
+                return
+            }
+            if (surface.appendStrokePoint(point.position.x, point.position.y, point.pressure, true)) {
+                surface.schedulePaint(false)
+            }
+        }
+    }
+
+    PointHandler {
+        id: mouseStrokeHandler
+        parent: canvasContainer
+        acceptedDevices: PointerDevice.Mouse
+        acceptedButtons: Qt.LeftButton
+        enabled: surface.toolMode === "brush" || surface.toolMode === "eraser"
+        target: null
+
+        onActiveChanged: {
+            if (active) {
+                surface.forceActiveFocus()
+                surface.beginStroke(point.position.x, point.position.y, 1.0, false)
+            } else {
+                surface.endStroke(point.position.x, point.position.y, 1.0, false)
+            }
+        }
+
+        onPointChanged: {
+            if (!active) {
+                return
+            }
+            if (!surface.currentStroke) {
+                surface.beginStroke(point.position.x, point.position.y, 1.0, false)
+                return
+            }
+            if (surface.appendStrokePoint(point.position.x, point.position.y, 1.0, false)) {
+                surface.schedulePaint(false)
+            }
+        }
+    }
+
     MouseArea {
         parent: canvasContainer
         anchors.fill: parent
         z: 3
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: surface.toolMode === "text" ? Qt.LeftButton : Qt.NoButton
         visible: surface.toolMode !== "grab"
         enabled: visible
         cursorShape: surface.toolMode === "eraser"
@@ -1430,64 +1617,8 @@ Rectangle {
                 mouse.accepted = false
                 return
             }
-            var colorValue
-            surface.pushUndoState()
-            var isEraser = surface.toolMode === "eraser"
-            if (isEraser) {
-                colorValue = "#000000"
-            } else {
-                colorValue = typeof surface.brushColor === "string" ? surface.brushColor : surface.brushColor.toString()
-            }
-            surface.currentStroke = {
-                color: colorValue,
-                size: surface.brushSize,
-                points: [ { x: mouse.x, y: mouse.y } ],
-                erase: isEraser
-            }
-            surface.appendStrokePending = true
-            surface.strokes = surface.strokes.concat([surface.currentStroke])
+            mouse.accepted = false
         }
-
-        onPositionChanged: function(mouse) {
-            if (surface.toolMode === "grab") {
-                mouse.accepted = false
-                return
-            }
-            if (surface.toolMode === "text") {
-                mouse.accepted = false
-                return
-            }
-            if (!surface.currentStroke) {
-                return
-            }
-            if (surface.appendStrokePoint(mouse.x, mouse.y)) {
-                surface.schedulePaint(false)
-            }
-        }
-
-        onReleased: function(mouse) {
-            if (surface.toolMode === "grab") {
-                mouse.accepted = false
-                return
-            }
-            if (surface.toolMode === "text") {
-                mouse.accepted = false
-                return
-            }
-            if (mouse.button !== Qt.LeftButton) {
-                mouse.accepted = false
-                return
-            }
-            if (!surface.currentStroke) {
-                return
-            }
-            if (surface.appendStrokePoint(mouse.x, mouse.y)) {
-                surface.schedulePaint(false)
-            }
-            surface.currentStroke = null
-        }
-
-        onCanceled: surface.currentStroke = null
 
         onWheel: function(wheel) {
             if (wheel.modifiers === Qt.ControlModifier) {

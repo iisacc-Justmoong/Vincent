@@ -1,11 +1,12 @@
-# Vincent 2.1.0 Application Structure
+# Vincent 2.2.1 Application Structure
 
-This document captures the current architecture of Vincent 2.1.0 as observed in the repository. It describes how the project is laid out, how the build system is wired, and how the runtime pieces cooperate to deliver the painting experience.
+This document captures the current architecture of Vincent 2.2.1 as observed in the repository. It describes how the project is laid out, how the build system is wired, and how the runtime pieces cooperate to deliver the painting experience.
 
 ## Top-Level Layout
 
 - `CMakeLists.txt` (root) – bootstraps the Qt build, configures install paths, and delegates to the application sources in `App/`.
 - `App/` – contains all C++ and QML code for the application bundle.
+- `App/brushengine.h`, `App/brushengine.cpp` – pressure-aware brush dynamics engine exposed to QML.
 - `App/paletteutils.h`, `App/paletteutils.cpp` – palette ordering helper exposed to QML as a singleton.
 - `resources/` – SVG icons and design assets consumed by the QML UI.
 - `build/`, `cmake-build-debug/` – out-of-source build trees (ignored in project description, but important to keep generated artifacts isolated).
@@ -27,6 +28,7 @@ The project relies on CMake and Qt 6 modules.
 ## Runtime Entry Point (`App/main.cpp`)
 
 - Creates the `QGuiApplication` instance that hosts the Qt Quick scene graph.
+- Registers the `BrushEngine` singleton-style context object used by the QML canvas for pressure-aware stroke sampling.
 - Registers the `PaletteUtils` singleton in the `Vincent` QML module for palette computation.
 - Configures a `QQmlApplicationEngine` and augments its import paths when `CRAFTROOT` exposes prebuilt QML modules.
 - Connects `objectCreationFailed` to `QCoreApplication::exit(-1)` for fail-fast behavior if the QML scene cannot load.
@@ -63,10 +65,18 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ### `DrawingSurface.qml`
 
 - Renders the actual canvas within a rounded `Rectangle`.
-- Manages drawing state (`strokes`, `currentStroke`, `backgroundSource`) and tool behavior.
-- Uses a `Canvas` element to batch-render all strokes; each stroke contains point arrays, colors, and widths.
-- Supports eraser mode by substituting white strokes, wheel-based brush size adjustments via the `brushDeltaRequested` signal, and optional background image loading.
+- Manages drawing state (`strokes`, `currentStroke`, imported images, and undo/redo snapshots) and tool behavior.
+- Uses `PointHandler` for stylus and mouse stroke capture, enabling pressure-sensitive brush sampling by default when a pen device reports pressure.
+- Stores each stroke as a sequence of sampled points that carry normalized pressure, resolved brush diameter, and resolved opacity.
+- Uses a `Canvas` element to batch-render all strokes; variable-width strokes are rasterized by interpolated stamp placement rather than fixed-width `lineTo()` segments, and each stamp carries its own alpha.
+- Supports eraser mode through pressure-sensitive `destination-out` compositing strength, wheel-based brush size adjustments via the `brushDeltaRequested` signal, and optional background image loading.
 - Normalizes file URLs for loading and saving, ensuring compatibility with both `file://` URIs and bare paths.
+
+### `BrushEngine` (`App/brushengine.*`)
+
+- Centralizes the brush-response policy so pressure handling is not duplicated in QML.
+- Resolves raw stylus pressure into usable size and opacity curves, clamps minimum visible stroke size, smooths sudden width and alpha jumps, and decides when a new sample is significant enough to append.
+- Provides segment stamp density hints so the QML renderer can fill gaps while preserving variable stroke width and opacity.
 
 ## Data Flow & Interaction Summary
 
@@ -74,7 +84,7 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 2. `Main.qml` instantiates `PainterCanvasPage`, which centralizes application state and owns the drawing surface.
 3. `PainterCanvasPage` requests the ordered color palette from the `PaletteUtils` singleton.
 4. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage` methods, which then mutate page state or invoke `DrawingSurface` methods.
-5. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, ensuring interactive updates.
+5. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, and `BrushEngine` converts stylus pressure into the final per-sample stroke width and opacity.
 6. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface` for persistence or background loading.
 
 ## Notable Platform Considerations
@@ -82,8 +92,7 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 - Craft integration: both CMake and `main.cpp` account for Craft-managed prefixes so that packaged QML plugins resolve without manual configuration.
 - macOS OpenGL: The CMake logic conditionally adds shim targets and explicit frameworks to satisfy Qt Quick's OpenGL requirements on modern SDKs.
 
-## Opportunities for Extension
+## Testing Surface
 
-- Extend the C++ back-end (e.g., document models, command stacks) if the painting logic outgrows the QML-only approach.
-- Add automated tests under `tests/` once non-trivial logic (such as file handling) gains more edge cases.
-- Expand documentation with user-facing guides (tool descriptions, keyboard shortcuts) alongside this structural overview.
+- `tests/tst_brushengine.cpp` validates the pressure-to-size and pressure-to-opacity curves, sample smoothing, append heuristics, and stamp-density calculations of the brush engine with Qt Test.
+- Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.
