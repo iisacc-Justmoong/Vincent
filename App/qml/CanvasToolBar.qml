@@ -246,7 +246,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
-                iconName: "general  delete"
+                iconName: "generaldelete"
                 Accessible.name: qsTr("Clear canvas")
                 onClicked: toolbar.clearCanvasRequested()
             }
@@ -278,7 +278,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: toolbar.currentTool === "grab" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "general  locate"
+                iconName: "generallocate"
                 Accessible.name: qsTr("Grab tool")
                 onClicked: toolbar.toolSelected("grab")
             }
@@ -326,7 +326,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
-                iconName: "image  zoomOut"
+                iconName: "imagezoomOut"
                 Accessible.name: qsTr("Decrease brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
             }
@@ -334,7 +334,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
-                iconName: "image  zoomIn"
+                iconName: "imagezoomIn"
                 Accessible.name: qsTr("Increase brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
             }
