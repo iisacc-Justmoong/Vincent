@@ -54,3 +54,20 @@ target_link_libraries(tests_canvasdocumentviewmodel PRIVATE
 )
 
 add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmodel)
+
+add_executable(tests_canvasbackend
+        tst_canvasbackend.cpp
+        ../App/canvasbackend.cpp
+        ../App/canvasbackend.h
+)
+
+target_include_directories(tests_canvasbackend PRIVATE
+        ${CMAKE_SOURCE_DIR}/App
+)
+
+target_link_libraries(tests_canvasbackend PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+
+add_test(NAME tests_canvasbackend COMMAND tests_canvasbackend)

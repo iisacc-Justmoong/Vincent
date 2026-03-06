@@ -35,14 +35,14 @@ Rectangle {
     property int shiftHoldCount: 0
     property var imageElementRegistry: ({})
     property var selectedImageItem: null
-    property var undoStack: []
-    property var redoStack: []
     readonly property int maxUndoSteps: 64
     property bool transformUndoCaptured: false
     readonly property bool textEntryActive: textInputOverlay.visible
     property bool externalDragHasSupportedImage: false
     readonly property int layerPanelWidth: 220
     readonly property int layerPanelTopMargin: 96
+    readonly property var canvasBackend: CanvasBackend
+    readonly property var imageImportService: ImageImport
 
     function updateCanvasSizeFromViewport() {
         surface.canvasWidth = Math.max(1, Math.round(surface.width))
@@ -132,7 +132,7 @@ Rectangle {
     }
 
     function isSupportedImageUrl(fileUrl) {
-        return !!fileUrl && ImageImport.supportsImageFile(fileUrl.toString())
+        return !!fileUrl && surface.imageImportService.supportsImageFile(fileUrl.toString())
     }
 
     function extractImageUrlsFromDrop(event) {
@@ -236,14 +236,11 @@ Rectangle {
     }
 
     function documentFitTransform(documentWidth, documentHeight) {
-        var safeWidth = Math.max(1, documentWidth !== undefined ? documentWidth : surface.canvasWidth)
-        var safeHeight = Math.max(1, documentHeight !== undefined ? documentHeight : surface.canvasHeight)
-        var scale = Math.min(surface.canvasWidth / safeWidth, surface.canvasHeight / safeHeight, 1)
-        return {
-            scale: scale,
-            offsetX: (surface.canvasWidth - safeWidth * scale) / 2,
-            offsetY: (surface.canvasHeight - safeHeight * scale) / 2
-        }
+        return surface.canvasBackend.documentFitTransform(
+                    surface.canvasWidth,
+                    surface.canvasHeight,
+                    documentWidth !== undefined ? documentWidth : surface.canvasWidth,
+                    documentHeight !== undefined ? documentHeight : surface.canvasHeight)
     }
 
     function appendImportedImageEntry(entryData) {
@@ -354,62 +351,6 @@ Rectangle {
         surface.updateSelectedImageItem();
     }
 
-    function cloneStrokes(src) {
-        var result = [];
-        for (var i = 0; i < src.length; ++i) {
-            var stroke = src[i];
-            if (!stroke) {
-                continue;
-            }
-            var clonedStroke = {
-                color: stroke.color,
-                size: stroke.size,
-                erase: stroke.erase === true,
-                pressureSensitive: stroke.pressureSensitive === true,
-                points: []
-            };
-            for (var j = 0; j < stroke.points.length; ++j) {
-                var pt = stroke.points[j];
-                clonedStroke.points.push({
-                    x: pt.x,
-                    y: pt.y,
-                    pressure: pt.pressure !== undefined ? pt.pressure : 1.0,
-                    size: pt.size !== undefined ? pt.size : stroke.size,
-                    opacity: pt.opacity !== undefined ? pt.opacity : (pt.pressure !== undefined ? pt.pressure : 1.0)
-                });
-            }
-            result.push(clonedStroke);
-        }
-        return result;
-    }
-
-    function cloneImages() {
-        if (!imageModel) {
-            return [];
-        }
-        var result = [];
-        for (var i = 0; i < surface.importedLayerCount; ++i) {
-            var entry = imageModel.get(i);
-            result.push({
-                imageId: entry.imageId,
-                source: entry.source,
-                x: entry.x,
-                y: entry.y,
-                originalWidth: entry.originalWidth,
-                originalHeight: entry.originalHeight,
-                scaleX: entry.scaleX,
-                scaleY: entry.scaleY,
-                ready: entry.ready,
-                layerName: entry.layerName,
-                layerVisible: entry.layerVisible,
-                layerOpacity: entry.layerOpacity,
-                blendModeKey: entry.blendModeKey,
-                importMetadata: entry.importMetadata !== undefined ? entry.importMetadata : ({})
-            });
-        }
-        return result;
-    }
-
     function cloneMetadata(value) {
         if (value === undefined || value === null) {
             return ({})
@@ -418,22 +359,16 @@ Rectangle {
     }
 
     function captureSnapshot() {
-        return {
-            canvasWidth: surface.canvasWidth,
-            canvasHeight: surface.canvasHeight,
-            strokes: cloneStrokes(surface.strokes),
-            images: cloneImages(),
-            selectedImageId: surface.selectedImageId
-        };
+        return surface.canvasBackend.captureSnapshot(
+                    surface.canvasWidth,
+                    surface.canvasHeight,
+                    surface.strokes,
+                    documentViewModel ? documentViewModel.exportLayers() : [],
+                    surface.selectedImageId)
     }
 
     function pushUndoState() {
-        var snapshot = surface.captureSnapshot();
-        surface.undoStack.push(snapshot);
-        if (surface.undoStack.length > surface.maxUndoSteps) {
-            surface.undoStack.shift();
-        }
-        surface.redoStack = [];
+        surface.canvasBackend.pushUndoState(surface.captureSnapshot(), surface.maxUndoSteps)
     }
 
     function applySnapshot(snapshot) {
@@ -446,11 +381,7 @@ Rectangle {
             surface.updateDocumentProperty("canvasWidth", surface.canvasWidth)
             surface.updateDocumentProperty("canvasHeight", surface.canvasHeight)
         }
-        var restoredStrokes = [];
-        for (var i = 0; i < snapshot.strokes.length; ++i) {
-            restoredStrokes.push(snapshot.strokes[i]);
-        }
-        surface.strokes = restoredStrokes;
+        surface.strokes = snapshot.strokes !== undefined ? snapshot.strokes : [];
 
         documentViewModel.importLayers(snapshot.images !== undefined ? snapshot.images : [])
 
@@ -465,29 +396,23 @@ Rectangle {
     }
 
     function undo() {
-        if (!surface.canMutateDocument() || !surface.undoStack.length) {
+        if (!surface.canMutateDocument() || !surface.canvasBackend.canUndo) {
             return;
         }
-        var currentSnapshot = surface.captureSnapshot();
-        var snapshot = surface.undoStack.pop();
-        surface.redoStack.push(currentSnapshot);
-        if (surface.redoStack.length > surface.maxUndoSteps) {
-            surface.redoStack.shift();
+        var snapshot = surface.canvasBackend.undo(surface.captureSnapshot(), surface.maxUndoSteps)
+        if (snapshot && Object.keys(snapshot).length) {
+            surface.applySnapshot(snapshot)
         }
-        surface.applySnapshot(snapshot);
     }
 
     function redo() {
-        if (!surface.canMutateDocument() || !surface.redoStack.length) {
+        if (!surface.canMutateDocument() || !surface.canvasBackend.canRedo) {
             return;
         }
-        var currentSnapshot = surface.captureSnapshot();
-        var snapshot = surface.redoStack.pop();
-        surface.undoStack.push(currentSnapshot);
-        if (surface.undoStack.length > surface.maxUndoSteps) {
-            surface.undoStack.shift();
+        var snapshot = surface.canvasBackend.redo(surface.captureSnapshot(), surface.maxUndoSteps)
+        if (snapshot && Object.keys(snapshot).length) {
+            surface.applySnapshot(snapshot)
         }
-        surface.applySnapshot(snapshot);
     }
 
     function beginTransformUndoCapture() {
@@ -719,10 +644,12 @@ Rectangle {
     }
 
     onDocumentViewModelChanged: {
+        surface.canvasBackend.clearHistory()
         surface.syncStateFromViewModel()
     }
 
     Component.onCompleted: {
+        surface.canvasBackend.clearHistory()
         surface.syncStateFromViewModel()
         surface.updateCanvasSizeFromViewport()
         Qt.callLater(surface.updateCanvasSizeFromViewport)
@@ -751,7 +678,7 @@ Rectangle {
         if (!surface.canMutateDocument()) {
             return
         }
-        var preparedImport = ImageImport.prepareImageImport(fileUrl ? fileUrl.toString() : "")
+        var preparedImport = surface.imageImportService.prepareImageImport(fileUrl ? fileUrl.toString() : "")
         if (!preparedImport.ok) {
             console.warn("Image import failed:", preparedImport.error)
             return
@@ -877,24 +804,18 @@ Rectangle {
         if (!entry || entry.originalWidth <= 0 || entry.originalHeight <= 0) {
             return
         }
-        const fitScale = Math.min(
-                    surface.canvasWidth / entry.originalWidth,
-                    surface.canvasHeight / entry.originalHeight,
-                    1)
-        var width = entry.originalWidth * fitScale
-        var height = entry.originalHeight * fitScale
-        if (!surface.updateLayerById(imageId, {
-                scaleX: fitScale,
-                scaleY: fitScale,
-                x: (surface.canvasWidth - width) / 2,
-                y: (surface.canvasHeight - height) / 2,
-                ready: true
-            })) {
-            imageModel.setProperty(index, "scaleX", fitScale)
-            imageModel.setProperty(index, "scaleY", fitScale)
-            imageModel.setProperty(index, "x", (surface.canvasWidth - width) / 2)
-            imageModel.setProperty(index, "y", (surface.canvasHeight - height) / 2)
-            imageModel.setProperty(index, "ready", true)
+        var placement = surface.canvasBackend.resetImagePlacement(
+                    surface.canvasWidth,
+                    surface.canvasHeight,
+                    entry.originalWidth,
+                    entry.originalHeight)
+        if (!placement || !Object.keys(placement).length) {
+            return
+        }
+        if (!surface.updateLayerById(imageId, placement)) {
+            for (var key in placement) {
+                imageModel.setProperty(index, key, placement[key])
+            }
         }
         surface.freeTransformActive = false
         if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
@@ -1548,169 +1469,22 @@ Rectangle {
                 if (!currentEntry || selectedIndex < 0) {
                     return
                 }
-                var startLeft = startRect.x
-                var startTop = startRect.y
-                var startRight = startRect.x + startRect.w
-                var startBottom = startRect.y + startRect.h
-
-                var newLeft = startLeft
-                var newTop = startTop
-                var newRight = startRight
-                var newBottom = startBottom
-
-                switch (role) {
-                case "topLeft":
-                    newLeft = startLeft + dx
-                    newTop = startTop + dy
-                    break
-                case "top":
-                    newTop = startTop + dy
-                    break
-                case "topRight":
-                    newRight = startRight + dx
-                    newTop = startTop + dy
-                    break
-                case "right":
-                    newRight = startRight + dx
-                    break
-                case "bottomRight":
-                    newRight = startRight + dx
-                    newBottom = startBottom + dy
-                    break
-                case "bottom":
-                    newBottom = startBottom + dy
-                    break
-                case "bottomLeft":
-                    newLeft = startLeft + dx
-                    newBottom = startBottom + dy
-                    break
-                case "left":
-                    newLeft = startLeft + dx
-                    break
-                default:
-                    break
-                }
-
-                var minWidth = Math.max(minSize, 8)
-                var minHeight = Math.max(minSize, 8)
-                var maxWidth = surface.canvasWidth * 4
-                var maxHeight = surface.canvasHeight * 4
-
-                var width = newRight - newLeft
-                if (width < minWidth) {
-                    if (role === "left" || role === "topLeft" || role === "bottomLeft") {
-                        newLeft = newRight - minWidth
-                    } else {
-                        newRight = newLeft + minWidth
-                    }
-                } else if (width > maxWidth) {
-                    if (role === "left" || role === "topLeft" || role === "bottomLeft") {
-                        newLeft = newRight - maxWidth
-                    } else {
-                        newRight = newLeft + maxWidth
-                    }
-                }
-
-                var height = newBottom - newTop
-                if (height < minHeight) {
-                    if (role === "top" || role === "topLeft" || role === "topRight") {
-                        newTop = newBottom - minHeight
-                    } else {
-                        newBottom = newTop + minHeight
-                    }
-                } else if (height > maxHeight) {
-                    if (role === "top" || role === "topLeft" || role === "topRight") {
-                        newTop = newBottom - maxHeight
-                    } else {
-                        newBottom = newTop + maxHeight
-                    }
-                }
-
-                var startWidth = startRect.w
-                var startHeight = startRect.h
-
                 var constrainAspectNow = forceConstrainAspect === undefined
                     ? surface.constrainAspect
                     : forceConstrainAspect
-
-                if (constrainAspectNow && startWidth > 0 && startHeight > 0) {
-                    var centerX = startLeft + startWidth / 2
-                    var centerY = startTop + startHeight / 2
-                    var minScale = Math.max(minWidth / startWidth, minHeight / startHeight)
-                    var maxScale = Math.min(maxWidth / startWidth, maxHeight / startHeight)
-                    var scaleCandidate = 1
-
-                    if (role === "left" || role === "right") {
-                        scaleCandidate = (newRight - newLeft) / startWidth
-                    } else if (role === "top" || role === "bottom") {
-                        scaleCandidate = (newBottom - newTop) / startHeight
-                    } else {
-                        var scaleX = (newRight - newLeft) / startWidth
-                        var scaleY = (newBottom - newTop) / startHeight
-                        scaleCandidate = Math.max(Math.abs(scaleX), Math.abs(scaleY))
-                    }
-
-                    scaleCandidate = Math.max(minScale, Math.min(maxScale, Math.abs(scaleCandidate)))
-                    var constrainedWidth = startWidth * scaleCandidate
-                    var constrainedHeight = startHeight * scaleCandidate
-
-                    switch (role) {
-                    case "topLeft":
-                        newRight = startRight
-                        newBottom = startBottom
-                        newLeft = newRight - constrainedWidth
-                        newTop = newBottom - constrainedHeight
-                        break
-                    case "topRight":
-                        newLeft = startLeft
-                        newBottom = startBottom
-                        newRight = newLeft + constrainedWidth
-                        newTop = newBottom - constrainedHeight
-                        break
-                    case "bottomRight":
-                        newLeft = startLeft
-                        newTop = startTop
-                        newRight = newLeft + constrainedWidth
-                        newBottom = newTop + constrainedHeight
-                        break
-                    case "bottomLeft":
-                        newRight = startRight
-                        newTop = startTop
-                        newLeft = newRight - constrainedWidth
-                        newBottom = newTop + constrainedHeight
-                        break
-                    case "left":
-                        newRight = startRight
-                        newLeft = newRight - constrainedWidth
-                        newTop = centerY - constrainedHeight / 2
-                        newBottom = centerY + constrainedHeight / 2
-                        break
-                    case "right":
-                        newLeft = startLeft
-                        newRight = newLeft + constrainedWidth
-                        newTop = centerY - constrainedHeight / 2
-                        newBottom = centerY + constrainedHeight / 2
-                        break
-                    case "top":
-                        newBottom = startBottom
-                        newTop = newBottom - constrainedHeight
-                        newLeft = centerX - constrainedWidth / 2
-                        newRight = centerX + constrainedWidth / 2
-                        break
-                    case "bottom":
-                        newTop = startTop
-                        newBottom = newTop + constrainedHeight
-                        newLeft = centerX - constrainedWidth / 2
-                        newRight = centerX + constrainedWidth / 2
-                        break
-                    default:
-                        break
-                    }
+                var result = surface.canvasBackend.resolveTransform(
+                            role,
+                            dx,
+                            dy,
+                            startRect,
+                            minSize,
+                            surface.canvasWidth,
+                            surface.canvasHeight,
+                            constrainAspectNow)
+                if (!result || result.width === undefined || result.height === undefined) {
+                    return
                 }
-
-                var finalWidth = newRight - newLeft
-                var finalHeight = newBottom - newTop
-                updateGeometry(newLeft, newTop, finalWidth, finalHeight)
+                updateGeometry(result.x, result.y, result.width, result.height)
             }
 
             Rectangle {

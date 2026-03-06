@@ -9,6 +9,7 @@
 #include <backend/runtime/appentry.h>
 
 #include "brushengine.h"
+#include "canvasbackend.h"
 #include "canvasdocumentviewmodel.h"
 #include "imageimport.h"
 #include "paletteutils.h"
@@ -83,6 +84,7 @@ int main(int argc, char *argv[])
     launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
         configureEngineImports(engine);
         auto *paletteUtils = new PaletteUtils(&engine);
+        engine.rootContext()->setContextProperty("CanvasBackend", new CanvasBackend(&engine));
         engine.rootContext()->setContextProperty("BrushEngine", new BrushEngine(&engine));
         engine.rootContext()->setContextProperty("ImageImport", new ImageImport(&engine));
         engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);

@@ -22,6 +22,8 @@ endif()
 target_sources(Vincent PRIVATE
         brushengine.cpp
         brushengine.h
+        canvasbackend.cpp
+        canvasbackend.h
         canvasdocumentviewmodel.cpp
         canvasdocumentviewmodel.h
         imageimport.cpp
