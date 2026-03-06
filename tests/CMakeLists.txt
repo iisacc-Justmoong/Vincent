@@ -71,3 +71,23 @@ target_link_libraries(tests_canvasbackend PRIVATE
 )
 
 add_test(NAME tests_canvasbackend COMMAND tests_canvasbackend)
+
+add_executable(tests_imageexport
+        tst_imageexport.cpp
+        ../App/imageexport.cpp
+        ../App/imageexport.h
+        ../App/imageimport.cpp
+        ../App/imageimport.h
+)
+
+target_include_directories(tests_imageexport PRIVATE
+        ${CMAKE_SOURCE_DIR}/App
+)
+
+target_link_libraries(tests_imageexport PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+
+add_test(NAME tests_imageexport COMMAND tests_imageexport)

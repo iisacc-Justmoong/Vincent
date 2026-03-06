@@ -61,6 +61,9 @@ Item {
 
     function defaultSaveExtension(nameFilter) {
         const suffix = (nameFilter || "").toLowerCase()
+        if (suffix.indexOf("psd") !== -1 || suffix.indexOf("photoshop") !== -1) {
+            return ".psd"
+        }
         if (suffix.indexOf("jpeg") !== -1 || suffix.indexOf("jpg") !== -1) {
             return ".jpg"
         }
@@ -152,7 +155,12 @@ Item {
         id: saveDialog
         title: qsTr("Save Image As")
         fileMode: Dialogs.FileDialog.SaveFile
-        nameFilters: [qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)")]
+        nameFilters: [
+            qsTr("PNG Image (*.png)"),
+            qsTr("JPEG Image (*.jpg *.jpeg)"),
+            qsTr("Bitmap Image (*.bmp)"),
+            qsTr("Photoshop Document (*.psd)")
+        ]
         onAccepted: {
             var urlString = toolbar.selectedDialogFileUrl(saveDialog)
             if (!urlString.length) {

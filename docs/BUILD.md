@@ -96,6 +96,6 @@ To configure and run the current unit test suite:
 
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target tests_brushengine tests_imageimport tests_canvasdocumentviewmodel tests_canvasbackend
+cmake --build build --target tests_brushengine tests_imageimport tests_canvasdocumentviewmodel tests_canvasbackend tests_imageexport
 ctest --test-dir build --output-on-failure
 ```

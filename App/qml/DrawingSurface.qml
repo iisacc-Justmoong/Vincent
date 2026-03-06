@@ -42,6 +42,7 @@ Rectangle {
     readonly property int layerPanelWidth: 220
     readonly property int layerPanelTopMargin: 96
     readonly property var canvasBackend: CanvasBackend
+    readonly property var imageExportService: ImageExport
     readonly property var imageImportService: ImageImport
 
     function updateCanvasSizeFromViewport() {
@@ -749,6 +750,20 @@ Rectangle {
         var path = toLocalPath(fileUrl)
         if (!path) {
             return false
+        }
+
+        if (path.toLowerCase().endsWith(".psd")) {
+            var exportResult = surface.imageExportService.saveDocumentAsPsd(
+                        path,
+                        surface.canvasWidth,
+                        surface.canvasHeight,
+                        documentViewModel ? documentViewModel.exportLayers() : [],
+                        surface.strokes.length ? paintCanvas.toDataURL("image/png") : "")
+            if (!exportResult.ok) {
+                console.warn("PSD export failed:", exportResult.error)
+                return false
+            }
+            return true
         }
 
         var overlayWasVisible = selectionOverlay.visible

@@ -26,6 +26,8 @@ target_sources(Vincent PRIVATE
         canvasbackend.h
         canvasdocumentviewmodel.cpp
         canvasdocumentviewmodel.h
+        imageexport.cpp
+        imageexport.h
         imageimport.cpp
         imageimport.h
         layerlistmodel.cpp
