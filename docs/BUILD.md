@@ -92,10 +92,10 @@ cmake --build build --target package
 The TGZ archive is written to the build directory as `Vincent-<version>-Linux.tar.gz`. If you prefer an installed tree, run `cmake --install build --prefix <path>`.
 
 ## Automated Tests
-To configure and run the brush-engine unit tests:
+To configure and run the current unit test suite:
 
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target tests_brushengine
+cmake --build build --target tests_brushengine tests_imageimport tests_canvasdocumentviewmodel
 ctest --test-dir build --output-on-failure
 ```

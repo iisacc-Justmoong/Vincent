@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import LVRS 1.0 as LV
 import "."
@@ -8,126 +10,85 @@ Item {
     readonly property int spacingSmall: LV.Theme.gap8
     readonly property int spacingMedium: LV.Theme.gap12
     readonly property int spacingLarge: LV.Theme.gap16
+    readonly property string viewId: "PainterCanvasPage"
 
-    readonly property var primaryPalette: [
-        {
-            name: qsTr("Ink Black"),
-            color: "#1a1a1a"
-        },
-        {
-            name: qsTr("Signal Red"),
-            color: "#e53935"
-        },
-        {
-            name: qsTr("Amber"),
-            color: "#fb8c00"
-        },
-        {
-            name: qsTr("Sun Yellow"),
-            color: "#fdd835"
-        },
-        {
-            name: qsTr("Leaf Green"),
-            color: "#43a047"
-        },
-        {
-            name: qsTr("Sky Blue"),
-            color: "#1e88e5"
-        },
-        {
-            name: qsTr("Violet"),
-            color: "#5e35b1"
-        },
-        {
-            name: qsTr("Clay"),
-            color: "#8d6e63"
-        },
-        {
-            name: qsTr("Pure White"),
-            color: "#ffffff"
-        },
-        {
-            name: qsTr("Pitch Black"),
-            color: "#000000"
-        }
-    ]
-
-    readonly property var extendedPalette: [
-        {
-            name: qsTr("Coral"),
-            color: "#ff7043"
-        },
-        {
-            name: qsTr("Rose"),
-            color: "#f06292"
-        },
-        {
-            name: qsTr("Lilac"),
-            color: "#ba68c8"
-        },
-        {
-            name: qsTr("Cerulean"),
-            color: "#0091ea"
-        },
-        {
-            name: qsTr("Seafoam"),
-            color: "#26c6da"
-        },
-        {
-            name: qsTr("Forest"),
-            color: "#2e7d32"
-        },
-        {
-            name: qsTr("Olive"),
-            color: "#827717"
-        },
-        {
-            name: qsTr("Burnt Sienna"),
-            color: "#d84315"
-        },
-        {
-            name: qsTr("Slate"),
-            color: "#546e7a"
-        }
-    ]
-
-    readonly property var defaultPalette: PaletteUtils.buildDefaultPalette(primaryPalette, extendedPalette)
-
-    property color brushColor: defaultPalette[0].color
-    property real brushSize: 2
-    property var colorPalette: defaultPalette
-    property string toolMode: "brush"
+    property var vm: null
 
     signal pageReady
 
-    Component.onCompleted: pageReady()
+    function refreshViewModel() {
+        painterPage.vm = LV.ViewModels.getForView(painterPage.viewId)
+    }
+
+    function bindViewModel() {
+        if (!LV.ViewModels.bindView(painterPage.viewId, "CanvasDocument", true)) {
+            console.warn(LV.ViewModels.lastError)
+        }
+        painterPage.refreshViewModel()
+    }
+
+    function updateDocumentProperty(propertyName, value) {
+        if (!LV.ViewModels.updateProperty(painterPage.viewId, propertyName, value)) {
+            console.warn(LV.ViewModels.lastError)
+        }
+    }
+
+    Component.onCompleted: {
+        painterPage.bindViewModel()
+        pageReady()
+    }
+
+    Component.onDestruction: {
+        LV.ViewModels.unbindView(painterPage.viewId)
+    }
+
+    Connections {
+        target: LV.ViewModels
+
+        function onViewsChanged() {
+            painterPage.refreshViewModel()
+        }
+
+        function onBindingsChanged() {
+            painterPage.refreshViewModel()
+        }
+    }
 
     function newCanvas() {
-        drawingSurface.newCanvas();
+        drawingSurface.newCanvas()
     }
 
     function clearCanvas() {
-        drawingSurface.clearCanvas();
+        drawingSurface.clearCanvas()
     }
 
     function setBrushColor(colorValue) {
-        brushColor = colorValue;
+        painterPage.updateDocumentProperty("brushColor", colorValue)
     }
 
     function adjustBrush(delta) {
-        brushSize = Math.max(1, Math.min(48, brushSize + delta));
+        const baseSize = painterPage.vm ? painterPage.vm.brushSize : 2
+        painterPage.updateDocumentProperty("brushSize", Math.max(1, Math.min(48, baseSize + delta)))
+    }
+
+    function setBrushSize(size) {
+        painterPage.updateDocumentProperty("brushSize", size)
+    }
+
+    function setToolMode(tool) {
+        painterPage.updateDocumentProperty("toolMode", tool)
     }
 
     function toggleFreeTransformMode() {
-        drawingSurface.toggleFreeTransformMode();
+        drawingSurface.toggleFreeTransformMode()
     }
 
     function saveCanvasAs(fileUrl) {
-        drawingSurface.saveToFile(fileUrl);
+        drawingSurface.saveToFile(fileUrl)
     }
 
     function openImage(fileUrl) {
-        drawingSurface.loadImage(fileUrl);
+        drawingSurface.loadImage(fileUrl)
     }
 
     Item {
@@ -140,13 +101,15 @@ Item {
             DrawingSurface {
                 id: drawingSurface
                 anchors.fill: parent
-                brushColor: painterPage.brushColor
-                brushSize: painterPage.brushSize
-                toolMode: painterPage.toolMode
-                onBrushDeltaRequested: painterPage.adjustBrush(delta)
-                onToolShortcutRequested: function (tool) {
-                    painterPage.toolMode = tool;
-                }
+                documentViewModel: painterPage.vm
+                viewId: painterPage.viewId
+                brushColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
+                brushSize: painterPage.vm ? painterPage.vm.brushSize : 2
+                toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
+                canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : 1
+                canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
+                onBrushDeltaRequested: (delta) => painterPage.adjustBrush(delta)
+                onToolShortcutRequested: (tool) => painterPage.setToolMode(tool)
                 onFreeTransformShortcutRequested: painterPage.toggleFreeTransformMode()
             }
         }
@@ -160,29 +123,18 @@ Item {
             anchors.leftMargin: painterPage.spacingSmall
             anchors.rightMargin: painterPage.spacingSmall
             z: 10
-            brushSize: painterPage.brushSize
-            currentColor: painterPage.brushColor
-            currentTool: painterPage.toolMode
-            palette: painterPage.colorPalette
+            brushSize: painterPage.vm ? painterPage.vm.brushSize : 2
+            currentColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
+            currentTool: painterPage.vm ? painterPage.vm.toolMode : "brush"
+            palette: painterPage.vm ? painterPage.vm.palette : []
             onNewCanvasRequested: painterPage.newCanvas()
             onClearCanvasRequested: painterPage.clearCanvas()
-            onBrushSizeChangeRequested: function (size) {
-                painterPage.brushSize = size;
-            }
-            onColorPicked: function (swatchColor) {
-                painterPage.setBrushColor(swatchColor);
-            }
-            onToolSelected: function (tool) {
-                painterPage.toolMode = tool;
-            }
-            onSaveRequested: function (fileUrl) {
-                painterPage.saveCanvasAs(fileUrl);
-            }
-            onOpenRequested: function (fileUrl) {
-                painterPage.openImage(fileUrl);
-            }
+            onBrushSizeChangeRequested: (size) => painterPage.setBrushSize(size)
+            onColorPicked: (swatchColor) => painterPage.setBrushColor(swatchColor)
+            onToolSelected: (tool) => painterPage.setToolMode(tool)
+            onSaveRequested: (fileUrl) => painterPage.saveCanvasAs(fileUrl)
+            onOpenRequested: (fileUrl) => painterPage.openImage(fileUrl)
             onFreeTransformRequested: painterPage.toggleFreeTransformMode()
         }
     }
-
 }

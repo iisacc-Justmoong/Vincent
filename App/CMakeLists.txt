@@ -22,8 +22,12 @@ endif()
 target_sources(Vincent PRIVATE
         brushengine.cpp
         brushengine.h
+        canvasdocumentviewmodel.cpp
+        canvasdocumentviewmodel.h
         imageimport.cpp
         imageimport.h
+        layerlistmodel.cpp
+        layerlistmodel.h
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h

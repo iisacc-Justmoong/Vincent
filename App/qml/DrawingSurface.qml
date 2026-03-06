@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import LVRS 1.0 as LV
 
@@ -9,6 +11,8 @@ Rectangle {
 
     property color brushColor: "#1a1a1a"
     property real brushSize: 2
+    property var documentViewModel: null
+    property string viewId: ""
     property int canvasWidth: 1
     property int canvasHeight: 1
     property var strokes: []
@@ -19,14 +23,12 @@ Rectangle {
     property int lastPaintedStrokeIndex: -1
     property int lastPaintedPointCount: 0
     property string toolMode: "brush"
-    ListModel {
-        id: imageModel
-    }
-
-    property int imageIdCounter: 0
-    property var imageImportMetadataStore: ({})
+    readonly property var imageModel: documentViewModel ? documentViewModel.layerListModel : null
+    readonly property int importedLayerCount: documentViewModel
+        ? documentViewModel.layerCount
+        : (imageModel ? imageModel.count : 0)
     property int selectedImageId: -1
-    readonly property bool hasImportedImage: imageModel.count > 0
+    readonly property bool hasImportedImage: importedLayerCount > 0
     property bool freeTransformActive: false
     property var freeTransformSnapshot: ({})
     property bool constrainAspect: false
@@ -45,15 +47,20 @@ Rectangle {
     function updateCanvasSizeFromViewport() {
         surface.canvasWidth = Math.max(1, Math.round(surface.width))
         surface.canvasHeight = Math.max(1, Math.round(surface.height))
+        surface.updateDocumentProperty("canvasWidth", surface.canvasWidth)
+        surface.updateDocumentProperty("canvasHeight", surface.canvasHeight)
     }
 
     function clearDocumentState() {
         surface.cancelTextEntry()
         surface.strokes = []
         surface.currentStroke = null
-        imageModel.clear()
-        surface.imageImportMetadataStore = ({})
-        surface.selectedImageId = -1
+        if (documentViewModel) {
+            documentViewModel.resetDocument()
+        } else if (imageModel) {
+            imageModel.clear()
+        }
+        surface.selectedImageId = documentViewModel ? documentViewModel.selectedLayerId : -1
         surface.imageElementRegistry = ({})
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
@@ -61,6 +68,24 @@ Rectangle {
         surface.updateSelectedImageItem()
         surface.notifySelectionOverlay()
         surface.schedulePaint(true)
+    }
+
+    function updateDocumentProperty(propertyName, value) {
+        if (!documentViewModel) {
+            return false
+        }
+        if (viewId.length && LV.ViewModels && LV.ViewModels.updateProperty(viewId, propertyName, value)) {
+            return true
+        }
+        documentViewModel[propertyName] = value
+        return true
+    }
+
+    function updateLayerById(imageId, changes) {
+        if (!documentViewModel || imageId === undefined || imageId === null || imageId === -1 || !changes) {
+            return false
+        }
+        return documentViewModel.updateLayerById(imageId, changes)
     }
 
     function isSupportedImageUrl(fileUrl) {
@@ -119,16 +144,10 @@ Rectangle {
     }
 
     function findImageIndexById(imageId) {
-        if (imageId === -1) {
+        if (imageId === -1 || !imageModel) {
             return -1;
         }
-        for (var i = 0; i < imageModel.count; ++i) {
-            var entry = imageModel.get(i);
-            if (entry && entry.imageId === imageId) {
-                return i;
-            }
-        }
-        return -1;
+        return imageModel.indexOfImageId(imageId)
     }
 
     function notifySelectionOverlay() {
@@ -142,6 +161,12 @@ Rectangle {
     }
 
     function selectedImageData() {
+        if (documentViewModel && documentViewModel.selectedLayerId === surface.selectedImageId) {
+            var selectedLayerData = documentViewModel.selectedLayerData
+            if (selectedLayerData) {
+                return surface.cloneMetadata(selectedLayerData)
+            }
+        }
         var index = surface.selectedImageIndex();
         if (index < 0) {
             return null;
@@ -154,7 +179,6 @@ Rectangle {
         for (var key in entry) {
             result[key] = entry[key];
         }
-        result.importMetadata = surface.imageImportMetadata(entry.imageId);
         return result;
     }
 
@@ -180,9 +204,10 @@ Rectangle {
     }
 
     function appendImportedImageEntry(entryData) {
-        var newId = ++surface.imageIdCounter
-        imageModel.append({
-            imageId: newId,
+        if (!documentViewModel) {
+            return -1
+        }
+        return documentViewModel.appendLayer({
             source: entryData.source !== undefined ? entryData.source : "",
             x: entryData.x !== undefined ? entryData.x : 0,
             y: entryData.y !== undefined ? entryData.y : 0,
@@ -193,23 +218,19 @@ Rectangle {
             ready: entryData.ready === true,
             layerName: entryData.layerName !== undefined
                 ? entryData.layerName
-                : surface.defaultImportedLayerName(entryData.importMetadata, newId),
+                : surface.defaultImportedLayerName(entryData.importMetadata, surface.importedLayerCount + 1),
             layerVisible: entryData.layerVisible !== false,
             layerOpacity: entryData.layerOpacity !== undefined ? entryData.layerOpacity : 1.0,
-            blendModeKey: entryData.blendModeKey !== undefined ? entryData.blendModeKey : ""
+            blendModeKey: entryData.blendModeKey !== undefined ? entryData.blendModeKey : "",
+            importMetadata: entryData.importMetadata !== undefined ? entryData.importMetadata : ({})
         })
-        if (entryData.importMetadata !== undefined) {
-            surface.storeImageImportMetadata(newId, entryData.importMetadata)
-        }
-        return newId
     }
 
     function setLayerVisibility(imageId, layerVisible) {
-        var index = surface.findImageIndexById(imageId)
-        if (index === -1) {
+        if (!documentViewModel) {
             return
         }
-        imageModel.setProperty(index, "layerVisible", layerVisible)
+        documentViewModel.setLayerVisibility(imageId, layerVisible)
         surface.notifySelectionOverlay()
     }
 
@@ -245,6 +266,7 @@ Rectangle {
         var idx = findImageIndexById(imageId);
         if (idx === -1) {
             surface.selectedImageId = -1;
+            surface.updateDocumentProperty("selectedLayerId", -1)
             surface.freeTransformActive = false;
             surface.freeTransformSnapshot = {};
             surface.updateSelectedImageItem();
@@ -252,6 +274,7 @@ Rectangle {
             return;
         }
         surface.selectedImageId = imageId;
+        surface.updateDocumentProperty("selectedLayerId", imageId)
         surface.updateSelectedImageItem();
         Qt.callLater(surface.updateSelectedImageItem);
         surface.freeTransformActive = false;
@@ -318,8 +341,11 @@ Rectangle {
     }
 
     function cloneImages() {
+        if (!imageModel) {
+            return [];
+        }
         var result = [];
-        for (var i = 0; i < imageModel.count; ++i) {
+        for (var i = 0; i < surface.importedLayerCount; ++i) {
             var entry = imageModel.get(i);
             result.push({
                 imageId: entry.imageId,
@@ -334,7 +360,8 @@ Rectangle {
                 layerName: entry.layerName,
                 layerVisible: entry.layerVisible,
                 layerOpacity: entry.layerOpacity,
-                blendModeKey: entry.blendModeKey
+                blendModeKey: entry.blendModeKey,
+                importMetadata: entry.importMetadata !== undefined ? entry.importMetadata : ({})
             });
         }
         return result;
@@ -347,46 +374,12 @@ Rectangle {
         return JSON.parse(JSON.stringify(value))
     }
 
-    function cloneImageImportMetadataStore() {
-        return surface.cloneMetadata(surface.imageImportMetadataStore)
-    }
-
-    function imageImportMetadata(imageId) {
-        if (imageId === undefined || imageId === null || imageId === -1) {
-            return ({})
-        }
-        var metadata = surface.imageImportMetadataStore[imageId]
-        return metadata !== undefined ? surface.cloneMetadata(metadata) : ({})
-    }
-
-    function storeImageImportMetadata(imageId, metadata) {
-        if (imageId === undefined || imageId === null || imageId === -1) {
-            return
-        }
-        var nextStore = surface.cloneImageImportMetadataStore()
-        nextStore[imageId] = surface.cloneMetadata(metadata)
-        surface.imageImportMetadataStore = nextStore
-    }
-
-    function removeImageImportMetadata(imageId) {
-        if (imageId === undefined || imageId === null || imageId === -1) {
-            return
-        }
-        if (surface.imageImportMetadataStore[imageId] === undefined) {
-            return
-        }
-        var nextStore = surface.cloneImageImportMetadataStore()
-        delete nextStore[imageId]
-        surface.imageImportMetadataStore = nextStore
-    }
-
     function captureSnapshot() {
         return {
             canvasWidth: surface.canvasWidth,
             canvasHeight: surface.canvasHeight,
             strokes: cloneStrokes(surface.strokes),
             images: cloneImages(),
-            imageImportMetadataStore: cloneImageImportMetadataStore(),
             selectedImageId: surface.selectedImageId
         };
     }
@@ -404,6 +397,8 @@ Rectangle {
         if (snapshot.canvasWidth !== undefined && snapshot.canvasHeight !== undefined) {
             surface.canvasWidth = Math.max(1, Math.round(snapshot.canvasWidth))
             surface.canvasHeight = Math.max(1, Math.round(snapshot.canvasHeight))
+            surface.updateDocumentProperty("canvasWidth", surface.canvasWidth)
+            surface.updateDocumentProperty("canvasHeight", surface.canvasHeight)
         }
         var restoredStrokes = [];
         for (var i = 0; i < snapshot.strokes.length; ++i) {
@@ -411,15 +406,17 @@ Rectangle {
         }
         surface.strokes = restoredStrokes;
 
-        imageModel.clear();
-        for (var j = 0; j < snapshot.images.length; ++j) {
-            imageModel.append(snapshot.images[j]);
+        if (documentViewModel) {
+            documentViewModel.importLayers(snapshot.images !== undefined ? snapshot.images : [])
+        } else if (imageModel) {
+            imageModel.clear()
+            for (var j = 0; j < snapshot.images.length; ++j) {
+                imageModel.append(snapshot.images[j]);
+            }
         }
-        surface.imageImportMetadataStore = snapshot.imageImportMetadataStore !== undefined
-                ? surface.cloneMetadata(snapshot.imageImportMetadataStore)
-                : ({})
 
         surface.selectedImageId = snapshot.selectedImageId !== undefined ? snapshot.selectedImageId : -1;
+        surface.updateDocumentProperty("selectedLayerId", surface.selectedImageId)
         surface.updateSelectedImageItem();
         surface.freeTransformActive = false;
         surface.freeTransformSnapshot = {};
@@ -458,6 +455,28 @@ Rectangle {
         if (!surface.transformUndoCaptured) {
             surface.pushUndoState();
             surface.transformUndoCaptured = true;
+        }
+    }
+
+    Connections {
+        target: surface.documentViewModel
+        ignoreUnknownSignals: true
+
+        function onSelectedLayerIdChanged() {
+            surface.selectedImageId = surface.documentViewModel ? surface.documentViewModel.selectedLayerId : -1
+            surface.updateSelectedImageItem()
+        }
+
+        function onCanvasWidthChanged() {
+            if (surface.documentViewModel && surface.canvasWidth !== surface.documentViewModel.canvasWidth) {
+                surface.canvasWidth = surface.documentViewModel.canvasWidth
+            }
+        }
+
+        function onCanvasHeightChanged() {
+            if (surface.documentViewModel && surface.canvasHeight !== surface.documentViewModel.canvasHeight) {
+                surface.canvasHeight = surface.documentViewModel.canvasHeight
+            }
         }
     }
 
@@ -661,6 +680,7 @@ Rectangle {
     }
 
     Component.onCompleted: {
+        surface.selectedImageId = documentViewModel ? documentViewModel.selectedLayerId : -1
         surface.updateCanvasSizeFromViewport()
         Qt.callLater(surface.updateCanvasSizeFromViewport)
         surface.forceActiveFocus()
@@ -736,7 +756,7 @@ Rectangle {
             scaleX: 1.0,
             scaleY: 1.0,
             ready: false,
-            layerName: surface.defaultImportedLayerName(importMetadata, imageModel.count + 1),
+            layerName: surface.defaultImportedLayerName(importMetadata, surface.importedLayerCount + 1),
             layerVisible: true,
             layerOpacity: 1.0,
             importMetadata: importMetadata
@@ -779,10 +799,15 @@ Rectangle {
         var entry = imageModel.get(index)
         if (entry) {
             surface.unregisterImageElement(entry.imageId)
-            surface.removeImageImportMetadata(entry.imageId)
+            if (documentViewModel) {
+                documentViewModel.removeLayerById(entry.imageId)
+            } else {
+                imageModel.remove(index)
+            }
         }
-        imageModel.remove(index)
-        surface.selectedImageId = imageModel.count > 0 ? imageModel.get(imageModel.count - 1).imageId : -1
+        surface.selectedImageId = documentViewModel
+            ? documentViewModel.selectedLayerId
+            : (surface.importedLayerCount > 0 ? imageModel.get(surface.importedLayerCount - 1).imageId : -1)
         surface.updateSelectedImageItem()
         surface.freeTransformActive = false
         surface.freeTransformSnapshot = {}
@@ -807,11 +832,19 @@ Rectangle {
                     1)
         var width = entry.originalWidth * fitScale
         var height = entry.originalHeight * fitScale
-        imageModel.setProperty(index, "scaleX", fitScale)
-        imageModel.setProperty(index, "scaleY", fitScale)
-        imageModel.setProperty(index, "x", (surface.canvasWidth - width) / 2)
-        imageModel.setProperty(index, "y", (surface.canvasHeight - height) / 2)
-        imageModel.setProperty(index, "ready", true)
+        if (!surface.updateLayerById(imageId, {
+                scaleX: fitScale,
+                scaleY: fitScale,
+                x: (surface.canvasWidth - width) / 2,
+                y: (surface.canvasHeight - height) / 2,
+                ready: true
+            })) {
+            imageModel.setProperty(index, "scaleX", fitScale)
+            imageModel.setProperty(index, "scaleY", fitScale)
+            imageModel.setProperty(index, "x", (surface.canvasWidth - width) / 2)
+            imageModel.setProperty(index, "y", (surface.canvasHeight - height) / 2)
+            imageModel.setProperty(index, "ready", true)
+        }
         surface.freeTransformActive = false
         if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
             surface.startFreeTransform()
@@ -914,7 +947,10 @@ Rectangle {
         }
     }
 
-    onFreeTransformActiveChanged: surface.updateConstrainAspectState()
+    onFreeTransformActiveChanged: {
+        surface.updateConstrainAspectState()
+        surface.updateDocumentProperty("freeTransformActive", surface.freeTransformActive)
+    }
 
     function startFreeTransform() {
         var index = surface.selectedImageIndex()
@@ -959,17 +995,24 @@ Rectangle {
         }
         var snapshot = surface.freeTransformSnapshot
         if (snapshot && snapshot.imageId === surface.selectedImageId) {
-            if (snapshot.x !== undefined) {
-                imageModel.setProperty(index, "x", snapshot.x)
-            }
-            if (snapshot.y !== undefined) {
-                imageModel.setProperty(index, "y", snapshot.y)
-            }
-            if (snapshot.scaleX !== undefined) {
-                imageModel.setProperty(index, "scaleX", snapshot.scaleX)
-            }
-            if (snapshot.scaleY !== undefined) {
-                imageModel.setProperty(index, "scaleY", snapshot.scaleY)
+            if (!surface.updateLayerById(surface.selectedImageId, {
+                    x: snapshot.x !== undefined ? snapshot.x : imageModel.get(index).x,
+                    y: snapshot.y !== undefined ? snapshot.y : imageModel.get(index).y,
+                    scaleX: snapshot.scaleX !== undefined ? snapshot.scaleX : imageModel.get(index).scaleX,
+                    scaleY: snapshot.scaleY !== undefined ? snapshot.scaleY : imageModel.get(index).scaleY
+                })) {
+                if (snapshot.x !== undefined) {
+                    imageModel.setProperty(index, "x", snapshot.x)
+                }
+                if (snapshot.y !== undefined) {
+                    imageModel.setProperty(index, "y", snapshot.y)
+                }
+                if (snapshot.scaleX !== undefined) {
+                    imageModel.setProperty(index, "scaleX", snapshot.scaleX)
+                }
+                if (snapshot.scaleY !== undefined) {
+                    imageModel.setProperty(index, "scaleY", snapshot.scaleY)
+                }
             }
         }
         surface.freeTransformActive = false
@@ -1063,7 +1106,7 @@ Rectangle {
         color: LV.Theme.panelBackground03
         border.width: 1
         border.color: Qt.rgba(255, 255, 255, 0.10)
-        visible: imageModel.count > 0
+        visible: surface.hasImportedImage
         z: 40
 
         Column {
@@ -1094,12 +1137,15 @@ Rectangle {
                     spacing: 6
 
                     Repeater {
-                        model: imageModel.count
+                        model: surface.importedLayerCount
 
                         delegate: Rectangle {
                             id: layerRow
-                            readonly property int modelIndex: imageModel.count - 1 - index
-                            readonly property var entry: modelIndex >= 0 ? imageModel.get(modelIndex) : null
+                            required property int index
+                            readonly property int modelIndex: surface.importedLayerCount - 1 - index
+                            readonly property var entry: modelIndex >= 0 && surface.imageModel
+                                ? surface.imageModel.get(modelIndex)
+                                : null
                             readonly property bool selected: entry && entry.imageId === surface.selectedImageId
                             width: layerListColumn.width
                             height: 44
@@ -1302,22 +1348,24 @@ Rectangle {
 
         Repeater {
             id: imageRepeater
-            model: imageModel
+            model: surface.imageModel ? surface.imageModel : null
 
             delegate: Image {
                 id: imageDisplay
-                property int delegateImageId: model.imageId
+                required property int index
+                readonly property var entry: surface.imageModel ? surface.imageModel.get(index) : null
+                property int delegateImageId: entry ? entry.imageId : -1
                 property int registeredImageId: -1
-                x: model.x
-                y: model.y
-                width: model.originalWidth > 0 ? model.originalWidth * model.scaleX : 0
-                height: model.originalHeight > 0 ? model.originalHeight * model.scaleY : 0
-                visible: model.ready && (model.layerVisible !== false)
+                x: entry ? entry.x : 0
+                y: entry ? entry.y : 0
+                width: entry && entry.originalWidth > 0 ? entry.originalWidth * entry.scaleX : 0
+                height: entry && entry.originalHeight > 0 ? entry.originalHeight * entry.scaleY : 0
+                visible: entry && entry.ready && (entry.layerVisible !== false)
                 smooth: true
                 asynchronous: true
                 fillMode: Image.Stretch
-                opacity: model.layerOpacity !== undefined ? model.layerOpacity : 1
-                source: model.source
+                opacity: entry && entry.layerOpacity !== undefined ? entry.layerOpacity : 1
+                source: entry ? entry.source : ""
 
                 Component.onCompleted: {
                     registeredImageId = delegateImageId
@@ -1345,12 +1393,17 @@ Rectangle {
                     if (modelIndex === -1) {
                         return
                     }
-                    var entry = imageModel.get(modelIndex)
-                    if (!entry || entry.ready) {
+                    var currentEntry = surface.imageModel ? surface.imageModel.get(modelIndex) : null
+                    if (!currentEntry || currentEntry.ready) {
                         return
                     }
-                    imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
-                    imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
+                    if (!surface.updateLayerById(delegateImageId, {
+                            originalWidth: implicitWidth,
+                            originalHeight: implicitHeight
+                        })) {
+                        surface.imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
+                        surface.imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
+                    }
                     surface.resetImagePlacement(delegateImageId)
                 }
 
@@ -1358,7 +1411,7 @@ Rectangle {
                     acceptedButtons: Qt.LeftButton
                     enabled: surface.toolMode === "grab" && imageDisplay.visible
                     onTapped: {
-                        surface.selectImage(delegateImageId)
+                        surface.selectImage(imageDisplay.delegateImageId)
                     }
                 }
             }
@@ -1374,7 +1427,7 @@ Rectangle {
 
             function refreshSelectionState() {
                 selectedIndex = surface.findImageIndexById(surface.selectedImageId)
-                currentEntry = selectedIndex >= 0 ? imageModel.get(selectedIndex) : null
+                currentEntry = selectedIndex >= 0 && surface.imageModel ? surface.imageModel.get(selectedIndex) : null
                 selectedItem = surface.selectedImageItem
             }
 
@@ -1391,7 +1444,7 @@ Rectangle {
             }
 
             Connections {
-                target: imageModel
+                target: surface.imageModel
                 function onDataChanged() {
                     selectionOverlay.refreshSelectionState()
                 }
@@ -1414,18 +1467,30 @@ Rectangle {
                 if (!currentEntry || selectedIndex < 0 || currentEntry.originalWidth <= 0 || currentEntry.originalHeight <= 0) {
                     return
                 }
-                imageModel.setProperty(selectedIndex, "x", newX)
-                imageModel.setProperty(selectedIndex, "y", newY)
-                imageModel.setProperty(selectedIndex, "scaleX", newWidth / currentEntry.originalWidth)
-                imageModel.setProperty(selectedIndex, "scaleY", newHeight / currentEntry.originalHeight)
+                if (!surface.updateLayerById(currentEntry.imageId, {
+                        x: newX,
+                        y: newY,
+                        scaleX: newWidth / currentEntry.originalWidth,
+                        scaleY: newHeight / currentEntry.originalHeight
+                    })) {
+                    imageModel.setProperty(selectedIndex, "x", newX)
+                    imageModel.setProperty(selectedIndex, "y", newY)
+                    imageModel.setProperty(selectedIndex, "scaleX", newWidth / currentEntry.originalWidth)
+                    imageModel.setProperty(selectedIndex, "scaleY", newHeight / currentEntry.originalHeight)
+                }
             }
 
             function moveSelection(newX, newY) {
                 if (!currentEntry || selectedIndex < 0) {
                     return
                 }
-                imageModel.setProperty(selectedIndex, "x", newX)
-                imageModel.setProperty(selectedIndex, "y", newY)
+                if (!surface.updateLayerById(currentEntry.imageId, {
+                        x: newX,
+                        y: newY
+                    })) {
+                    imageModel.setProperty(selectedIndex, "x", newX)
+                    imageModel.setProperty(selectedIndex, "y", newY)
+                }
             }
 
             function handleTransform(role, dx, dy, startRect, forceConstrainAspect) {
@@ -1631,6 +1696,8 @@ Rectangle {
                     ]
 
                     delegate: Rectangle {
+                        id: transformHandle
+                        required property var modelData
                         width: overlayHandles.handleSize
                         height: overlayHandles.handleSize
                         radius: 2
@@ -1642,7 +1709,7 @@ Rectangle {
                         y: modelData.yFactor * parent.height - height / 2
 
                         HoverHandler {
-                            cursorShape: modelData.cursor
+                            cursorShape: transformHandle.modelData.cursor
                         }
 
                         DragHandler {
@@ -1672,7 +1739,7 @@ Rectangle {
                                 var deltaY = centroid.scenePosition.y - startPointerSceneY
                                 var keepAspect = surface.isShiftModifierActive(centroid.modifiers) || surface.constrainAspect
                                 selectionOverlay.handleTransform(
-                                            modelData.role,
+                                            transformHandle.modelData.role,
                                             deltaX,
                                             deltaY,
                                             { x: startX, y: startY, w: startWidth, h: startHeight },
@@ -1748,6 +1815,7 @@ Rectangle {
         property real overlayHeight: 140
         z: 15
         visible: false
+        onVisibleChanged: surface.updateDocumentProperty("textEntryActive", visible)
         x: targetX
         y: targetY
         width: overlayWidth

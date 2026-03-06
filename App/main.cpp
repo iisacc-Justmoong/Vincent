@@ -3,10 +3,13 @@
 #include <QQmlContext>
 #include <QSet>
 #include <QStringList>
+#include <QtQml>
 
+#include <backend/state/viewmodelregistry.h>
 #include <backend/runtime/appentry.h>
 
 #include "brushengine.h"
+#include "canvasdocumentviewmodel.h"
 #include "imageimport.h"
 #include "paletteutils.h"
 
@@ -56,6 +59,18 @@ void configureEngineImports(QQmlApplicationEngine &engine)
     }
 }
 
+void registerViewModels(QQmlApplicationEngine &engine, PaletteUtils *paletteUtils)
+{
+    auto *registry = engine.singletonInstance<ViewModelRegistry *>(QStringLiteral("LVRS"),
+                                                                   QStringLiteral("ViewModels"));
+    if (!registry) {
+        return;
+    }
+
+    auto *documentViewModel = new CanvasDocumentViewModel(paletteUtils, registry);
+    registry->set(QStringLiteral("CanvasDocument"), documentViewModel);
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -66,10 +81,12 @@ int main(int argc, char *argv[])
     launchSpec.moduleUri = QStringLiteral("Vincent");
     launchSpec.rootObject = QStringLiteral("Main");
     launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
+        configureEngineImports(engine);
+        auto *paletteUtils = new PaletteUtils(&engine);
         engine.rootContext()->setContextProperty("BrushEngine", new BrushEngine(&engine));
         engine.rootContext()->setContextProperty("ImageImport", new ImageImport(&engine));
-        engine.rootContext()->setContextProperty("PaletteUtils", new PaletteUtils(&engine));
-        configureEngineImports(engine);
+        engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
+        registerViewModels(engine, paletteUtils);
     };
 
     return lvrs::runBootstrappedQmlApp(argc, argv, launchSpec);

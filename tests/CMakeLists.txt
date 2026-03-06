@@ -32,3 +32,25 @@ target_link_libraries(tests_imageimport PRIVATE
 )
 
 add_test(NAME tests_imageimport COMMAND tests_imageimport)
+
+add_executable(tests_canvasdocumentviewmodel
+        tst_canvasdocumentviewmodel.cpp
+        ../App/canvasdocumentviewmodel.cpp
+        ../App/canvasdocumentviewmodel.h
+        ../App/layerlistmodel.cpp
+        ../App/layerlistmodel.h
+        ../App/paletteutils.cpp
+        ../App/paletteutils.h
+)
+
+target_include_directories(tests_canvasdocumentviewmodel PRIVATE
+        ${CMAKE_SOURCE_DIR}/App
+)
+
+target_link_libraries(tests_canvasdocumentviewmodel PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+
+add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmodel)

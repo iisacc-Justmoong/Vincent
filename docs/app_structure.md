@@ -7,8 +7,10 @@ This document captures the current architecture of Vincent 2.2.1 as observed in 
 - `CMakeLists.txt` (root) – bootstraps the Qt build, configures install paths, and delegates to the application sources in `App/`.
 - `App/` – contains all C++ and QML code for the application bundle.
 - `App/brushengine.h`, `App/brushengine.cpp` – pressure-aware brush dynamics engine exposed to QML.
+- `App/canvasdocumentviewmodel.h`, `App/canvasdocumentviewmodel.cpp` – LVRS-facing document view model that owns brush state, canvas sizing, selection state, and imported layers.
 - `App/imageimport.h`, `App/imageimport.cpp` – image import service that passes standard rasters through and decodes PSD composites into cacheable PNGs for QML.
-- `App/paletteutils.h`, `App/paletteutils.cpp` – palette ordering helper exposed to QML as a singleton.
+- `App/layerlistmodel.h`, `App/layerlistmodel.cpp` – `QAbstractListModel` implementation for imported image layers, including PSD metadata payloads.
+- `App/paletteutils.h`, `App/paletteutils.cpp` – palette ordering helper exposed to QML as a context object.
 - `resources/` – SVG icons and design assets consumed by the QML UI.
 - `build/`, `cmake-build-debug/` – out-of-source build trees (ignored in project description, but important to keep generated artifacts isolated).
 
@@ -31,12 +33,13 @@ The project relies on CMake and Qt 6 modules.
 - Creates the `QGuiApplication` instance that hosts the Qt Quick scene graph.
 - Registers the `BrushEngine` singleton-style context object used by the QML canvas for pressure-aware stroke sampling.
 - Registers the `ImageImport` context object used by QML to normalize raster imports and decode PSD files before they reach the canvas.
-- Registers the `PaletteUtils` singleton in the `Vincent` QML module for palette computation.
+- Registers the `PaletteUtils` context object for palette computation.
+- Resolves the LVRS `ViewModels` registry and registers a shared `CanvasDocumentViewModel` under the `CanvasDocument` key before the main view loads.
 - Configures a `QQmlApplicationEngine` and augments its import paths when `CRAFTROOT` exposes prebuilt QML modules.
 - Connects `objectCreationFailed` to `QCoreApplication::exit(-1)` for fail-fast behavior if the QML scene cannot load.
 - Loads the `Vincent` QML module's `Main` component and starts the event loop.
 
-All UI and interaction logic lives in QML, with palette calculation delegated to the C++ helper.
+Rendering and transient interaction logic still live in QML, while persistent document-facing state is now modeled in C++.
 
 ## QML Module Layout (`App/qml/`)
 
@@ -49,12 +52,12 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ### `PainterCanvasPage.qml`
 
 - Extends `Controls.Page` to host the main drawing surface.
-- Maintains the user-facing state (`brushColor`, `brushSize`, `toolMode`, and color `palette`).
-- Computes the default palette by calling `PaletteUtils.buildDefaultPalette` instead of running JavaScript sorting logic.
+- Binds the view to LVRS `ViewModels` using the stable `PainterCanvasPage` view ID and the shared `CanvasDocument` model key.
+- Reads user-facing document state (`brushColor`, `brushSize`, `toolMode`, canvas size, palette) from `CanvasDocumentViewModel` instead of duplicating that state in QML.
 - Emits `pageReady` when the component loads to let `Main.qml` grab a pointer.
-- Provides imperative helpers (`newCanvas`, `clearCanvas`, `saveCanvasAs`, `openImage`, `adjustBrush`) that wrap the lower-level `DrawingSurface` API.
-- Instantiates the `CanvasToolBar` as the page header and wires its signals back into the page state.
-- Hosts the `DrawingSurface` inside a `Rectangle`, forwarding brush parameters and listening for scroll-wheel-driven size changes.
+- Provides imperative helpers (`newCanvas`, `clearCanvas`, `saveCanvasAs`, `openImage`, `adjustBrush`) that wrap the lower-level `DrawingSurface` API while routing simple state changes back through `LV.ViewModels.updateProperty`.
+- Instantiates the `CanvasToolBar` as the page header and wires its signals into the bound document view model.
+- Hosts the `DrawingSurface` inside a `Rectangle`, forwarding the bound document view model and listening for scroll-wheel-driven size changes.
 
 ### `CanvasToolBar.qml`
 
@@ -67,15 +70,28 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ### `DrawingSurface.qml`
 
 - Renders the actual canvas within a rounded `Rectangle`.
-- Manages drawing state (`strokes`, `currentStroke`, imported images, import metadata storage, and undo/redo snapshots) and tool behavior.
+- Manages drawing state (`strokes`, `currentStroke`, undo/redo snapshots, and transform overlays) and tool behavior.
 - Uses `PointHandler` for stylus and mouse stroke capture, enabling pressure-sensitive brush sampling by default when a pen device reports pressure.
 - Stores each stroke as a sequence of sampled points that carry normalized pressure, resolved brush diameter, and resolved opacity.
 - Uses a `Canvas` element to batch-render all strokes; variable-width strokes are rasterized by interpolated stamp placement rather than fixed-width `lineTo()` segments, and each stamp carries its own alpha.
 - Supports eraser mode through pressure-sensitive `destination-out` compositing strength, wheel-based brush size adjustments via the `brushDeltaRequested` signal, and optional background image loading.
 - Routes all opened or dropped images through `ImageImport`, so PSD documents can arrive either as a flattened raster fallback or as multiple positioned image layers.
-- Stores per-image import metadata in the canvas state keyed by imported image ID, allowing PSD header details to remain attached to the in-app document state from the moment of import.
+- Treats imported layers as a `LayerListModel` supplied by `CanvasDocumentViewModel`; imports, removal, visibility changes, geometry edits, and selection updates go through the view model instead of a QML `ListModel`.
 - Preserves imported image stacking order during selection and exposes a right-side layer panel for selecting layers and toggling visibility without reordering the canvas stack.
 - Normalizes file URLs for loading and saving, ensuring compatibility with both `file://` URIs and bare paths.
+
+### `CanvasDocumentViewModel` (`App/canvasdocumentviewmodel.*`)
+
+- Owns the document-facing MVVM state shared by the canvas page.
+- Exposes palette, brush color, brush size, current tool, selected layer ID, selected layer metadata, canvas dimensions, and layer count as QML-friendly properties.
+- Provides mutation methods for appending, importing, updating, moving, hiding, and removing layers by stable image ID.
+- Keeps selection state valid when layers are imported, removed, or replaced from undo/redo snapshots.
+
+### `LayerListModel` (`App/layerlistmodel.*`)
+
+- Implements the imported-layer store as a typed `QAbstractListModel`.
+- Exposes each layer's source URL, geometry, readiness, visibility, opacity, blend mode key, and import metadata to QML delegates.
+- Supports imperative mutation (`append`, `remove`, `move`, `setProperty`, `importEntries`, `exportEntries`) so existing QML interactions can migrate gradually without losing undo/redo compatibility.
 
 ### `BrushEngine` (`App/brushengine.*`)
 
@@ -95,11 +111,11 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ## Data Flow & Interaction Summary
 
 1. The C++ entry point loads `Vincent.Main` and hands off control to QML.
-2. `Main.qml` instantiates `PainterCanvasPage`, which centralizes application state and owns the drawing surface.
-3. `PainterCanvasPage` requests the ordered color palette from the `PaletteUtils` singleton.
-4. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage` methods, which then mutate page state or invoke `DrawingSurface` methods.
-5. `DrawingSurface` tracks strokes and encodes them into the Qt Quick `Canvas`. Brush parameters flow from the page to the surface, and `BrushEngine` converts stylus pressure into the final per-sample stroke width and opacity.
-6. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface`; `ImageImport` either forwards the original raster URL, returns multiple positioned PSD layers, or falls back to a rasterized PSD composite before the image data is added to the canvas.
+2. `Main.qml` instantiates `PainterCanvasPage`, which binds its LVRS view ID to the shared `CanvasDocumentViewModel`.
+3. `CanvasToolBar` surfaces user actions. Signals propagate up to `PainterCanvasPage`, which either updates view-model properties directly or invokes `DrawingSurface` commands.
+4. `DrawingSurface` tracks transient stroke rendering data and encodes it into the Qt Quick `Canvas`. Brush parameters flow from the document view model to the surface, and `BrushEngine` converts stylus pressure into the final per-sample stroke width and opacity.
+5. File dialog selections bubble from `CanvasToolBar` to `PainterCanvasPage`, which forwards them to `DrawingSurface`; `ImageImport` either forwards the original raster URL, returns multiple positioned PSD layers, or falls back to a rasterized PSD composite before the image data is added to `CanvasDocumentViewModel`.
+6. `LayerListModel` feeds both the visual image repeater and the layer sidebar, keeping imported layer metadata in one shared model.
 
 ## Notable Platform Considerations
 
@@ -109,5 +125,6 @@ All UI and interaction logic lives in QML, with palette calculation delegated to
 ## Testing Surface
 
 - `tests/tst_brushengine.cpp` validates the pressure-to-size and pressure-to-opacity curves, sample smoothing, append heuristics, and stamp-density calculations of the brush engine with Qt Test.
+- `tests/tst_canvasdocumentviewmodel.cpp` validates default MVVM document state, selection-derived properties, layer export/import with metadata, layer movement, and layer-removal fallback behavior.
 - `tests/tst_imageimport.cpp` validates PSD support detection, passthrough import for standard rasters, PSD metadata extraction, PSD composite decoding for both raw and RLE-compressed fixtures, and multi-layer PSD extraction into separate cached images.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.
