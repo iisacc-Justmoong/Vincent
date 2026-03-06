@@ -172,11 +172,13 @@ bool LayerListModel::move(int from, int to, int countValue)
         return false;
     }
 
-    if (from == to || from == to - 1) {
+    const int normalizedTo = qMin(to, m_entries.size() - countValue);
+
+    if (from == normalizedTo) {
         return true;
     }
 
-    const int destination = to > from ? to + countValue : to;
+    const int destination = normalizedTo > from ? normalizedTo + countValue : normalizedTo;
     if (!beginMoveRows(QModelIndex(), from, from + countValue - 1, QModelIndex(), destination)) {
         return false;
     }
@@ -188,13 +190,8 @@ bool LayerListModel::move(int from, int to, int countValue)
         m_entries.removeAt(from);
     }
 
-    int insertAt = to;
-    if (to > from) {
-        insertAt -= countValue;
-    }
-
     for (int i = 0; i < moving.size(); ++i) {
-        m_entries.insert(insertAt + i, moving.at(i));
+        m_entries.insert(normalizedTo + i, moving.at(i));
     }
 
     endMoveRows();
@@ -224,6 +221,7 @@ QVariantList LayerListModel::exportEntries() const
 
 void LayerListModel::importEntries(const QVariantList &entries)
 {
+    const int previousCount = m_entries.size();
     beginResetModel();
     m_entries.clear();
     m_entries.reserve(entries.size());
@@ -231,7 +229,9 @@ void LayerListModel::importEntries(const QVariantList &entries)
         m_entries.push_back(layerEntryFromMap(entry.toMap()));
     }
     endResetModel();
-    emit countChanged();
+    if (previousCount != m_entries.size()) {
+        emit countChanged();
+    }
 }
 
 LayerListModel::LayerEntry LayerListModel::entryAt(int index) const

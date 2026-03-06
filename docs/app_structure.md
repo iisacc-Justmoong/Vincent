@@ -77,6 +77,7 @@ Rendering and transient interaction logic still live in QML, while persistent do
 - Supports eraser mode through pressure-sensitive `destination-out` compositing strength, wheel-based brush size adjustments via the `brushDeltaRequested` signal, and optional background image loading.
 - Routes all opened or dropped images through `ImageImport`, so PSD documents can arrive either as a flattened raster fallback or as multiple positioned image layers.
 - Treats imported layers as a `LayerListModel` supplied by `CanvasDocumentViewModel`; imports, removal, visibility changes, geometry edits, and selection updates go through the view model instead of a QML `ListModel`.
+- Honors LVRS single-writer semantics for document mutations after binding, while still allowing pre-bind initialization to seed canvas dimensions during startup.
 - Preserves imported image stacking order during selection and exposes a right-side layer panel for selecting layers and toggling visibility without reordering the canvas stack.
 - Normalizes file URLs for loading and saving, ensuring compatibility with both `file://` URIs and bare paths.
 

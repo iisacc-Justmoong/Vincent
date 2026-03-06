@@ -13,8 +13,10 @@ private slots:
     void exposesDefaultDocumentState();
     void appendsAndSelectsLayers();
     void exportsAndImportsLayersWithMetadata();
+    void keepsLayerCountSignalStableOnSameSizedImport();
     void exposesDerivedSelectionStateAndSignals();
     void movesLayersThroughViewModel();
+    void movesAdjacentLayerForward();
     void removesSelectedLayerAndFallsBackToLast();
 };
 
@@ -108,6 +110,33 @@ void tst_CanvasDocumentViewModel::exportsAndImportsLayersWithMetadata()
              QStringLiteral("psd-layer"));
 }
 
+void tst_CanvasDocumentViewModel::keepsLayerCountSignalStableOnSameSizedImport()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QSignalSpy layerCountSpy(&viewModel, &CanvasDocumentViewModel::layerCountChanged);
+
+    viewModel.appendLayer({
+        {QStringLiteral("imageId"), 1},
+        {QStringLiteral("source"), QStringLiteral("file:///tmp/one.png")},
+        {QStringLiteral("layerName"), QStringLiteral("One")}
+    });
+    QCOMPARE(layerCountSpy.count(), 1);
+
+    const QVariantList replacement = {
+        QVariantMap{
+            {QStringLiteral("imageId"), 9},
+            {QStringLiteral("source"), QStringLiteral("file:///tmp/replaced.png")},
+            {QStringLiteral("layerName"), QStringLiteral("Replaced")}
+        }
+    };
+
+    layerCountSpy.clear();
+    viewModel.importLayers(replacement);
+    QCOMPARE(viewModel.layerCount(), 1);
+    QCOMPARE(layerCountSpy.count(), 0);
+}
+
 void tst_CanvasDocumentViewModel::exposesDerivedSelectionStateAndSignals()
 {
     PaletteUtils paletteUtils;
@@ -165,6 +194,30 @@ void tst_CanvasDocumentViewModel::movesLayersThroughViewModel()
     QCOMPARE(viewModel.layerAt(2).value(QStringLiteral("imageId")).toInt(), firstId);
     QCOMPARE(viewModel.selectedLayerId(), secondId);
     QCOMPARE(viewModel.selectedLayerName(), QStringLiteral("Second"));
+}
+
+void tst_CanvasDocumentViewModel::movesAdjacentLayerForward()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    const int firstId = viewModel.appendLayer({
+        {QStringLiteral("source"), QStringLiteral("file:///tmp/first.png")},
+        {QStringLiteral("layerName"), QStringLiteral("First")}
+    });
+    const int secondId = viewModel.appendLayer({
+        {QStringLiteral("source"), QStringLiteral("file:///tmp/second.png")},
+        {QStringLiteral("layerName"), QStringLiteral("Second")}
+    });
+    const int thirdId = viewModel.appendLayer({
+        {QStringLiteral("source"), QStringLiteral("file:///tmp/third.png")},
+        {QStringLiteral("layerName"), QStringLiteral("Third")}
+    });
+
+    QVERIFY(viewModel.moveLayer(0, 1));
+    QCOMPARE(viewModel.layerAt(0).value(QStringLiteral("imageId")).toInt(), secondId);
+    QCOMPARE(viewModel.layerAt(1).value(QStringLiteral("imageId")).toInt(), firstId);
+    QCOMPARE(viewModel.layerAt(2).value(QStringLiteral("imageId")).toInt(), thirdId);
 }
 
 void tst_CanvasDocumentViewModel::removesSelectedLayerAndFallsBackToLast()

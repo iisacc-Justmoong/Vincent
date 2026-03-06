@@ -52,14 +52,13 @@ Rectangle {
     }
 
     function clearDocumentState() {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         surface.cancelTextEntry()
         surface.strokes = []
         surface.currentStroke = null
-        if (documentViewModel) {
-            documentViewModel.resetDocument()
-        } else if (imageModel) {
-            imageModel.clear()
-        }
+        documentViewModel.resetDocument()
         surface.selectedImageId = documentViewModel ? documentViewModel.selectedLayerId : -1
         surface.imageElementRegistry = ({})
         surface.freeTransformActive = false
@@ -74,18 +73,62 @@ Rectangle {
         if (!documentViewModel) {
             return false
         }
-        if (viewId.length && LV.ViewModels && LV.ViewModels.updateProperty(viewId, propertyName, value)) {
-            return true
+        if (viewId.length && LV.ViewModels) {
+            var boundViewModel = LV.ViewModels.getForView(viewId)
+            if (boundViewModel) {
+                if (!LV.ViewModels.canWrite(viewId)) {
+                    console.warn("CanvasDocument is not writable for view:", viewId)
+                    return false
+                }
+                if (!LV.ViewModels.updateProperty(viewId, propertyName, value)) {
+                    console.warn(LV.ViewModels.lastError)
+                    return false
+                }
+                return true
+            }
         }
         documentViewModel[propertyName] = value
         return true
     }
 
+    function canMutateDocument() {
+        if (!documentViewModel) {
+            return false
+        }
+        if (viewId.length && LV.ViewModels) {
+            var boundViewModel = LV.ViewModels.getForView(viewId)
+            if (boundViewModel && !LV.ViewModels.canWrite(viewId)) {
+                console.warn("CanvasDocument is not writable for view:", viewId)
+                return false
+            }
+        }
+        return true
+    }
+
     function updateLayerById(imageId, changes) {
-        if (!documentViewModel || imageId === undefined || imageId === null || imageId === -1 || !changes) {
+        if (!surface.canMutateDocument() || imageId === undefined || imageId === null || imageId === -1 || !changes) {
             return false
         }
         return documentViewModel.updateLayerById(imageId, changes)
+    }
+
+    function syncStateFromViewModel() {
+        if (!documentViewModel) {
+            surface.selectedImageId = -1
+            surface.updateSelectedImageItem()
+            surface.notifySelectionOverlay()
+            return
+        }
+        surface.selectedImageId = documentViewModel.selectedLayerId
+        if (surface.canvasWidth !== documentViewModel.canvasWidth) {
+            surface.canvasWidth = documentViewModel.canvasWidth
+        }
+        if (surface.canvasHeight !== documentViewModel.canvasHeight) {
+            surface.canvasHeight = documentViewModel.canvasHeight
+        }
+        surface.updateSelectedImageItem()
+        surface.notifySelectionOverlay()
+        surface.schedulePaint(true)
     }
 
     function isSupportedImageUrl(fileUrl) {
@@ -204,7 +247,7 @@ Rectangle {
     }
 
     function appendImportedImageEntry(entryData) {
-        if (!documentViewModel) {
+        if (!surface.canMutateDocument()) {
             return -1
         }
         return documentViewModel.appendLayer({
@@ -227,7 +270,7 @@ Rectangle {
     }
 
     function setLayerVisibility(imageId, layerVisible) {
-        if (!documentViewModel) {
+        if (!surface.canMutateDocument()) {
             return
         }
         documentViewModel.setLayerVisibility(imageId, layerVisible)
@@ -394,6 +437,9 @@ Rectangle {
     }
 
     function applySnapshot(snapshot) {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         if (snapshot.canvasWidth !== undefined && snapshot.canvasHeight !== undefined) {
             surface.canvasWidth = Math.max(1, Math.round(snapshot.canvasWidth))
             surface.canvasHeight = Math.max(1, Math.round(snapshot.canvasHeight))
@@ -406,14 +452,7 @@ Rectangle {
         }
         surface.strokes = restoredStrokes;
 
-        if (documentViewModel) {
-            documentViewModel.importLayers(snapshot.images !== undefined ? snapshot.images : [])
-        } else if (imageModel) {
-            imageModel.clear()
-            for (var j = 0; j < snapshot.images.length; ++j) {
-                imageModel.append(snapshot.images[j]);
-            }
-        }
+        documentViewModel.importLayers(snapshot.images !== undefined ? snapshot.images : [])
 
         surface.selectedImageId = snapshot.selectedImageId !== undefined ? snapshot.selectedImageId : -1;
         surface.updateDocumentProperty("selectedLayerId", surface.selectedImageId)
@@ -426,7 +465,7 @@ Rectangle {
     }
 
     function undo() {
-        if (!surface.undoStack.length) {
+        if (!surface.canMutateDocument() || !surface.undoStack.length) {
             return;
         }
         var currentSnapshot = surface.captureSnapshot();
@@ -439,7 +478,7 @@ Rectangle {
     }
 
     function redo() {
-        if (!surface.redoStack.length) {
+        if (!surface.canMutateDocument() || !surface.redoStack.length) {
             return;
         }
         var currentSnapshot = surface.captureSnapshot();
@@ -679,8 +718,12 @@ Rectangle {
         ctx.restore()
     }
 
+    onDocumentViewModelChanged: {
+        surface.syncStateFromViewModel()
+    }
+
     Component.onCompleted: {
-        surface.selectedImageId = documentViewModel ? documentViewModel.selectedLayerId : -1
+        surface.syncStateFromViewModel()
         surface.updateCanvasSizeFromViewport()
         Qt.callLater(surface.updateCanvasSizeFromViewport)
         surface.forceActiveFocus()
@@ -688,17 +731,26 @@ Rectangle {
     }
 
     function newCanvas() {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         surface.pushUndoState()
         surface.updateCanvasSizeFromViewport()
         surface.clearDocumentState()
     }
 
     function clearCanvas() {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         surface.pushUndoState()
         surface.clearDocumentState()
     }
 
     function loadImage(fileUrl, options) {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         var preparedImport = ImageImport.prepareImageImport(fileUrl ? fileUrl.toString() : "")
         if (!preparedImport.ok) {
             console.warn("Image import failed:", preparedImport.error)
@@ -791,6 +843,9 @@ Rectangle {
     }
 
     function clearImportedImage() {
+        if (!surface.canMutateDocument()) {
+            return
+        }
         var index = surface.selectedImageIndex()
         if (index === -1) {
             return
@@ -799,11 +854,7 @@ Rectangle {
         var entry = imageModel.get(index)
         if (entry) {
             surface.unregisterImageElement(entry.imageId)
-            if (documentViewModel) {
-                documentViewModel.removeLayerById(entry.imageId)
-            } else {
-                imageModel.remove(index)
-            }
+            documentViewModel.removeLayerById(entry.imageId)
         }
         surface.selectedImageId = documentViewModel
             ? documentViewModel.selectedLayerId
@@ -853,7 +904,7 @@ Rectangle {
     }
 
     function insertText(textValue, posX, posY, fontPixelSize) {
-        if (!textValue || !textValue.length) {
+        if (!surface.canMutateDocument() || !textValue || !textValue.length) {
             return
         }
         surface.pushUndoState()

@@ -41,8 +41,6 @@ CanvasDocumentViewModel::CanvasDocumentViewModel(PaletteUtils *paletteUtils, QOb
 
     connect(&m_layerListModel, &QAbstractItemModel::modelReset, this, [this]() {
         sanitizeSelection();
-        emit layerCountChanged();
-        emit hasImportedLayerChanged();
         emit hasLayerSelectionChanged();
         emit selectedLayerNameChanged();
         emit selectedLayerDataChanged();
