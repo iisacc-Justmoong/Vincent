@@ -59,19 +59,7 @@ Rectangle {
     }
 
     function isSupportedImageUrl(fileUrl) {
-        if (!fileUrl) {
-            return false
-        }
-        var urlString = fileUrl.toString().toLowerCase()
-        var pathOnly = urlString.split("?")[0].split("#")[0]
-        return pathOnly.endsWith(".png")
-            || pathOnly.endsWith(".jpg")
-            || pathOnly.endsWith(".jpeg")
-            || pathOnly.endsWith(".bmp")
-            || pathOnly.endsWith(".gif")
-            || pathOnly.endsWith(".webp")
-            || pathOnly.endsWith(".tif")
-            || pathOnly.endsWith(".tiff")
+        return !!fileUrl && ImageImport.supportsImageFile(fileUrl.toString())
     }
 
     function extractImageUrlsFromDrop(event) {
@@ -575,10 +563,12 @@ Rectangle {
     }
 
     function loadImage(fileUrl, options) {
-        var sourceUrl = normalizeUrl(fileUrl)
-        if (!sourceUrl) {
+        var preparedImport = ImageImport.prepareImageImport(fileUrl ? fileUrl.toString() : "")
+        if (!preparedImport.ok) {
+            console.warn("Image import failed:", preparedImport.error)
             return
         }
+        var sourceUrl = preparedImport.source
         var shouldSkipUndo = options && options.skipUndo === true
         if (!shouldSkipUndo) {
             surface.pushUndoState()

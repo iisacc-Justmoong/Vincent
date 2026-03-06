@@ -22,6 +22,7 @@ Vincent 2.2.1 is a minimalist painting app built with Qt 6.
 
 ## Features at a Glance
 - Pressure-sensitive size and opacity for stylus brush and eraser strokes
+- PSD import that rasterizes the document composite into an editable image layer
 - Brush, eraser, grab, and text tools
 - Quick color palette and brush size controls
 - Save canvases to PNG

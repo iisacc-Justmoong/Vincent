@@ -22,6 +22,8 @@ endif()
 target_sources(Vincent PRIVATE
         brushengine.cpp
         brushengine.h
+        imageimport.cpp
+        imageimport.h
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h

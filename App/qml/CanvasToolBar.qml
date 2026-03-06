@@ -139,7 +139,7 @@ Item {
         id: openDialog
         title: qsTr("Open Image")
         fileMode: Dialogs.FileDialog.OpenFile
-        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif)")]
+        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")]
         onAccepted: {
             const urlString = toolbar.selectedDialogFileUrl(openDialog)
             if (urlString.length) {
