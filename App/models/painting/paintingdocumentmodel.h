@@ -1,14 +1,16 @@
 #pragma once
 
 #include <QObject>
-#include <QImage>
-#include <QRectF>
 #include <QVariantList>
 #include <QVariantMap>
 
+class QImage;
+class QRectF;
 class QPainter;
 class BrushStrokeBuilder;
-class CanvasBackend;
+class PaintingBackgroundState;
+class PaintingHistoryController;
+class PaintingRenderer;
 
 class PaintingDocumentModel : public QObject
 {
@@ -16,6 +18,7 @@ class PaintingDocumentModel : public QObject
 
 public:
     explicit PaintingDocumentModel(QObject *parent = nullptr);
+    ~PaintingDocumentModel() override;
 
     [[nodiscard]] bool canUndo() const;
     [[nodiscard]] bool canRedo() const;
@@ -46,16 +49,14 @@ signals:
     void backgroundChanged();
 
 private:
-    [[nodiscard]] QVariantMap captureSnapshot(int canvasWidth, int canvasHeight) const;
     void applySnapshot(const QVariantMap &snapshot);
     [[nodiscard]] static QVariant cloneDeep(const QVariant &value);
     [[nodiscard]] static QVariantMap cloneMap(const QVariantMap &value);
     [[nodiscard]] static QVariantList cloneList(const QVariantList &value);
 
-    CanvasBackend *m_canvasBackend;
+    PaintingBackgroundState *m_backgroundState = nullptr;
+    PaintingHistoryController *m_historyController = nullptr;
+    PaintingRenderer *m_renderer = nullptr;
     QVariantList m_strokes;
     QVariantMap m_currentStroke;
-    QString m_backgroundSource;
-    QRectF m_backgroundPlacement;
-    QImage m_backgroundImage;
 };

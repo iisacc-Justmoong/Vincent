@@ -41,8 +41,14 @@ target_sources(Vincent PRIVATE
         models/painting/drawingsurfaceitem.h
         models/painting/drawingstrokecontroller.cpp
         models/painting/drawingstrokecontroller.h
+        models/painting/paintingbackgroundstate.cpp
+        models/painting/paintingbackgroundstate.h
         models/painting/paintingdocumentmodel.cpp
         models/painting/paintingdocumentmodel.h
+        models/painting/paintinghistorycontroller.cpp
+        models/painting/paintinghistorycontroller.h
+        models/painting/paintingrenderer.cpp
+        models/painting/paintingrenderer.h
         paletteutils.cpp
         paletteutils.h
         rasterdocumentio.cpp

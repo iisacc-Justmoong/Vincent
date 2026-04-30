@@ -94,8 +94,14 @@ add_executable(tests_drawingsurfaceitem
         ../App/models/painting/drawingsurfaceitem.h
         ../App/models/painting/drawingstrokecontroller.cpp
         ../App/models/painting/drawingstrokecontroller.h
+        ../App/models/painting/paintingbackgroundstate.cpp
+        ../App/models/painting/paintingbackgroundstate.h
         ../App/models/painting/paintingdocumentmodel.cpp
         ../App/models/painting/paintingdocumentmodel.h
+        ../App/models/painting/paintinghistorycontroller.cpp
+        ../App/models/painting/paintinghistorycontroller.h
+        ../App/models/painting/paintingrenderer.cpp
+        ../App/models/painting/paintingrenderer.h
 )
 
 target_include_directories(tests_drawingsurfaceitem PRIVATE

@@ -1,29 +1,34 @@
 #include "paintingdocumentmodel.h"
 
+#include "paintingbackgroundstate.h"
+#include "paintinghistorycontroller.h"
+#include "paintingrenderer.h"
 #include "../brush/brushstrokebuilder.h"
-#include "../../canvasbackend.h"
-
-#include <QImageReader>
-#include <QPainter>
-#include <QUrl>
-#include <QtGlobal>
 
 PaintingDocumentModel::PaintingDocumentModel(QObject *parent)
     : QObject(parent)
-    , m_canvasBackend(new CanvasBackend(this))
+    , m_backgroundState(new PaintingBackgroundState())
+    , m_historyController(new PaintingHistoryController(this))
+    , m_renderer(new PaintingRenderer())
 {
-    connect(m_canvasBackend, &CanvasBackend::canUndoChanged, this, &PaintingDocumentModel::canUndoChanged);
-    connect(m_canvasBackend, &CanvasBackend::canRedoChanged, this, &PaintingDocumentModel::canRedoChanged);
+    connect(m_historyController, &PaintingHistoryController::canUndoChanged, this, &PaintingDocumentModel::canUndoChanged);
+    connect(m_historyController, &PaintingHistoryController::canRedoChanged, this, &PaintingDocumentModel::canRedoChanged);
+}
+
+PaintingDocumentModel::~PaintingDocumentModel()
+{
+    delete m_renderer;
+    delete m_backgroundState;
 }
 
 bool PaintingDocumentModel::canUndo() const
 {
-    return m_canvasBackend->canUndo();
+    return m_historyController->canUndo();
 }
 
 bool PaintingDocumentModel::canRedo() const
 {
-    return m_canvasBackend->canRedo();
+    return m_historyController->canRedo();
 }
 
 int PaintingDocumentModel::strokeCount() const
@@ -38,27 +43,31 @@ QVariantMap PaintingDocumentModel::currentStroke() const
 
 QString PaintingDocumentModel::backgroundSource() const
 {
-    return m_backgroundSource;
+    return m_backgroundState->source();
 }
 
 bool PaintingDocumentModel::hasBackground() const
 {
-    return !m_backgroundSource.isEmpty();
+    return m_backgroundState->hasBackground();
 }
 
 const QImage &PaintingDocumentModel::backgroundImage() const
 {
-    return m_backgroundImage;
+    return m_backgroundState->image();
 }
 
 QRectF PaintingDocumentModel::backgroundPlacement() const
 {
-    return m_backgroundPlacement;
+    return m_backgroundState->placement();
 }
 
 void PaintingDocumentModel::pushUndoState(int canvasWidth, int canvasHeight, int maxUndoSteps)
 {
-    m_canvasBackend->pushUndoState(captureSnapshot(canvasWidth, canvasHeight), maxUndoSteps);
+    m_historyController->pushUndoState(canvasWidth,
+                                       canvasHeight,
+                                       cloneList(m_strokes),
+                                       m_backgroundState->snapshot(),
+                                       maxUndoSteps);
 }
 
 void PaintingDocumentModel::clear()
@@ -66,9 +75,7 @@ void PaintingDocumentModel::clear()
     const int previousStrokeCount = m_strokes.size();
     m_strokes.clear();
     m_currentStroke.clear();
-    m_backgroundSource.clear();
-    m_backgroundPlacement = {};
-    m_backgroundImage = {};
+    m_backgroundState->clear();
     if (previousStrokeCount != 0) {
         emit strokeCountChanged();
     }
@@ -77,9 +84,7 @@ void PaintingDocumentModel::clear()
 
 void PaintingDocumentModel::setBackground(const QString &sourceUrl, const QImage &image, const QRectF &placement)
 {
-    m_backgroundSource = sourceUrl;
-    m_backgroundImage = image;
-    m_backgroundPlacement = placement;
+    m_backgroundState->setBackground(sourceUrl, image, placement);
     emit backgroundChanged();
 }
 
@@ -110,7 +115,11 @@ void PaintingDocumentModel::undo(int canvasWidth, int canvasHeight, int maxUndoS
     if (!canUndo()) {
         return;
     }
-    applySnapshot(m_canvasBackend->undo(captureSnapshot(canvasWidth, canvasHeight), maxUndoSteps));
+    applySnapshot(m_historyController->undo(canvasWidth,
+                                            canvasHeight,
+                                            cloneList(m_strokes),
+                                            m_backgroundState->snapshot(),
+                                            maxUndoSteps));
 }
 
 void PaintingDocumentModel::redo(int canvasWidth, int canvasHeight, int maxUndoSteps)
@@ -118,53 +127,35 @@ void PaintingDocumentModel::redo(int canvasWidth, int canvasHeight, int maxUndoS
     if (!canRedo()) {
         return;
     }
-    applySnapshot(m_canvasBackend->redo(captureSnapshot(canvasWidth, canvasHeight), maxUndoSteps));
+    applySnapshot(m_historyController->redo(canvasWidth,
+                                            canvasHeight,
+                                            cloneList(m_strokes),
+                                            m_backgroundState->snapshot(),
+                                            maxUndoSteps));
 }
 
 void PaintingDocumentModel::render(QPainter *painter,
                                    const BrushStrokeBuilder &brushBuilder,
                                    qreal fallbackBrushSize) const
 {
-    painter->fillRect(QRectF(QPointF(0, 0), QSizeF(painter->device()->width(), painter->device()->height())), Qt::white);
-    if (!m_backgroundImage.isNull() && !m_backgroundPlacement.isEmpty()) {
-        painter->drawImage(m_backgroundPlacement, m_backgroundImage);
-    }
-    for (const QVariant &strokeVar : m_strokes) {
-        brushBuilder.drawStroke(painter, strokeVar.toMap(), fallbackBrushSize);
-    }
+    m_renderer->render(painter,
+                       m_strokes,
+                       m_backgroundState->image(),
+                       m_backgroundState->placement(),
+                       brushBuilder,
+                       fallbackBrushSize);
 }
 
 QImage PaintingDocumentModel::renderToImage(const QSize &imageSize,
                                             const BrushStrokeBuilder &brushBuilder,
                                             qreal fallbackBrushSize) const
 {
-    QImage image(imageSize, QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::white);
-    QPainter painter(&image);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    if (!m_backgroundImage.isNull() && !m_backgroundPlacement.isEmpty()) {
-        painter.drawImage(m_backgroundPlacement, m_backgroundImage);
-    }
-    for (const QVariant &strokeVar : m_strokes) {
-        brushBuilder.drawStroke(&painter, strokeVar.toMap(), fallbackBrushSize);
-    }
-    painter.end();
-    return image;
-}
-
-QVariantMap PaintingDocumentModel::captureSnapshot(int canvasWidth, int canvasHeight) const
-{
-    QVariantMap background;
-    if (!m_backgroundSource.isEmpty()) {
-        background = {
-            {QStringLiteral("source"), m_backgroundSource},
-            {QStringLiteral("x"), m_backgroundPlacement.x()},
-            {QStringLiteral("y"), m_backgroundPlacement.y()},
-            {QStringLiteral("width"), m_backgroundPlacement.width()},
-            {QStringLiteral("height"), m_backgroundPlacement.height()}
-        };
-    }
-    return m_canvasBackend->captureSnapshot(canvasWidth, canvasHeight, cloneList(m_strokes), background);
+    return m_renderer->renderToImage(imageSize,
+                                     m_strokes,
+                                     m_backgroundState->image(),
+                                     m_backgroundState->placement(),
+                                     brushBuilder,
+                                     fallbackBrushSize);
 }
 
 void PaintingDocumentModel::applySnapshot(const QVariantMap &snapshot)
@@ -172,23 +163,7 @@ void PaintingDocumentModel::applySnapshot(const QVariantMap &snapshot)
     const int previousStrokeCount = m_strokes.size();
     m_strokes = cloneList(snapshot.value(QStringLiteral("strokes")).toList());
     m_currentStroke.clear();
-
-    const QVariantMap background = snapshot.value(QStringLiteral("background")).toMap();
-    m_backgroundSource = background.value(QStringLiteral("source")).toString();
-    m_backgroundPlacement = QRectF(background.value(QStringLiteral("x")).toReal(),
-                                   background.value(QStringLiteral("y")).toReal(),
-                                   background.value(QStringLiteral("width")).toReal(),
-                                   background.value(QStringLiteral("height")).toReal());
-    if (m_backgroundSource.isEmpty()) {
-        m_backgroundImage = {};
-    } else {
-        const QUrl url(m_backgroundSource);
-        const QString localPath = url.isLocalFile() ? url.toLocalFile() : m_backgroundSource;
-        QImageReader reader(localPath);
-        reader.setAutoTransform(true);
-        m_backgroundImage = reader.read();
-    }
-
+    m_backgroundState->applySnapshot(snapshot.value(QStringLiteral("background")).toMap());
     if (previousStrokeCount != m_strokes.size()) {
         emit strokeCountChanged();
     }
