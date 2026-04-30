@@ -1,6 +1,6 @@
 #include "brushstrokebuilder.h"
 
-#include "../../brushengine.h"
+#include "brushengine.h"
 
 #include <QPainter>
 

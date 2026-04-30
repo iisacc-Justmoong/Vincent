@@ -3,7 +3,7 @@
 #include "paintingdocumentmodel.h"
 #include "../brush/brushstrokebuilder.h"
 #include "../file/canvasfileadapter.h"
-#include "../../canvasbackend.h"
+#include "../canvas/canvasbackend.h"
 
 #include <QRectF>
 

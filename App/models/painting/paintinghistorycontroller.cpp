@@ -1,6 +1,6 @@
 #include "paintinghistorycontroller.h"
 
-#include "../../canvasbackend.h"
+#include "../canvas/canvasbackend.h"
 
 PaintingHistoryController::PaintingHistoryController(QObject *parent)
     : QObject(parent)

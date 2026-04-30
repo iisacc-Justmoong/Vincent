@@ -1,6 +1,6 @@
 #include "canvasfileadapter.h"
 
-#include "../../rasterdocumentio.h"
+#include "rasterdocumentio.h"
 
 #include <QImageReader>
 #include <QUrl>

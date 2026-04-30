@@ -9,9 +9,9 @@
 #include <backend/state/viewmodelregistry.h>
 #include <backend/runtime/appentry.h>
 
-#include "canvasdocumentviewmodel.h"
+#include "models/canvas/canvasdocumentviewmodel.h"
 #include "models/painting/drawingsurfaceitem.h"
-#include "paletteutils.h"
+#include "models/brush/paletteutils.h"
 
 namespace {
 

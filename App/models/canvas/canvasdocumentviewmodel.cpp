@@ -1,6 +1,6 @@
 #include "canvasdocumentviewmodel.h"
 
-#include "paletteutils.h"
+#include "../brush/paletteutils.h"
 
 #include <QStringList>
 #include <QVariantMap>

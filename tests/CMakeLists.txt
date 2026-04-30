@@ -1,11 +1,12 @@
 add_executable(tests_brushengine
         tst_brushengine.cpp
-        ../App/brushengine.cpp
-        ../App/brushengine.h
+        ../App/models/brush/brushengine.cpp
+        ../App/models/brush/brushengine.h
 )
 
 target_include_directories(tests_brushengine PRIVATE
         ${CMAKE_SOURCE_DIR}/App
+        ${CMAKE_SOURCE_DIR}/App/models/brush
 )
 
 target_link_libraries(tests_brushengine PRIVATE
@@ -17,14 +18,16 @@ add_test(NAME tests_brushengine COMMAND tests_brushengine)
 
 add_executable(tests_canvasdocumentviewmodel
         tst_canvasdocumentviewmodel.cpp
-        ../App/canvasdocumentviewmodel.cpp
-        ../App/canvasdocumentviewmodel.h
-        ../App/paletteutils.cpp
-        ../App/paletteutils.h
+        ../App/models/canvas/canvasdocumentviewmodel.cpp
+        ../App/models/canvas/canvasdocumentviewmodel.h
+        ../App/models/brush/paletteutils.cpp
+        ../App/models/brush/paletteutils.h
 )
 
 target_include_directories(tests_canvasdocumentviewmodel PRIVATE
         ${CMAKE_SOURCE_DIR}/App
+        ${CMAKE_SOURCE_DIR}/App/models/brush
+        ${CMAKE_SOURCE_DIR}/App/models/canvas
 )
 
 target_link_libraries(tests_canvasdocumentviewmodel PRIVATE
@@ -37,12 +40,13 @@ add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmode
 
 add_executable(tests_canvasbackend
         tst_canvasbackend.cpp
-        ../App/canvasbackend.cpp
-        ../App/canvasbackend.h
+        ../App/models/canvas/canvasbackend.cpp
+        ../App/models/canvas/canvasbackend.h
 )
 
 target_include_directories(tests_canvasbackend PRIVATE
         ${CMAKE_SOURCE_DIR}/App
+        ${CMAKE_SOURCE_DIR}/App/models/canvas
 )
 
 target_link_libraries(tests_canvasbackend PRIVATE
@@ -54,12 +58,13 @@ add_test(NAME tests_canvasbackend COMMAND tests_canvasbackend)
 
 add_executable(tests_rasterdocumentio
         tst_rasterdocumentio.cpp
-        ../App/rasterdocumentio.cpp
-        ../App/rasterdocumentio.h
+        ../App/models/file/rasterdocumentio.cpp
+        ../App/models/file/rasterdocumentio.h
 )
 
 target_include_directories(tests_rasterdocumentio PRIVATE
         ${CMAKE_SOURCE_DIR}/App
+        ${CMAKE_SOURCE_DIR}/App/models/file
 )
 
 target_link_libraries(tests_rasterdocumentio PRIVATE
@@ -72,22 +77,22 @@ add_test(NAME tests_rasterdocumentio COMMAND tests_rasterdocumentio)
 
 add_executable(tests_drawingsurfaceitem
         tst_drawingsurfaceitem.cpp
-        ../App/brushengine.cpp
-        ../App/brushengine.h
-        ../App/canvasbackend.cpp
-        ../App/canvasbackend.h
-        ../App/canvasdocumentviewmodel.cpp
-        ../App/canvasdocumentviewmodel.h
-        ../App/paletteutils.cpp
-        ../App/paletteutils.h
-        ../App/rasterdocumentio.cpp
-        ../App/rasterdocumentio.h
+        ../App/models/brush/brushengine.cpp
+        ../App/models/brush/brushengine.h
         ../App/models/brush/brushstrokebuilder.cpp
         ../App/models/brush/brushstrokebuilder.h
+        ../App/models/brush/paletteutils.cpp
+        ../App/models/brush/paletteutils.h
+        ../App/models/canvas/canvasbackend.cpp
+        ../App/models/canvas/canvasbackend.h
+        ../App/models/canvas/canvasdocumentviewmodel.cpp
+        ../App/models/canvas/canvasdocumentviewmodel.h
         ../App/models/canvas/canvasviewmodelbridge.cpp
         ../App/models/canvas/canvasviewmodelbridge.h
         ../App/models/file/canvasfileadapter.cpp
         ../App/models/file/canvasfileadapter.h
+        ../App/models/file/rasterdocumentio.cpp
+        ../App/models/file/rasterdocumentio.h
         ../App/models/painting/drawingdocumentcontroller.cpp
         ../App/models/painting/drawingdocumentcontroller.h
         ../App/models/painting/drawingsurfaceitem.cpp
@@ -106,6 +111,10 @@ add_executable(tests_drawingsurfaceitem
 
 target_include_directories(tests_drawingsurfaceitem PRIVATE
         ${CMAKE_SOURCE_DIR}/App
+        ${CMAKE_SOURCE_DIR}/App/models/brush
+        ${CMAKE_SOURCE_DIR}/App/models/canvas
+        ${CMAKE_SOURCE_DIR}/App/models/file
+        ${CMAKE_SOURCE_DIR}/App/models/painting
 )
 
 target_link_libraries(tests_drawingsurfaceitem PRIVATE
