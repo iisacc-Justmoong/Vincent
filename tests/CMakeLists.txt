@@ -82,8 +82,14 @@ add_executable(tests_drawingsurfaceitem
         ../App/paletteutils.h
         ../App/rasterdocumentio.cpp
         ../App/rasterdocumentio.h
+        ../App/models/brush/brushstrokebuilder.cpp
+        ../App/models/brush/brushstrokebuilder.h
+        ../App/models/file/canvasfileadapter.cpp
+        ../App/models/file/canvasfileadapter.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
+        ../App/models/painting/paintingdocumentmodel.cpp
+        ../App/models/painting/paintingdocumentmodel.h
 )
 
 target_include_directories(tests_drawingsurfaceitem PRIVATE

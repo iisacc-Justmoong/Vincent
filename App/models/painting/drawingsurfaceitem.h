@@ -1,15 +1,12 @@
 #pragma once
 
 #include <QColor>
-#include <QImage>
 #include <QPointer>
 #include <QQuickPaintedItem>
-#include <QVariantList>
-#include <QVariantMap>
 
-class BrushEngine;
-class CanvasBackend;
-class RasterDocumentIO;
+class BrushStrokeBuilder;
+class CanvasFileAdapter;
+class PaintingDocumentModel;
 
 class DrawingSurfaceItem : public QQuickPaintedItem
 {
@@ -27,6 +24,7 @@ class DrawingSurfaceItem : public QQuickPaintedItem
 
 public:
     explicit DrawingSurfaceItem(QQuickItem *parent = nullptr);
+    ~DrawingSurfaceItem() override;
 
     void paint(QPainter *painter) override;
 
@@ -75,37 +73,13 @@ private:
     [[nodiscard]] bool canMutateDocument() const;
     void syncWithDocumentViewModel();
     void syncDocumentCanvasSize();
-    [[nodiscard]] QVariantMap captureBackgroundSnapshot() const;
-    void applyBackgroundSnapshot(const QVariantMap &snapshot);
-    [[nodiscard]] QVariantMap captureSnapshot() const;
-    void applySnapshot(const QVariantMap &snapshot);
-    void pushUndoState();
-    void clearDocumentState();
-    [[nodiscard]] QString currentStrokeColor() const;
-    [[nodiscard]] qreal strokePointSize(const QVariantMap &point, qreal fallbackSize) const;
-    [[nodiscard]] qreal strokePointOpacity(const QVariantMap &point) const;
-    [[nodiscard]] QVariantMap createStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive) const;
-    void drawStroke(QPainter *painter, const QVariantMap &stroke) const;
-    void drawStamp(QPainter *painter, qreal pointX, qreal pointY, qreal diameter, qreal opacity) const;
-    [[nodiscard]] QImage renderToImage() const;
-    [[nodiscard]] QString toLocalPath(const QString &fileUrl) const;
-    [[nodiscard]] bool loadBackgroundImage(const QString &sourceUrl);
-    [[nodiscard]] static QVariantList cloneVariantList(const QVariantList &value);
-    [[nodiscard]] static QVariantMap cloneVariantMap(const QVariantMap &value);
-    void connectDocumentViewModel();
-    void disconnectDocumentViewModel();
 
-    BrushEngine *m_brushEngine = nullptr;
-    CanvasBackend *m_canvasBackend = nullptr;
-    RasterDocumentIO *m_rasterDocumentIO = nullptr;
+    BrushStrokeBuilder *m_brushBuilder;
+    CanvasFileAdapter *m_fileAdapter;
+    PaintingDocumentModel *m_paintingModel;
     QColor m_brushColor = QColor(QStringLiteral("#1a1a1a"));
     qreal m_brushSize = 2.0;
     QString m_toolMode = QStringLiteral("brush");
     QPointer<QObject> m_documentViewModel;
     QString m_viewId;
-    QVariantList m_strokes;
-    QVariantMap m_currentStroke;
-    QString m_backgroundSource;
-    QRectF m_backgroundPlacement;
-    QImage m_backgroundImage;
 };
