@@ -2,7 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import LVRS 1.0 as LV
-import "."
+import "../brush" as BrushUi
+import "../painting" as Painting
 
 Item {
     id: painterPage
@@ -94,7 +95,7 @@ Item {
             anchors.fill: parent
             color: LV.Theme.window
 
-            DrawingSurface {
+            Painting.DrawingSurface {
                 id: drawingSurface
                 anchors.fill: parent
                 documentViewModel: painterPage.vm
@@ -109,7 +110,7 @@ Item {
             }
         }
 
-        CanvasToolBar {
+        BrushUi.CanvasToolBar {
             id: canvasToolBar
             anchors.top: parent.top
             anchors.left: parent.left

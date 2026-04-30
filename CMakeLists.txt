@@ -119,9 +119,9 @@ qt_add_qml_module(Vincent
         NO_IMPORT_SCAN
         QML_FILES
         App/qml/Main.qml
-        App/qml/PainterCanvasPage.qml
-        App/qml/CanvasToolBar.qml
-        App/qml/DrawingSurface.qml
+        App/qml/canvas/PainterCanvasPage.qml
+        App/qml/brush/CanvasToolBar.qml
+        App/qml/painting/DrawingSurface.qml
 )
 
 # qmltyperegistrar 빈 메타타입 안전장치

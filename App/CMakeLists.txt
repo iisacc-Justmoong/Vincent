@@ -29,6 +29,8 @@ target_sources(Vincent PRIVATE
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h
+        models/painting/drawingsurfaceitem.cpp
+        models/painting/drawingsurfaceitem.h
         paletteutils.cpp
         paletteutils.h
         rasterdocumentio.cpp
@@ -38,4 +40,5 @@ target_sources(Vincent PRIVATE
 
 target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
 )

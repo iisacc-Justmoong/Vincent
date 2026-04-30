@@ -4,15 +4,14 @@
 #include <QSet>
 #include <QStringList>
 #include <QtQml>
+#include <qqml.h>
 
 #include <backend/state/viewmodelregistry.h>
 #include <backend/runtime/appentry.h>
 
-#include "brushengine.h"
-#include "canvasbackend.h"
 #include "canvasdocumentviewmodel.h"
+#include "models/painting/drawingsurfaceitem.h"
 #include "paletteutils.h"
-#include "rasterdocumentio.h"
 
 namespace {
 
@@ -83,11 +82,9 @@ int main(int argc, char *argv[])
     launchSpec.rootObject = QStringLiteral("Main");
     launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
         configureEngineImports(engine);
+        qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
         auto *paletteUtils = new PaletteUtils(&engine);
-        engine.rootContext()->setContextProperty("CanvasBackend", new CanvasBackend(&engine));
-        engine.rootContext()->setContextProperty("BrushEngine", new BrushEngine(&engine));
         engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
-        engine.rootContext()->setContextProperty("RasterDocumentIO", new RasterDocumentIO(&engine));
         registerViewModels(engine, paletteUtils);
     };
 

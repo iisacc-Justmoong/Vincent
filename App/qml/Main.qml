@@ -1,6 +1,6 @@
 import QtQuick
 import LVRS 1.0 as LV
-import "."
+import "./canvas" as CanvasViews
 
 LV.ApplicationWindow {
     id: window
@@ -19,7 +19,7 @@ LV.ApplicationWindow {
 
     property var canvasPage: null
 
-    PainterCanvasPage {
+    CanvasViews.PainterCanvasPage {
         id: painterPage
         anchors.fill: parent
         onPageReady: window.canvasPage = painterPage
