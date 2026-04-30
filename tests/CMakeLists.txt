@@ -84,10 +84,16 @@ add_executable(tests_drawingsurfaceitem
         ../App/rasterdocumentio.h
         ../App/models/brush/brushstrokebuilder.cpp
         ../App/models/brush/brushstrokebuilder.h
+        ../App/models/canvas/canvasviewmodelbridge.cpp
+        ../App/models/canvas/canvasviewmodelbridge.h
         ../App/models/file/canvasfileadapter.cpp
         ../App/models/file/canvasfileadapter.h
+        ../App/models/painting/drawingdocumentcontroller.cpp
+        ../App/models/painting/drawingdocumentcontroller.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
+        ../App/models/painting/drawingstrokecontroller.cpp
+        ../App/models/painting/drawingstrokecontroller.h
         ../App/models/painting/paintingdocumentmodel.cpp
         ../App/models/painting/paintingdocumentmodel.h
 )

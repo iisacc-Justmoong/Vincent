@@ -1,9 +1,11 @@
 #include "drawingsurfaceitem.h"
 
-#include "../brush/brushstrokebuilder.h"
-#include "../file/canvasfileadapter.h"
+#include "drawingdocumentcontroller.h"
+#include "drawingstrokecontroller.h"
 #include "paintingdocumentmodel.h"
-#include "../../canvasbackend.h"
+#include "../brush/brushstrokebuilder.h"
+#include "../canvas/canvasviewmodelbridge.h"
+#include "../file/canvasfileadapter.h"
 
 #include <QPainter>
 #include <QtGlobal>
@@ -21,9 +23,12 @@ QString normalizedToolMode(const QString &toolMode)
 
 DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
     : QQuickPaintedItem(parent)
+    , m_viewModelBridge(new CanvasViewModelBridge())
     , m_brushBuilder(new BrushStrokeBuilder())
     , m_fileAdapter(new CanvasFileAdapter())
     , m_paintingModel(new PaintingDocumentModel(this))
+    , m_documentController(new DrawingDocumentController(m_paintingModel, m_fileAdapter, m_brushBuilder))
+    , m_strokeController(new DrawingStrokeController(m_brushBuilder, m_paintingModel))
 {
     setAntialiasing(true);
     setOpaquePainting(true);
@@ -43,8 +48,11 @@ DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
 
 DrawingSurfaceItem::~DrawingSurfaceItem()
 {
-    delete m_brushBuilder;
+    delete m_strokeController;
+    delete m_documentController;
     delete m_fileAdapter;
+    delete m_brushBuilder;
+    delete m_viewModelBridge;
 }
 
 void DrawingSurfaceItem::paint(QPainter *painter)
@@ -70,7 +78,7 @@ QString DrawingSurfaceItem::toolMode() const
 
 QObject *DrawingSurfaceItem::documentViewModel() const
 {
-    return m_documentViewModel;
+    return m_viewModelBridge->documentViewModel();
 }
 
 QString DrawingSurfaceItem::viewId() const
@@ -134,12 +142,13 @@ void DrawingSurfaceItem::setToolMode(const QString &toolMode)
 
 void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
 {
-    if (m_documentViewModel == documentViewModel) {
+    if (m_viewModelBridge->documentViewModel() == documentViewModel) {
         return;
     }
-    m_documentViewModel = documentViewModel;
-    syncWithDocumentViewModel();
-    syncDocumentCanvasSize();
+
+    m_viewModelBridge->setDocumentViewModel(documentViewModel);
+    m_viewModelBridge->syncToolState(m_brushColor, m_brushSize, m_toolMode);
+    m_viewModelBridge->syncCanvasSize(width(), height());
     emit documentViewModelChanged();
 }
 
@@ -157,9 +166,8 @@ void DrawingSurfaceItem::newCanvas()
     if (!canMutateDocument()) {
         return;
     }
-    m_paintingModel->pushUndoState(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
-    syncDocumentCanvasSize();
-    m_paintingModel->clear();
+    m_viewModelBridge->syncCanvasSize(width(), height());
+    m_documentController->newCanvas(canvasSize(), kMaxUndoSteps);
 }
 
 void DrawingSurfaceItem::clearCanvas()
@@ -167,42 +175,17 @@ void DrawingSurfaceItem::clearCanvas()
     if (!canMutateDocument()) {
         return;
     }
-    m_paintingModel->pushUndoState(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
-    m_paintingModel->clear();
+    m_documentController->clearCanvas(canvasSize(), kMaxUndoSteps);
 }
 
 bool DrawingSurfaceItem::openRaster(const QString &fileUrl)
 {
-    if (!canMutateDocument()) {
-        return false;
-    }
-
-    const RasterLoadResult raster = m_fileAdapter->openRaster(fileUrl);
-    if (!raster.ok) {
-        return false;
-    }
-
-    m_paintingModel->pushUndoState(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
-    const QVariantMap fit = CanvasBackend().documentFitTransform(qMax(1, qRound(width())),
-                                                                 qMax(1, qRound(height())),
-                                                                 raster.width,
-                                                                 raster.height);
-    m_paintingModel->setBackground(raster.sourceUrl,
-                                   raster.image,
-                                   QRectF(fit.value(QStringLiteral("offsetX")).toReal(),
-                                          fit.value(QStringLiteral("offsetY")).toReal(),
-                                          raster.width * fit.value(QStringLiteral("scale")).toReal(),
-                                          raster.height * fit.value(QStringLiteral("scale")).toReal()));
-    return true;
+    return canMutateDocument() && m_documentController->openRaster(fileUrl, canvasSize(), kMaxUndoSteps);
 }
 
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl) const
 {
-    return m_fileAdapter->saveImage(fileUrl,
-                                    m_paintingModel->renderToImage(QSize(qMax(1, qRound(width())),
-                                                                         qMax(1, qRound(height()))),
-                                                                   *m_brushBuilder,
-                                                                   m_brushSize));
+    return m_documentController->saveToFile(fileUrl, canvasSize(), m_brushSize);
 }
 
 void DrawingSurfaceItem::undo()
@@ -210,7 +193,7 @@ void DrawingSurfaceItem::undo()
     if (!canMutateDocument()) {
         return;
     }
-    m_paintingModel->undo(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
+    m_documentController->undo(canvasSize(), kMaxUndoSteps);
 }
 
 void DrawingSurfaceItem::redo()
@@ -218,7 +201,7 @@ void DrawingSurfaceItem::redo()
     if (!canMutateDocument()) {
         return;
     }
-    m_paintingModel->redo(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
+    m_documentController->redo(canvasSize(), kMaxUndoSteps);
 }
 
 void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
@@ -230,37 +213,30 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
         return;
     }
 
-    m_paintingModel->pushUndoState(qMax(1, qRound(width())), qMax(1, qRound(height())), kMaxUndoSteps);
-    m_paintingModel->beginStroke(m_brushBuilder->beginStroke(m_toolMode,
-                                                             m_brushColor,
-                                                             m_brushSize,
-                                                             pointX,
-                                                             pointY,
-                                                             rawPressure,
-                                                             pressureSensitive));
+    m_strokeController->beginStroke(m_toolMode,
+                                    m_brushColor,
+                                    m_brushSize,
+                                    pointX,
+                                    pointY,
+                                    rawPressure,
+                                    pressureSensitive,
+                                    canvasSize().width(),
+                                    canvasSize().height(),
+                                    kMaxUndoSteps);
 }
 
 bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    QVariantMap stroke = m_paintingModel->currentStroke();
-    if (stroke.isEmpty()) {
-        return false;
+    const bool appended = m_strokeController->appendStrokePoint(pointX, pointY, rawPressure, pressureSensitive);
+    if (appended) {
+        update();
     }
-    if (!m_brushBuilder->appendPoint(stroke, pointX, pointY, rawPressure, pressureSensitive)) {
-        return false;
-    }
-    m_paintingModel->updateCurrentStroke(stroke);
-    update();
-    return true;
+    return appended;
 }
 
 void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    if (!appendStrokePoint(pointX, pointY, rawPressure, pressureSensitive)) {
-        m_paintingModel->endStroke();
-        return;
-    }
-    m_paintingModel->endStroke();
+    m_strokeController->endStroke(pointX, pointY, rawPressure, pressureSensitive);
 }
 
 void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
@@ -269,39 +245,16 @@ void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF 
     if (newGeometry.size() == oldGeometry.size()) {
         return;
     }
-    syncDocumentCanvasSize();
+    m_viewModelBridge->syncCanvasSize(newGeometry.width(), newGeometry.height());
     update();
+}
+
+QSize DrawingSurfaceItem::canvasSize() const
+{
+    return QSize(qMax(1, qRound(width())), qMax(1, qRound(height())));
 }
 
 bool DrawingSurfaceItem::canMutateDocument() const
 {
-    return !m_documentViewModel.isNull();
-}
-
-void DrawingSurfaceItem::syncWithDocumentViewModel()
-{
-    if (!m_documentViewModel) {
-        return;
-    }
-    const QVariant brushColorValue = m_documentViewModel->property("brushColor");
-    if (brushColorValue.isValid()) {
-        setBrushColor(brushColorValue.value<QColor>());
-    }
-    const QVariant brushSizeValue = m_documentViewModel->property("brushSize");
-    if (brushSizeValue.isValid()) {
-        setBrushSize(brushSizeValue.toReal());
-    }
-    const QVariant toolModeValue = m_documentViewModel->property("toolMode");
-    if (toolModeValue.isValid()) {
-        setToolMode(toolModeValue.toString());
-    }
-}
-
-void DrawingSurfaceItem::syncDocumentCanvasSize()
-{
-    if (!m_documentViewModel) {
-        return;
-    }
-    m_documentViewModel->setProperty("canvasWidth", qMax(1, qRound(width())));
-    m_documentViewModel->setProperty("canvasHeight", qMax(1, qRound(height())));
+    return m_viewModelBridge->canMutateDocument();
 }

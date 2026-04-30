@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QColor>
-#include <QPointer>
 #include <QQuickPaintedItem>
 
+class CanvasViewModelBridge;
+class DrawingDocumentController;
+class DrawingStrokeController;
 class BrushStrokeBuilder;
 class CanvasFileAdapter;
 class PaintingDocumentModel;
@@ -70,16 +72,17 @@ protected:
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 private:
+    [[nodiscard]] QSize canvasSize() const;
     [[nodiscard]] bool canMutateDocument() const;
-    void syncWithDocumentViewModel();
-    void syncDocumentCanvasSize();
 
-    BrushStrokeBuilder *m_brushBuilder;
-    CanvasFileAdapter *m_fileAdapter;
-    PaintingDocumentModel *m_paintingModel;
+    CanvasViewModelBridge *m_viewModelBridge = nullptr;
+    BrushStrokeBuilder *m_brushBuilder = nullptr;
+    CanvasFileAdapter *m_fileAdapter = nullptr;
+    PaintingDocumentModel *m_paintingModel = nullptr;
+    DrawingDocumentController *m_documentController = nullptr;
+    DrawingStrokeController *m_strokeController = nullptr;
     QColor m_brushColor = QColor(QStringLiteral("#1a1a1a"));
     qreal m_brushSize = 2.0;
     QString m_toolMode = QStringLiteral("brush");
-    QPointer<QObject> m_documentViewModel;
     QString m_viewId;
 };

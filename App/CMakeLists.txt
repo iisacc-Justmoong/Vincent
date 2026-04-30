@@ -31,10 +31,16 @@ target_sources(Vincent PRIVATE
         metatypes_dummy.h
         models/brush/brushstrokebuilder.cpp
         models/brush/brushstrokebuilder.h
+        models/canvas/canvasviewmodelbridge.cpp
+        models/canvas/canvasviewmodelbridge.h
         models/file/canvasfileadapter.cpp
         models/file/canvasfileadapter.h
+        models/painting/drawingdocumentcontroller.cpp
+        models/painting/drawingdocumentcontroller.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
+        models/painting/drawingstrokecontroller.cpp
+        models/painting/drawingstrokecontroller.h
         models/painting/paintingdocumentmodel.cpp
         models/painting/paintingdocumentmodel.h
         paletteutils.cpp
@@ -47,6 +53,7 @@ target_sources(Vincent PRIVATE
 target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/models/brush
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/canvas
         ${CMAKE_CURRENT_SOURCE_DIR}/models/file
         ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
 )
