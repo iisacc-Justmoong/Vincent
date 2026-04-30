@@ -15,30 +15,10 @@ target_link_libraries(tests_brushengine PRIVATE
 
 add_test(NAME tests_brushengine COMMAND tests_brushengine)
 
-add_executable(tests_imageimport
-        tst_imageimport.cpp
-        ../App/imageimport.cpp
-        ../App/imageimport.h
-)
-
-target_include_directories(tests_imageimport PRIVATE
-        ${CMAKE_SOURCE_DIR}/App
-)
-
-target_link_libraries(tests_imageimport PRIVATE
-        Qt6::Core
-        Qt6::Gui
-        Qt6::Test
-)
-
-add_test(NAME tests_imageimport COMMAND tests_imageimport)
-
 add_executable(tests_canvasdocumentviewmodel
         tst_canvasdocumentviewmodel.cpp
         ../App/canvasdocumentviewmodel.cpp
         ../App/canvasdocumentviewmodel.h
-        ../App/layerlistmodel.cpp
-        ../App/layerlistmodel.h
         ../App/paletteutils.cpp
         ../App/paletteutils.h
 )
@@ -72,22 +52,38 @@ target_link_libraries(tests_canvasbackend PRIVATE
 
 add_test(NAME tests_canvasbackend COMMAND tests_canvasbackend)
 
-add_executable(tests_imageexport
-        tst_imageexport.cpp
-        ../App/imageexport.cpp
-        ../App/imageexport.h
-        ../App/imageimport.cpp
-        ../App/imageimport.h
+add_executable(tests_rasterdocumentio
+        tst_rasterdocumentio.cpp
+        ../App/rasterdocumentio.cpp
+        ../App/rasterdocumentio.h
 )
 
-target_include_directories(tests_imageexport PRIVATE
+target_include_directories(tests_rasterdocumentio PRIVATE
         ${CMAKE_SOURCE_DIR}/App
 )
 
-target_link_libraries(tests_imageexport PRIVATE
+target_link_libraries(tests_rasterdocumentio PRIVATE
         Qt6::Core
         Qt6::Gui
         Qt6::Test
 )
 
-add_test(NAME tests_imageexport COMMAND tests_imageexport)
+add_test(NAME tests_rasterdocumentio COMMAND tests_rasterdocumentio)
+
+set(_vincent_test_environment
+        "CMAKE_PREFIX_PATH="
+        "QML2_IMPORT_PATH="
+        "QTDIR="
+        "QT_PLUGIN_PATH="
+        "QT_PREFIX="
+        "QT_QML_IMPORT_PATH="
+)
+
+set_tests_properties(
+        tests_brushengine
+        tests_canvasdocumentviewmodel
+        tests_canvasbackend
+        tests_rasterdocumentio
+        PROPERTIES
+        ENVIRONMENT "${_vincent_test_environment}"
+)

@@ -11,9 +11,8 @@
 #include "brushengine.h"
 #include "canvasbackend.h"
 #include "canvasdocumentviewmodel.h"
-#include "imageexport.h"
-#include "imageimport.h"
 #include "paletteutils.h"
+#include "rasterdocumentio.h"
 
 namespace {
 
@@ -87,9 +86,8 @@ int main(int argc, char *argv[])
         auto *paletteUtils = new PaletteUtils(&engine);
         engine.rootContext()->setContextProperty("CanvasBackend", new CanvasBackend(&engine));
         engine.rootContext()->setContextProperty("BrushEngine", new BrushEngine(&engine));
-        engine.rootContext()->setContextProperty("ImageExport", new ImageExport(&engine));
-        engine.rootContext()->setContextProperty("ImageImport", new ImageImport(&engine));
         engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
+        engine.rootContext()->setContextProperty("RasterDocumentIO", new RasterDocumentIO(&engine));
         registerViewModels(engine, paletteUtils);
     };
 

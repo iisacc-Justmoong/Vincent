@@ -26,17 +26,13 @@ target_sources(Vincent PRIVATE
         canvasbackend.h
         canvasdocumentviewmodel.cpp
         canvasdocumentviewmodel.h
-        imageexport.cpp
-        imageexport.h
-        imageimport.cpp
-        imageimport.h
-        layerlistmodel.cpp
-        layerlistmodel.h
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h
         paletteutils.cpp
         paletteutils.h
+        rasterdocumentio.cpp
+        rasterdocumentio.h
         resources.qrc
 )
 

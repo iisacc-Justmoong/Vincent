@@ -116,6 +116,7 @@ endif()
 qt_add_qml_module(Vincent
         URI Vincent
         VERSION ${VINCENT_QML_MODULE_VERSION}
+        NO_IMPORT_SCAN
         QML_FILES
         App/qml/Main.qml
         App/qml/PainterCanvasPage.qml

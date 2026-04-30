@@ -23,27 +23,16 @@ Rectangle {
     property int lastPaintedStrokeIndex: -1
     property int lastPaintedPointCount: 0
     property string toolMode: "brush"
-    readonly property var imageModel: documentViewModel ? documentViewModel.layerListModel : null
-    readonly property int importedLayerCount: documentViewModel
-        ? documentViewModel.layerCount
-        : (imageModel ? imageModel.count : 0)
-    property int selectedImageId: -1
-    readonly property bool hasImportedImage: importedLayerCount > 0
-    property bool freeTransformActive: false
-    property var freeTransformSnapshot: ({})
-    property bool constrainAspect: false
-    property int shiftHoldCount: 0
-    property var imageElementRegistry: ({})
-    property var selectedImageItem: null
+    property string backgroundSource: ""
+    property var backgroundPlacement: ({
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+        })
     readonly property int maxUndoSteps: 64
-    property bool transformUndoCaptured: false
-    readonly property bool textEntryActive: textInputOverlay.visible
-    property bool externalDragHasSupportedImage: false
-    readonly property int layerPanelWidth: 220
-    readonly property int layerPanelTopMargin: 96
     readonly property var canvasBackend: CanvasBackend
-    readonly property var imageExportService: ImageExport
-    readonly property var imageImportService: ImageImport
+    readonly property var rasterDocumentIO: RasterDocumentIO
 
     function updateCanvasSizeFromViewport() {
         surface.canvasWidth = Math.max(1, Math.round(surface.width))
@@ -56,17 +45,15 @@ Rectangle {
         if (!surface.canMutateDocument()) {
             return
         }
-        surface.cancelTextEntry()
         surface.strokes = []
         surface.currentStroke = null
-        documentViewModel.resetDocument()
-        surface.selectedImageId = documentViewModel ? documentViewModel.selectedLayerId : -1
-        surface.imageElementRegistry = ({})
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
-        surface.transformUndoCaptured = false
-        surface.updateSelectedImageItem()
-        surface.notifySelectionOverlay()
+        surface.backgroundSource = ""
+        surface.backgroundPlacement = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+        }
         surface.schedulePaint(true)
     }
 
@@ -106,257 +93,44 @@ Rectangle {
         return true
     }
 
-    function updateLayerById(imageId, changes) {
-        if (!surface.canMutateDocument() || imageId === undefined || imageId === null || imageId === -1 || !changes) {
-            return false
-        }
-        return documentViewModel.updateLayerById(imageId, changes)
-    }
-
     function syncStateFromViewModel() {
         if (!documentViewModel) {
-            surface.selectedImageId = -1
-            surface.updateSelectedImageItem()
-            surface.notifySelectionOverlay()
             return
         }
-        surface.selectedImageId = documentViewModel.selectedLayerId
         if (surface.canvasWidth !== documentViewModel.canvasWidth) {
             surface.canvasWidth = documentViewModel.canvasWidth
         }
         if (surface.canvasHeight !== documentViewModel.canvasHeight) {
             surface.canvasHeight = documentViewModel.canvasHeight
         }
-        surface.updateSelectedImageItem()
-        surface.notifySelectionOverlay()
         surface.schedulePaint(true)
     }
 
-    function isSupportedImageUrl(fileUrl) {
-        return !!fileUrl && surface.imageImportService.supportsImageFile(fileUrl.toString())
-    }
-
-    function extractImageUrlsFromDrop(event) {
-        var result = []
-        function appendIfSupported(candidate) {
-            if (!candidate) {
-                return
-            }
-            var normalized = normalizeUrl(candidate)
-            if (!normalized || !surface.isSupportedImageUrl(normalized)) {
-                return
-            }
-            for (var i = 0; i < result.length; ++i) {
-                if (result[i] === normalized) {
-                    return
-                }
-            }
-            result.push(normalized)
-        }
-
-        if (event && event.hasUrls && event.urls) {
-            for (var index = 0; index < event.urls.length; ++index) {
-                appendIfSupported(event.urls[index].toString())
-            }
-        }
-
-        if (!result.length && event && event.hasText && event.text) {
-            var textLines = event.text.split(/\r?\n/)
-            for (var lineIndex = 0; lineIndex < textLines.length; ++lineIndex) {
-                var line = textLines[lineIndex].trim()
-                if (!line.length || line.startsWith("#")) {
-                    continue
-                }
-                appendIfSupported(line)
-            }
-        }
-
-        return result
-    }
-
-    function importDroppedImages(urls) {
-        if (!urls || !urls.length) {
-            return false
-        }
-        surface.pushUndoState()
-        for (var i = 0; i < urls.length; ++i) {
-            surface.loadImage(urls[i], {
-                skipUndo: true
-            })
-        }
-        return true
-    }
-
-    function findImageIndexById(imageId) {
-        if (imageId === -1 || !imageModel) {
-            return -1;
-        }
-        return imageModel.indexOfImageId(imageId)
-    }
-
-    function notifySelectionOverlay() {
-        if (selectionOverlay) {
-            selectionOverlay.refreshSelectionState();
-        }
-    }
-
-    function selectedImageIndex() {
-        return findImageIndexById(surface.selectedImageId);
-    }
-
-    function selectedImageData() {
-        if (documentViewModel && documentViewModel.selectedLayerId === surface.selectedImageId) {
-            var selectedLayerData = documentViewModel.selectedLayerData
-            if (selectedLayerData) {
-                return surface.cloneMetadata(selectedLayerData)
-            }
-        }
-        var index = surface.selectedImageIndex();
-        if (index < 0) {
-            return null;
-        }
-        var entry = imageModel.get(index);
-        if (!entry) {
-            return null;
-        }
-        var result = {};
-        for (var key in entry) {
-            result[key] = entry[key];
-        }
-        return result;
-    }
-
-    function defaultImportedLayerName(metadata, fallbackIndex) {
-        if (metadata && metadata.psdLayer && metadata.psdLayer.name) {
-            return metadata.psdLayer.name
-        }
-        if (metadata && metadata.fileName) {
-            return metadata.fileName
-        }
-        return qsTr("Layer %1").arg(fallbackIndex)
-    }
-
-    function documentFitTransform(documentWidth, documentHeight) {
-        return surface.canvasBackend.documentFitTransform(
-                    surface.canvasWidth,
-                    surface.canvasHeight,
-                    documentWidth !== undefined ? documentWidth : surface.canvasWidth,
-                    documentHeight !== undefined ? documentHeight : surface.canvasHeight)
-    }
-
-    function appendImportedImageEntry(entryData) {
-        if (!surface.canMutateDocument()) {
-            return -1
-        }
-        return documentViewModel.appendLayer({
-            source: entryData.source !== undefined ? entryData.source : "",
-            x: entryData.x !== undefined ? entryData.x : 0,
-            y: entryData.y !== undefined ? entryData.y : 0,
-            originalWidth: entryData.originalWidth !== undefined ? entryData.originalWidth : 0,
-            originalHeight: entryData.originalHeight !== undefined ? entryData.originalHeight : 0,
-            scaleX: entryData.scaleX !== undefined ? entryData.scaleX : 1.0,
-            scaleY: entryData.scaleY !== undefined ? entryData.scaleY : 1.0,
-            ready: entryData.ready === true,
-            layerName: entryData.layerName !== undefined
-                ? entryData.layerName
-                : surface.defaultImportedLayerName(entryData.importMetadata, surface.importedLayerCount + 1),
-            layerVisible: entryData.layerVisible !== false,
-            layerOpacity: entryData.layerOpacity !== undefined ? entryData.layerOpacity : 1.0,
-            blendModeKey: entryData.blendModeKey !== undefined ? entryData.blendModeKey : "",
-            importMetadata: entryData.importMetadata !== undefined ? entryData.importMetadata : ({})
-        })
-    }
-
-    function setLayerVisibility(imageId, layerVisible) {
-        if (!surface.canMutateDocument()) {
-            return
-        }
-        documentViewModel.setLayerVisibility(imageId, layerVisible)
-        surface.notifySelectionOverlay()
-    }
-
-    function findImageElementById(imageId) {
-        if (imageId === -1 || !imageRepeater || imageRepeater.count <= 0) {
-            return null
-        }
-        for (var i = 0; i < imageRepeater.count; ++i) {
-            var item = imageRepeater.itemAt(i)
-            if (item && item.delegateImageId === imageId) {
-                return item
-            }
-        }
-        return null
-    }
-
-    function updateSelectedImageItem() {
-        var item = surface.imageElementRegistry[surface.selectedImageId]
-        if (item && item.delegateImageId !== surface.selectedImageId) {
-            item = null
-        }
-        if (!item) {
-            item = surface.findImageElementById(surface.selectedImageId)
-            if (item) {
-                surface.imageElementRegistry[surface.selectedImageId] = item
-            }
-        }
-        surface.selectedImageItem = item ? item : null
-        surface.notifySelectionOverlay()
-    }
-
-    function selectImage(imageId) {
-        var idx = findImageIndexById(imageId);
-        if (idx === -1) {
-            surface.selectedImageId = -1;
-            surface.updateDocumentProperty("selectedLayerId", -1)
-            surface.freeTransformActive = false;
-            surface.freeTransformSnapshot = {};
-            surface.updateSelectedImageItem();
-            surface.notifySelectionOverlay();
-            return;
-        }
-        surface.selectedImageId = imageId;
-        surface.updateDocumentProperty("selectedLayerId", imageId)
-        surface.updateSelectedImageItem();
-        Qt.callLater(surface.updateSelectedImageItem);
-        surface.freeTransformActive = false;
-        surface.freeTransformSnapshot = {};
-        if (surface.toolMode === "grab") {
-            surface.startFreeTransform();
-        }
-        surface.notifySelectionOverlay();
-    }
-
-    function registerImageElement(imageId, element) {
-        if (!element) {
-            return;
-        }
-        surface.imageElementRegistry[imageId] = element;
-        if (imageId === surface.selectedImageId) {
-            surface.updateSelectedImageItem();
-        }
-        surface.notifySelectionOverlay();
-    }
-
-    function unregisterImageElement(imageId, element) {
-        if (imageId === undefined || imageId === null) {
-            return;
-        }
-        var current = surface.imageElementRegistry[imageId]
-        if (!current) {
-            return;
-        }
-        if (element && current !== element) {
-            return;
-        }
-        delete surface.imageElementRegistry[imageId];
-        surface.updateSelectedImageItem();
-    }
-
-    function cloneMetadata(value) {
-        if (value === undefined || value === null) {
+    function captureBackgroundSnapshot() {
+        if (!surface.backgroundSource.length) {
             return ({})
         }
-        return JSON.parse(JSON.stringify(value))
+        return {
+            source: surface.backgroundSource,
+            x: surface.backgroundPlacement.x,
+            y: surface.backgroundPlacement.y,
+            width: surface.backgroundPlacement.width,
+            height: surface.backgroundPlacement.height
+        }
+    }
+
+    function applyBackgroundSnapshot(snapshot) {
+        var nextBackground = snapshot && snapshot.source ? snapshot : ({})
+        surface.backgroundSource = nextBackground.source !== undefined ? nextBackground.source : ""
+        surface.backgroundPlacement = {
+            x: nextBackground.x !== undefined ? nextBackground.x : 0,
+            y: nextBackground.y !== undefined ? nextBackground.y : 0,
+            width: nextBackground.width !== undefined ? nextBackground.width : 0,
+            height: nextBackground.height !== undefined ? nextBackground.height : 0
+        }
+        if (surface.backgroundSource.length) {
+            paintCanvas.loadImage(surface.backgroundSource)
+        }
     }
 
     function captureSnapshot() {
@@ -364,8 +138,7 @@ Rectangle {
                     surface.canvasWidth,
                     surface.canvasHeight,
                     surface.strokes,
-                    documentViewModel ? documentViewModel.exportLayers() : [],
-                    surface.selectedImageId)
+                    surface.captureBackgroundSnapshot())
     }
 
     function pushUndoState() {
@@ -376,30 +149,25 @@ Rectangle {
         if (!surface.canMutateDocument()) {
             return
         }
+
         if (snapshot.canvasWidth !== undefined && snapshot.canvasHeight !== undefined) {
             surface.canvasWidth = Math.max(1, Math.round(snapshot.canvasWidth))
             surface.canvasHeight = Math.max(1, Math.round(snapshot.canvasHeight))
             surface.updateDocumentProperty("canvasWidth", surface.canvasWidth)
             surface.updateDocumentProperty("canvasHeight", surface.canvasHeight)
         }
-        surface.strokes = snapshot.strokes !== undefined ? snapshot.strokes : [];
 
-        documentViewModel.importLayers(snapshot.images !== undefined ? snapshot.images : [])
-
-        surface.selectedImageId = snapshot.selectedImageId !== undefined ? snapshot.selectedImageId : -1;
-        surface.updateDocumentProperty("selectedLayerId", surface.selectedImageId)
-        surface.updateSelectedImageItem();
-        surface.freeTransformActive = false;
-        surface.freeTransformSnapshot = {};
-        surface.transformUndoCaptured = false;
-        surface.notifySelectionOverlay();
-        surface.cancelTextEntry();
+        surface.strokes = snapshot.strokes !== undefined ? snapshot.strokes : []
+        surface.currentStroke = null
+        surface.applyBackgroundSnapshot(snapshot.background !== undefined ? snapshot.background : {})
+        surface.schedulePaint(true)
     }
 
     function undo() {
         if (!surface.canMutateDocument() || !surface.canvasBackend.canUndo) {
-            return;
+            return
         }
+
         var snapshot = surface.canvasBackend.undo(surface.captureSnapshot(), surface.maxUndoSteps)
         if (snapshot && Object.keys(snapshot).length) {
             surface.applySnapshot(snapshot)
@@ -408,18 +176,12 @@ Rectangle {
 
     function redo() {
         if (!surface.canMutateDocument() || !surface.canvasBackend.canRedo) {
-            return;
+            return
         }
+
         var snapshot = surface.canvasBackend.redo(surface.captureSnapshot(), surface.maxUndoSteps)
         if (snapshot && Object.keys(snapshot).length) {
             surface.applySnapshot(snapshot)
-        }
-    }
-
-    function beginTransformUndoCapture() {
-        if (!surface.transformUndoCaptured) {
-            surface.pushUndoState();
-            surface.transformUndoCaptured = true;
         }
     }
 
@@ -427,35 +189,23 @@ Rectangle {
         target: surface.documentViewModel
         ignoreUnknownSignals: true
 
-        function onSelectedLayerIdChanged() {
-            surface.selectedImageId = surface.documentViewModel ? surface.documentViewModel.selectedLayerId : -1
-            surface.updateSelectedImageItem()
-        }
-
         function onCanvasWidthChanged() {
             if (surface.documentViewModel && surface.canvasWidth !== surface.documentViewModel.canvasWidth) {
                 surface.canvasWidth = surface.documentViewModel.canvasWidth
+                surface.schedulePaint(true)
             }
         }
 
         function onCanvasHeightChanged() {
             if (surface.documentViewModel && surface.canvasHeight !== surface.documentViewModel.canvasHeight) {
                 surface.canvasHeight = surface.documentViewModel.canvasHeight
+                surface.schedulePaint(true)
             }
         }
     }
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
-    signal freeTransformShortcutRequested
-
-    function updateConstrainAspectState() {
-        surface.constrainAspect = surface.freeTransformActive && surface.shiftHoldCount > 0
-    }
-
-    function isShiftModifierActive(modifiers) {
-        return (modifiers & Qt.ShiftModifier) !== 0
-    }
 
     function schedulePaint(fullRedraw) {
         if (fullRedraw) {
@@ -465,7 +215,7 @@ Rectangle {
             return
         }
         surface.paintScheduled = true
-        Qt.callLater(function () {
+        Qt.callLater(function() {
             surface.paintScheduled = false
             paintCanvas.requestPaint()
         })
@@ -582,6 +332,7 @@ Rectangle {
         if (!stroke || !stroke.points || stroke.points.length === 0) {
             return
         }
+
         var points = stroke.points
         var pointCount = points.length
         var start = startIndex !== undefined ? startIndex : 0
@@ -597,13 +348,13 @@ Rectangle {
         ctx.fillStyle = stroke.color
 
         if (pointCount === 1 && start === 0) {
-            var point = points[0]
+            var singlePoint = points[0]
             surface.drawStamp(
                         ctx,
-                        point.x,
-                        point.y,
-                        surface.strokePointSize(point, stroke.size),
-                        surface.strokePointOpacity(point))
+                        singlePoint.x,
+                        singlePoint.y,
+                        surface.strokePointSize(singlePoint, stroke.size),
+                        surface.strokePointOpacity(singlePoint))
             ctx.restore()
             return
         }
@@ -641,12 +392,19 @@ Rectangle {
                 surface.drawStamp(ctx, stampX, stampY, stampSize, stampOpacity)
             }
         }
+
         ctx.restore()
     }
 
     onDocumentViewModelChanged: {
         surface.canvasBackend.clearHistory()
         surface.syncStateFromViewModel()
+    }
+
+    onToolModeChanged: {
+        if (surface.currentStroke) {
+            surface.currentStroke = null
+        }
     }
 
     Component.onCompleted: {
@@ -675,75 +433,35 @@ Rectangle {
         surface.clearDocumentState()
     }
 
-    function loadImage(fileUrl, options) {
+    function openRaster(fileUrl) {
         if (!surface.canMutateDocument()) {
             return
         }
-        var preparedImport = surface.imageImportService.prepareImageImport(fileUrl ? fileUrl.toString() : "")
-        if (!preparedImport.ok) {
-            console.warn("Image import failed:", preparedImport.error)
-            return
-        }
-        var sourceUrl = preparedImport.source
-        var importMetadata = preparedImport.metadata !== undefined ? preparedImport.metadata : ({})
-        var importedLayers = preparedImport.layers !== undefined ? preparedImport.layers : []
-        var shouldSkipUndo = options && options.skipUndo === true
-        if (!shouldSkipUndo) {
-            surface.pushUndoState()
-        }
-        surface.cancelTextEntry()
-        currentStroke = null
 
-        if (importedLayers.length) {
-            var psdMetadata = importMetadata.psd !== undefined ? importMetadata.psd : ({})
-            var fit = surface.documentFitTransform(psdMetadata.width, psdMetadata.height)
-            var selectedLayerId = -1
-            for (var layerIndex = importedLayers.length - 1; layerIndex >= 0; --layerIndex) {
-                var layer = importedLayers[layerIndex]
-                var layerWidth = layer.width !== undefined ? layer.width : 0
-                var layerHeight = layer.height !== undefined ? layer.height : 0
-                var layerMetadata = layer.metadata !== undefined ? layer.metadata : importMetadata
-                selectedLayerId = surface.appendImportedImageEntry({
-                    source: layer.source,
-                    x: fit.offsetX + (layer.x !== undefined ? layer.x : 0) * fit.scale,
-                    y: fit.offsetY + (layer.y !== undefined ? layer.y : 0) * fit.scale,
-                    originalWidth: layerWidth,
-                    originalHeight: layerHeight,
-                    scaleX: fit.scale,
-                    scaleY: fit.scale,
-                    ready: layerWidth > 0 && layerHeight > 0,
-                    layerName: layer.name !== undefined ? layer.name : surface.defaultImportedLayerName(layerMetadata, layerIndex + 1),
-                    layerVisible: layer.visible !== false,
-                    layerOpacity: layer.opacity !== undefined ? layer.opacity : 1.0,
-                    blendModeKey: layer.blendModeKey !== undefined ? layer.blendModeKey : "",
-                    importMetadata: layerMetadata
-                })
-            }
-            if (selectedLayerId !== -1) {
-                surface.selectImage(selectedLayerId)
-            }
-            surface.freeTransformActive = false
-            surface.freeTransformSnapshot = {}
+        var openResult = surface.rasterDocumentIO.loadRasterDocument(fileUrl ? fileUrl.toString() : "")
+        if (!openResult.ok) {
+            console.warn("Raster open failed:", openResult.error)
             return
         }
 
-        var newId = surface.appendImportedImageEntry({
-            source: sourceUrl,
-            x: 0,
-            y: 0,
-            originalWidth: 0,
-            originalHeight: 0,
-            scaleX: 1.0,
-            scaleY: 1.0,
-            ready: false,
-            layerName: surface.defaultImportedLayerName(importMetadata, surface.importedLayerCount + 1),
-            layerVisible: true,
-            layerOpacity: 1.0,
-            importMetadata: importMetadata
-        })
-        surface.selectImage(newId)
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
+        surface.pushUndoState()
+        surface.currentStroke = null
+
+        var fit = surface.canvasBackend.documentFitTransform(
+                    surface.canvasWidth,
+                    surface.canvasHeight,
+                    openResult.width !== undefined ? openResult.width : surface.canvasWidth,
+                    openResult.height !== undefined ? openResult.height : surface.canvasHeight)
+
+        surface.backgroundSource = openResult.source
+        surface.backgroundPlacement = {
+            x: fit.offsetX,
+            y: fit.offsetY,
+            width: (openResult.width !== undefined ? openResult.width : surface.canvasWidth) * fit.scale,
+            height: (openResult.height !== undefined ? openResult.height : surface.canvasHeight) * fit.scale
+        }
+        paintCanvas.loadImage(surface.backgroundSource)
+        surface.schedulePaint(true)
     }
 
     function saveToFile(fileUrl) {
@@ -752,271 +470,9 @@ Rectangle {
             return false
         }
 
-        if (path.toLowerCase().endsWith(".psd")) {
-            var exportResult = surface.imageExportService.saveDocumentAsPsd(
-                        path,
-                        surface.canvasWidth,
-                        surface.canvasHeight,
-                        documentViewModel ? documentViewModel.exportLayers() : [],
-                        surface.strokes.length ? paintCanvas.toDataURL("image/png") : "")
-            if (!exportResult.ok) {
-                console.warn("PSD export failed:", exportResult.error)
-                return false
-            }
-            return true
-        }
-
-        var overlayWasVisible = selectionOverlay.visible
-        var textOverlayWasVisible = textInputOverlay.visible
-        selectionOverlay.visible = false
-        textInputOverlay.visible = false
-        var grabResult = canvasContainer.grabToImage(function(result) {
+        return canvasContainer.grabToImage(function(result) {
             result.saveToFile(path)
-            selectionOverlay.visible = overlayWasVisible
-            textInputOverlay.visible = textOverlayWasVisible
         })
-
-        if (!grabResult) {
-            selectionOverlay.visible = overlayWasVisible
-            textInputOverlay.visible = textOverlayWasVisible
-        }
-
-        return grabResult
-    }
-
-    function clearImportedImage() {
-        if (!surface.canMutateDocument()) {
-            return
-        }
-        var index = surface.selectedImageIndex()
-        if (index === -1) {
-            return
-        }
-        surface.pushUndoState()
-        var entry = imageModel.get(index)
-        if (entry) {
-            surface.unregisterImageElement(entry.imageId)
-            documentViewModel.removeLayerById(entry.imageId)
-        }
-        surface.selectedImageId = documentViewModel
-            ? documentViewModel.selectedLayerId
-            : (surface.importedLayerCount > 0 ? imageModel.get(surface.importedLayerCount - 1).imageId : -1)
-        surface.updateSelectedImageItem()
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
-        if (surface.selectedImageId !== -1 && surface.toolMode === "grab") {
-            surface.startFreeTransform()
-        }
-        surface.notifySelectionOverlay()
-    }
-
-    function resetImagePlacement(imageId) {
-        var index = surface.findImageIndexById(imageId)
-        if (index === -1) {
-            return
-        }
-        var entry = imageModel.get(index)
-        if (!entry || entry.originalWidth <= 0 || entry.originalHeight <= 0) {
-            return
-        }
-        var placement = surface.canvasBackend.resetImagePlacement(
-                    surface.canvasWidth,
-                    surface.canvasHeight,
-                    entry.originalWidth,
-                    entry.originalHeight)
-        if (!placement || !Object.keys(placement).length) {
-            return
-        }
-        if (!surface.updateLayerById(imageId, placement)) {
-            for (var key in placement) {
-                imageModel.setProperty(index, key, placement[key])
-            }
-        }
-        surface.freeTransformActive = false
-        if (surface.toolMode === "grab" && surface.selectedImageId === imageId) {
-            surface.startFreeTransform()
-        }
-        surface.notifySelectionOverlay()
-    }
-
-    function insertText(textValue, posX, posY, fontPixelSize) {
-        if (!surface.canMutateDocument() || !textValue || !textValue.length) {
-            return
-        }
-        surface.pushUndoState()
-        var fontPx = fontPixelSize !== undefined ? fontPixelSize : Math.max(12, surface.brushSize * 2)
-        textMetrics.font.pixelSize = fontPx
-        textMetrics.font.family = textRasterizer.fontFamily
-        var lines = textValue.split("\n")
-        var maxAdvance = 0
-        for (var i = 0; i < lines.length; ++i) {
-            var lineText = lines[i].length ? lines[i] : " "
-            textMetrics.text = lineText
-            maxAdvance = Math.max(maxAdvance, Math.ceil(textMetrics.advanceWidth))
-        }
-        var lineSpacing = Math.ceil(fontPx * textRasterizer.lineSpacingFactor)
-        var width = Math.max(1, maxAdvance + textRasterizer.padding)
-        var height = Math.max(1, lineSpacing * lines.length + textRasterizer.padding)
-        textRasterizer.width = width
-        textRasterizer.height = height
-        textRasterizer.fontSize = fontPx
-        textRasterizer.textColor = surface.brushColor
-        var targetX = posX !== undefined ? posX : (surface.canvasWidth - width) / 2
-        var targetY = posY !== undefined ? posY : (surface.canvasHeight - height) / 2
-        targetX = Math.max(0, Math.min(surface.canvasWidth - width, targetX))
-        targetY = Math.max(0, Math.min(surface.canvasHeight - height, targetY))
-        textRasterizer.targetX = targetX
-        textRasterizer.targetY = targetY
-        textRasterizer.completion = function (dataUrl, renderedWidth, renderedHeight, finalX, finalY) {
-            var newId = surface.appendImportedImageEntry({
-                source: dataUrl,
-                x: finalX,
-                y: finalY,
-                originalWidth: renderedWidth,
-                originalHeight: renderedHeight,
-                scaleX: 1.0,
-                scaleY: 1.0,
-                ready: true,
-                layerName: qsTr("Text"),
-                layerVisible: true,
-                layerOpacity: 1.0
-            })
-            surface.selectImage(newId)
-        }
-        textRasterizer.textValue = textValue
-        textRasterizer.requestPaint()
-    }
-
-    function startTextEntry(x, y) {
-        textInputOverlay.fontPixelSize = Math.max(12, surface.brushSize * 2)
-        var width = Math.min(320, surface.canvasWidth)
-        var height = Math.min(140, surface.canvasHeight)
-        textInputOverlay.overlayWidth = width
-        textInputOverlay.overlayHeight = height
-        textInputOverlay.targetX = Math.max(0, Math.min(surface.canvasWidth - width, x))
-        textInputOverlay.targetY = Math.max(0, Math.min(surface.canvasHeight - height, y))
-        textEntryEdit.text = ""
-        textInputOverlay.visible = true
-        textEntryEdit.forceActiveFocus()
-    }
-
-    function commitTextEntry() {
-        if (!textInputOverlay.visible) {
-            return
-        }
-        var content = textEntryEdit.text.trim()
-        textInputOverlay.visible = false
-        if (content.length) {
-            surface.insertText(content, textInputOverlay.x, textInputOverlay.y, textInputOverlay.fontPixelSize)
-        }
-        textEntryEdit.text = ""
-    }
-
-    function cancelTextEntry() {
-        if (!textInputOverlay.visible) {
-            return
-        }
-        textInputOverlay.visible = false
-        textEntryEdit.text = ""
-    }
-
-    onToolModeChanged: {
-        if (surface.currentStroke) {
-            surface.currentStroke = null
-        }
-        if (toolMode !== "text" && textInputOverlay.visible) {
-            surface.cancelTextEntry()
-        }
-        if (toolMode === "grab") {
-            surface.startFreeTransform()
-        } else if (surface.freeTransformActive) {
-            surface.commitFreeTransform()
-        }
-    }
-
-    onFreeTransformActiveChanged: {
-        surface.updateConstrainAspectState()
-        surface.updateDocumentProperty("freeTransformActive", surface.freeTransformActive)
-    }
-
-    function startFreeTransform() {
-        var index = surface.selectedImageIndex()
-        if (index === -1 || surface.freeTransformActive) {
-            return
-        }
-        var entry = imageModel.get(index)
-        if (!entry || !entry.ready) {
-            return
-        }
-        surface.freeTransformSnapshot = {
-            imageId: entry.imageId,
-            x: entry.x,
-            y: entry.y,
-            scaleX: entry.scaleX,
-            scaleY: entry.scaleY
-        }
-        surface.freeTransformActive = true
-        surface.updateConstrainAspectState()
-    }
-
-    function commitFreeTransform() {
-        if (!surface.freeTransformActive) {
-            return
-        }
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
-        surface.transformUndoCaptured = false
-        surface.updateConstrainAspectState()
-    }
-
-    function cancelFreeTransform() {
-        if (!surface.freeTransformActive) {
-            return
-        }
-        var index = surface.selectedImageIndex()
-        if (index === -1) {
-            surface.freeTransformActive = false
-            surface.freeTransformSnapshot = {}
-            surface.updateConstrainAspectState()
-            return
-        }
-        var snapshot = surface.freeTransformSnapshot
-        if (snapshot && snapshot.imageId === surface.selectedImageId) {
-            if (!surface.updateLayerById(surface.selectedImageId, {
-                    x: snapshot.x !== undefined ? snapshot.x : imageModel.get(index).x,
-                    y: snapshot.y !== undefined ? snapshot.y : imageModel.get(index).y,
-                    scaleX: snapshot.scaleX !== undefined ? snapshot.scaleX : imageModel.get(index).scaleX,
-                    scaleY: snapshot.scaleY !== undefined ? snapshot.scaleY : imageModel.get(index).scaleY
-                })) {
-                if (snapshot.x !== undefined) {
-                    imageModel.setProperty(index, "x", snapshot.x)
-                }
-                if (snapshot.y !== undefined) {
-                    imageModel.setProperty(index, "y", snapshot.y)
-                }
-                if (snapshot.scaleX !== undefined) {
-                    imageModel.setProperty(index, "scaleX", snapshot.scaleX)
-                }
-                if (snapshot.scaleY !== undefined) {
-                    imageModel.setProperty(index, "scaleY", snapshot.scaleY)
-                }
-            }
-        }
-        surface.freeTransformActive = false
-        surface.freeTransformSnapshot = {}
-        surface.transformUndoCaptured = false
-        surface.updateConstrainAspectState()
-    }
-
-    function toggleFreeTransformMode() {
-        if (!surface.hasImportedImage || surface.selectedImageIndex() === -1) {
-            return
-        }
-        if (!surface.freeTransformActive) {
-            surface.startFreeTransform()
-        } else {
-            surface.commitFreeTransform()
-        }
     }
 
     Rectangle {
@@ -1031,199 +487,6 @@ Rectangle {
         clip: true
     }
 
-    Rectangle {
-        parent: canvasContainer
-        anchors.fill: parent
-        z: 25
-        visible: externalDropArea.containsDrag
-        color: surface.externalDragHasSupportedImage
-            ? Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.16)
-            : Qt.rgba(220 / 255, 60 / 255, 60 / 255, 0.16)
-        border.width: 2
-        border.color: surface.externalDragHasSupportedImage ? "#2d89ef" : "#dc3c3c"
-
-        Text {
-            anchors.centerIn: parent
-            text: surface.externalDragHasSupportedImage
-                ? qsTr("Drop image to import")
-                : qsTr("Unsupported file type")
-            color: "#1a1a1a"
-            font.pixelSize: 18
-            font.bold: true
-        }
-    }
-
-    DropArea {
-        id: externalDropArea
-        parent: canvasContainer
-        anchors.fill: parent
-        z: 30
-        onEntered: function (drag) {
-            var urls = surface.extractImageUrlsFromDrop(drag)
-            surface.externalDragHasSupportedImage = urls.length > 0
-            drag.accepted = surface.externalDragHasSupportedImage
-        }
-        onPositionChanged: function (drag) {
-            if (!surface.externalDragHasSupportedImage) {
-                var urls = surface.extractImageUrlsFromDrop(drag)
-                surface.externalDragHasSupportedImage = urls.length > 0
-            }
-            drag.accepted = surface.externalDragHasSupportedImage
-        }
-        onDropped: function (drop) {
-            var urls = surface.extractImageUrlsFromDrop(drop)
-            var imported = surface.importDroppedImages(urls)
-            drop.accepted = imported
-            surface.externalDragHasSupportedImage = false
-        }
-        onExited: {
-            surface.externalDragHasSupportedImage = false
-        }
-    }
-
-    Rectangle {
-        id: layerPanel
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.topMargin: surface.layerPanelTopMargin
-        anchors.rightMargin: 16
-        width: surface.layerPanelWidth
-        height: Math.min(parent.height - surface.layerPanelTopMargin - 16, layerPanelContent.implicitHeight + 20)
-        radius: 12
-        color: LV.Theme.panelBackground03
-        border.width: 1
-        border.color: Qt.rgba(255, 255, 255, 0.10)
-        visible: surface.hasImportedImage
-        z: 40
-
-        Column {
-            id: layerPanelContent
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-
-            Text {
-                text: qsTr("Layers")
-                color: "#f5f7fa"
-                font.pixelSize: 14
-                font.bold: true
-            }
-
-            Flickable {
-                id: layerFlickable
-                width: parent.width
-                height: Math.max(48, layerPanel.height - 56)
-                contentWidth: width
-                contentHeight: layerListColumn.height
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-
-                Column {
-                    id: layerListColumn
-                    width: layerFlickable.width
-                    spacing: 6
-
-                    Repeater {
-                        model: surface.importedLayerCount
-
-                        delegate: Rectangle {
-                            id: layerRow
-                            required property int index
-                            readonly property int modelIndex: surface.importedLayerCount - 1 - index
-                            readonly property var entry: modelIndex >= 0 && surface.imageModel
-                                ? surface.imageModel.get(modelIndex)
-                                : null
-                            readonly property bool selected: entry && entry.imageId === surface.selectedImageId
-                            width: layerListColumn.width
-                            height: 44
-                            radius: 10
-                            color: selected ? Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.22) : Qt.rgba(255, 255, 255, 0.04)
-                            border.width: 1
-                            border.color: selected ? "#2d89ef" : Qt.rgba(255, 255, 255, 0.08)
-                            opacity: entry && entry.layerVisible === false ? 0.6 : 1.0
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (layerRow.entry) {
-                                        surface.selectImage(layerRow.entry.imageId)
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                id: visibilityChip
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 28
-                                height: 28
-                                radius: 8
-                                color: layerRow.entry && layerRow.entry.layerVisible === false
-                                    ? Qt.rgba(255, 255, 255, 0.08)
-                                    : Qt.rgba(45 / 255, 137 / 255, 239 / 255, 0.20)
-                                border.width: 1
-                                border.color: layerRow.entry && layerRow.entry.layerVisible === false
-                                    ? Qt.rgba(255, 255, 255, 0.10)
-                                    : "#2d89ef"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: layerRow.entry && layerRow.entry.layerVisible === false ? qsTr("Off") : qsTr("On")
-                                    color: "#f5f7fa"
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (layerRow.entry) {
-                                            surface.setLayerVisibility(layerRow.entry.imageId, layerRow.entry.layerVisible === false)
-                                        }
-                                        mouse.accepted = true
-                                    }
-                                }
-                            }
-
-                            Column {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 46
-                                anchors.right: parent.right
-                                anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    width: parent.width
-                                    text: layerRow.entry ? layerRow.entry.layerName : ""
-                                    color: "#f5f7fa"
-                                    font.pixelSize: 12
-                                    font.bold: layerRow.selected
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    width: parent.width
-                                    text: layerRow.entry
-                                        ? (layerRow.entry.blendModeKey && layerRow.entry.blendModeKey.length
-                                            ? layerRow.entry.blendModeKey
-                                            : qsTr("Normal"))
-                                        : ""
-                                    color: Qt.rgba(245 / 255, 247 / 255, 250 / 255, 0.70)
-                                    font.pixelSize: 10
-                                    elide: Text.ElideRight
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     Canvas {
         id: paintCanvas
         parent: canvasContainer
@@ -1232,6 +495,8 @@ Rectangle {
         z: 10
         enabled: false
 
+        onImageLoaded: surface.schedulePaint(true)
+
         onPaint: {
             var ctx = getContext("2d")
             ctx.lineCap = "round"
@@ -1239,9 +504,24 @@ Rectangle {
 
             if (surface.fullRedrawPending) {
                 ctx.clearRect(0, 0, width, height)
-                for (var i = 0; i < surface.strokes.length; ++i) {
-                    surface.drawStroke(ctx, surface.strokes[i], 0)
+
+                if (surface.backgroundSource.length) {
+                    if (!paintCanvas.isImageLoaded(surface.backgroundSource)) {
+                        paintCanvas.loadImage(surface.backgroundSource)
+                        return
+                    }
+
+                    ctx.drawImage(surface.backgroundSource,
+                                  surface.backgroundPlacement.x,
+                                  surface.backgroundPlacement.y,
+                                  surface.backgroundPlacement.width,
+                                  surface.backgroundPlacement.height)
                 }
+
+                for (var redrawIndex = 0; redrawIndex < surface.strokes.length; ++redrawIndex) {
+                    surface.drawStroke(ctx, surface.strokes[redrawIndex], 0)
+                }
+
                 surface.fullRedrawPending = false
                 if (surface.strokes.length > 0) {
                     surface.lastPaintedStrokeIndex = surface.strokes.length - 1
@@ -1260,8 +540,8 @@ Rectangle {
             }
 
             if (strokeCount - 1 > surface.lastPaintedStrokeIndex) {
-                for (var s = surface.lastPaintedStrokeIndex + 1; s < strokeCount; ++s) {
-                    surface.drawStroke(ctx, surface.strokes[s], 0)
+                for (var strokeIndex = surface.lastPaintedStrokeIndex + 1; strokeIndex < strokeCount; ++strokeIndex) {
+                    surface.drawStroke(ctx, surface.strokes[strokeIndex], 0)
                 }
                 surface.lastPaintedStrokeIndex = strokeCount - 1
                 var appendedStroke = surface.strokes[surface.lastPaintedStrokeIndex]
@@ -1270,447 +550,15 @@ Rectangle {
             }
 
             if (surface.lastPaintedStrokeIndex >= 0) {
-                var stroke = surface.strokes[surface.lastPaintedStrokeIndex]
-                if (stroke && stroke.points && stroke.points.length > surface.lastPaintedPointCount) {
-                    surface.drawStroke(ctx, stroke, surface.lastPaintedPointCount)
-                    surface.lastPaintedPointCount = stroke.points.length
+                var currentStroke = surface.strokes[surface.lastPaintedStrokeIndex]
+                if (currentStroke && currentStroke.points
+                        && currentStroke.points.length > surface.lastPaintedPointCount) {
+                    surface.drawStroke(ctx, currentStroke, surface.lastPaintedPointCount)
+                    surface.lastPaintedPointCount = currentStroke.points.length
                 }
             }
         }
     }
-
-    TextMetrics {
-        id: textMetrics
-        text: ""
-    }
-
-    Canvas {
-        id: textRasterizer
-        visible: false
-        property string textValue: ""
-        property color textColor: "#ffffff"
-        property string fontFamily: "Helvetica"
-        property int fontSize: 32
-        property int padding: 16
-        property var completion: null
-        property real targetX: 0
-        property real targetY: 0
-        property real lineSpacingFactor: 1.25
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.save()
-            ctx.clearRect(0, 0, width, height)
-            if (!textRasterizer.textValue.length) {
-                ctx.restore()
-                return
-            }
-            ctx.fillStyle = textColor
-            ctx.font = fontSize + "px " + fontFamily
-            ctx.textBaseline = "top"
-            var lines = textValue.split("\n")
-            var lineSpacing = Math.ceil(fontSize * lineSpacingFactor)
-            for (var i = 0; i < lines.length; ++i) {
-                var lineText = lines[i]
-                ctx.fillText(lineText, padding / 2, padding / 2 + i * lineSpacing)
-            }
-            ctx.restore()
-            if (completion) {
-                var dataUrl = textRasterizer.toDataURL("image/png")
-                var callback = completion
-                var finalX = textRasterizer.targetX
-                var finalY = textRasterizer.targetY
-                completion = null
-                callback(dataUrl, width, height, finalX, finalY)
-            }
-        }
-    }
-
-    Item {
-        id: imageLayer
-        parent: canvasContainer
-        anchors.fill: parent
-        visible: surface.hasImportedImage
-        clip: true
-        z: 5
-
-        Repeater {
-            id: imageRepeater
-            model: surface.imageModel ? surface.imageModel : null
-
-            delegate: Image {
-                id: imageDisplay
-                required property int index
-                readonly property var entry: surface.imageModel ? surface.imageModel.get(index) : null
-                property int delegateImageId: entry ? entry.imageId : -1
-                property int registeredImageId: -1
-                x: entry ? entry.x : 0
-                y: entry ? entry.y : 0
-                width: entry && entry.originalWidth > 0 ? entry.originalWidth * entry.scaleX : 0
-                height: entry && entry.originalHeight > 0 ? entry.originalHeight * entry.scaleY : 0
-                visible: entry && entry.ready && (entry.layerVisible !== false)
-                smooth: true
-                asynchronous: true
-                fillMode: Image.Stretch
-                opacity: entry && entry.layerOpacity !== undefined ? entry.layerOpacity : 1
-                source: entry ? entry.source : ""
-
-                Component.onCompleted: {
-                    registeredImageId = delegateImageId
-                    surface.registerImageElement(registeredImageId, imageDisplay)
-                }
-
-                onDelegateImageIdChanged: {
-                    if (registeredImageId === delegateImageId) {
-                        return
-                    }
-                    if (registeredImageId !== -1) {
-                        surface.unregisterImageElement(registeredImageId, imageDisplay)
-                    }
-                    registeredImageId = delegateImageId
-                    surface.registerImageElement(registeredImageId, imageDisplay)
-                }
-
-                Component.onDestruction: surface.unregisterImageElement(registeredImageId, imageDisplay)
-
-                onStatusChanged: {
-                    if (status !== Image.Ready) {
-                        return
-                    }
-                    var modelIndex = surface.findImageIndexById(delegateImageId)
-                    if (modelIndex === -1) {
-                        return
-                    }
-                    var currentEntry = surface.imageModel ? surface.imageModel.get(modelIndex) : null
-                    if (!currentEntry || currentEntry.ready) {
-                        return
-                    }
-                    if (!surface.updateLayerById(delegateImageId, {
-                            originalWidth: implicitWidth,
-                            originalHeight: implicitHeight
-                        })) {
-                        surface.imageModel.setProperty(modelIndex, "originalWidth", implicitWidth)
-                        surface.imageModel.setProperty(modelIndex, "originalHeight", implicitHeight)
-                    }
-                    surface.resetImagePlacement(delegateImageId)
-                }
-
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    enabled: surface.toolMode === "grab" && imageDisplay.visible
-                    onTapped: {
-                        surface.selectImage(imageDisplay.delegateImageId)
-                    }
-                }
-            }
-        }
-
-        Item {
-            id: selectionOverlay
-            z: 10
-            property int selectedIndex: -1
-            property var currentEntry: null
-            property var selectedItem: null
-            property real minSize: 24
-
-            function refreshSelectionState() {
-                selectedIndex = surface.findImageIndexById(surface.selectedImageId)
-                currentEntry = selectedIndex >= 0 && surface.imageModel ? surface.imageModel.get(selectedIndex) : null
-                selectedItem = surface.selectedImageItem
-            }
-
-            Component.onCompleted: refreshSelectionState()
-
-            Connections {
-                target: surface
-                function onSelectedImageIdChanged() {
-                    selectionOverlay.refreshSelectionState()
-                }
-                function onSelectedImageItemChanged() {
-                    selectionOverlay.refreshSelectionState()
-                }
-            }
-
-            Connections {
-                target: surface.imageModel
-                function onDataChanged() {
-                    selectionOverlay.refreshSelectionState()
-                }
-                function onCountChanged() {
-                    selectionOverlay.refreshSelectionState()
-                }
-            }
-
-            visible: selectedItem
-                && currentEntry
-                && currentEntry.ready
-                && currentEntry.layerVisible !== false
-                && (surface.toolMode === "grab" || surface.freeTransformActive)
-            x: selectedItem ? selectedItem.x : 0
-            y: selectedItem ? selectedItem.y : 0
-            width: selectedItem ? selectedItem.width : 0
-            height: selectedItem ? selectedItem.height : 0
-
-            function updateGeometry(newX, newY, newWidth, newHeight) {
-                if (!currentEntry || selectedIndex < 0 || currentEntry.originalWidth <= 0 || currentEntry.originalHeight <= 0) {
-                    return
-                }
-                if (!surface.updateLayerById(currentEntry.imageId, {
-                        x: newX,
-                        y: newY,
-                        scaleX: newWidth / currentEntry.originalWidth,
-                        scaleY: newHeight / currentEntry.originalHeight
-                    })) {
-                    imageModel.setProperty(selectedIndex, "x", newX)
-                    imageModel.setProperty(selectedIndex, "y", newY)
-                    imageModel.setProperty(selectedIndex, "scaleX", newWidth / currentEntry.originalWidth)
-                    imageModel.setProperty(selectedIndex, "scaleY", newHeight / currentEntry.originalHeight)
-                }
-            }
-
-            function moveSelection(newX, newY) {
-                if (!currentEntry || selectedIndex < 0) {
-                    return
-                }
-                if (!surface.updateLayerById(currentEntry.imageId, {
-                        x: newX,
-                        y: newY
-                    })) {
-                    imageModel.setProperty(selectedIndex, "x", newX)
-                    imageModel.setProperty(selectedIndex, "y", newY)
-                }
-            }
-
-            function handleTransform(role, dx, dy, startRect, forceConstrainAspect) {
-                if (!currentEntry || selectedIndex < 0) {
-                    return
-                }
-                var constrainAspectNow = forceConstrainAspect === undefined
-                    ? surface.constrainAspect
-                    : forceConstrainAspect
-                var result = surface.canvasBackend.resolveTransform(
-                            role,
-                            dx,
-                            dy,
-                            startRect,
-                            minSize,
-                            surface.canvasWidth,
-                            surface.canvasHeight,
-                            constrainAspectNow)
-                if (!result || result.width === undefined || result.height === undefined) {
-                    return
-                }
-                updateGeometry(result.x, result.y, result.width, result.height)
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                visible: selectionOverlay.visible
-                color: "transparent"
-                border.color: surface.freeTransformActive ? Qt.rgba(88 / 255, 161 / 255, 234 / 255, 0.9) : Qt.rgba(255, 255, 255, 0.35)
-                border.width: surface.freeTransformActive ? 2 : 1
-            }
-
-            HoverHandler {
-                acceptedDevices: PointerDevice.Mouse
-                cursorShape: surface.toolMode === "grab"
-                    ? (selectionDrag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
-                    : Qt.ArrowCursor
-            }
-
-            Item {
-                id: overlayHandles
-                anchors.fill: parent
-                visible: surface.freeTransformActive
-                readonly property real handleSize: 12
-
-                Repeater {
-                    model: [
-                        { role: "topLeft", xFactor: 0, yFactor: 0, cursor: Qt.SizeFDiagCursor },
-                        { role: "top", xFactor: 0.5, yFactor: 0, cursor: Qt.SizeVerCursor },
-                        { role: "topRight", xFactor: 1, yFactor: 0, cursor: Qt.SizeBDiagCursor },
-                        { role: "right", xFactor: 1, yFactor: 0.5, cursor: Qt.SizeHorCursor },
-                        { role: "bottomRight", xFactor: 1, yFactor: 1, cursor: Qt.SizeFDiagCursor },
-                        { role: "bottom", xFactor: 0.5, yFactor: 1, cursor: Qt.SizeVerCursor },
-                        { role: "bottomLeft", xFactor: 0, yFactor: 1, cursor: Qt.SizeBDiagCursor },
-                        { role: "left", xFactor: 0, yFactor: 0.5, cursor: Qt.SizeHorCursor }
-                    ]
-
-                    delegate: Rectangle {
-                        id: transformHandle
-                        required property var modelData
-                        width: overlayHandles.handleSize
-                        height: overlayHandles.handleSize
-                        radius: 2
-                        color: "#ffffff"
-                        border.color: "#1a1a1a"
-                        antialiasing: true
-                        visible: surface.freeTransformActive
-                        x: modelData.xFactor * parent.width - width / 2
-                        y: modelData.yFactor * parent.height - height / 2
-
-                        HoverHandler {
-                            cursorShape: transformHandle.modelData.cursor
-                        }
-
-                        DragHandler {
-                            target: null
-                            enabled: surface.freeTransformActive
-                            acceptedButtons: Qt.LeftButton
-                            property real startX: 0
-                            property real startY: 0
-                            property real startWidth: 0
-                            property real startHeight: 0
-                            property real startPointerSceneX: 0
-                            property real startPointerSceneY: 0
-                            onActiveChanged: {
-                                if (active) {
-                                    surface.forceActiveFocus()
-                                    surface.beginTransformUndoCapture()
-                                    startX = selectionOverlay.x
-                                    startY = selectionOverlay.y
-                                    startWidth = selectionOverlay.width
-                                    startHeight = selectionOverlay.height
-                                    startPointerSceneX = centroid.scenePosition.x
-                                    startPointerSceneY = centroid.scenePosition.y
-                                }
-                            }
-                            onTranslationChanged: {
-                                var deltaX = centroid.scenePosition.x - startPointerSceneX
-                                var deltaY = centroid.scenePosition.y - startPointerSceneY
-                                var keepAspect = surface.isShiftModifierActive(centroid.modifiers) || surface.constrainAspect
-                                selectionOverlay.handleTransform(
-                                            transformHandle.modelData.role,
-                                            deltaX,
-                                            deltaY,
-                                            { x: startX, y: startY, w: startWidth, h: startHeight },
-                                            keepAspect)
-                            }
-                        }
-                    }
-                }
-            }
-
-            DragHandler {
-                id: selectionDrag
-                target: null
-                enabled: selectionOverlay.visible && surface.toolMode === "grab"
-                acceptedButtons: Qt.LeftButton
-                property real startX: 0
-                property real startY: 0
-                property real startPointerSceneX: 0
-                property real startPointerSceneY: 0
-
-                onActiveChanged: {
-                    if (active) {
-                        surface.forceActiveFocus()
-                        surface.beginTransformUndoCapture()
-                        startX = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.x : selectionOverlay.x
-                        startY = selectionOverlay.selectedItem ? selectionOverlay.selectedItem.y : selectionOverlay.y
-                        startPointerSceneX = centroid.scenePosition.x
-                        startPointerSceneY = centroid.scenePosition.y
-                        if (!surface.freeTransformActive) {
-                            surface.startFreeTransform()
-                        }
-                    } else if (surface.freeTransformActive) {
-                        surface.commitFreeTransform()
-                    }
-                }
-
-                onTranslationChanged: {
-                    var deltaX = centroid.scenePosition.x - startPointerSceneX
-                    var deltaY = centroid.scenePosition.y - startPointerSceneY
-                    selectionOverlay.moveSelection(startX + deltaX, startY + deltaY)
-                }
-            }
-
-            WheelHandler {
-                acceptedModifiers: Qt.ControlModifier
-                enabled: selectionOverlay.visible
-                onWheel: {
-                    if (!selectionOverlay.currentEntry || selectionOverlay.currentEntry.originalWidth <= 0) {
-                        return
-                    }
-                    if (!surface.freeTransformActive) {
-                        surface.startFreeTransform()
-                    }
-                    surface.beginTransformUndoCapture()
-                    const factor = wheel.angleDelta.y > 0 ? 1.1 : 0.9
-                    const newWidth = selectionOverlay.width * factor
-                    const newHeight = selectionOverlay.height * factor
-                    const centerX = selectionOverlay.x + selectionOverlay.width / 2
-                    const centerY = selectionOverlay.y + selectionOverlay.height / 2
-                    selectionOverlay.updateGeometry(centerX - newWidth / 2, centerY - newHeight / 2, newWidth, newHeight)
-                }
-            }
-        }
-    }
-
-    Item {
-        id: textInputOverlay
-        parent: canvasContainer
-        property real targetX: 0
-        property real targetY: 0
-        property real fontPixelSize: 24
-        property real overlayWidth: 320
-        property real overlayHeight: 140
-        z: 15
-        visible: false
-        onVisibleChanged: surface.updateDocumentProperty("textEntryActive", visible)
-        x: targetX
-        y: targetY
-        width: overlayWidth
-        height: overlayHeight
-
-        Rectangle {
-            anchors.fill: parent
-            color: Qt.rgba(0, 0, 0, 0.7)
-            border.color: Qt.rgba(255, 255, 255, 0.4)
-            border.width: 1
-            radius: 6
-        }
-
-        Text {
-            id: textEntryHint
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: 8
-            text: qsTr("Press Enter to place text (Shift+Enter for newline)")
-            color: Qt.rgba(1, 1, 1, 0.7)
-            wrapMode: Text.WordWrap
-            font.pixelSize: 12
-        }
-
-        TextEdit {
-            id: textEntryEdit
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.top: textEntryHint.bottom
-            anchors.leftMargin: 8
-            anchors.rightMargin: 8
-            anchors.bottomMargin: 8
-            anchors.topMargin: 4
-            wrapMode: TextEdit.NoWrap
-            color: surface.brushColor
-            font.pixelSize: textInputOverlay.fontPixelSize
-            focus: textInputOverlay.visible
-            cursorVisible: textInputOverlay.visible
-            Keys.onPressed: function (event) {
-                if (!textInputOverlay.visible) {
-                    return
-                }
-                if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
-                    event.accepted = true
-                    surface.commitTextEntry()
-                } else if (event.key === Qt.Key_Escape) {
-                    event.accepted = true
-                    surface.cancelTextEntry()
-                }
-            }
-        }
-    }
-
 
     onStrokesChanged: {
         if (surface.appendStrokePending) {
@@ -1787,137 +635,36 @@ Rectangle {
         anchors.fill: parent
         z: 3
         hoverEnabled: true
-        acceptedButtons: surface.toolMode === "text" ? Qt.LeftButton : Qt.NoButton
-        visible: surface.toolMode !== "grab"
-        enabled: visible
-        cursorShape: surface.toolMode === "eraser"
-            ? Qt.PointingHandCursor
-            : (surface.toolMode === "text" ? Qt.IBeamCursor : Qt.CrossCursor)
-
-        onPressed: function(mouse) {
-            if (surface.toolMode === "grab") {
-                mouse.accepted = false
-                return
-            }
-            if (surface.toolMode === "text") {
-                if (mouse.button === Qt.LeftButton) {
-                    if (textInputOverlay.visible && textEntryEdit.text.length) {
-                        surface.commitTextEntry()
-                    }
-                    surface.startTextEntry(mouse.x, mouse.y)
-                    mouse.accepted = true
-                } else {
-                    mouse.accepted = false
-                }
-                return
-            }
-            if (mouse.button !== Qt.LeftButton) {
-                mouse.accepted = false
-                return
-            }
-            mouse.accepted = false
-        }
+        acceptedButtons: Qt.NoButton
+        cursorShape: surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
 
         onWheel: function(wheel) {
-            if (wheel.modifiers === Qt.ControlModifier) {
-                wheel.accepted = false
-                return
-            }
             surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1)
-        }
-    }
-
-    Keys.onPressed: function (event) {
-        if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
-            surface.shiftHoldCount = surface.shiftHoldCount + 1
-            surface.updateConstrainAspectState()
-            event.accepted = true
-            return
-        }
-        event.accepted = false
-    }
-
-    Keys.onReleased: function (event) {
-        if (event.key === Qt.Key_Shift && !event.isAutoRepeat) {
-            surface.shiftHoldCount = Math.max(0, surface.shiftHoldCount - 1)
-            surface.updateConstrainAspectState()
-            event.accepted = true
-            return
-        }
-        event.accepted = false
-    }
-
-    onActiveFocusChanged: {
-        if (!activeFocus && surface.shiftHoldCount > 0) {
-            surface.shiftHoldCount = 0
-            surface.updateConstrainAspectState()
         }
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "B", "ㅠ" ]
+        sequences: ["B", "ㅠ"]
         onActivated: surface.toolShortcutRequested("brush")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "E", "ㄷ" ]
+        sequences: ["E", "ㄷ"]
         onActivated: surface.toolShortcutRequested("eraser")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "V", "ㅍ" ]
-        onActivated: surface.toolShortcutRequested("grab")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "T", "ㅅ" ]
-        onActivated: surface.toolShortcutRequested("text")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "[" ]
+        sequences: ["["]
         onActivated: surface.brushDeltaRequested(-1)
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [ "]" ]
+        sequences: ["]"]
         onActivated: surface.brushDeltaRequested(1)
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: !textInputOverlay.visible
-        sequences: [
-            Qt.platform.os === "osx" ? "Meta+T" : "Ctrl+T",
-            Qt.platform.os === "osx" ? "Meta+ㅅ" : "Ctrl+ㅅ"
-        ]
-        onActivated: surface.freeTransformShortcutRequested()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: surface.freeTransformActive
-        sequences: [ "Return", "Enter" ]
-        onActivated: surface.commitFreeTransform()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: surface.freeTransformActive
-        sequences: [ "Esc" ]
-        onActivated: surface.cancelFreeTransform()
     }
 
     Shortcut {
@@ -1930,37 +677,6 @@ Rectangle {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Redo
         onActivated: surface.redo()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: surface.hasImportedImage
-        sequence: StandardKey.Delete
-        onActivated: surface.clearImportedImage()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        enabled: surface.hasImportedImage
-        sequence: "Backspace"
-        onActivated: surface.clearImportedImage()
-    }
-
-    function normalizeUrl(fileUrl) {
-        if (!fileUrl) {
-            return ""
-        }
-        var url = fileUrl.toString()
-        if (url.startsWith("file://")) {
-            return url
-        }
-        if (url.indexOf("://") !== -1) {
-            return url
-        }
-        if (url.startsWith("/")) {
-            return "file://" + url
-        }
-        return Qt.resolvedUrl(url)
     }
 
     function toLocalPath(fileUrl) {

@@ -13,16 +13,16 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 
 ## 2. Configure the Release Build
 ```bash
-cmake -S . -B build-release \
+cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
-cmake --build build-release --target Vincent
+cmake --build build --target Vincent
 ```
 If you need a different bundle identifier, update `BUNDLE_ID` in `CMakeLists.txt` before configuring. Adjust the deployment target if you need to support newer or older macOS releases.
 
 ## 3. Stage the App Bundle
-The built app lives under `build-release/"Vincent 2.2.1.app"`. Copy it to a staging directory (for example, `dist/"Vincent 2.2.1.app"`) so you can safely run deployment tools without touching your build tree.
+The built app lives under `build/"Vincent 2.2.1.app"`. Copy it to a staging directory (for example, `dist/"Vincent 2.2.1.app"`) so you can safely run deployment tools without touching your build tree.
 
 ## 4. Embed Qt Frameworks
 Run `macdeployqt` in App Store mode to embed the required Qt frameworks and QML plugins:
@@ -96,6 +96,6 @@ To configure and run the current unit test suite:
 
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target tests_brushengine tests_imageimport tests_canvasdocumentviewmodel tests_canvasbackend tests_imageexport
+cmake --build build --target Vincent tests_brushengine tests_canvasdocumentviewmodel tests_canvasbackend tests_rasterdocumentio
 ctest --test-dir build --output-on-failure
 ```

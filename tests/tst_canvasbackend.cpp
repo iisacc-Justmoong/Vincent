@@ -1,5 +1,5 @@
-#include <QtTest>
 #include <QSignalSpy>
+#include <QtTest>
 
 #include "canvasbackend.h"
 
@@ -15,8 +15,7 @@ private slots:
     void capturesIndependentSnapshots();
     void managesUndoRedoHistory();
     void trimsUndoHistoryToConfiguredLimit();
-    void calculatesDocumentFitAndResetPlacement();
-    void resolvesTransformGeometry();
+    void calculatesDocumentFit();
 };
 
 QVariantMap tst_CanvasBackend::makeSnapshot(int id)
@@ -38,19 +37,14 @@ QVariantMap tst_CanvasBackend::makeSnapshot(int id)
                   }}
              }
          }},
-        {QStringLiteral("images"),
-         QVariantList{
-             QVariantMap{
-                 {QStringLiteral("imageId"), id},
-                 {QStringLiteral("source"), QStringLiteral("file:///tmp/%1.png").arg(id)},
-                 {QStringLiteral("importMetadata"),
-                  QVariantMap{
-                      {QStringLiteral("kind"), QStringLiteral("fixture")},
-                      {QStringLiteral("sequence"), id}
-                  }}
-             }
-         }},
-        {QStringLiteral("selectedImageId"), id}
+        {QStringLiteral("background"),
+         QVariantMap{
+             {QStringLiteral("source"), QStringLiteral("file:///tmp/background-%1.png").arg(id)},
+             {QStringLiteral("x"), 10 + id},
+             {QStringLiteral("y"), 20 + id},
+             {QStringLiteral("width"), 30 + id},
+             {QStringLiteral("height"), 40 + id}
+         }}
     };
 }
 
@@ -76,18 +70,15 @@ void tst_CanvasBackend::capturesIndependentSnapshots()
              }}
         }
     };
-    QVariantList images{
-        QVariantMap{
-            {QStringLiteral("imageId"), 7},
-            {QStringLiteral("importMetadata"),
-             QVariantMap{
-                 {QStringLiteral("kind"), QStringLiteral("psd")},
-                 {QStringLiteral("visible"), true}
-             }}
-        }
+    QVariantMap background{
+        {QStringLiteral("source"), QStringLiteral("file:///tmp/opened.png")},
+        {QStringLiteral("x"), 14},
+        {QStringLiteral("y"), 18},
+        {QStringLiteral("width"), 120},
+        {QStringLiteral("height"), 90}
     };
 
-    const QVariantMap snapshot = backend.captureSnapshot(320, 240, strokes, images, 7);
+    const QVariantMap snapshot = backend.captureSnapshot(320, 240, strokes, background);
 
     QVariantMap stroke = strokes[0].toMap();
     QVariantList points = stroke.value(QStringLiteral("points")).toList();
@@ -97,19 +88,17 @@ void tst_CanvasBackend::capturesIndependentSnapshots()
     stroke.insert(QStringLiteral("points"), points);
     strokes[0] = stroke;
 
-    QVariantMap image = images[0].toMap();
-    QVariantMap metadata = image.value(QStringLiteral("importMetadata")).toMap();
-    metadata.insert(QStringLiteral("kind"), QStringLiteral("changed"));
-    image.insert(QStringLiteral("importMetadata"), metadata);
-    images[0] = image;
+    background.insert(QStringLiteral("source"), QStringLiteral("file:///tmp/changed.png"));
+    background.insert(QStringLiteral("width"), 10);
 
     const QVariantMap snapshotStroke = snapshot.value(QStringLiteral("strokes")).toList()[0].toMap();
     const QVariantMap snapshotPoint = snapshotStroke.value(QStringLiteral("points")).toList()[0].toMap();
-    const QVariantMap snapshotImage = snapshot.value(QStringLiteral("images")).toList()[0].toMap();
-    const QVariantMap snapshotMetadata = snapshotImage.value(QStringLiteral("importMetadata")).toMap();
+    const QVariantMap snapshotBackground = snapshot.value(QStringLiteral("background")).toMap();
 
     QCOMPARE(snapshotPoint.value(QStringLiteral("x")).toInt(), 12);
-    QCOMPARE(snapshotMetadata.value(QStringLiteral("kind")).toString(), QStringLiteral("psd"));
+    QCOMPARE(snapshotBackground.value(QStringLiteral("source")).toString(),
+             QStringLiteral("file:///tmp/opened.png"));
+    QCOMPARE(snapshotBackground.value(QStringLiteral("width")).toInt(), 120);
 }
 
 void tst_CanvasBackend::managesUndoRedoHistory()
@@ -131,14 +120,16 @@ void tst_CanvasBackend::managesUndoRedoHistory()
     QCOMPARE(canRedoSpy.count(), 0);
 
     const QVariantMap undone = backend.undo(secondSnapshot, 8);
-    QCOMPARE(undone.value(QStringLiteral("selectedImageId")).toInt(), 1);
+    QCOMPARE(undone.value(QStringLiteral("background")).toMap().value(QStringLiteral("source")).toString(),
+             QStringLiteral("file:///tmp/background-1.png"));
     QVERIFY(!backend.canUndo());
     QVERIFY(backend.canRedo());
     QCOMPARE(canUndoSpy.count(), 2);
     QCOMPARE(canRedoSpy.count(), 1);
 
-    const QVariantMap redone = backend.redo(firstSnapshot, 8);
-    QCOMPARE(redone.value(QStringLiteral("selectedImageId")).toInt(), 2);
+    const QVariantMap redone = backend.redo(secondSnapshot, 8);
+    QCOMPARE(redone.value(QStringLiteral("background")).toMap().value(QStringLiteral("source")).toString(),
+             QStringLiteral("file:///tmp/background-2.png"));
     QVERIFY(backend.canUndo());
     QVERIFY(!backend.canRedo());
     QCOMPARE(canUndoSpy.count(), 3);
@@ -165,16 +156,16 @@ void tst_CanvasBackend::trimsUndoHistoryToConfiguredLimit()
     backend.pushUndoState(thirdSnapshot, 2);
 
     QVariantMap restored = backend.undo(fourthSnapshot, 2);
-    QCOMPARE(restored.value(QStringLiteral("selectedImageId")).toInt(), 3);
+    QCOMPARE(restored.value(QStringLiteral("canvasWidth")).toInt(), 203);
 
     restored = backend.undo(restored, 2);
-    QCOMPARE(restored.value(QStringLiteral("selectedImageId")).toInt(), 2);
+    QCOMPARE(restored.value(QStringLiteral("canvasWidth")).toInt(), 202);
 
     QVERIFY(backend.undo(restored, 2).isEmpty());
     QVERIFY(!backend.canUndo());
 }
 
-void tst_CanvasBackend::calculatesDocumentFitAndResetPlacement()
+void tst_CanvasBackend::calculatesDocumentFit()
 {
     CanvasBackend backend;
 
@@ -187,53 +178,6 @@ void tst_CanvasBackend::calculatesDocumentFitAndResetPlacement()
     compareReal(noUpscaleTransform.value(QStringLiteral("scale")).toDouble(), 1.0);
     compareReal(noUpscaleTransform.value(QStringLiteral("offsetX")).toDouble(), 30.0);
     compareReal(noUpscaleTransform.value(QStringLiteral("offsetY")).toDouble(), 40.0);
-
-    const QVariantMap placement = backend.resetImagePlacement(100, 100, 200, 50);
-    compareReal(placement.value(QStringLiteral("scaleX")).toDouble(), 0.5);
-    compareReal(placement.value(QStringLiteral("scaleY")).toDouble(), 0.5);
-    compareReal(placement.value(QStringLiteral("x")).toDouble(), 0.0);
-    compareReal(placement.value(QStringLiteral("y")).toDouble(), 37.5);
-    QVERIFY(placement.value(QStringLiteral("ready")).toBool());
-
-    QVERIFY(backend.resetImagePlacement(100, 100, 0, 50).isEmpty());
-}
-
-void tst_CanvasBackend::resolvesTransformGeometry()
-{
-    CanvasBackend backend;
-
-    const QVariantMap baseRect{
-        {QStringLiteral("x"), 10.0},
-        {QStringLiteral("y"), 20.0},
-        {QStringLiteral("w"), 100.0},
-        {QStringLiteral("h"), 80.0}
-    };
-    const QVariantMap widened = backend.resolveTransform(
-        QStringLiteral("right"), 40, 0, baseRect, 24, 300, 200, false);
-    compareReal(widened.value(QStringLiteral("x")).toDouble(), 10.0);
-    compareReal(widened.value(QStringLiteral("y")).toDouble(), 20.0);
-    compareReal(widened.value(QStringLiteral("width")).toDouble(), 140.0);
-    compareReal(widened.value(QStringLiteral("height")).toDouble(), 80.0);
-
-    const QVariantMap clamped = backend.resolveTransform(
-        QStringLiteral("topLeft"), 90, 80, baseRect, 24, 300, 200, false);
-    compareReal(clamped.value(QStringLiteral("x")).toDouble(), 86.0);
-    compareReal(clamped.value(QStringLiteral("y")).toDouble(), 76.0);
-    compareReal(clamped.value(QStringLiteral("width")).toDouble(), 24.0);
-    compareReal(clamped.value(QStringLiteral("height")).toDouble(), 24.0);
-
-    const QVariantMap constrainedRect{
-        {QStringLiteral("x"), 10.0},
-        {QStringLiteral("y"), 20.0},
-        {QStringLiteral("w"), 100.0},
-        {QStringLiteral("h"), 50.0}
-    };
-    const QVariantMap constrained = backend.resolveTransform(
-        QStringLiteral("right"), 50, 0, constrainedRect, 24, 300, 200, true);
-    compareReal(constrained.value(QStringLiteral("x")).toDouble(), 10.0);
-    compareReal(constrained.value(QStringLiteral("y")).toDouble(), 7.5);
-    compareReal(constrained.value(QStringLiteral("width")).toDouble(), 150.0);
-    compareReal(constrained.value(QStringLiteral("height")).toDouble(), 75.0);
 }
 
 QTEST_APPLESS_MAIN(tst_CanvasBackend)

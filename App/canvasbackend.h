@@ -21,8 +21,7 @@ public:
     Q_INVOKABLE QVariantMap captureSnapshot(int canvasWidth,
                                             int canvasHeight,
                                             const QVariantList &strokes,
-                                            const QVariantList &images,
-                                            int selectedImageId) const;
+                                            const QVariantMap &background) const;
     Q_INVOKABLE void pushUndoState(const QVariantMap &snapshot, int maxUndoSteps);
     Q_INVOKABLE QVariantMap undo(const QVariantMap &currentSnapshot, int maxUndoSteps);
     Q_INVOKABLE QVariantMap redo(const QVariantMap &currentSnapshot, int maxUndoSteps);
@@ -32,18 +31,6 @@ public:
                                                  int canvasHeight,
                                                  int documentWidth,
                                                  int documentHeight) const;
-    Q_INVOKABLE QVariantMap resetImagePlacement(int canvasWidth,
-                                                int canvasHeight,
-                                                int originalWidth,
-                                                int originalHeight) const;
-    Q_INVOKABLE QVariantMap resolveTransform(const QString &role,
-                                             qreal dx,
-                                             qreal dy,
-                                             const QVariantMap &startRect,
-                                             qreal minSize,
-                                             int canvasWidth,
-                                             int canvasHeight,
-                                             bool constrainAspect) const;
 
 signals:
     void canUndoChanged();

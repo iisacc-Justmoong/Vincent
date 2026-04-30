@@ -37,7 +37,6 @@ Item {
     signal brushSizeChangeRequested(real size)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
-    signal freeTransformRequested
 
     function openFileDialog() {
         openDialog.open()
@@ -61,9 +60,6 @@ Item {
 
     function defaultSaveExtension(nameFilter) {
         const suffix = (nameFilter || "").toLowerCase()
-        if (suffix.indexOf("psd") !== -1 || suffix.indexOf("photoshop") !== -1) {
-            return ".psd"
-        }
         if (suffix.indexOf("jpeg") !== -1 || suffix.indexOf("jpg") !== -1) {
             return ".jpg"
         }
@@ -142,7 +138,7 @@ Item {
         id: openDialog
         title: qsTr("Open Image")
         fileMode: Dialogs.FileDialog.OpenFile
-        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")]
+        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff)")]
         onAccepted: {
             const urlString = toolbar.selectedDialogFileUrl(openDialog)
             if (urlString.length) {
@@ -158,8 +154,7 @@ Item {
         nameFilters: [
             qsTr("PNG Image (*.png)"),
             qsTr("JPEG Image (*.jpg *.jpeg)"),
-            qsTr("Bitmap Image (*.bmp)"),
-            qsTr("Photoshop Document (*.psd)")
+            qsTr("Bitmap Image (*.bmp)")
         ]
         onAccepted: {
             var urlString = toolbar.selectedDialogFileUrl(saveDialog)
@@ -239,7 +234,7 @@ Item {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
                 iconName: "virtualFolder"
-                Accessible.name: qsTr("Open image")
+                Accessible.name: qsTr("Open raster image")
                 onClicked: toolbar.openFileDialog()
             }
 
@@ -281,22 +276,6 @@ Item {
                 iconName: "eraser"
                 Accessible.name: qsTr("Eraser tool")
                 onClicked: toolbar.toolSelected("eraser")
-            }
-
-            LV.IconButton {
-                iconSize: 20
-                tone: toolbar.currentTool === "grab" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "generallocate"
-                Accessible.name: qsTr("Grab tool")
-                onClicked: toolbar.toolSelected("grab")
-            }
-
-            LV.IconButton {
-                iconSize: 20
-                tone: toolbar.currentTool === "text" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "textGeneration"
-                Accessible.name: qsTr("Text tool")
-                onClicked: toolbar.toolSelected("text")
             }
         }
 

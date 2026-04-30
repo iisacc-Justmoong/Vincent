@@ -79,16 +79,12 @@ Item {
         painterPage.updateDocumentProperty("toolMode", tool)
     }
 
-    function toggleFreeTransformMode() {
-        drawingSurface.toggleFreeTransformMode()
-    }
-
     function saveCanvasAs(fileUrl) {
         drawingSurface.saveToFile(fileUrl)
     }
 
-    function openImage(fileUrl) {
-        drawingSurface.loadImage(fileUrl)
+    function openRaster(fileUrl) {
+        drawingSurface.openRaster(fileUrl)
     }
 
     Item {
@@ -110,7 +106,6 @@ Item {
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onBrushDeltaRequested: (delta) => painterPage.adjustBrush(delta)
                 onToolShortcutRequested: (tool) => painterPage.setToolMode(tool)
-                onFreeTransformShortcutRequested: painterPage.toggleFreeTransformMode()
             }
         }
 
@@ -133,8 +128,7 @@ Item {
             onColorPicked: (swatchColor) => painterPage.setBrushColor(swatchColor)
             onToolSelected: (tool) => painterPage.setToolMode(tool)
             onSaveRequested: (fileUrl) => painterPage.saveCanvasAs(fileUrl)
-            onOpenRequested: (fileUrl) => painterPage.openImage(fileUrl)
-            onFreeTransformRequested: painterPage.toggleFreeTransformMode()
+            onOpenRequested: (fileUrl) => painterPage.openRaster(fileUrl)
         }
     }
 }

@@ -1,6 +1,6 @@
 # Vincent 2.2.1
 
-Vincent 2.2.1 is a minimalist painting app built with Qt 6.
+Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 
 ## System Requirements
 - macOS 12 or later (Apple Silicon or Intel)
@@ -22,27 +22,24 @@ Vincent 2.2.1 is a minimalist painting app built with Qt 6.
 
 ## Features at a Glance
 - Pressure-sensitive size and opacity for stylus brush and eraser strokes
-- PSD import that can split document layers into separate in-app layers while capturing PSD metadata at import time
-- PSD export that preserves imported layers and writes canvas strokes as a top `Paint` layer
-- LVRS-backed MVVM document state with a C++ canvas document view model and layer list model
-- C++ canvas backend for undo/redo snapshots, document fit, and free-transform geometry resolution
-- Brush, eraser, grab, and text tools
-- Layer panel for selecting imported layers and toggling visibility
-- Quick color palette and brush size controls
-- Save canvases to PNG
+- Drawing-only document model with a single flat raster canvas
+- Flat raster open flow for common image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF
+- Flat raster save flow for PNG, JPEG, and BMP
+- LVRS-backed MVVM document state with a compact C++ canvas document view model
+- C++ canvas backend for undo/redo snapshots and document-fit placement
+- Brush and eraser tools with quick color palette and brush size controls
 
 ## Testing
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target tests_brushengine tests_imageimport tests_canvasdocumentviewmodel tests_canvasbackend tests_imageexport
+cmake --build build --target Vincent tests_brushengine tests_canvasdocumentviewmodel tests_canvasbackend tests_rasterdocumentio
 ctest --test-dir build --output-on-failure
 ```
 
 ## Known Limitations
-- No shape tools or fill bucket yet
-- Strokes are rasterized and cannot be re-selected
-- Stroke rasterization still lives in the QML `Canvas`; only snapshot history and transform math have moved to the C++ canvas backend so far
-- PSD export currently writes 8-bit raw RGB+alpha documents and rasterizes live strokes into a single `Paint` layer
+- No layer stack, PSD import/export, blend modes, or transform tools
+- No shape tools, fill bucket, or text tool
+- Opened raster images are fit onto the current canvas and then edited as part of the flat drawing surface
+- Stroke rasterization still lives in the QML `Canvas`
 - Palette is fixed to the built-in colors
-- Canvas size follows the window size
-- PSD blend modes are preserved as metadata, but rendering currently uses standard alpha compositing
+- Canvas size follows the current drawing surface when you create a new canvas
