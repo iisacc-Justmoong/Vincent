@@ -10,6 +10,7 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 - A macOS App Store provisioning profile that matches your bundle identifier.
 - Xcode command-line tools (`xcode-select --install`) and Transporter from the Mac App Store.
 - Qt toolchain (Core, Qml, Quick, QuickControls2, Svg) available in your `PATH` so that `macdeployqt` is callable.
+- iiPaintEngine installed under `$HOME/.local/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
 
 ## 2. Configure the Release Build
 ```bash
@@ -96,6 +97,6 @@ To configure and run the current unit test suite:
 
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build --target Vincent tests_brushengine tests_canvasdocumentviewmodel tests_canvasbackend tests_rasterdocumentio
+cmake --build build --target Vincent tests_canvasdocumentviewmodel tests_drawingsurfaceitem
 ctest --test-dir build --output-on-failure
 ```

@@ -84,6 +84,17 @@ if(EXISTS "${_vincent_lvrs_prefix}/LVRSConfig.cmake")
 endif()
 unset(_vincent_lvrs_prefix)
 
+# 로컬 iiPaintEngine 설치 경로 힌트(.local) 우선 반영
+set(_vincent_iipaintengine_prefix "$ENV{HOME}/.local/iiPaintEngine")
+if(EXISTS "${_vincent_iipaintengine_prefix}/lib/cmake/iiPaintEngine/iiPaintEngineConfig.cmake")
+    list(FIND CMAKE_PREFIX_PATH "${_vincent_iipaintengine_prefix}" _vincent_iipaintengine_index)
+    if(_vincent_iipaintengine_index EQUAL -1)
+        list(PREPEND CMAKE_PREFIX_PATH "${_vincent_iipaintengine_prefix}")
+    endif()
+    unset(_vincent_iipaintengine_index)
+endif()
+unset(_vincent_iipaintengine_prefix)
+
 # 요구 버전
 set(QT_MIN_VERSION "6.8.0")
 
@@ -97,6 +108,7 @@ if(BUILD_TESTING)
     find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Test)
 endif()
 find_package(LVRS CONFIG REQUIRED)
+find_package(iiPaintEngine CONFIG REQUIRED)
 
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
@@ -166,6 +178,7 @@ endif()
 # 링크
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
+        iiPaintEngine::iiPaintEngine
 )
 
 # LVRS QML 모듈 링크 및 import 경로/정적 플러그인 자동 처리

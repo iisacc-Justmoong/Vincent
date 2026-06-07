@@ -1,79 +1,45 @@
 #include "drawingsurfaceitem.h"
 
-#include "drawingdocumentcontroller.h"
-#include "drawingstrokecontroller.h"
-#include "paintingdocumentmodel.h"
-#include "../brush/brushstrokebuilder.h"
 #include "../canvas/canvasviewmodelbridge.h"
-#include "../file/canvasfileadapter.h"
 
-#include <QPainter>
+#include <QEvent>
+#include <QMouseEvent>
+#include <QPointF>
+#include <QRectF>
+#include <QSize>
+#include <QUrl>
 #include <QtGlobal>
 
 namespace {
 
-constexpr int kMaxUndoSteps = 64;
-
-QString normalizedToolMode(const QString &toolMode)
+QString localFileSource(const QString &fileUrl)
 {
-    return toolMode == QStringLiteral("eraser") ? QStringLiteral("eraser") : QStringLiteral("brush");
+    const QUrl url(fileUrl);
+    if (url.isValid() && url.isLocalFile()) {
+        return url.toString();
+    }
+    return QUrl::fromLocalFile(fileUrl).toString();
+}
+
+bool isTabletEvent(QEvent::Type type)
+{
+    return type == QEvent::TabletPress
+        || type == QEvent::TabletMove
+        || type == QEvent::TabletRelease;
 }
 
 } // namespace
 
 DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
-    : QQuickPaintedItem(parent)
+    : CanvasAdapter(parent)
     , m_viewModelBridge(new CanvasViewModelBridge())
-    , m_brushBuilder(new BrushStrokeBuilder())
-    , m_fileAdapter(new CanvasFileAdapter())
-    , m_paintingModel(new PaintingDocumentModel(this))
-    , m_documentController(new DrawingDocumentController(m_paintingModel, m_fileAdapter, m_brushBuilder))
-    , m_strokeController(new DrawingStrokeController(m_brushBuilder, m_paintingModel))
 {
-    setAntialiasing(true);
-    setOpaquePainting(true);
-    setFillColor(Qt::transparent);
-
-    connect(m_paintingModel, &PaintingDocumentModel::canUndoChanged, this, &DrawingSurfaceItem::canUndoChanged);
-    connect(m_paintingModel, &PaintingDocumentModel::canRedoChanged, this, &DrawingSurfaceItem::canRedoChanged);
-    connect(m_paintingModel, &PaintingDocumentModel::strokeCountChanged, this, [this]() {
-        emit strokeCountChanged();
-        update();
-    });
-    connect(m_paintingModel, &PaintingDocumentModel::backgroundChanged, this, [this]() {
-        emit backgroundChanged();
-        update();
-    });
+    connect(this, &CanvasAdapter::undoRedoChanged, this, &DrawingSurfaceItem::emitUndoRedoSignals);
 }
 
 DrawingSurfaceItem::~DrawingSurfaceItem()
 {
-    delete m_strokeController;
-    delete m_documentController;
-    delete m_fileAdapter;
-    delete m_brushBuilder;
     delete m_viewModelBridge;
-}
-
-void DrawingSurfaceItem::paint(QPainter *painter)
-{
-    painter->setRenderHint(QPainter::Antialiasing, true);
-    m_paintingModel->render(painter, *m_brushBuilder, m_brushSize);
-}
-
-QColor DrawingSurfaceItem::brushColor() const
-{
-    return m_brushColor;
-}
-
-qreal DrawingSurfaceItem::brushSize() const
-{
-    return m_brushSize;
-}
-
-QString DrawingSurfaceItem::toolMode() const
-{
-    return m_toolMode;
 }
 
 QObject *DrawingSurfaceItem::documentViewModel() const
@@ -88,56 +54,12 @@ QString DrawingSurfaceItem::viewId() const
 
 QString DrawingSurfaceItem::backgroundSource() const
 {
-    return m_paintingModel->backgroundSource();
+    return m_backgroundSource;
 }
 
 bool DrawingSurfaceItem::hasBackground() const
 {
-    return m_paintingModel->hasBackground();
-}
-
-int DrawingSurfaceItem::strokeCount() const
-{
-    return m_paintingModel->strokeCount();
-}
-
-bool DrawingSurfaceItem::canUndo() const
-{
-    return m_paintingModel->canUndo();
-}
-
-bool DrawingSurfaceItem::canRedo() const
-{
-    return m_paintingModel->canRedo();
-}
-
-void DrawingSurfaceItem::setBrushColor(const QColor &brushColor)
-{
-    if (m_brushColor == brushColor) {
-        return;
-    }
-    m_brushColor = brushColor;
-    emit brushColorChanged();
-}
-
-void DrawingSurfaceItem::setBrushSize(qreal brushSize)
-{
-    const qreal boundedSize = qBound<qreal>(1.0, brushSize, 48.0);
-    if (qFuzzyCompare(m_brushSize, boundedSize)) {
-        return;
-    }
-    m_brushSize = boundedSize;
-    emit brushSizeChanged();
-}
-
-void DrawingSurfaceItem::setToolMode(const QString &toolMode)
-{
-    const QString normalizedTool = normalizedToolMode(toolMode);
-    if (m_toolMode == normalizedTool) {
-        return;
-    }
-    m_toolMode = normalizedTool;
-    emit toolModeChanged();
+    return m_hasBackground;
 }
 
 void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
@@ -147,8 +69,14 @@ void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
     }
 
     m_viewModelBridge->setDocumentViewModel(documentViewModel);
-    m_viewModelBridge->syncToolState(m_brushColor, m_brushSize, m_toolMode);
-    m_viewModelBridge->syncCanvasSize(width(), height());
+    QColor nextBrushColor = brushColor();
+    qreal nextBrushSize = brushSize();
+    QString nextToolMode = toolMode();
+    m_viewModelBridge->syncToolState(nextBrushColor, nextBrushSize, nextToolMode);
+    setBrushColor(nextBrushColor);
+    setBrushSize(nextBrushSize);
+    setToolMode(nextToolMode);
+    syncCanvasSize();
     emit documentViewModelChanged();
 }
 
@@ -166,87 +94,151 @@ void DrawingSurfaceItem::newCanvas()
     if (!canMutateDocument()) {
         return;
     }
-    m_viewModelBridge->syncCanvasSize(width(), height());
-    m_documentController->newCanvas(canvasSize(), kMaxUndoSteps);
+
+    syncCanvasSize();
+    const bool created = CanvasAdapter::newCanvas(canvasSize().width(), canvasSize().height());
+    if (created && m_hasBackground) {
+        m_hasBackground = false;
+        m_backgroundSource.clear();
+        emit backgroundChanged();
+    }
 }
 
 void DrawingSurfaceItem::clearCanvas()
 {
-    if (!canMutateDocument()) {
-        return;
-    }
-    m_documentController->clearCanvas(canvasSize(), kMaxUndoSteps);
+    newCanvas();
 }
 
 bool DrawingSurfaceItem::openRaster(const QString &fileUrl)
 {
-    return canMutateDocument() && m_documentController->openRaster(fileUrl, canvasSize(), kMaxUndoSteps);
+    if (!canMutateDocument()) {
+        return false;
+    }
+
+    const bool opened = CanvasAdapter::openRaster(fileUrl);
+    if (!opened) {
+        return false;
+    }
+
+    m_backgroundSource = localFileSource(fileUrl);
+    m_hasBackground = true;
+    syncCanvasSize();
+    emit backgroundChanged();
+    return true;
 }
 
-bool DrawingSurfaceItem::saveToFile(const QString &fileUrl) const
+bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
-    return m_documentController->saveToFile(fileUrl, canvasSize(), m_brushSize);
+    return CanvasAdapter::saveToFile(fileUrl);
 }
 
 void DrawingSurfaceItem::undo()
 {
-    if (!canMutateDocument()) {
-        return;
-    }
-    m_documentController->undo(canvasSize(), kMaxUndoSteps);
+    const bool applied = CanvasAdapter::undo();
+    Q_UNUSED(applied)
 }
 
 void DrawingSurfaceItem::redo()
 {
-    if (!canMutateDocument()) {
-        return;
-    }
-    m_documentController->redo(canvasSize(), kMaxUndoSteps);
+    const bool applied = CanvasAdapter::redo();
+    Q_UNUSED(applied)
 }
 
 void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
+    Q_UNUSED(rawPressure)
+    Q_UNUSED(pressureSensitive)
+
     if (!canMutateDocument()) {
         return;
     }
-    if (m_toolMode != QStringLiteral("brush") && m_toolMode != QStringLiteral("eraser")) {
-        return;
-    }
 
-    m_strokeController->beginStroke(m_toolMode,
-                                    m_brushColor,
-                                    m_brushSize,
-                                    pointX,
-                                    pointY,
-                                    rawPressure,
-                                    pressureSensitive,
-                                    canvasSize().width(),
-                                    canvasSize().height(),
-                                    kMaxUndoSteps);
+    QMouseEvent event = makeMouseEvent(QEvent::MouseButtonPress,
+                                       pointX,
+                                       pointY,
+                                       Qt::LeftButton,
+                                       Qt::LeftButton);
+    CanvasAdapter::mousePressEvent(&event);
 }
 
 bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    const bool appended = m_strokeController->appendStrokePoint(pointX, pointY, rawPressure, pressureSensitive);
-    if (appended) {
-        update();
+    Q_UNUSED(rawPressure)
+    Q_UNUSED(pressureSensitive)
+
+    if (!canMutateDocument()) {
+        return false;
     }
-    return appended;
+
+    QMouseEvent event = makeMouseEvent(QEvent::MouseMove,
+                                       pointX,
+                                       pointY,
+                                       Qt::NoButton,
+                                       Qt::LeftButton);
+    CanvasAdapter::mouseMoveEvent(&event);
+    return true;
 }
 
 void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    m_strokeController->endStroke(pointX, pointY, rawPressure, pressureSensitive);
+    Q_UNUSED(rawPressure)
+    Q_UNUSED(pressureSensitive)
+
+    if (!canMutateDocument()) {
+        return;
+    }
+
+    QMouseEvent event = makeMouseEvent(QEvent::MouseButtonRelease,
+                                       pointX,
+                                       pointY,
+                                       Qt::LeftButton,
+                                       Qt::NoButton);
+    CanvasAdapter::mouseReleaseEvent(&event);
+}
+
+bool DrawingSurfaceItem::event(QEvent *event)
+{
+    if (event && isTabletEvent(event->type()) && !canMutateDocument()) {
+        event->accept();
+        return true;
+    }
+    return CanvasAdapter::event(event);
+}
+
+void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
+{
+    if (!canMutateDocument()) {
+        event->accept();
+        return;
+    }
+    CanvasAdapter::mousePressEvent(event);
+}
+
+void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!canMutateDocument()) {
+        event->accept();
+        return;
+    }
+    CanvasAdapter::mouseMoveEvent(event);
+}
+
+void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (!canMutateDocument()) {
+        event->accept();
+        return;
+    }
+    CanvasAdapter::mouseReleaseEvent(event);
 }
 
 void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
-    QQuickPaintedItem::geometryChange(newGeometry, oldGeometry);
+    CanvasAdapter::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() == oldGeometry.size()) {
         return;
     }
-    m_viewModelBridge->syncCanvasSize(newGeometry.width(), newGeometry.height());
-    update();
+    syncCanvasSize();
 }
 
 QSize DrawingSurfaceItem::canvasSize() const
@@ -257,4 +249,31 @@ QSize DrawingSurfaceItem::canvasSize() const
 bool DrawingSurfaceItem::canMutateDocument() const
 {
     return m_viewModelBridge->canMutateDocument();
+}
+
+void DrawingSurfaceItem::syncCanvasSize()
+{
+    m_viewModelBridge->syncCanvasSize(width(), height());
+}
+
+void DrawingSurfaceItem::emitUndoRedoSignals()
+{
+    emit canUndoChanged();
+    emit canRedoChanged();
+}
+
+QMouseEvent DrawingSurfaceItem::makeMouseEvent(QEvent::Type eventType,
+                                               qreal pointX,
+                                               qreal pointY,
+                                               Qt::MouseButton button,
+                                               Qt::MouseButtons buttons) const
+{
+    const QPointF position{pointX, pointY};
+    return QMouseEvent{eventType,
+                       position,
+                       position,
+                       position,
+                       button,
+                       buttons,
+                       Qt::NoModifier};
 }

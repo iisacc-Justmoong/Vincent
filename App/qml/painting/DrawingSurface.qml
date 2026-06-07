@@ -49,55 +49,6 @@ Rectangle {
         viewId: surface.viewId
     }
 
-    PointHandler {
-        id: stylusStrokeHandler
-        parent: canvasSurface
-        acceptedPointerTypes: PointerDevice.Pen | PointerDevice.Eraser
-        enabled: surface.toolMode === "brush" || surface.toolMode === "eraser"
-        target: null
-
-        onActiveChanged: {
-            if (active) {
-                surface.forceActiveFocus()
-                canvasSurface.beginStroke(point.position.x, point.position.y, point.pressure, true)
-            } else {
-                canvasSurface.endStroke(point.position.x, point.position.y, point.pressure, true)
-            }
-        }
-
-        onPointChanged: {
-            if (!active) {
-                return
-            }
-            canvasSurface.appendStrokePoint(point.position.x, point.position.y, point.pressure, true)
-        }
-    }
-
-    PointHandler {
-        id: mouseStrokeHandler
-        parent: canvasSurface
-        acceptedDevices: PointerDevice.Mouse
-        acceptedButtons: Qt.LeftButton
-        enabled: surface.toolMode === "brush" || surface.toolMode === "eraser"
-        target: null
-
-        onActiveChanged: {
-            if (active) {
-                surface.forceActiveFocus()
-                canvasSurface.beginStroke(point.position.x, point.position.y, 1.0, false)
-            } else {
-                canvasSurface.endStroke(point.position.x, point.position.y, 1.0, false)
-            }
-        }
-
-        onPointChanged: {
-            if (!active) {
-                return
-            }
-            canvasSurface.appendStrokePoint(point.position.x, point.position.y, 1.0, false)
-        }
-    }
-
     MouseArea {
         parent: canvasSurface
         anchors.fill: parent

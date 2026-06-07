@@ -23,36 +23,14 @@ target_sources(Vincent PRIVATE
         main.cpp
         metatypes_dummy.cpp
         metatypes_dummy.h
-        models/brush/brushengine.cpp
-        models/brush/brushengine.h
-        models/brush/brushstrokebuilder.cpp
-        models/brush/brushstrokebuilder.h
         models/brush/paletteutils.cpp
         models/brush/paletteutils.h
-        models/canvas/canvasbackend.cpp
-        models/canvas/canvasbackend.h
         models/canvas/canvasdocumentviewmodel.cpp
         models/canvas/canvasdocumentviewmodel.h
         models/canvas/canvasviewmodelbridge.cpp
         models/canvas/canvasviewmodelbridge.h
-        models/file/canvasfileadapter.cpp
-        models/file/canvasfileadapter.h
-        models/file/rasterdocumentio.cpp
-        models/file/rasterdocumentio.h
-        models/painting/drawingdocumentcontroller.cpp
-        models/painting/drawingdocumentcontroller.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
-        models/painting/drawingstrokecontroller.cpp
-        models/painting/drawingstrokecontroller.h
-        models/painting/paintingbackgroundstate.cpp
-        models/painting/paintingbackgroundstate.h
-        models/painting/paintingdocumentmodel.cpp
-        models/painting/paintingdocumentmodel.h
-        models/painting/paintinghistorycontroller.cpp
-        models/painting/paintinghistorycontroller.h
-        models/painting/paintingrenderer.cpp
-        models/painting/paintingrenderer.h
         resources.qrc
 )
 
@@ -60,6 +38,5 @@ target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/models/brush
         ${CMAKE_CURRENT_SOURCE_DIR}/models/canvas
-        ${CMAKE_CURRENT_SOURCE_DIR}/models/file
         ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
 )
