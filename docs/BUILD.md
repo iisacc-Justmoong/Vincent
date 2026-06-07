@@ -83,6 +83,7 @@ This produces the installer payload required by App Store Connect. Keep the `.pk
 - Leverage `plutil -p` to inspect `Info.plist` after `macdeployqt` runs.
 - If Transporter rejects the upload due to missing `LC_VERSION_MIN_MACOSX`, make sure `CMAKE_OSX_DEPLOYMENT_TARGET` is set at configure time.
 - Should you require notarization for outside-the-store distribution, rerun codesigning with the same entitlements and submit via `xcrun notarytool`; App Store submissions do not need separate notarization.
+- If CLion reports `loading 'build.ninja': No such file or directory`, rerun CMake configure for the selected profile before building. The project also injects local build-tree rpaths for `$HOME/.local/LVRS` and `$HOME/.local/iiPaintEngine` so CLion and CTest can run without extra `DYLD_LIBRARY_PATH` setup.
 
 ## Linux Build and Packaging
 ```bash

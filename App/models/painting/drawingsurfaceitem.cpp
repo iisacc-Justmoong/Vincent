@@ -144,6 +144,24 @@ void DrawingSurfaceItem::redo()
     Q_UNUSED(applied)
 }
 
+void DrawingSurfaceItem::resizeCanvasSurface(qreal canvasWidth, qreal canvasHeight)
+{
+    const qreal boundedWidth = qMax<qreal>(1.0, qRound(canvasWidth));
+    const qreal boundedHeight = qMax<qreal>(1.0, qRound(canvasHeight));
+
+    if (qFuzzyCompare(width(), boundedWidth) && qFuzzyCompare(height(), boundedHeight)) {
+        syncCanvasSize();
+        return;
+    }
+
+    m_isApplyingCanvasSurfaceSize = true;
+    setWidth(boundedWidth);
+    setHeight(boundedHeight);
+    m_isApplyingCanvasSurfaceSize = false;
+
+    syncCanvasSize();
+}
+
 void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
     Q_UNUSED(rawPressure)
@@ -236,6 +254,9 @@ void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF 
 {
     CanvasAdapter::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() == oldGeometry.size()) {
+        return;
+    }
+    if (m_isApplyingCanvasSurfaceSize) {
         return;
     }
     syncCanvasSize();

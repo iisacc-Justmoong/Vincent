@@ -17,6 +17,7 @@ target_link_libraries(tests_canvasdocumentviewmodel PRIVATE
         Qt6::Gui
         Qt6::Test
 )
+vincent_configure_local_runtime_paths(tests_canvasdocumentviewmodel)
 
 add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmodel)
 
@@ -42,10 +43,12 @@ target_include_directories(tests_drawingsurfaceitem PRIVATE
 target_link_libraries(tests_drawingsurfaceitem PRIVATE
         Qt6::Core
         Qt6::Gui
+        Qt6::Qml
         Qt6::Quick
         Qt6::Test
         iiPaintEngine::iiPaintEngine
 )
+vincent_configure_local_runtime_paths(tests_drawingsurfaceitem)
 
 add_test(NAME tests_drawingsurfaceitem COMMAND tests_drawingsurfaceitem)
 

@@ -54,6 +54,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
+- Uses the available surface size as the initial canvas size while the document model still has its default 1x1 dimensions.
 - Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, and toolbar state binding.
 
 ## Core C++ Components
@@ -63,6 +64,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 - Inherits `CanvasAdapter` from iiPaintEngine.
 - Preserves Vincent's previous QML-facing commands such as `newCanvas`, `openRaster`, `saveToFile`, `undo`, `redo`, and compatibility stroke methods.
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
+- Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
 
 ### `CanvasDocumentViewModel`

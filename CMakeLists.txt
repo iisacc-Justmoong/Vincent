@@ -110,6 +110,25 @@ endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
 
+set(_vincent_local_dependency_runtime_paths)
+foreach(_vincent_runtime_prefix IN ITEMS
+        "$ENV{HOME}/.local/LVRS/platforms/macos"
+        "$ENV{HOME}/.local/LVRS"
+        "$ENV{HOME}/.local/iiPaintEngine/platforms/macos"
+        "$ENV{HOME}/.local/iiPaintEngine")
+    if(EXISTS "${_vincent_runtime_prefix}/lib")
+        list(APPEND _vincent_local_dependency_runtime_paths "${_vincent_runtime_prefix}/lib")
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES _vincent_local_dependency_runtime_paths)
+
+function(vincent_configure_local_runtime_paths target_name)
+    if(_vincent_local_dependency_runtime_paths)
+        set_property(TARGET ${target_name} APPEND PROPERTY
+                BUILD_RPATH "${_vincent_local_dependency_runtime_paths}")
+    endif()
+endfunction()
+
 qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 
 # 실행 타깃
@@ -180,6 +199,7 @@ target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
         iiPaintEngine::iiPaintEngine
 )
+vincent_configure_local_runtime_paths(Vincent)
 
 # LVRS QML 모듈 링크 및 import 경로/정적 플러그인 자동 처리
 set_target_properties(Vincent PROPERTIES

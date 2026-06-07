@@ -17,36 +17,72 @@ Rectangle {
     property int canvasWidth: 1
     property int canvasHeight: 1
     property string toolMode: "brush"
+    property bool canvasItemReady: false
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
 
+    function resolvedCanvasWidth() {
+        return Math.max(1, surface.canvasWidth > 1 ? surface.canvasWidth : Math.round(surface.width));
+    }
+
+    function resolvedCanvasHeight() {
+        return Math.max(1, surface.canvasHeight > 1 ? surface.canvasHeight : Math.round(surface.height));
+    }
+
+    function syncCanvasItemSize() {
+        if (!canvasItemReady) {
+            return;
+        }
+        canvasSurface.resizeCanvasSurface(resolvedCanvasWidth(), resolvedCanvasHeight());
+    }
+
     function newCanvas() {
-        canvasSurface.newCanvas()
+        canvasSurface.newCanvas();
     }
 
     function clearCanvas() {
-        canvasSurface.clearCanvas()
+        canvasSurface.clearCanvas();
     }
 
     function openRaster(fileUrl) {
-        return canvasSurface.openRaster(fileUrl ? fileUrl.toString() : "")
+        return canvasSurface.openRaster(fileUrl ? fileUrl.toString() : "");
     }
 
     function saveToFile(fileUrl) {
-        return canvasSurface.saveToFile(fileUrl ? fileUrl.toString() : "")
+        return canvasSurface.saveToFile(fileUrl ? fileUrl.toString() : "");
     }
+
+    onWidthChanged: {
+        if (surface.canvasWidth <= 1) {
+            syncCanvasItemSize();
+        }
+    }
+
+    onHeightChanged: {
+        if (surface.canvasHeight <= 1) {
+            syncCanvasItemSize();
+        }
+    }
+
+    onCanvasWidthChanged: syncCanvasItemSize()
+    onCanvasHeightChanged: syncCanvasItemSize()
 
     DrawingSurfaceItem {
         id: canvasSurface
         anchors.centerIn: parent
-        width: Math.max(1, surface.canvasWidth)
-        height: Math.max(1, surface.canvasHeight)
+        width: 1
+        height: 1
         brushColor: surface.brushColor
         brushSize: surface.brushSize
         toolMode: surface.toolMode
         documentViewModel: surface.documentViewModel
         viewId: surface.viewId
+
+        Component.onCompleted: {
+            surface.canvasItemReady = true;
+            surface.syncCanvasItemSize();
+        }
     }
 
     MouseArea {
@@ -57,8 +93,8 @@ Rectangle {
         acceptedButtons: Qt.NoButton
         cursorShape: surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
 
-        onWheel: function(wheel) {
-            surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1)
+        onWheel: function (wheel) {
+            surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);
         }
     }
 

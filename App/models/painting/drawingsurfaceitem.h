@@ -34,6 +34,7 @@ public:
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
+    Q_INVOKABLE void resizeCanvasSurface(qreal canvasWidth, qreal canvasHeight);
     Q_INVOKABLE void beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
     Q_INVOKABLE bool appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
     Q_INVOKABLE void endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
@@ -67,4 +68,5 @@ private:
     QString m_viewId;
     QString m_backgroundSource;
     bool m_hasBackground = false;
+    bool m_isApplyingCanvasSurfaceSize = false;
 };
