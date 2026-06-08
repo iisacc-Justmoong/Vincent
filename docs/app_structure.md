@@ -35,6 +35,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 ### `Main.qml`
 
 - Creates the main LVRS application window.
+- Removes the native title bar through `Qt.Window | Qt.FramelessWindowHint` on the application window flags.
 - Hosts `PainterCanvasPage` as the single content view.
 
 ### `PainterCanvasPage.qml`
@@ -47,6 +48,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Provides the drawing-only command bar.
 - Exposes actions for new, open, save, and clear.
+- Renders the command bar inside a full-height solid round cylinder background.
 - Uses LVRS-rendered icon selections for open, save, and brush while leaving the clear-canvas delete icon unchanged.
 - Restricts tools to brush and eraser.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.

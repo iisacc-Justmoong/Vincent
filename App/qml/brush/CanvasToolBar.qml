@@ -435,10 +435,11 @@ Item {
         anchors.rightMargin: toolbar.spacingSmall
         anchors.topMargin: toolbar.spacingSmall
         anchors.bottomMargin: toolbar.spacingSmall
-        radius: LV.Theme.radiusLg
+        radius: height / 2
+        clip: true
         color: LV.Theme.panelBackground03
         border.width: 1
-        border.color: Qt.rgba(255, 255, 255, 0.08)
+        border.color: Qt.rgba(255, 255, 255, 0.16)
     }
 
     MouseArea {

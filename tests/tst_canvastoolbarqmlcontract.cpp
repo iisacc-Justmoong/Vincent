@@ -11,6 +11,7 @@ private slots:
     void colorSelectionUsesHslTrianglePicker();
     void usesSelectedToolbarIconsExceptClearCanvas();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
+    void toolbarUsesFullRoundSolidCylinderBackground();
 };
 
 void tst_CanvasToolBarQmlContract::brushReselectionOpensBrushSettingsMenu()
@@ -114,6 +115,29 @@ void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIn
     QVERIFY(increaseIndex >= 0);
     QVERIFY(decreaseIndex < sliderIndex);
     QVERIFY(sliderIndex < increaseIndex);
+}
+
+void tst_CanvasToolBarQmlContract::toolbarUsesFullRoundSolidCylinderBackground()
+{
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+
+    QFile toolbarQml(toolbarQmlPath);
+    QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
+
+    const qsizetype backgroundIndex = toolbarSource.indexOf(QStringLiteral("id: floatingBackground"));
+    const qsizetype layoutIndex = toolbarSource.indexOf(QStringLiteral("id: toolbarLayout"));
+    QVERIFY(backgroundIndex >= 0);
+    QVERIFY(layoutIndex > backgroundIndex);
+
+    const QString backgroundBlock = toolbarSource.mid(backgroundIndex, layoutIndex - backgroundIndex);
+    QVERIFY(backgroundBlock.contains(QStringLiteral("radius: height / 2")));
+    QVERIFY(backgroundBlock.contains(QStringLiteral("color: LV.Theme.panelBackground03")));
+    QVERIFY(!backgroundBlock.contains(QStringLiteral("gradient: Gradient")));
+    QVERIFY(!backgroundBlock.contains(QStringLiteral("GradientStop")));
+    QVERIFY(!backgroundBlock.contains(QStringLiteral("anchors.top: parent.top")));
+    QVERIFY(!backgroundBlock.contains(QStringLiteral("radius: LV.Theme.radiusLg")));
 }
 
 QTEST_APPLESS_MAIN(tst_CanvasToolBarQmlContract)

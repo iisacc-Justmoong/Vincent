@@ -10,6 +10,7 @@ LV.ApplicationWindow {
     height: initialHeight
     minimumWidth: initialWidth
     minimumHeight: initialHeight
+    flags: Qt.Window | Qt.FramelessWindowHint
     visible: true
     windowColor: LV.Theme.window
     solidChrome: false
