@@ -574,14 +574,6 @@ Item {
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
             }
 
-            LV.IconButton {
-                iconSize: 20
-                tone: LV.AbstractButton.Borderless
-                iconName: "imagezoomIn"
-                Accessible.name: qsTr("Increase brush size")
-                onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
-            }
-
             Controls.Slider {
                 id: sizeSlider
                 from: 1
@@ -628,6 +620,14 @@ Item {
                     border.width: 1
                     border.color: sizeSlider.pressed ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(0, 0, 0, 0.38)
                 }
+            }
+
+            LV.IconButton {
+                iconSize: 20
+                tone: LV.AbstractButton.Borderless
+                iconName: "imagezoomIn"
+                Accessible.name: qsTr("Increase brush size")
+                onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
             }
         }
 

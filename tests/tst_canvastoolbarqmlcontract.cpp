@@ -10,6 +10,7 @@ private slots:
     void brushReselectionOpensBrushSettingsMenu();
     void colorSelectionUsesHslTrianglePicker();
     void usesSelectedToolbarIconsExceptClearCanvas();
+    void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
 };
 
 void tst_CanvasToolBarQmlContract::brushReselectionOpensBrushSettingsMenu()
@@ -93,6 +94,26 @@ void tst_CanvasToolBarQmlContract::usesSelectedToolbarIconsExceptClearCanvas()
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"imageClassification\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"rendererKit\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"clearOutputs\"")));
+}
+
+void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIncrease()
+{
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+
+    QFile toolbarQml(toolbarQmlPath);
+    QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
+
+    const qsizetype decreaseIndex = toolbarSource.indexOf(QStringLiteral("Accessible.name: qsTr(\"Decrease brush size\")"));
+    const qsizetype sliderIndex = toolbarSource.indexOf(QStringLiteral("id: sizeSlider"));
+    const qsizetype increaseIndex = toolbarSource.indexOf(QStringLiteral("Accessible.name: qsTr(\"Increase brush size\")"));
+
+    QVERIFY(decreaseIndex >= 0);
+    QVERIFY(sliderIndex >= 0);
+    QVERIFY(increaseIndex >= 0);
+    QVERIFY(decreaseIndex < sliderIndex);
+    QVERIFY(sliderIndex < increaseIndex);
 }
 
 QTEST_APPLESS_MAIN(tst_CanvasToolBarQmlContract)

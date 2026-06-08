@@ -50,6 +50,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 - Uses LVRS-rendered icon selections for open, save, and brush while leaving the clear-canvas delete icon unchanged.
 - Restricts tools to brush and eraser.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
+- Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, pressure curve, and stabilizer strength.
 - Restricts open/save dialogs to flat raster formats and handles default save extensions.
 
