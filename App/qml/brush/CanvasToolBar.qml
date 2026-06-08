@@ -488,7 +488,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
-                iconName: "virtualFolder"
+                iconName: "generalopen"
                 Accessible.name: qsTr("Open raster image")
                 onClicked: toolbar.openFileDialog()
             }
@@ -496,7 +496,7 @@ Item {
             LV.IconButton {
                 iconSize: 20
                 tone: LV.AbstractButton.Borderless
-                iconName: "imageClassification"
+                iconName: "generalsave"
                 Accessible.name: qsTr("Save image")
                 onClicked: toolbar.openSaveDialog()
             }
@@ -521,7 +521,7 @@ Item {
                 id: brushToolButton
                 iconSize: 20
                 tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "rendererKit"
+                iconName: "generaledit"
                 Accessible.name: qsTr("Brush tool")
                 onClicked: toolbar.activateBrushTool(brushToolButton)
             }
