@@ -1,47 +1,59 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import LVRS 1.0 as LV
 import Vincent 2.0
 
 Rectangle {
     id: surface
-    color: "transparent"
+    color: "white"
     focus: true
     clip: true
 
     property color brushColor: "#1a1a1a"
     property real brushSize: 2
+    property real brushFlow: 1
+    property real brushOpacity: 1
+    property real brushHardness: 1
+    property real brushSpacing: 0
+    property real brushSpacingRatio: 0
+    property real pressureCurveMinimum: 0
+    property real pressureCurveCenter: 0.5
+    property real pressureCurveMaximum: 1
+    property real stabilizerStrength: 0
     property var documentViewModel: null
     property string viewId: ""
     property int canvasWidth: 1
     property int canvasHeight: 1
     property string toolMode: "brush"
     property bool canvasItemReady: false
+    property bool canvasSizeCreated: false
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
 
-    function resolvedCanvasWidth() {
-        return Math.max(1, surface.canvasWidth > 1 ? surface.canvasWidth : Math.round(surface.width));
+    function windowCanvasWidth() {
+        return Math.max(1, Math.round(surface.width));
     }
 
-    function resolvedCanvasHeight() {
-        return Math.max(1, surface.canvasHeight > 1 ? surface.canvasHeight : Math.round(surface.height));
+    function windowCanvasHeight() {
+        return Math.max(1, Math.round(surface.height));
     }
 
-    function syncCanvasItemSize() {
-        if (!canvasItemReady) {
+    function syncCanvasItemSizeToWindow() {
+        if (!canvasItemReady || surface.width <= 0 || surface.height <= 0) {
             return;
         }
-        canvasSurface.resizeCanvasSurface(resolvedCanvasWidth(), resolvedCanvasHeight());
+        canvasSurface.resizeCanvasSurface(windowCanvasWidth(), windowCanvasHeight());
+        canvasSizeCreated = true;
     }
 
     function newCanvas() {
+        syncCanvasItemSizeToWindow();
         canvasSurface.newCanvas();
     }
 
     function clearCanvas() {
+        syncCanvasItemSizeToWindow();
         canvasSurface.clearCanvas();
     }
 
@@ -54,19 +66,16 @@ Rectangle {
     }
 
     onWidthChanged: {
-        if (surface.canvasWidth <= 1) {
-            syncCanvasItemSize();
+        if (!surface.canvasSizeCreated) {
+            syncCanvasItemSizeToWindow();
         }
     }
 
     onHeightChanged: {
-        if (surface.canvasHeight <= 1) {
-            syncCanvasItemSize();
+        if (!surface.canvasSizeCreated) {
+            syncCanvasItemSizeToWindow();
         }
     }
-
-    onCanvasWidthChanged: syncCanvasItemSize()
-    onCanvasHeightChanged: syncCanvasItemSize()
 
     DrawingSurfaceItem {
         id: canvasSurface
@@ -75,13 +84,22 @@ Rectangle {
         height: 1
         brushColor: surface.brushColor
         brushSize: surface.brushSize
+        brushFlow: surface.brushFlow
+        brushOpacity: surface.brushOpacity
+        brushHardness: surface.brushHardness
+        brushSpacing: surface.brushSpacing
+        brushSpacingRatio: surface.brushSpacingRatio
+        pressureCurveMinimum: surface.pressureCurveMinimum
+        pressureCurveCenter: surface.pressureCurveCenter
+        pressureCurveMaximum: surface.pressureCurveMaximum
+        stabilizerStrength: surface.stabilizerStrength
         toolMode: surface.toolMode
         documentViewModel: surface.documentViewModel
         viewId: surface.viewId
 
         Component.onCompleted: {
             surface.canvasItemReady = true;
-            surface.syncCanvasItemSize();
+            surface.syncCanvasItemSizeToWindow();
         }
     }
 

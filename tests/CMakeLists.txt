@@ -21,6 +21,18 @@ vincent_configure_local_runtime_paths(tests_canvasdocumentviewmodel)
 
 add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmodel)
 
+add_executable(tests_canvastoolbarqmlcontract
+        tst_canvastoolbarqmlcontract.cpp
+)
+
+target_link_libraries(tests_canvastoolbarqmlcontract PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_canvastoolbarqmlcontract)
+
+add_test(NAME tests_canvastoolbarqmlcontract COMMAND tests_canvastoolbarqmlcontract)
+
 add_executable(tests_drawingsurfaceitem
         tst_drawingsurfaceitem.cpp
         ../App/models/brush/paletteutils.cpp
@@ -63,6 +75,7 @@ set(_vincent_test_environment
 
 set_tests_properties(
         tests_canvasdocumentviewmodel
+        tests_canvastoolbarqmlcontract
         tests_drawingsurfaceitem
         PROPERTIES
         ENVIRONMENT "${_vincent_test_environment}"

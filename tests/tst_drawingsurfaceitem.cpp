@@ -1,6 +1,5 @@
 #include <QFileInfo>
 #include <QImage>
-#include <QDir>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -18,6 +17,7 @@ class tst_DrawingSurfaceItem : public QObject
 
 private slots:
     void createsInitialCanvasAtSurfaceSize();
+    void createsNewCanvasAtCurrentSurfaceSize();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void supportsUndoRedo();
@@ -63,74 +63,88 @@ void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
 
     QQmlEngine engine;
-    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/LVRS/platforms/macos/lib/qt6/qml"));
-    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/LVRS/platforms/linux/lib/qt6/qml"));
-    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/LVRS/platforms/windows/lib/qt6/qml"));
-
-    static constexpr auto qmlSource = R"(
-import QtQuick
-import Vincent 2.0
-
-Item {
-    id: surface
-    property var documentViewModel: null
-    property int canvasWidth: documentViewModel ? documentViewModel.canvasWidth : 1
-    property int canvasHeight: documentViewModel ? documentViewModel.canvasHeight : 1
-    property bool canvasItemReady: false
-
-    function resolvedCanvasWidth() {
-        return Math.max(1, surface.canvasWidth > 1 ? surface.canvasWidth : Math.round(surface.width))
-    }
-
-    function resolvedCanvasHeight() {
-        return Math.max(1, surface.canvasHeight > 1 ? surface.canvasHeight : Math.round(surface.height))
-    }
-
-    function syncCanvasItemSize() {
-        if (!canvasItemReady) {
-            return
-        }
-        canvasSurface.resizeCanvasSurface(resolvedCanvasWidth(), resolvedCanvasHeight())
-    }
-
-    onWidthChanged: {
-        if (surface.canvasWidth <= 1) {
-            syncCanvasItemSize()
-        }
-    }
-
-    onHeightChanged: {
-        if (surface.canvasHeight <= 1) {
-            syncCanvasItemSize()
-        }
-    }
-
-    onCanvasWidthChanged: syncCanvasItemSize()
-    onCanvasHeightChanged: syncCanvasItemSize()
-
-    DrawingSurfaceItem {
-        id: canvasSurface
-        anchors.centerIn: parent
-        width: 1
-        height: 1
-        documentViewModel: surface.documentViewModel
-        viewId: "testSurface"
-
-        Component.onCompleted: {
-            surface.canvasItemReady = true
-            surface.syncCanvasItemSize()
-        }
-    }
-}
-)";
 
     QQmlComponent component(&engine);
-    component.setData(qmlSource, QUrl(QStringLiteral("memory:DrawingSurfaceSizing.qml")));
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
     QTRY_VERIFY(component.isReady() || component.isError());
     QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
 
     PaletteUtils paletteUtils;
     CanvasDocumentViewModel viewModel(&paletteUtils);
+    viewModel.setBrushFlow(0.42);
+    viewModel.setBrushOpacity(0.64);
+    viewModel.setBrushHardness(0.71);
+    viewModel.setBrushSpacing(7.5);
+    viewModel.setBrushSpacingRatio(0.33);
+    viewModel.setPressureCurveMinimum(0.2);
+    viewModel.setPressureCurveMaximum(0.8);
+    viewModel.setPressureCurveCenter(0.6);
+    viewModel.setStabilizerStrength(0.44);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("brushFlow"), 0.42);
+    initialProperties.insert(QStringLiteral("brushOpacity"), 0.64);
+    initialProperties.insert(QStringLiteral("brushHardness"), 0.71);
+    initialProperties.insert(QStringLiteral("brushSpacing"), 7.5);
+    initialProperties.insert(QStringLiteral("brushSpacingRatio"), 0.33);
+    initialProperties.insert(QStringLiteral("pressureCurveMinimum"), 0.2);
+    initialProperties.insert(QStringLiteral("pressureCurveCenter"), 0.6);
+    initialProperties.insert(QStringLiteral("pressureCurveMaximum"), 0.8);
+    initialProperties.insert(QStringLiteral("stabilizerStrength"), 0.44);
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+    QCOMPARE(rootItem->property("color").value<QColor>(), QColor(Qt::white));
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QTRY_COMPARE(canvasItem->width(), 720.0);
+    QTRY_COMPARE(canvasItem->height(), 480.0);
+    QTRY_COMPARE(viewModel.canvasWidth(), 720);
+    QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    QCOMPARE(canvasItem->brushFlow(), 0.42);
+    QCOMPARE(canvasItem->brushOpacity(), 0.64);
+    QCOMPARE(canvasItem->brushHardness(), 0.71);
+    QCOMPARE(canvasItem->brushSpacing(), 7.5);
+    QCOMPARE(canvasItem->brushSpacingRatio(), 0.33);
+    QCOMPARE(canvasItem->pressureCurveMinimum(), 0.2);
+    QCOMPARE(canvasItem->pressureCurveCenter(), 0.6);
+    QCOMPARE(canvasItem->pressureCurveMaximum(), 0.8);
+    QCOMPARE(canvasItem->stabilizerStrength(), 0.44);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString outputPath = dir.filePath(QStringLiteral("initial-canvas.png"));
+    QVERIFY(canvasItem->saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(720, 480));
+}
+
+void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
     QVariantMap initialProperties;
     initialProperties.insert(QStringLiteral("width"), 720);
     initialProperties.insert(QStringLiteral("height"), 480);
@@ -148,14 +162,50 @@ Item {
     QTRY_COMPARE(canvasItem->height(), 480.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 720);
     QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    QVERIFY(rootItem->setProperty("canvasWidth", 720));
+    QVERIFY(rootItem->setProperty("canvasHeight", 480));
+
+    QVERIFY(rootItem->setProperty("canvasWidth", 300));
+    QVERIFY(rootItem->setProperty("canvasHeight", 200));
+    QCoreApplication::processEvents();
+    QCOMPARE(canvasItem->width(), 720.0);
+    QCOMPARE(canvasItem->height(), 480.0);
+    QVERIFY(rootItem->setProperty("canvasWidth", 720));
+    QVERIFY(rootItem->setProperty("canvasHeight", 480));
+
+    rootItem->setWidth(960);
+    rootItem->setHeight(540);
+    QCoreApplication::processEvents();
+    QCOMPARE(canvasItem->width(), 720.0);
+    QCOMPARE(canvasItem->height(), 480.0);
+
+    QVERIFY(QMetaObject::invokeMethod(rootItem, "newCanvas", Qt::DirectConnection));
+    QTRY_COMPARE(canvasItem->width(), 960.0);
+    QTRY_COMPARE(canvasItem->height(), 540.0);
+    QTRY_COMPARE(viewModel.canvasWidth(), 960);
+    QTRY_COMPARE(viewModel.canvasHeight(), 540);
 
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString outputPath = dir.filePath(QStringLiteral("initial-canvas.png"));
+    const QString outputPath = dir.filePath(QStringLiteral("new-window-sized-canvas.png"));
     QVERIFY(canvasItem->saveToFile(outputPath));
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
-    QCOMPARE(saved.size(), QSize(720, 480));
+    QCOMPARE(saved.size(), QSize(960, 540));
+
+    QVERIFY(rootItem->setProperty("canvasWidth", 960));
+    QVERIFY(rootItem->setProperty("canvasHeight", 540));
+    rootItem->setWidth(800);
+    rootItem->setHeight(600);
+    QCoreApplication::processEvents();
+    QCOMPARE(canvasItem->width(), 960.0);
+    QCOMPARE(canvasItem->height(), 540.0);
+
+    QVERIFY(QMetaObject::invokeMethod(rootItem, "clearCanvas", Qt::DirectConnection));
+    QTRY_COMPARE(canvasItem->width(), 800.0);
+    QTRY_COMPARE(canvasItem->height(), 600.0);
+    QTRY_COMPARE(viewModel.canvasWidth(), 800);
+    QTRY_COMPARE(viewModel.canvasHeight(), 600);
 }
 
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()

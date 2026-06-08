@@ -69,12 +69,10 @@ void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
     }
 
     m_viewModelBridge->setDocumentViewModel(documentViewModel);
-    QColor nextBrushColor = brushColor();
-    qreal nextBrushSize = brushSize();
+    CanvasBrushConfig nextBrushConfig = brushConfig();
     QString nextToolMode = toolMode();
-    m_viewModelBridge->syncToolState(nextBrushColor, nextBrushSize, nextToolMode);
-    setBrushColor(nextBrushColor);
-    setBrushSize(nextBrushSize);
+    m_viewModelBridge->syncToolState(nextBrushConfig, nextToolMode);
+    setBrushConfig(nextBrushConfig);
     setToolMode(nextToolMode);
     syncCanvasSize();
     emit documentViewModelChanged();

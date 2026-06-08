@@ -16,6 +16,28 @@ QVariantMap paletteEntry(const QString &name, const QString &color)
     };
 }
 
+bool setBoundedValue(qreal &storage, qreal value, qreal minimum, qreal maximum)
+{
+    const qreal boundedValue = qBound(minimum, value, maximum);
+    if (qFuzzyCompare(storage, boundedValue)) {
+        return false;
+    }
+
+    storage = boundedValue;
+    return true;
+}
+
+bool setMinimumValue(qreal &storage, qreal value, qreal minimum)
+{
+    const qreal boundedValue = qMax(minimum, value);
+    if (qFuzzyCompare(storage, boundedValue)) {
+        return false;
+    }
+
+    storage = boundedValue;
+    return true;
+}
+
 } // namespace
 
 CanvasDocumentViewModel::CanvasDocumentViewModel(PaletteUtils *paletteUtils, QObject *parent)
@@ -38,6 +60,51 @@ QColor CanvasDocumentViewModel::brushColor() const
 qreal CanvasDocumentViewModel::brushSize() const
 {
     return m_brushSize;
+}
+
+qreal CanvasDocumentViewModel::brushFlow() const
+{
+    return m_brushFlow;
+}
+
+qreal CanvasDocumentViewModel::brushOpacity() const
+{
+    return m_brushOpacity;
+}
+
+qreal CanvasDocumentViewModel::brushHardness() const
+{
+    return m_brushHardness;
+}
+
+qreal CanvasDocumentViewModel::brushSpacing() const
+{
+    return m_brushSpacing;
+}
+
+qreal CanvasDocumentViewModel::brushSpacingRatio() const
+{
+    return m_brushSpacingRatio;
+}
+
+qreal CanvasDocumentViewModel::pressureCurveMinimum() const
+{
+    return m_pressureCurveMinimum;
+}
+
+qreal CanvasDocumentViewModel::pressureCurveCenter() const
+{
+    return m_pressureCurveCenter;
+}
+
+qreal CanvasDocumentViewModel::pressureCurveMaximum() const
+{
+    return m_pressureCurveMaximum;
+}
+
+qreal CanvasDocumentViewModel::stabilizerStrength() const
+{
+    return m_stabilizerStrength;
 }
 
 QString CanvasDocumentViewModel::toolMode() const
@@ -74,6 +141,115 @@ void CanvasDocumentViewModel::setBrushSize(qreal brushSize)
 
     m_brushSize = boundedSize;
     emit brushSizeChanged();
+}
+
+void CanvasDocumentViewModel::setBrushFlow(qreal brushFlow)
+{
+    if (setBoundedValue(m_brushFlow, brushFlow, 0.0, 1.0)) {
+        emit brushFlowChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setBrushOpacity(qreal brushOpacity)
+{
+    if (setBoundedValue(m_brushOpacity, brushOpacity, 0.0, 1.0)) {
+        emit brushOpacityChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setBrushHardness(qreal brushHardness)
+{
+    if (setBoundedValue(m_brushHardness, brushHardness, 0.01, 1.0)) {
+        emit brushHardnessChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setBrushSpacing(qreal brushSpacing)
+{
+    if (setMinimumValue(m_brushSpacing, brushSpacing, 0.0)) {
+        emit brushSpacingChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setBrushSpacingRatio(qreal brushSpacingRatio)
+{
+    if (setBoundedValue(m_brushSpacingRatio, brushSpacingRatio, 0.0, 1.0)) {
+        emit brushSpacingRatioChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setPressureCurveMinimum(qreal pressureCurveMinimum)
+{
+    const qreal nextMinimum = qBound<qreal>(0.0, pressureCurveMinimum, 1.0);
+    const qreal nextCenter = qMax(m_pressureCurveCenter, nextMinimum);
+    const qreal nextMaximum = qMax(m_pressureCurveMaximum, nextMinimum);
+    const bool minimumChanged = !qFuzzyCompare(m_pressureCurveMinimum, nextMinimum);
+    const bool centerChanged = !qFuzzyCompare(m_pressureCurveCenter, nextCenter);
+    const bool maximumChanged = !qFuzzyCompare(m_pressureCurveMaximum, nextMaximum);
+
+    if (!minimumChanged && !centerChanged && !maximumChanged) {
+        return;
+    }
+
+    m_pressureCurveMinimum = nextMinimum;
+    m_pressureCurveCenter = nextCenter;
+    m_pressureCurveMaximum = nextMaximum;
+
+    if (minimumChanged) {
+        emit pressureCurveMinimumChanged();
+    }
+    if (centerChanged) {
+        emit pressureCurveCenterChanged();
+    }
+    if (maximumChanged) {
+        emit pressureCurveMaximumChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setPressureCurveCenter(qreal pressureCurveCenter)
+{
+    const qreal nextCenter = qBound(m_pressureCurveMinimum, pressureCurveCenter, m_pressureCurveMaximum);
+    if (qFuzzyCompare(m_pressureCurveCenter, nextCenter)) {
+        return;
+    }
+
+    m_pressureCurveCenter = nextCenter;
+    emit pressureCurveCenterChanged();
+}
+
+void CanvasDocumentViewModel::setPressureCurveMaximum(qreal pressureCurveMaximum)
+{
+    const qreal nextMaximum = qBound<qreal>(0.0, pressureCurveMaximum, 1.0);
+    const qreal nextMinimum = qMin(m_pressureCurveMinimum, nextMaximum);
+    const qreal nextCenter = qBound(nextMinimum, m_pressureCurveCenter, nextMaximum);
+    const bool minimumChanged = !qFuzzyCompare(m_pressureCurveMinimum, nextMinimum);
+    const bool centerChanged = !qFuzzyCompare(m_pressureCurveCenter, nextCenter);
+    const bool maximumChanged = !qFuzzyCompare(m_pressureCurveMaximum, nextMaximum);
+
+    if (!minimumChanged && !centerChanged && !maximumChanged) {
+        return;
+    }
+
+    m_pressureCurveMinimum = nextMinimum;
+    m_pressureCurveCenter = nextCenter;
+    m_pressureCurveMaximum = nextMaximum;
+
+    if (minimumChanged) {
+        emit pressureCurveMinimumChanged();
+    }
+    if (centerChanged) {
+        emit pressureCurveCenterChanged();
+    }
+    if (maximumChanged) {
+        emit pressureCurveMaximumChanged();
+    }
+}
+
+void CanvasDocumentViewModel::setStabilizerStrength(qreal stabilizerStrength)
+{
+    if (setBoundedValue(m_stabilizerStrength, stabilizerStrength, 0.0, 1.0)) {
+        emit stabilizerStrengthChanged();
+    }
 }
 
 void CanvasDocumentViewModel::setToolMode(const QString &toolMode)

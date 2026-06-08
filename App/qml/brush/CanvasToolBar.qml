@@ -15,6 +15,15 @@ Item {
     readonly property int spacingLarge: LV.Theme.gap16
 
     property real brushSize: 2
+    property real brushFlow: 1
+    property real brushOpacity: 1
+    property real brushHardness: 1
+    property real brushSpacing: 0
+    property real brushSpacingRatio: 0
+    property real pressureCurveMinimum: 0
+    property real pressureCurveCenter: 0.5
+    property real pressureCurveMaximum: 1
+    property real stabilizerStrength: 0
     property color currentColor: "#1a1a1a"
     property var palette: []
     property string currentTool: "brush"
@@ -35,38 +44,62 @@ Item {
     signal openRequested(string fileUrl)
     signal saveRequested(string fileUrl)
     signal brushSizeChangeRequested(real size)
+    signal brushPropertyChangeRequested(string propertyName, real value)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
 
     function openFileDialog() {
-        openDialog.open()
+        openDialog.open();
     }
 
     function openSaveDialog() {
-        saveDialog.open()
+        saveDialog.open();
+    }
+
+    function openBrushSettingsMenu(triggerItem) {
+        const mappedPosition = triggerItem.mapToItem(toolbar, 0, triggerItem.height + toolbar.spacingSmall);
+        brushSettingsMenu.x = Math.max(toolbar.spacingSmall, Math.min(mappedPosition.x, toolbar.width - brushSettingsMenu.width - toolbar.spacingSmall));
+        brushSettingsMenu.y = mappedPosition.y;
+        brushSettingsMenu.open();
+    }
+
+    function activateBrushTool(triggerItem) {
+        if (toolbar.currentTool === "brush") {
+            toolbar.openBrushSettingsMenu(triggerItem);
+            return;
+        }
+        toolbar.toolSelected("brush");
+    }
+
+    function requestBrushPropertyChange(propertyName, value) {
+        if (propertyName === "brushSize") {
+            brushSizeChangeRequested(value);
+            return;
+        }
+        brushPropertyChangeRequested(propertyName, value);
     }
 
     function selectedDialogFileUrl(dialog) {
-        const selected = dialog.selectedFile
-        return selected ? selected.toString() : ""
+        const selected = dialog.selectedFile;
+        return selected ? selected.toString() : "";
     }
 
     function hasPathExtension(urlString) {
-        const pathOnly = urlString.split("?")[0].split("#")[0]
-        const lastSlashIndex = pathOnly.lastIndexOf("/")
-        const fileName = lastSlashIndex >= 0 ? pathOnly.substring(lastSlashIndex + 1) : pathOnly
-        return fileName.lastIndexOf(".") > 0
+        const pathOnly = urlString.split("?")[0].split("#")[0];
+        const lastSlashIndex = pathOnly.lastIndexOf("/");
+        const fileName = lastSlashIndex >= 0 ? pathOnly.substring(lastSlashIndex + 1) : pathOnly;
+        return fileName.lastIndexOf(".") > 0;
     }
 
     function defaultSaveExtension(nameFilter) {
-        const suffix = (nameFilter || "").toLowerCase()
+        const suffix = (nameFilter || "").toLowerCase();
         if (suffix.indexOf("jpeg") !== -1 || suffix.indexOf("jpg") !== -1) {
-            return ".jpg"
+            return ".jpg";
         }
         if (suffix.indexOf("bmp") !== -1) {
-            return ".bmp"
+            return ".bmp";
         }
-        return ".png"
+        return ".png";
     }
 
     Shortcut {
@@ -134,15 +167,127 @@ Item {
         }
     }
 
+    component BrushPropertySlider: Item {
+        id: brushPropertySlider
+
+        property string label: ""
+        property string propertyName: ""
+        property real value: 0
+        property real from: 0
+        property real to: 1
+        property real stepSize: 0.01
+        property int decimals: 0
+        property real displayScale: 1
+        property string suffix: ""
+        property real lastRequestedValue: -999999
+
+        Layout.fillWidth: true
+        implicitWidth: 300
+        implicitHeight: sliderColumn.implicitHeight
+
+        function formattedValue(rawValue) {
+            const scaledValue = rawValue * displayScale;
+            const textValue = decimals === 0 ? Math.round(scaledValue).toString() : scaledValue.toFixed(decimals);
+            return textValue + suffix;
+        }
+
+        function requestValue(rawValue) {
+            if (Math.abs(lastRequestedValue - rawValue) < 0.0001) {
+                return;
+            }
+            lastRequestedValue = rawValue;
+            toolbar.requestBrushPropertyChange(propertyName, rawValue);
+        }
+
+        ColumnLayout {
+            id: sliderColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: toolbar.spacingSmall
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: toolbar.spacingSmall
+
+                Controls.Label {
+                    text: brushPropertySlider.label
+                    color: "#f2f4f7"
+                    font.pixelSize: 12
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
+
+                Controls.Label {
+                    text: brushPropertySlider.formattedValue(propertySlider.value)
+                    color: "#d7dde6"
+                    font.pixelSize: 12
+                    horizontalAlignment: Text.AlignRight
+                    Layout.preferredWidth: 52
+                }
+            }
+
+            Controls.Slider {
+                id: propertySlider
+                from: brushPropertySlider.from
+                to: brushPropertySlider.to
+                stepSize: brushPropertySlider.stepSize
+                value: brushPropertySlider.value
+                hoverEnabled: true
+                Layout.fillWidth: true
+                Accessible.name: brushPropertySlider.label
+                onMoved: brushPropertySlider.requestValue(value)
+                onValueChanged: {
+                    if (pressed || activeFocus) {
+                        brushPropertySlider.requestValue(value);
+                    }
+                }
+                onPressedChanged: {
+                    if (!pressed) {
+                        brushPropertySlider.lastRequestedValue = -999999;
+                    }
+                }
+
+                background: Rectangle {
+                    x: propertySlider.leftPadding
+                    y: propertySlider.topPadding + (propertySlider.availableHeight - height) / 2
+                    width: propertySlider.availableWidth
+                    height: 4
+                    radius: 2
+                    color: Qt.rgba(255, 255, 255, 0.18)
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, Math.min(parent.width, propertySlider.position * parent.width))
+                        height: parent.height
+                        radius: parent.radius
+                        color: LV.Theme.primary
+                    }
+                }
+
+                handle: Rectangle {
+                    x: propertySlider.leftPadding + (propertySlider.availableWidth - width) * propertySlider.position
+                    y: propertySlider.topPadding + (propertySlider.availableHeight - height) / 2
+                    implicitWidth: 12
+                    implicitHeight: 12
+                    radius: 6
+                    color: propertySlider.pressed ? LV.Theme.primary : "#f2f4f7"
+                    border.width: 1
+                    border.color: propertySlider.pressed ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(0, 0, 0, 0.38)
+                }
+            }
+        }
+    }
+
     Dialogs.FileDialog {
         id: openDialog
         title: qsTr("Open Image")
         fileMode: Dialogs.FileDialog.OpenFile
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff)")]
         onAccepted: {
-            const urlString = toolbar.selectedDialogFileUrl(openDialog)
+            const urlString = toolbar.selectedDialogFileUrl(openDialog);
             if (urlString.length) {
-                toolbar.openRequested(urlString)
+                toolbar.openRequested(urlString);
             }
         }
     }
@@ -151,25 +296,136 @@ Item {
         id: saveDialog
         title: qsTr("Save Image As")
         fileMode: Dialogs.FileDialog.SaveFile
-        nameFilters: [
-            qsTr("PNG Image (*.png)"),
-            qsTr("JPEG Image (*.jpg *.jpeg)"),
-            qsTr("Bitmap Image (*.bmp)")
-        ]
+        nameFilters: [qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)")]
         onAccepted: {
-            var urlString = toolbar.selectedDialogFileUrl(saveDialog)
+            var urlString = toolbar.selectedDialogFileUrl(saveDialog);
             if (!urlString.length) {
-                return
+                return;
             }
 
             if (!toolbar.hasPathExtension(urlString)) {
                 if (urlString.endsWith("/")) {
-                    urlString += "canvas"
+                    urlString += "canvas";
                 }
-                urlString += toolbar.defaultSaveExtension(saveDialog.selectedNameFilter)
+                urlString += toolbar.defaultSaveExtension(saveDialog.selectedNameFilter);
             }
 
-            toolbar.saveRequested(urlString)
+            toolbar.saveRequested(urlString);
+        }
+    }
+
+    Controls.Popup {
+        id: brushSettingsMenu
+        width: 340
+        z: 20
+        padding: toolbar.spacingMedium
+        modal: false
+        focus: true
+        closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside | Controls.Popup.CloseOnReleaseOutside
+
+        background: Rectangle {
+            radius: LV.Theme.radiusLg
+            color: LV.Theme.panelBackground06
+            border.width: 1
+            border.color: Qt.rgba(255, 255, 255, 0.12)
+        }
+
+        contentItem: ColumnLayout {
+            spacing: toolbar.spacingMedium
+
+            Controls.Label {
+                text: qsTr("Brush")
+                color: "#ffffff"
+                font.pixelSize: 13
+                font.bold: true
+                Layout.fillWidth: true
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Size")
+                propertyName: "brushSize"
+                value: toolbar.brushSize
+                from: 1
+                to: 48
+                stepSize: 1
+                suffix: qsTr(" px")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Flow")
+                propertyName: "brushFlow"
+                value: toolbar.brushFlow
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Opacity")
+                propertyName: "brushOpacity"
+                value: toolbar.brushOpacity
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Hardness")
+                propertyName: "brushHardness"
+                value: toolbar.brushHardness
+                from: 0.01
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Spacing")
+                propertyName: "brushSpacing"
+                value: toolbar.brushSpacing
+                from: 0
+                to: 64
+                stepSize: 0.5
+                decimals: 1
+                suffix: qsTr(" px")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Spacing Ratio")
+                propertyName: "brushSpacingRatio"
+                value: toolbar.brushSpacingRatio
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Pressure Minimum")
+                propertyName: "pressureCurveMinimum"
+                value: toolbar.pressureCurveMinimum
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Pressure Center")
+                propertyName: "pressureCurveCenter"
+                value: toolbar.pressureCurveCenter
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Pressure Maximum")
+                propertyName: "pressureCurveMaximum"
+                value: toolbar.pressureCurveMaximum
+                displayScale: 100
+                suffix: qsTr("%")
+            }
+
+            BrushPropertySlider {
+                label: qsTr("Stabilizer")
+                propertyName: "stabilizerStrength"
+                value: toolbar.stabilizerStrength
+                displayScale: 100
+                suffix: qsTr("%")
+            }
         }
     }
 
@@ -193,16 +449,16 @@ Item {
         acceptedButtons: Qt.AllButtons
         hoverEnabled: true
         onPressed: function (mouse) {
-            mouse.accepted = true
+            mouse.accepted = true;
         }
         onPositionChanged: function (mouse) {
-            mouse.accepted = true
+            mouse.accepted = true;
         }
         onReleased: function (mouse) {
-            mouse.accepted = true
+            mouse.accepted = true;
         }
         onWheel: function (wheel) {
-            wheel.accepted = true
+            wheel.accepted = true;
         }
     }
 
@@ -255,7 +511,7 @@ Item {
             }
         }
 
-        ToolbarDivider { }
+        ToolbarDivider {}
 
         LV.HStack {
             id: toolSelectionRow
@@ -263,11 +519,12 @@ Item {
             Layout.alignment: Qt.AlignVCenter
 
             LV.IconButton {
+                id: brushToolButton
                 iconSize: 20
                 tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
                 iconName: "rendererKit"
                 Accessible.name: qsTr("Brush tool")
-                onClicked: toolbar.toolSelected("brush")
+                onClicked: toolbar.activateBrushTool(brushToolButton)
             }
 
             LV.IconButton {
@@ -279,7 +536,7 @@ Item {
             }
         }
 
-        ToolbarDivider { }
+        ToolbarDivider {}
 
         LV.HStack {
             id: brushControlsRow
@@ -338,7 +595,7 @@ Item {
                 onMoved: toolbar.brushSizeChangeRequested(value)
                 onValueChanged: {
                     if (pressed || activeFocus) {
-                        toolbar.brushSizeChangeRequested(value)
+                        toolbar.brushSizeChangeRequested(value);
                     }
                 }
                 Controls.ToolTip.visible: hovered || pressed
@@ -370,14 +627,12 @@ Item {
                     radius: 6
                     color: sizeSlider.pressed ? LV.Theme.primary : "#f2f4f7"
                     border.width: 1
-                    border.color: sizeSlider.pressed
-                        ? Qt.rgba(255, 255, 255, 0.28)
-                        : Qt.rgba(0, 0, 0, 0.38)
+                    border.color: sizeSlider.pressed ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(0, 0, 0, 0.38)
                 }
             }
         }
 
-        LV.Spacer { }
+        LV.Spacer {}
 
         Item {
             id: paletteContainer
@@ -401,5 +656,4 @@ Item {
             }
         }
     }
-
 }

@@ -48,13 +48,16 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 - Provides the drawing-only command bar.
 - Exposes actions for new, open, save, and clear.
 - Restricts tools to brush and eraser.
+- Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, pressure curve, and stabilizer strength.
 - Restricts open/save dialogs to flat raster formats and handles default save extensions.
 
 ### `DrawingSurface.qml`
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
-- Uses the available surface size as the initial canvas size while the document model still has its default 1x1 dimensions.
+- Uses the current window-sized surface as a fixed canvas size for initial, new, and clear canvas creation.
+- Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
+- Presents the canvas on a white paper background while keeping iiPaintEngine's raster layer semantics unchanged.
 - Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, and toolbar state binding.
 
 ## Core C++ Components
@@ -69,26 +72,26 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 ### `CanvasDocumentViewModel`
 
-- Exposes palette, brush color, brush size, active tool, and canvas dimensions to QML.
-- Clamps brush size and canvas dimensions to safe ranges.
+- Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, and canvas dimensions to QML.
+- Clamps brush size, brush dynamics, pressure curve, stabilizer, and canvas dimensions to safe ranges.
 - Restricts tool mode to the drawing-only set.
 
 ### `CanvasViewModelBridge`
 
 - Resolves the active LVRS document view model.
 - Blocks canvas mutation until the expected document/view binding is available.
-- Keeps the model's canvas size and tool state aligned with the rendered surface.
+- Keeps the model's canvas size, tool state, and iiPaintEngine brush config aligned with the rendered surface.
 
 ## Data Flow Summary
 
 1. `main.cpp` launches the LVRS-backed QML application and registers the shared view model plus helper services.
 2. `PainterCanvasPage` binds to `CanvasDocumentViewModel` and passes brush state into `DrawingSurface`.
-3. `CanvasToolBar` emits user actions for file flow, tool selection, palette changes, and brush size updates.
+3. `CanvasToolBar` emits user actions for file flow, tool selection, palette changes, brush size updates, and brush reselection settings.
 4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.
 5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save.
 
 ## Testing Surface
 
-- `tests/tst_canvasdocumentviewmodel.cpp` validates the drawing-only document state and value clamping.
+- `tests/tst_canvasdocumentviewmodel.cpp` validates the drawing-only document state and value clamping, including iiPaintEngine brush settings.
 - `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, undo/redo, saving, and opening rasters.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.
