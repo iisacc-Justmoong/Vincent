@@ -56,6 +56,26 @@ DrawingSurfaceItem *findDrawingSurfaceItem(QQuickItem *root)
     return nullptr;
 }
 
+QQuickItem *findItemByObjectName(QQuickItem *root, const QString &objectName)
+{
+    if (!root) {
+        return nullptr;
+    }
+
+    if (root->objectName() == objectName) {
+        return root;
+    }
+
+    const QList<QQuickItem *> children = root->childItems();
+    for (QQuickItem *child : children) {
+        if (QQuickItem *item = findItemByObjectName(child, objectName)) {
+            return item;
+        }
+    }
+
+    return nullptr;
+}
+
 } // namespace
 
 void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
@@ -102,12 +122,19 @@ void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
     QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
     auto *rootItem = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(rootItem);
-    QCOMPARE(rootItem->property("color").value<QColor>(), QColor(Qt::white));
+    const QColor workspaceColor = rootItem->property("color").value<QColor>();
+    QVERIFY(workspaceColor != QColor(Qt::white));
+
+    QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
+    QVERIFY(canvasPaper);
+    QCOMPARE(canvasPaper->property("color").value<QColor>(), QColor(Qt::white));
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
     QTRY_COMPARE(canvasItem->width(), 720.0);
     QTRY_COMPARE(canvasItem->height(), 480.0);
+    QTRY_COMPARE(canvasPaper->width(), 720.0);
+    QTRY_COMPARE(canvasPaper->height(), 480.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 720);
     QTRY_COMPARE(viewModel.canvasHeight(), 480);
     QCOMPARE(canvasItem->brushFlow(), 0.42);
@@ -158,10 +185,15 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
+    QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
+    QVERIFY(canvasPaper);
     QTRY_COMPARE(canvasItem->width(), 720.0);
     QTRY_COMPARE(canvasItem->height(), 480.0);
+    QTRY_COMPARE(canvasPaper->width(), 720.0);
+    QTRY_COMPARE(canvasPaper->height(), 480.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 720);
     QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    QVERIFY(rootItem->property("color").value<QColor>() != canvasPaper->property("color").value<QColor>());
     QVERIFY(rootItem->setProperty("canvasWidth", 720));
     QVERIFY(rootItem->setProperty("canvasHeight", 480));
 
@@ -178,10 +210,14 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
     QCoreApplication::processEvents();
     QCOMPARE(canvasItem->width(), 720.0);
     QCOMPARE(canvasItem->height(), 480.0);
+    QCOMPARE(canvasPaper->width(), 720.0);
+    QCOMPARE(canvasPaper->height(), 480.0);
 
     QVERIFY(QMetaObject::invokeMethod(rootItem, "newCanvas", Qt::DirectConnection));
     QTRY_COMPARE(canvasItem->width(), 960.0);
     QTRY_COMPARE(canvasItem->height(), 540.0);
+    QTRY_COMPARE(canvasPaper->width(), 960.0);
+    QTRY_COMPARE(canvasPaper->height(), 540.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 960);
     QTRY_COMPARE(viewModel.canvasHeight(), 540);
 
@@ -200,10 +236,14 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
     QCoreApplication::processEvents();
     QCOMPARE(canvasItem->width(), 960.0);
     QCOMPARE(canvasItem->height(), 540.0);
+    QCOMPARE(canvasPaper->width(), 960.0);
+    QCOMPARE(canvasPaper->height(), 540.0);
 
     QVERIFY(QMetaObject::invokeMethod(rootItem, "clearCanvas", Qt::DirectConnection));
     QTRY_COMPARE(canvasItem->width(), 800.0);
     QTRY_COMPARE(canvasItem->height(), 600.0);
+    QTRY_COMPARE(canvasPaper->width(), 800.0);
+    QTRY_COMPARE(canvasPaper->height(), 600.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 800);
     QTRY_COMPARE(viewModel.canvasHeight(), 600);
 }

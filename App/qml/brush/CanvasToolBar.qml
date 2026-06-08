@@ -25,7 +25,6 @@ Item {
     property real pressureCurveMaximum: 1
     property real stabilizerStrength: 0
     property color currentColor: "#1a1a1a"
-    property var palette: []
     property string currentTool: "brush"
     readonly property bool dialogActive: openDialog.visible || saveDialog.visible
     readonly property string modifierKeyLabel: Qt.platform.os === "osx" ? "Cmd" : "Ctrl"
@@ -61,6 +60,14 @@ Item {
         brushSettingsMenu.x = Math.max(toolbar.spacingSmall, Math.min(mappedPosition.x, toolbar.width - brushSettingsMenu.width - toolbar.spacingSmall));
         brushSettingsMenu.y = mappedPosition.y;
         brushSettingsMenu.open();
+    }
+
+    function openColorPickerMenu(triggerItem) {
+        const mappedPosition = triggerItem.mapToItem(toolbar, 0, triggerItem.height + toolbar.spacingSmall);
+        colorPickerMenu.x = Math.max(toolbar.spacingSmall, Math.min(mappedPosition.x, toolbar.width - colorPickerMenu.width - toolbar.spacingSmall));
+        colorPickerMenu.y = mappedPosition.y;
+        hslTriangleColorPicker.selectedColor = toolbar.currentColor;
+        colorPickerMenu.open();
     }
 
     function activateBrushTool(triggerItem) {
@@ -135,36 +142,6 @@ Item {
         Layout.preferredHeight: 32
         Layout.alignment: Qt.AlignVCenter
         color: Qt.rgba(255, 255, 255, 0.12)
-    }
-
-    component ColorSwatch: Rectangle {
-        property color swatchColor: "#ffffff"
-        property string swatchLabel: ""
-
-        width: 20
-        height: 20
-        radius: 6
-        color: swatchColor
-        border.width: toolbar.currentColor === swatchColor ? 2 : 1
-        border.color: toolbar.currentColor === swatchColor ? toolbar.accentColor : "#e0e0e0"
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width - 8
-            height: parent.height - 8
-            visible: swatchColor === "#ffffff"
-            color: "transparent"
-            border.color: "#b0b0b0"
-            border.width: 1
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: toolbar.colorPicked(swatchColor)
-            Accessible.name: swatchLabel.length ? swatchLabel : qsTr("Brush color")
-        }
     }
 
     component BrushPropertySlider: Item {
@@ -311,6 +288,28 @@ Item {
             }
 
             toolbar.saveRequested(urlString);
+        }
+    }
+
+    Controls.Popup {
+        id: colorPickerMenu
+        width: 320
+        padding: toolbar.spacingMedium
+        modal: false
+        focus: true
+        closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside | Controls.Popup.CloseOnReleaseOutside
+
+        background: Rectangle {
+            radius: LV.Theme.radiusLg
+            color: LV.Theme.panelBackground06
+            border.width: 1
+            border.color: Qt.rgba(255, 255, 255, 0.12)
+        }
+
+        contentItem: HslTriangleColorPicker {
+            id: hslTriangleColorPicker
+            selectedColor: toolbar.currentColor
+            onColorSelected: selectedColor => toolbar.colorPicked(selectedColor)
         }
     }
 
@@ -634,26 +633,99 @@ Item {
 
         LV.Spacer {}
 
-        Item {
-            id: paletteContainer
-            implicitWidth: paletteRow.implicitWidth
-            implicitHeight: paletteRow.implicitHeight
+        Rectangle {
+            id: currentColorButton
+            implicitWidth: 36
+            implicitHeight: 36
+            Layout.preferredWidth: implicitWidth
+            Layout.preferredHeight: implicitHeight
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+            radius: 18
+            color: colorButtonMouseArea.containsMouse || colorPickerMenu.opened ? LV.Theme.panelBackground10 : Qt.rgba(255, 255, 255, 0.04)
+            border.width: colorPickerMenu.opened ? 2 : 1
+            border.color: colorPickerMenu.opened ? toolbar.accentColor : Qt.rgba(255, 255, 255, 0.15)
 
-            Row {
-                id: paletteRow
-                spacing: toolbar.spacingSmall
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: parent.right
+            Canvas {
+                id: colorPickerBall
+                anchors.centerIn: parent
+                width: 24
+                height: 24
+                renderTarget: Canvas.Image
 
-                Repeater {
-                    model: toolbar.palette
-                    delegate: ColorSwatch {
-                        swatchColor: modelData.color
-                        swatchLabel: modelData.name ?? ""
+                function paintRgbRainbowBall() {
+                    const context = getContext("2d");
+                    context.clearRect(0, 0, width, height);
+
+                    const centerX = width / 2;
+                    const centerY = height / 2;
+                    const radius = Math.min(width, height) / 2 - 1;
+                    for (let y = 0; y < height; ++y) {
+                        for (let x = 0; x < width; ++x) {
+                            const dx = x + 0.5 - centerX;
+                            const dy = y + 0.5 - centerY;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance > radius) {
+                                continue;
+                            }
+
+                            const hue = (Math.atan2(dy, dx) / (Math.PI * 2) + 1) % 1;
+                            const saturation = Math.min(1, distance / radius);
+                            const lightness = 0.58 - saturation * 0.08;
+                            context.fillStyle = Qt.hsla(hue, saturation, lightness, 1).toString();
+                            context.fillRect(x, y, 1, 1);
+                        }
                     }
+
+                    context.save();
+                    context.beginPath();
+                    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    context.clip();
+
+                    var highlight = context.createRadialGradient(centerX - radius * 0.4, centerY - radius * 0.45, 0, centerX - radius * 0.35, centerY - radius * 0.35, radius * 0.75);
+                    highlight.addColorStop(0, "rgba(255, 255, 255, 0.62)");
+                    highlight.addColorStop(0.45, "rgba(255, 255, 255, 0.16)");
+                    highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+                    context.fillStyle = highlight;
+                    context.fillRect(0, 0, width, height);
+
+                    var shade = context.createRadialGradient(centerX + radius * 0.42, centerY + radius * 0.48, 0, centerX + radius * 0.2, centerY + radius * 0.2, radius * 1.2);
+                    shade.addColorStop(0, "rgba(0, 0, 0, 0.18)");
+                    shade.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    context.fillStyle = shade;
+                    context.fillRect(0, 0, width, height);
+
+                    context.restore();
+                    context.beginPath();
+                    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    context.lineWidth = 1;
+                    context.strokeStyle = "rgba(255, 255, 255, 0.55)";
+                    context.stroke();
                 }
+
+                onPaint: colorPickerBall.paintRgbRainbowBall()
             }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 28
+                height: 28
+                radius: 14
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(255, 255, 255, 0.22)
+            }
+
+            MouseArea {
+                id: colorButtonMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: toolbar.openColorPickerMenu(currentColorButton)
+                Accessible.name: qsTr("Brush color")
+            }
+
+            Controls.ToolTip.visible: colorButtonMouseArea.containsMouse
+            Controls.ToolTip.text: qsTr("Brush color")
         }
     }
 }

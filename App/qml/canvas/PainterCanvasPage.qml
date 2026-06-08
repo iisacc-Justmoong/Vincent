@@ -102,6 +102,7 @@ Item {
             Painting.DrawingSurface {
                 id: drawingSurface
                 anchors.fill: parent
+                workspaceColor: LV.Theme.window
                 documentViewModel: painterPage.vm
                 viewId: painterPage.viewId
                 brushColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
@@ -144,7 +145,6 @@ Item {
             stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
             currentColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
             currentTool: painterPage.vm ? painterPage.vm.toolMode : "brush"
-            palette: painterPage.vm ? painterPage.vm.palette : []
             onNewCanvasRequested: painterPage.newCanvas()
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)

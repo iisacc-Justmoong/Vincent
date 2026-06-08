@@ -5,10 +5,12 @@ import Vincent 2.0
 
 Rectangle {
     id: surface
-    color: "white"
+    color: workspaceColor
     focus: true
     clip: true
 
+    property color workspaceColor: "#1f1f20"
+    property color canvasColor: "white"
     property color brushColor: "#1a1a1a"
     property real brushSize: 2
     property real brushFlow: 1
@@ -77,9 +79,21 @@ Rectangle {
         }
     }
 
+    Rectangle {
+        id: canvasPaper
+        objectName: "canvasPaper"
+        anchors.centerIn: parent
+        width: canvasSurface.width
+        height: canvasSurface.height
+        color: surface.canvasColor
+        border.color: "#b8bcc4"
+        border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
+    }
+
     DrawingSurfaceItem {
         id: canvasSurface
         anchors.centerIn: parent
+        z: 1
         width: 1
         height: 1
         brushColor: surface.brushColor

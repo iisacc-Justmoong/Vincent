@@ -152,6 +152,7 @@ qt_add_qml_module(Vincent
         App/qml/Main.qml
         App/qml/canvas/PainterCanvasPage.qml
         App/qml/brush/CanvasToolBar.qml
+        App/qml/brush/HslTriangleColorPicker.qml
         App/qml/painting/DrawingSurface.qml
 )
 
