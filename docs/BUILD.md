@@ -12,6 +12,19 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 - Qt toolchain (Core, Qml, Quick, QuickControls2, Svg) available in your `PATH` so that `macdeployqt` is callable.
 - iiPaintEngine installed under `$HOME/.local/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
 
+## 1a. Automated Local Build Script
+Use `./build.sh` or `./build.sh local` for local development validation. The default local mode configures `build/`, builds Vincent, runs `ctest --test-dir build --output-on-failure`, deploys Qt runtime files into `dist/Vincent.app`, and signs that app with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature if no development certificate is installed.
+
+Distribution modes must be requested explicitly:
+
+```bash
+VINCENT_BUILD_MODE=devid ./build.sh
+VINCENT_BUILD_MODE=mas ./build.sh
+VINCENT_BUILD_MODE=all ./build.sh
+```
+
+`devid` requires `Developer ID Application` and `Developer ID Installer` certificates plus notarization credentials. `mas` requires `Apple Distribution` and `3rd Party Mac Developer Installer` certificates. `all` runs both distribution flows. For Developer ID notarization, prefer `NOTARY_KEYCHAIN_PROFILE`; if Apple ID mode is used, provide the app-specific password through `NOTARY_APP_PASSWORD` rather than storing it in the script.
+
 ## 2. Configure the Release Build
 ```bash
 cmake -S . -B build \

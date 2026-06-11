@@ -35,7 +35,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 ### `Main.qml`
 
 - Creates the main LVRS application window.
-- Removes the native title bar through `Qt.Window | Qt.FramelessWindowHint` on the application window flags.
+- Keeps native close, minimize, and maximize controls while using LVRS solid chrome to suppress the visual title-bar strip.
 - Hosts `PainterCanvasPage` as the single content view.
 
 ### `PainterCanvasPage.qml`

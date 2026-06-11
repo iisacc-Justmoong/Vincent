@@ -45,6 +45,18 @@ vincent_configure_local_runtime_paths(tests_mainqmlcontract)
 
 add_test(NAME tests_mainqmlcontract COMMAND tests_mainqmlcontract)
 
+add_executable(tests_macosbuildworkflowcontract
+        tst_macosbuildworkflowcontract.cpp
+)
+
+target_link_libraries(tests_macosbuildworkflowcontract PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_macosbuildworkflowcontract)
+
+add_test(NAME tests_macosbuildworkflowcontract COMMAND tests_macosbuildworkflowcontract)
+
 add_executable(tests_drawingsurfaceitem
         tst_drawingsurfaceitem.cpp
         ../App/models/brush/paletteutils.cpp
@@ -89,6 +101,7 @@ set_tests_properties(
         tests_canvasdocumentviewmodel
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
+        tests_macosbuildworkflowcontract
         tests_drawingsurfaceitem
         PROPERTIES
         ENVIRONMENT "${_vincent_test_environment}"
