@@ -28,6 +28,11 @@ class CanvasDocumentViewModel : public QObject
 public:
     explicit CanvasDocumentViewModel(PaletteUtils *paletteUtils, QObject *parent = nullptr);
 
+    static constexpr qreal maximumAntialiasingBrushHardness()
+    {
+        return 1.0;
+    }
+
     [[nodiscard]] QVariantList palette() const;
     [[nodiscard]] QColor brushColor() const;
     [[nodiscard]] qreal brushSize() const;
@@ -83,7 +88,7 @@ private:
     qreal m_brushSize = 2.0;
     qreal m_brushFlow = 1.0;
     qreal m_brushOpacity = 1.0;
-    qreal m_brushHardness = 1.0;
+    qreal m_brushHardness = maximumAntialiasingBrushHardness();
     qreal m_brushSpacing = 0.0;
     qreal m_brushSpacingRatio = 0.0;
     qreal m_pressureCurveMinimum = 0.0;

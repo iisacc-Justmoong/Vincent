@@ -85,6 +85,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 ### `CanvasDocumentViewModel`
 
 - Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, and canvas dimensions to QML.
+- Sets the default brush hardness to the app's maximum anti-aliased edge setting for iiPaintEngine's coverage-based circular brush.
 - Clamps brush size, brush dynamics, pressure curve, stabilizer, and canvas dimensions to safe ranges.
 - Restricts tool mode to the drawing-only set.
 

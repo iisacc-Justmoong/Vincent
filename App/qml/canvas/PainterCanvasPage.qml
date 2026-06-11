@@ -12,6 +12,7 @@ Item {
     readonly property int spacingMedium: LV.Theme.gap12
     readonly property int spacingLarge: LV.Theme.gap16
     readonly property string viewId: "PainterCanvasPage"
+    readonly property real maximumAntialiasingBrushHardness: 1
 
     property var vm: null
 
@@ -109,7 +110,7 @@ Item {
                 brushSize: painterPage.vm ? painterPage.vm.brushSize : 2
                 brushFlow: painterPage.vm ? painterPage.vm.brushFlow : 1
                 brushOpacity: painterPage.vm ? painterPage.vm.brushOpacity : 1
-                brushHardness: painterPage.vm ? painterPage.vm.brushHardness : 1
+                brushHardness: painterPage.vm ? painterPage.vm.brushHardness : painterPage.maximumAntialiasingBrushHardness
                 brushSpacing: painterPage.vm ? painterPage.vm.brushSpacing : 0
                 brushSpacingRatio: painterPage.vm ? painterPage.vm.brushSpacingRatio : 0
                 pressureCurveMinimum: painterPage.vm ? painterPage.vm.pressureCurveMinimum : 0
@@ -136,7 +137,7 @@ Item {
             brushSize: painterPage.vm ? painterPage.vm.brushSize : 2
             brushFlow: painterPage.vm ? painterPage.vm.brushFlow : 1
             brushOpacity: painterPage.vm ? painterPage.vm.brushOpacity : 1
-            brushHardness: painterPage.vm ? painterPage.vm.brushHardness : 1
+            brushHardness: painterPage.vm ? painterPage.vm.brushHardness : painterPage.maximumAntialiasingBrushHardness
             brushSpacing: painterPage.vm ? painterPage.vm.brushSpacing : 0
             brushSpacingRatio: painterPage.vm ? painterPage.vm.brushSpacingRatio : 0
             pressureCurveMinimum: painterPage.vm ? painterPage.vm.pressureCurveMinimum : 0

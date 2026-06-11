@@ -185,6 +185,8 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
+    QCOMPARE(rootItem->property("maximumAntialiasingBrushHardness").toReal(),
+             CanvasDocumentViewModel::maximumAntialiasingBrushHardness());
     QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
     QVERIFY(canvasPaper);
     QTRY_COMPARE(canvasItem->width(), 720.0);
@@ -193,6 +195,7 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
     QTRY_COMPARE(canvasPaper->height(), 480.0);
     QTRY_COMPARE(viewModel.canvasWidth(), 720);
     QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    QCOMPARE(canvasItem->brushHardness(), CanvasDocumentViewModel::maximumAntialiasingBrushHardness());
     QVERIFY(rootItem->property("color").value<QColor>() != canvasPaper->property("color").value<QColor>());
     QVERIFY(rootItem->setProperty("canvasWidth", 720));
     QVERIFY(rootItem->setProperty("canvasHeight", 480));

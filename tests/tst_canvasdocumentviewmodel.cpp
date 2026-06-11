@@ -26,7 +26,8 @@ void tst_CanvasDocumentViewModel::exposesDefaultDocumentState()
     QCOMPARE(viewModel.brushSize(), 2.0);
     QCOMPARE(viewModel.brushFlow(), 1.0);
     QCOMPARE(viewModel.brushOpacity(), 1.0);
-    QCOMPARE(viewModel.brushHardness(), 1.0);
+    QCOMPARE(CanvasDocumentViewModel::maximumAntialiasingBrushHardness(), 1.0);
+    QCOMPARE(viewModel.brushHardness(), CanvasDocumentViewModel::maximumAntialiasingBrushHardness());
     QCOMPARE(viewModel.brushSpacing(), 0.0);
     QCOMPARE(viewModel.brushSpacingRatio(), 0.0);
     QCOMPARE(viewModel.pressureCurveMinimum(), 0.0);

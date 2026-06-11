@@ -15,7 +15,8 @@ Rectangle {
     property real brushSize: 2
     property real brushFlow: 1
     property real brushOpacity: 1
-    property real brushHardness: 1
+    readonly property real maximumAntialiasingBrushHardness: 1
+    property real brushHardness: maximumAntialiasingBrushHardness
     property real brushSpacing: 0
     property real brushSpacingRatio: 0
     property real pressureCurveMinimum: 0
