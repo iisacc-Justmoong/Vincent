@@ -9,7 +9,7 @@ class tst_CanvasToolBarQmlContract : public QObject
 private slots:
     void brushReselectionOpensBrushSettingsMenu();
     void colorSelectionUsesHslTrianglePicker();
-    void usesSelectedToolbarIconsExceptClearCanvas();
+    void leftToolbarMatchesFigmaDesignContract();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
     void toolbarUsesFullRoundSolidCylinderBackground();
 };
@@ -73,7 +73,7 @@ void tst_CanvasToolBarQmlContract::colorSelectionUsesHslTrianglePicker()
     QVERIFY(!pickerSource.contains(QStringLiteral("putImageData")));
 }
 
-void tst_CanvasToolBarQmlContract::usesSelectedToolbarIconsExceptClearCanvas()
+void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
 {
     const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
     QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
@@ -82,19 +82,57 @@ void tst_CanvasToolBarQmlContract::usesSelectedToolbarIconsExceptClearCanvas()
     QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
 
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"addFile\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"generalopen\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"generalsave\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"generaldelete\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"generaledit\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"eraser\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"imagezoomOut\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"imagezoomIn\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaLeftToolbarWidth: 178")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaLeftToolbarHeight: 28")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarIconSize: 16")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarOuterHorizontalPadding: 8")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarOuterVerticalPadding: 4")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property color figmaToolbarBackground: LV.Theme.panelBackground12")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url translateObjectIconSource: \"qrc:/Vincent/resources/icons/translateObject.svg\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: figmaLeftToolbar")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Layout.preferredWidth: toolbar.figmaLeftToolbarWidth")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Layout.preferredHeight: toolbar.figmaLeftToolbarHeight")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("radius: height / 2")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("color: toolbar.figmaToolbarBackground")));
+
+    const qsizetype addIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"addFile\""));
+    const qsizetype deleteIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generaldelete\""));
+    const qsizetype translateIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"translateObject\""));
+    const qsizetype brushIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"showCode\""));
+    const qsizetype eraserIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"eraser\""));
+    const qsizetype colorIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"gutterCheckBox@14x14\""));
+    const qsizetype typeIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"typeAlias\""));
+
+    QVERIFY(addIndex >= 0);
+    QVERIFY(deleteIndex > addIndex);
+    QVERIFY(translateIndex > deleteIndex);
+    QVERIFY(brushIndex > translateIndex);
+    QVERIFY(eraserIndex > brushIndex);
+    QVERIFY(colorIndex > eraserIndex);
+    QVERIFY(typeIndex > colorIndex);
+
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"New canvas\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Clear canvas\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.clearCanvasRequested()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.translateObjectIconSource")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Brush tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.activateBrushTool(brushToolButton)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Eraser tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"eraser\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Brush color\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openColorPickerMenu(colorMenuButton)")));
 
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"virtualFolder\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"imageClassification\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"rendererKit\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"clearOutputs\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generalopen\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generalsave\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generaledit\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("toolbar.toolSelected(\"translate\")")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("toolbar.toolSelected(\"type\")")));
 }
 
 void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIncrease()

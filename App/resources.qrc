@@ -1,2 +1,5 @@
 <RCC>
+    <qresource prefix="/Vincent">
+        <file>resources/icons/translateObject.svg</file>
+    </qresource>
 </RCC>

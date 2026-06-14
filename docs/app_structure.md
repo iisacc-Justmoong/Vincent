@@ -47,9 +47,11 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 ### `CanvasToolBar.qml`
 
 - Provides the drawing-only command bar.
-- Exposes actions for new, open, save, and clear.
+- Exposes actions for new, open, save, and clear, with open/save still available through shortcuts and dialogs.
 - Renders the command bar inside a full-height solid round cylinder background.
-- Uses LVRS-rendered icon selections for open, save, and brush while leaving the clear-canvas delete icon unchanged.
+- Renders the left command cluster as the Figma `178x28` capsule using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, `gutterCheckBox@14x14`, and `typeAlias` icons.
+- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, eraser selects the eraser, and the checkbox dropdown opens the HSL color picker.
+- Uses an app-local vector source for the `translateObject` slot while preserving the Figma/LVRS icon name, because the bundled LVRS SVG contains an embedded image form that Qt SVG logs at runtime.
 - Restricts tools to brush and eraser.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.

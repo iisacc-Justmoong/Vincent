@@ -33,6 +33,15 @@ Item {
     readonly property string shortcutSave: modifierKeyLabel + "+S"
     readonly property string shortcutClear: modifierKeyLabel + "+Shift+K"
     readonly property color accentColor: LV.Theme.primary
+    readonly property int figmaLeftToolbarWidth: 178
+    readonly property int figmaLeftToolbarHeight: 28
+    readonly property int figmaToolbarButtonSize: 20
+    readonly property int figmaToolbarMenuButtonWidth: 34
+    readonly property int figmaToolbarIconSize: 16
+    readonly property int figmaToolbarOuterHorizontalPadding: 8
+    readonly property int figmaToolbarOuterVerticalPadding: 4
+    readonly property color figmaToolbarBackground: LV.Theme.panelBackground12
+    readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
 
     implicitHeight: toolbarLayout.implicitHeight + spacingSmall * 4
     implicitWidth: toolbarLayout.implicitWidth + spacingSmall * 4
@@ -142,6 +151,79 @@ Item {
         Layout.preferredHeight: 32
         Layout.alignment: Qt.AlignVCenter
         color: Qt.rgba(255, 255, 255, 0.12)
+    }
+
+    component FigmaToolbarButton: LV.IconButton {
+        iconSize: toolbar.figmaToolbarIconSize
+        tone: LV.AbstractButton.Borderless
+        horizontalPadding: 2
+        verticalPadding: 2
+        cornerRadius: LV.Theme.radiusSm
+        implicitWidth: toolbar.figmaToolbarButtonSize
+        implicitHeight: toolbar.figmaToolbarButtonSize
+        width: toolbar.figmaToolbarButtonSize
+        height: toolbar.figmaToolbarButtonSize
+        Layout.preferredWidth: toolbar.figmaToolbarButtonSize
+        Layout.preferredHeight: toolbar.figmaToolbarButtonSize
+        Layout.alignment: Qt.AlignVCenter
+    }
+
+    component FigmaToolbarMenuButton: LV.AbstractButton {
+        id: menuButton
+
+        property string iconName: ""
+        readonly property url iconSource: LV.Theme.iconPath(iconName)
+        readonly property url indicatorSource: LV.Theme.iconPath("generalchevronDownBorderless")
+
+        tone: LV.AbstractButton.Borderless
+        horizontalPadding: 2
+        verticalPadding: 2
+        spacing: -2
+        cornerRadius: LV.Theme.radiusSm
+        implicitWidth: toolbar.figmaToolbarMenuButtonWidth
+        implicitHeight: toolbar.figmaToolbarButtonSize
+        width: toolbar.figmaToolbarMenuButtonWidth
+        height: toolbar.figmaToolbarButtonSize
+        clip: true
+        Layout.preferredWidth: toolbar.figmaToolbarMenuButtonWidth
+        Layout.preferredHeight: toolbar.figmaToolbarButtonSize
+        Layout.alignment: Qt.AlignVCenter
+
+        contentItem: RowLayout {
+            spacing: -2
+
+            Image {
+                source: menuButton.iconSource
+                sourceSize.width: toolbar.figmaToolbarIconSize
+                sourceSize.height: toolbar.figmaToolbarIconSize
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
+                Layout.preferredWidth: toolbar.figmaToolbarIconSize
+                Layout.preferredHeight: toolbar.figmaToolbarIconSize
+                Layout.minimumWidth: toolbar.figmaToolbarIconSize
+                Layout.minimumHeight: toolbar.figmaToolbarIconSize
+                Layout.maximumWidth: toolbar.figmaToolbarIconSize
+                Layout.maximumHeight: toolbar.figmaToolbarIconSize
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            Image {
+                source: menuButton.indicatorSource
+                sourceSize.width: toolbar.figmaToolbarIconSize
+                sourceSize.height: toolbar.figmaToolbarIconSize
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
+                Layout.preferredWidth: toolbar.figmaToolbarIconSize
+                Layout.preferredHeight: toolbar.figmaToolbarIconSize
+                Layout.minimumWidth: toolbar.figmaToolbarIconSize
+                Layout.minimumHeight: toolbar.figmaToolbarIconSize
+                Layout.maximumWidth: toolbar.figmaToolbarIconSize
+                Layout.maximumHeight: toolbar.figmaToolbarIconSize
+                Layout.alignment: Qt.AlignVCenter
+            }
+        }
     }
 
     component BrushPropertySlider: Item {
@@ -473,66 +555,81 @@ Item {
         spacing: toolbar.spacingMedium
         alignmentName: "center"
 
-        LV.HStack {
-            id: fileActionsRow
-            spacing: toolbar.spacingSmall
+        Rectangle {
+            id: figmaLeftToolbar
+            implicitWidth: toolbar.figmaLeftToolbarWidth
+            implicitHeight: toolbar.figmaLeftToolbarHeight
+            Layout.preferredWidth: toolbar.figmaLeftToolbarWidth
+            Layout.preferredHeight: toolbar.figmaLeftToolbarHeight
             Layout.alignment: Qt.AlignVCenter
+            radius: height / 2
+            color: toolbar.figmaToolbarBackground
 
-            LV.IconButton {
-                iconSize: 20
-                tone: LV.AbstractButton.Borderless
-                iconName: "addFile"
-                Accessible.name: qsTr("New canvas")
-                onClicked: toolbar.newCanvasRequested()
-            }
+            LV.HStack {
+                anchors.fill: parent
+                anchors.leftMargin: toolbar.figmaToolbarOuterHorizontalPadding
+                anchors.rightMargin: toolbar.figmaToolbarOuterHorizontalPadding
+                anchors.topMargin: toolbar.figmaToolbarOuterVerticalPadding
+                anchors.bottomMargin: toolbar.figmaToolbarOuterVerticalPadding
+                spacing: toolbar.spacingSmall
+                alignmentName: "center"
 
-            LV.IconButton {
-                iconSize: 20
-                tone: LV.AbstractButton.Borderless
-                iconName: "generalopen"
-                Accessible.name: qsTr("Open raster image")
-                onClicked: toolbar.openFileDialog()
-            }
+                LV.HStack {
+                    id: figmaFileActionsRow
+                    spacing: 0
+                    Layout.alignment: Qt.AlignVCenter
 
-            LV.IconButton {
-                iconSize: 20
-                tone: LV.AbstractButton.Borderless
-                iconName: "generalsave"
-                Accessible.name: qsTr("Save image")
-                onClicked: toolbar.openSaveDialog()
-            }
+                    FigmaToolbarButton {
+                        iconName: "addFile"
+                        Accessible.name: qsTr("New canvas")
+                        onClicked: toolbar.newCanvasRequested()
+                    }
 
-            LV.IconButton {
-                iconSize: 20
-                tone: LV.AbstractButton.Borderless
-                iconName: "generaldelete"
-                Accessible.name: qsTr("Clear canvas")
-                onClicked: toolbar.clearCanvasRequested()
-            }
-        }
+                    FigmaToolbarButton {
+                        iconName: "generaldelete"
+                        Accessible.name: qsTr("Clear canvas")
+                        onClicked: toolbar.clearCanvasRequested()
+                    }
+                }
 
-        ToolbarDivider {}
+                LV.HStack {
+                    id: figmaToolActionsRow
+                    spacing: 0
+                    Layout.alignment: Qt.AlignVCenter
 
-        LV.HStack {
-            id: toolSelectionRow
-            spacing: toolbar.spacingSmall
-            Layout.alignment: Qt.AlignVCenter
+                    FigmaToolbarButton {
+                        iconName: "translateObject"
+                        iconSource: toolbar.translateObjectIconSource
+                        Accessible.name: qsTr("Move tool")
+                    }
 
-            LV.IconButton {
-                id: brushToolButton
-                iconSize: 20
-                tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "generaledit"
-                Accessible.name: qsTr("Brush tool")
-                onClicked: toolbar.activateBrushTool(brushToolButton)
-            }
+                    FigmaToolbarButton {
+                        id: brushToolButton
+                        tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                        iconName: "showCode"
+                        Accessible.name: qsTr("Brush tool")
+                        onClicked: toolbar.activateBrushTool(brushToolButton)
+                    }
 
-            LV.IconButton {
-                iconSize: 20
-                tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                iconName: "eraser"
-                Accessible.name: qsTr("Eraser tool")
-                onClicked: toolbar.toolSelected("eraser")
+                    FigmaToolbarButton {
+                        tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                        iconName: "eraser"
+                        Accessible.name: qsTr("Eraser tool")
+                        onClicked: toolbar.toolSelected("eraser")
+                    }
+
+                    FigmaToolbarMenuButton {
+                        id: colorMenuButton
+                        iconName: "gutterCheckBox@14x14"
+                        Accessible.name: qsTr("Brush color")
+                        onClicked: toolbar.openColorPickerMenu(colorMenuButton)
+                    }
+
+                    FigmaToolbarButton {
+                        iconName: "typeAlias"
+                        Accessible.name: qsTr("Type tool")
+                    }
+                }
             }
         }
 
