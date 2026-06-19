@@ -30,33 +30,34 @@ Rectangle {
     property string toolMode: "brush"
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
+    readonly property real workspaceCanvasHorizontalInsetRatio: 0.09
+    readonly property real workspaceCanvasTopInsetRatio: 0.12
+    readonly property real workspaceCanvasBottomInsetRatio: 0.10
+    readonly property int workspaceCanvasMinimumInset: 24
+    readonly property int workspaceCanvasHorizontalInset: Math.max(workspaceCanvasMinimumInset, Math.round(width * workspaceCanvasHorizontalInsetRatio))
+    readonly property int workspaceCanvasTopInset: Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasTopInsetRatio))
+    readonly property int workspaceCanvasBottomInset: Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasBottomInsetRatio))
+    readonly property int workspaceCanvasWidth: Math.max(1, Math.round(width) - workspaceCanvasHorizontalInset * 2)
+    readonly property int workspaceCanvasHeight: Math.max(1, Math.round(height) - workspaceCanvasTopInset - workspaceCanvasBottomInset)
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
 
-    function windowCanvasWidth() {
-        return Math.max(1, Math.round(surface.width));
-    }
-
-    function windowCanvasHeight() {
-        return Math.max(1, Math.round(surface.height));
-    }
-
-    function syncCanvasItemSizeToWindow() {
+    function syncCanvasItemSizeToWorkspace() {
         if (!canvasItemReady || surface.width <= 0 || surface.height <= 0) {
             return;
         }
-        canvasSurface.resizeCanvasSurface(windowCanvasWidth(), windowCanvasHeight());
+        canvasSurface.resizeCanvasSurface(workspaceCanvasWidth, workspaceCanvasHeight);
         canvasSizeCreated = true;
     }
 
     function newCanvas() {
-        syncCanvasItemSizeToWindow();
+        syncCanvasItemSizeToWorkspace();
         canvasSurface.newCanvas();
     }
 
     function clearCanvas() {
-        syncCanvasItemSizeToWindow();
+        syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
     }
 
@@ -70,51 +71,60 @@ Rectangle {
 
     onWidthChanged: {
         if (!surface.canvasSizeCreated) {
-            syncCanvasItemSizeToWindow();
+            syncCanvasItemSizeToWorkspace();
         }
     }
 
     onHeightChanged: {
         if (!surface.canvasSizeCreated) {
-            syncCanvasItemSizeToWindow();
+            syncCanvasItemSizeToWorkspace();
         }
     }
 
-    Rectangle {
-        id: canvasPaper
-        objectName: "canvasPaper"
-        anchors.centerIn: parent
-        width: canvasSurface.width
-        height: canvasSurface.height
-        color: surface.canvasColor
-        border.color: "#b8bcc4"
-        border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
-    }
+    Item {
+        id: canvasViewport
+        objectName: "canvasViewport"
+        x: surface.workspaceCanvasHorizontalInset
+        y: surface.workspaceCanvasTopInset
+        width: surface.workspaceCanvasWidth
+        height: surface.workspaceCanvasHeight
 
-    DrawingSurfaceItem {
-        id: canvasSurface
-        anchors.centerIn: parent
-        z: 1
-        width: 1
-        height: 1
-        brushColor: surface.brushColor
-        brushSize: surface.brushSize
-        brushFlow: surface.brushFlow
-        brushOpacity: surface.brushOpacity
-        brushHardness: surface.brushHardness
-        brushSpacing: surface.brushSpacing
-        brushSpacingRatio: surface.brushSpacingRatio
-        pressureCurveMinimum: surface.pressureCurveMinimum
-        pressureCurveCenter: surface.pressureCurveCenter
-        pressureCurveMaximum: surface.pressureCurveMaximum
-        stabilizerStrength: surface.stabilizerStrength
-        toolMode: surface.toolMode
-        documentViewModel: surface.documentViewModel
-        viewId: surface.viewId
+        Rectangle {
+            id: canvasPaper
+            objectName: "canvasPaper"
+            anchors.centerIn: parent
+            width: canvasSurface.width
+            height: canvasSurface.height
+            color: surface.canvasColor
+            border.color: "#b8bcc4"
+            border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
+        }
 
-        Component.onCompleted: {
-            surface.canvasItemReady = true;
-            surface.syncCanvasItemSizeToWindow();
+        DrawingSurfaceItem {
+            id: canvasSurface
+            anchors.centerIn: parent
+            z: 1
+            width: 1
+            height: 1
+            brushColor: surface.brushColor
+            brushSize: surface.brushSize
+            brushFlow: surface.brushFlow
+            brushOpacity: surface.brushOpacity
+            brushHardness: surface.brushHardness
+            brushSpacing: surface.brushSpacing
+            brushSpacingRatio: surface.brushSpacingRatio
+            pressureCurveMinimum: surface.pressureCurveMinimum
+            pressureCurveCenter: surface.pressureCurveCenter
+            pressureCurveMaximum: surface.pressureCurveMaximum
+            stabilizerStrength: surface.stabilizerStrength
+            toolMode: surface.toolMode
+            documentViewModel: surface.documentViewModel
+            viewId: surface.viewId
+
+            Component.onCompleted: {
+                surface.canvasItemReady = true;
+                surface.syncCanvasItemSizeToWorkspace();
+            }
         }
     }
 

@@ -13,7 +13,7 @@ LV.ApplicationWindow {
     visible: true
     windowColor: LV.Theme.window
     solidChrome: true
-    windowDragHandleEnabled: false
+    windowDragHandleEnabled: true
     navigationEnabled: false
     autoAttachRuntimeEvents: true
 
@@ -22,6 +22,7 @@ LV.ApplicationWindow {
     CanvasViews.PainterCanvasPage {
         id: painterPage
         anchors.fill: parent
+        topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
         onPageReady: window.canvasPage = painterPage
     }
 }

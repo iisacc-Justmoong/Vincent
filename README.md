@@ -28,6 +28,8 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
 - Brush and eraser tools with the Figma-aligned left toolbar, HSL color picker, and brush size controls
 - Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting
+- LVRS solid chrome keeps the top window drag handle logically active without adding a visible title strip, while the toolbar is offset below that reserved chrome area
+- New and initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible
 
 ## Testing
 ```bash

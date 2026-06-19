@@ -33,15 +33,11 @@ Item {
     readonly property string shortcutSave: modifierKeyLabel + "+S"
     readonly property string shortcutClear: modifierKeyLabel + "+Shift+K"
     readonly property color accentColor: LV.Theme.primary
-    readonly property int figmaLeftToolbarWidth: 178
-    readonly property int figmaLeftToolbarHeight: 28
     readonly property int figmaToolbarButtonSize: 20
     readonly property int figmaToolbarMenuButtonWidth: 34
     readonly property int figmaToolbarIconSize: 16
-    readonly property int figmaToolbarOuterHorizontalPadding: 8
-    readonly property int figmaToolbarOuterVerticalPadding: 4
-    readonly property color figmaToolbarBackground: LV.Theme.panelBackground12
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
+    readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
 
     implicitHeight: toolbarLayout.implicitHeight + spacingSmall * 4
     implicitWidth: toolbarLayout.implicitWidth + spacingSmall * 4
@@ -338,6 +334,241 @@ Item {
         }
     }
 
+    component PressureCurveGraph: Item {
+        id: pressureCurveGraph
+
+        property real minimumValue: 0
+        property real centerValue: 0.5
+        property real maximumValue: 1
+        readonly property int graphHeight: 92
+        readonly property int handleSize: 12
+        readonly property real plotLeft: handleSize / 2
+        readonly property real plotRight: Math.max(plotLeft + 1, width - handleSize / 2)
+        readonly property real plotTop: handleSize / 2
+        readonly property real plotBottom: graphHeight - handleSize / 2
+        readonly property var pointModel: [
+            {
+                label: qsTr("Pressure Minimum"),
+                propertyName: "pressureCurveMinimum",
+                position: 0,
+                value: minimumValue
+            },
+            {
+                label: qsTr("Pressure Center"),
+                propertyName: "pressureCurveCenter",
+                position: 0.5,
+                value: centerValue
+            },
+            {
+                label: qsTr("Pressure Maximum"),
+                propertyName: "pressureCurveMaximum",
+                position: 1,
+                value: maximumValue
+            }
+        ]
+
+        Layout.fillWidth: true
+        implicitWidth: 300
+        implicitHeight: graphColumn.implicitHeight
+
+        function clampedValue(value) {
+            return Math.max(0, Math.min(1, value));
+        }
+
+        function formattedValue(value) {
+            return Math.round(clampedValue(value) * 100).toString() + qsTr("%");
+        }
+
+        function pointX(position) {
+            return plotLeft + clampedValue(position) * (plotRight - plotLeft);
+        }
+
+        function pointY(value) {
+            return plotTop + (1 - clampedValue(value)) * (plotBottom - plotTop);
+        }
+
+        function valueFromY(yPosition) {
+            return clampedValue(1 - (yPosition - plotTop) / Math.max(1, plotBottom - plotTop));
+        }
+
+        function requestPointChange(point, yPosition) {
+            const nextValue = valueFromY(yPosition);
+            toolbar.requestBrushPropertyChange(point.propertyName, nextValue);
+        }
+
+        onMinimumValueChanged: pressureCurveCanvas.requestPaint()
+        onCenterValueChanged: pressureCurveCanvas.requestPaint()
+        onMaximumValueChanged: pressureCurveCanvas.requestPaint()
+        onWidthChanged: pressureCurveCanvas.requestPaint()
+
+        ColumnLayout {
+            id: graphColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            spacing: toolbar.spacingSmall
+
+            Controls.Label {
+                text: qsTr("Pressure Curve")
+                color: "#f2f4f7"
+                font.pixelSize: 12
+                Layout.fillWidth: true
+            }
+
+            Item {
+                id: pressureGraphArea
+                Layout.fillWidth: true
+                Layout.preferredHeight: pressureCurveGraph.graphHeight
+
+                Canvas {
+                    id: pressureCurveCanvas
+                    anchors.fill: parent
+
+                    onPaint: {
+                        const context = getContext("2d");
+                        context.clearRect(0, 0, width, height);
+
+                        context.lineWidth = 1;
+                        context.strokeStyle = Qt.rgba(255, 255, 255, 0.12).toString();
+                        for (let i = 0; i <= 4; ++i) {
+                            const y = pressureCurveGraph.plotTop + i * (pressureCurveGraph.plotBottom - pressureCurveGraph.plotTop) / 4;
+                            context.beginPath();
+                            context.moveTo(pressureCurveGraph.plotLeft, y);
+                            context.lineTo(pressureCurveGraph.plotRight, y);
+                            context.stroke();
+                        }
+
+                        const points = pressureCurveGraph.pointModel;
+                        context.lineWidth = 3;
+                        context.lineCap = "round";
+                        context.lineJoin = "round";
+                        context.strokeStyle = LV.Theme.primary.toString();
+                        context.beginPath();
+                        for (let pointIndex = 0; pointIndex < points.length; ++pointIndex) {
+                            const point = points[pointIndex];
+                            const x = pressureCurveGraph.pointX(point.position);
+                            const y = pressureCurveGraph.pointY(point.value);
+                            if (pointIndex === 0) {
+                                context.moveTo(x, y);
+                            } else {
+                                context.lineTo(x, y);
+                            }
+                        }
+                        context.stroke();
+                    }
+                }
+
+                Repeater {
+                    id: pressurePointRepeater
+                    model: pressureCurveGraph.pointModel
+
+                    Rectangle {
+                        id: pressurePointHandle
+                        required property var modelData
+                        readonly property var point: modelData
+
+                        width: pressureCurveGraph.handleSize
+                        height: pressureCurveGraph.handleSize
+                        radius: width / 2
+                        x: pressureCurveGraph.pointX(point.position) - width / 2
+                        y: pressureCurveGraph.pointY(point.value) - height / 2
+                        color: pressurePointMouseArea.pressed ? LV.Theme.primary : "#f2f4f7"
+                        border.width: 1
+                        border.color: Qt.rgba(0, 0, 0, 0.38)
+
+                        MouseArea {
+                            id: pressurePointMouseArea
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.SizeVerCursor
+                            hoverEnabled: true
+
+                            function updateValue(mouse) {
+                                const graphPoint = mapToItem(pressureGraphArea, mouse.x, mouse.y);
+                                pressureCurveGraph.requestPointChange(pressurePointHandle.point, graphPoint.y);
+                            }
+
+                            onPressed: function(mouse) {
+                                updateValue(mouse);
+                            }
+
+                            onPositionChanged: function(mouse) {
+                                if (pressed) {
+                                    updateValue(mouse);
+                                }
+                            }
+                        }
+
+                        Controls.ToolTip.visible: pressurePointMouseArea.containsMouse || pressurePointMouseArea.pressed
+                        Controls.ToolTip.text: point.label + " " + pressureCurveGraph.formattedValue(point.value)
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: toolbar.spacingSmall
+
+                Controls.Label {
+                    text: qsTr("Pressure Minimum")
+                    color: "#d7dde6"
+                    font.pixelSize: 11
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
+
+                Controls.Label {
+                    text: pressureCurveGraph.formattedValue(pressureCurveGraph.minimumValue)
+                    color: "#f2f4f7"
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignRight
+                    Layout.preferredWidth: 42
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: toolbar.spacingSmall
+
+                Controls.Label {
+                    text: qsTr("Pressure Center")
+                    color: "#d7dde6"
+                    font.pixelSize: 11
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
+
+                Controls.Label {
+                    text: pressureCurveGraph.formattedValue(pressureCurveGraph.centerValue)
+                    color: "#f2f4f7"
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignRight
+                    Layout.preferredWidth: 42
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: toolbar.spacingSmall
+
+                Controls.Label {
+                    text: qsTr("Pressure Maximum")
+                    color: "#d7dde6"
+                    font.pixelSize: 11
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
+
+                Controls.Label {
+                    text: pressureCurveGraph.formattedValue(pressureCurveGraph.maximumValue)
+                    color: "#f2f4f7"
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignRight
+                    Layout.preferredWidth: 42
+                }
+            }
+        }
+    }
+
     Dialogs.FileDialog {
         id: openDialog
         title: qsTr("Open Image")
@@ -477,35 +708,18 @@ Item {
             }
 
             BrushPropertySlider {
-                label: qsTr("Pressure Minimum")
-                propertyName: "pressureCurveMinimum"
-                value: toolbar.pressureCurveMinimum
-                displayScale: 100
-                suffix: qsTr("%")
-            }
-
-            BrushPropertySlider {
-                label: qsTr("Pressure Center")
-                propertyName: "pressureCurveCenter"
-                value: toolbar.pressureCurveCenter
-                displayScale: 100
-                suffix: qsTr("%")
-            }
-
-            BrushPropertySlider {
-                label: qsTr("Pressure Maximum")
-                propertyName: "pressureCurveMaximum"
-                value: toolbar.pressureCurveMaximum
-                displayScale: 100
-                suffix: qsTr("%")
-            }
-
-            BrushPropertySlider {
                 label: qsTr("Stabilizer")
                 propertyName: "stabilizerStrength"
                 value: toolbar.stabilizerStrength
                 displayScale: 100
                 suffix: qsTr("%")
+            }
+
+            PressureCurveGraph {
+                id: pressureCurveGraph
+                minimumValue: toolbar.pressureCurveMinimum
+                centerValue: toolbar.pressureCurveCenter
+                maximumValue: toolbar.pressureCurveMaximum
             }
         }
     }
@@ -555,80 +769,66 @@ Item {
         spacing: toolbar.spacingMedium
         alignmentName: "center"
 
-        Rectangle {
-            id: figmaLeftToolbar
-            implicitWidth: toolbar.figmaLeftToolbarWidth
-            implicitHeight: toolbar.figmaLeftToolbarHeight
-            Layout.preferredWidth: toolbar.figmaLeftToolbarWidth
-            Layout.preferredHeight: toolbar.figmaLeftToolbarHeight
+        LV.HStack {
+            id: leftToolbarActions
+            spacing: toolbar.spacingSmall
             Layout.alignment: Qt.AlignVCenter
-            radius: height / 2
-            color: toolbar.figmaToolbarBackground
+            alignmentName: "center"
 
             LV.HStack {
-                anchors.fill: parent
-                anchors.leftMargin: toolbar.figmaToolbarOuterHorizontalPadding
-                anchors.rightMargin: toolbar.figmaToolbarOuterHorizontalPadding
-                anchors.topMargin: toolbar.figmaToolbarOuterVerticalPadding
-                anchors.bottomMargin: toolbar.figmaToolbarOuterVerticalPadding
-                spacing: toolbar.spacingSmall
-                alignmentName: "center"
+                id: figmaFileActionsRow
+                spacing: 0
+                Layout.alignment: Qt.AlignVCenter
 
-                LV.HStack {
-                    id: figmaFileActionsRow
-                    spacing: 0
-                    Layout.alignment: Qt.AlignVCenter
-
-                    FigmaToolbarButton {
-                        iconName: "addFile"
-                        Accessible.name: qsTr("New canvas")
-                        onClicked: toolbar.newCanvasRequested()
-                    }
-
-                    FigmaToolbarButton {
-                        iconName: "generaldelete"
-                        Accessible.name: qsTr("Clear canvas")
-                        onClicked: toolbar.clearCanvasRequested()
-                    }
+                FigmaToolbarButton {
+                    iconName: "addFile"
+                    Accessible.name: qsTr("New canvas")
+                    onClicked: toolbar.newCanvasRequested()
                 }
 
-                LV.HStack {
-                    id: figmaToolActionsRow
-                    spacing: 0
-                    Layout.alignment: Qt.AlignVCenter
+                FigmaToolbarButton {
+                    iconName: "generaldelete"
+                    Accessible.name: qsTr("Clear canvas")
+                    onClicked: toolbar.clearCanvasRequested()
+                }
+            }
 
-                    FigmaToolbarButton {
-                        iconName: "translateObject"
-                        iconSource: toolbar.translateObjectIconSource
-                        Accessible.name: qsTr("Move tool")
-                    }
+            LV.HStack {
+                id: figmaToolActionsRow
+                spacing: 0
+                Layout.alignment: Qt.AlignVCenter
 
-                    FigmaToolbarButton {
-                        id: brushToolButton
-                        tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                        iconName: "showCode"
-                        Accessible.name: qsTr("Brush tool")
-                        onClicked: toolbar.activateBrushTool(brushToolButton)
-                    }
+                FigmaToolbarButton {
+                    iconName: "translateObject"
+                    iconSource: toolbar.translateObjectIconSource
+                    Accessible.name: qsTr("Move tool")
+                }
 
-                    FigmaToolbarButton {
-                        tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                        iconName: "eraser"
-                        Accessible.name: qsTr("Eraser tool")
-                        onClicked: toolbar.toolSelected("eraser")
-                    }
+                FigmaToolbarButton {
+                    id: brushToolButton
+                    tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: "showCode"
+                    Accessible.name: qsTr("Brush tool")
+                    onClicked: toolbar.activateBrushTool(brushToolButton)
+                }
 
-                    FigmaToolbarMenuButton {
-                        id: colorMenuButton
-                        iconName: "gutterCheckBox@14x14"
-                        Accessible.name: qsTr("Brush color")
-                        onClicked: toolbar.openColorPickerMenu(colorMenuButton)
-                    }
+                FigmaToolbarButton {
+                    tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: "eraser"
+                    Accessible.name: qsTr("Eraser tool")
+                    onClicked: toolbar.toolSelected("eraser")
+                }
 
-                    FigmaToolbarButton {
-                        iconName: "typeAlias"
-                        Accessible.name: qsTr("Type tool")
-                    }
+                FigmaToolbarMenuButton {
+                    id: shapeToolButton
+                    iconName: "gutterCheckBox@14x14"
+                    Accessible.name: qsTr("Shape tool")
+                }
+
+                FigmaToolbarButton {
+                    iconName: "typeAlias"
+                    iconSource: toolbar.typeAliasIconSource
+                    Accessible.name: qsTr("Type tool")
                 }
             }
         }

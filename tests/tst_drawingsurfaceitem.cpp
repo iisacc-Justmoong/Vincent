@@ -16,8 +16,8 @@ class tst_DrawingSurfaceItem : public QObject
     Q_OBJECT
 
 private slots:
-    void createsInitialCanvasAtSurfaceSize();
-    void createsNewCanvasAtCurrentSurfaceSize();
+    void createsInitialCanvasInsideWorkspaceMargins();
+    void createsNewCanvasAtCurrentWorkspaceSize();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void supportsUndoRedo();
@@ -76,9 +76,30 @@ QQuickItem *findItemByObjectName(QQuickItem *root, const QString &objectName)
     return nullptr;
 }
 
+int workspaceHorizontalInset(qreal width)
+{
+    return qMax(24, qRound(width * 0.09));
+}
+
+int workspaceTopInset(qreal height)
+{
+    return qMax(24, qRound(height * 0.12));
+}
+
+int workspaceBottomInset(qreal height)
+{
+    return qMax(24, qRound(height * 0.10));
+}
+
+QSize workspaceCanvasSize(qreal width, qreal height)
+{
+    return QSize(qMax(1, qRound(width) - workspaceHorizontalInset(width) * 2),
+                 qMax(1, qRound(height) - workspaceTopInset(height) - workspaceBottomInset(height)));
+}
+
 } // namespace
 
-void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
+void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
 
@@ -128,15 +149,22 @@ void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
     QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
     QVERIFY(canvasPaper);
     QCOMPARE(canvasPaper->property("color").value<QColor>(), QColor(Qt::white));
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
-    QTRY_COMPARE(canvasItem->width(), 720.0);
-    QTRY_COMPARE(canvasItem->height(), 480.0);
-    QTRY_COMPARE(canvasPaper->width(), 720.0);
-    QTRY_COMPARE(canvasPaper->height(), 480.0);
-    QTRY_COMPARE(viewModel.canvasWidth(), 720);
-    QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    const QSize expectedCanvasSize = workspaceCanvasSize(720, 480);
+    QTRY_COMPARE(canvasViewport->x(), static_cast<qreal>(workspaceHorizontalInset(720)));
+    QTRY_COMPARE(canvasViewport->y(), static_cast<qreal>(workspaceTopInset(480)));
+    QTRY_COMPARE(canvasViewport->width(), static_cast<qreal>(expectedCanvasSize.width()));
+    QTRY_COMPARE(canvasViewport->height(), static_cast<qreal>(expectedCanvasSize.height()));
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(expectedCanvasSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(expectedCanvasSize.height()));
+    QTRY_COMPARE(canvasPaper->width(), static_cast<qreal>(expectedCanvasSize.width()));
+    QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(expectedCanvasSize.height()));
+    QTRY_COMPARE(viewModel.canvasWidth(), expectedCanvasSize.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), expectedCanvasSize.height());
     QCOMPARE(canvasItem->brushFlow(), 0.42);
     QCOMPARE(canvasItem->brushOpacity(), 0.64);
     QCOMPARE(canvasItem->brushHardness(), 0.71);
@@ -153,10 +181,10 @@ void tst_DrawingSurfaceItem::createsInitialCanvasAtSurfaceSize()
     QVERIFY(canvasItem->saveToFile(outputPath));
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
-    QCOMPARE(saved.size(), QSize(720, 480));
+    QCOMPARE(saved.size(), expectedCanvasSize);
 }
 
-void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
+void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
 
@@ -189,12 +217,17 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
              CanvasDocumentViewModel::maximumAntialiasingBrushHardness());
     QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
     QVERIFY(canvasPaper);
-    QTRY_COMPARE(canvasItem->width(), 720.0);
-    QTRY_COMPARE(canvasItem->height(), 480.0);
-    QTRY_COMPARE(canvasPaper->width(), 720.0);
-    QTRY_COMPARE(canvasPaper->height(), 480.0);
-    QTRY_COMPARE(viewModel.canvasWidth(), 720);
-    QTRY_COMPARE(viewModel.canvasHeight(), 480);
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    const QSize initialCanvasSize = workspaceCanvasSize(720, 480);
+    QTRY_COMPARE(canvasViewport->x(), static_cast<qreal>(workspaceHorizontalInset(720)));
+    QTRY_COMPARE(canvasViewport->y(), static_cast<qreal>(workspaceTopInset(480)));
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(initialCanvasSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(initialCanvasSize.height()));
+    QTRY_COMPARE(canvasPaper->width(), static_cast<qreal>(initialCanvasSize.width()));
+    QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(initialCanvasSize.height()));
+    QTRY_COMPARE(viewModel.canvasWidth(), initialCanvasSize.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), initialCanvasSize.height());
     QCOMPARE(canvasItem->brushHardness(), CanvasDocumentViewModel::maximumAntialiasingBrushHardness());
     QVERIFY(rootItem->property("color").value<QColor>() != canvasPaper->property("color").value<QColor>());
     QVERIFY(rootItem->setProperty("canvasWidth", 720));
@@ -203,52 +236,62 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentSurfaceSize()
     QVERIFY(rootItem->setProperty("canvasWidth", 300));
     QVERIFY(rootItem->setProperty("canvasHeight", 200));
     QCoreApplication::processEvents();
-    QCOMPARE(canvasItem->width(), 720.0);
-    QCOMPARE(canvasItem->height(), 480.0);
+    QCOMPARE(canvasItem->width(), static_cast<qreal>(initialCanvasSize.width()));
+    QCOMPARE(canvasItem->height(), static_cast<qreal>(initialCanvasSize.height()));
     QVERIFY(rootItem->setProperty("canvasWidth", 720));
     QVERIFY(rootItem->setProperty("canvasHeight", 480));
 
     rootItem->setWidth(960);
     rootItem->setHeight(540);
     QCoreApplication::processEvents();
-    QCOMPARE(canvasItem->width(), 720.0);
-    QCOMPARE(canvasItem->height(), 480.0);
-    QCOMPARE(canvasPaper->width(), 720.0);
-    QCOMPARE(canvasPaper->height(), 480.0);
+    const QSize expandedCanvasSize = workspaceCanvasSize(960, 540);
+    QCOMPARE(canvasViewport->x(), static_cast<qreal>(workspaceHorizontalInset(960)));
+    QCOMPARE(canvasViewport->y(), static_cast<qreal>(workspaceTopInset(540)));
+    QCOMPARE(canvasViewport->width(), static_cast<qreal>(expandedCanvasSize.width()));
+    QCOMPARE(canvasViewport->height(), static_cast<qreal>(expandedCanvasSize.height()));
+    QCOMPARE(canvasItem->width(), static_cast<qreal>(initialCanvasSize.width()));
+    QCOMPARE(canvasItem->height(), static_cast<qreal>(initialCanvasSize.height()));
+    QCOMPARE(canvasPaper->width(), static_cast<qreal>(initialCanvasSize.width()));
+    QCOMPARE(canvasPaper->height(), static_cast<qreal>(initialCanvasSize.height()));
 
     QVERIFY(QMetaObject::invokeMethod(rootItem, "newCanvas", Qt::DirectConnection));
-    QTRY_COMPARE(canvasItem->width(), 960.0);
-    QTRY_COMPARE(canvasItem->height(), 540.0);
-    QTRY_COMPARE(canvasPaper->width(), 960.0);
-    QTRY_COMPARE(canvasPaper->height(), 540.0);
-    QTRY_COMPARE(viewModel.canvasWidth(), 960);
-    QTRY_COMPARE(viewModel.canvasHeight(), 540);
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(expandedCanvasSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(expandedCanvasSize.height()));
+    QTRY_COMPARE(canvasPaper->width(), static_cast<qreal>(expandedCanvasSize.width()));
+    QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(expandedCanvasSize.height()));
+    QTRY_COMPARE(viewModel.canvasWidth(), expandedCanvasSize.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), expandedCanvasSize.height());
 
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString outputPath = dir.filePath(QStringLiteral("new-window-sized-canvas.png"));
+    const QString outputPath = dir.filePath(QStringLiteral("new-workspace-sized-canvas.png"));
     QVERIFY(canvasItem->saveToFile(outputPath));
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
-    QCOMPARE(saved.size(), QSize(960, 540));
+    QCOMPARE(saved.size(), expandedCanvasSize);
 
-    QVERIFY(rootItem->setProperty("canvasWidth", 960));
-    QVERIFY(rootItem->setProperty("canvasHeight", 540));
+    QVERIFY(rootItem->setProperty("canvasWidth", expandedCanvasSize.width()));
+    QVERIFY(rootItem->setProperty("canvasHeight", expandedCanvasSize.height()));
     rootItem->setWidth(800);
     rootItem->setHeight(600);
     QCoreApplication::processEvents();
-    QCOMPARE(canvasItem->width(), 960.0);
-    QCOMPARE(canvasItem->height(), 540.0);
-    QCOMPARE(canvasPaper->width(), 960.0);
-    QCOMPARE(canvasPaper->height(), 540.0);
+    const QSize compactCanvasSize = workspaceCanvasSize(800, 600);
+    QCOMPARE(canvasViewport->x(), static_cast<qreal>(workspaceHorizontalInset(800)));
+    QCOMPARE(canvasViewport->y(), static_cast<qreal>(workspaceTopInset(600)));
+    QCOMPARE(canvasViewport->width(), static_cast<qreal>(compactCanvasSize.width()));
+    QCOMPARE(canvasViewport->height(), static_cast<qreal>(compactCanvasSize.height()));
+    QCOMPARE(canvasItem->width(), static_cast<qreal>(expandedCanvasSize.width()));
+    QCOMPARE(canvasItem->height(), static_cast<qreal>(expandedCanvasSize.height()));
+    QCOMPARE(canvasPaper->width(), static_cast<qreal>(expandedCanvasSize.width()));
+    QCOMPARE(canvasPaper->height(), static_cast<qreal>(expandedCanvasSize.height()));
 
     QVERIFY(QMetaObject::invokeMethod(rootItem, "clearCanvas", Qt::DirectConnection));
-    QTRY_COMPARE(canvasItem->width(), 800.0);
-    QTRY_COMPARE(canvasItem->height(), 600.0);
-    QTRY_COMPARE(canvasPaper->width(), 800.0);
-    QTRY_COMPARE(canvasPaper->height(), 600.0);
-    QTRY_COMPARE(viewModel.canvasWidth(), 800);
-    QTRY_COMPARE(viewModel.canvasHeight(), 600);
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(compactCanvasSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(compactCanvasSize.height()));
+    QTRY_COMPARE(canvasPaper->width(), static_cast<qreal>(compactCanvasSize.width()));
+    QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(compactCanvasSize.height()));
+    QTRY_COMPARE(viewModel.canvasWidth(), compactCanvasSize.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), compactCanvasSize.height());
 }
 
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()

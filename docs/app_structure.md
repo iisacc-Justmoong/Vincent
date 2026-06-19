@@ -36,12 +36,15 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Creates the main LVRS application window.
 - Keeps native close, minimize, and maximize controls while using LVRS solid chrome to suppress the visual title-bar strip.
+- Enables LVRS's logical top drag handle so the window can move from the top area without adding a visible handle.
+- Passes the active top drag-handle height into `PainterCanvasPage` so floating toolbar placement clears ApplicationWindow controls.
 - Hosts `PainterCanvasPage` as the single content view.
 
 ### `PainterCanvasPage.qml`
 
 - Binds the view to LVRS `ViewModels` using the stable `PainterCanvasPage` view ID.
 - Reads brush and canvas state from `CanvasDocumentViewModel`.
+- Offsets the floating toolbar by the reserved top chrome height plus the normal page gap, keeping its absolute top position below the ApplicationWindow control/drag region.
 - Routes toolbar actions into either view-model property updates or `DrawingSurface` commands.
 
 ### `CanvasToolBar.qml`
@@ -49,13 +52,13 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 - Provides the drawing-only command bar.
 - Exposes actions for new, open, save, and clear, with open/save still available through shortcuts and dialogs.
 - Renders the command bar inside a full-height solid round cylinder background.
-- Renders the left command cluster as the Figma `178x28` capsule using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, `gutterCheckBox@14x14`, and `typeAlias` icons.
-- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, eraser selects the eraser, and the checkbox dropdown opens the HSL color picker.
-- Uses an app-local vector source for the `translateObject` slot while preserving the Figma/LVRS icon name, because the bundled LVRS SVG contains an embedded image form that Qt SVG logs at runtime.
+- Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, `gutterCheckBox@14x14`, and `typeAlias` icons.
+- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, and eraser selects the eraser. The shape dropdown slot to the right of eraser is intentionally left as a no-op until shape tools exist.
+- Uses app-local vector sources for the `translateObject` and `typeAlias` slots while preserving the Figma/LVRS icon names. `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
 - Restricts tools to brush and eraser.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
-- Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, pressure curve, and stabilizer strength.
+- Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
 - Restricts open/save dialogs to flat raster formats and handles default save extensions.
 
 ### `HslTriangleColorPicker.qml`
@@ -69,7 +72,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
-- Uses the current window-sized surface as a fixed canvas size for initial, new, and clear canvas creation.
+- Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
 - Presents only the fixed canvas area on a white paper background and leaves any resized viewport overflow in the LVRS workspace color, while keeping iiPaintEngine's raster layer semantics unchanged.
 - Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, and toolbar state binding.
@@ -109,5 +112,6 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - `tests/tst_canvasdocumentviewmodel.cpp` validates the drawing-only document state and value clamping, including iiPaintEngine brush settings.
 - `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings and HSL triangle color-picker usage.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, undo/redo, saving, and opening rasters.
+- `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

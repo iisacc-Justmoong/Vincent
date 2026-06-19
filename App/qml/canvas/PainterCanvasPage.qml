@@ -13,7 +13,9 @@ Item {
     readonly property int spacingLarge: LV.Theme.gap16
     readonly property string viewId: "PainterCanvasPage"
     readonly property real maximumAntialiasingBrushHardness: 1
+    readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall
 
+    property int topChromeReservedHeight: 0
     property var vm: null
 
     signal pageReady
@@ -130,7 +132,7 @@ Item {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.topMargin: painterPage.spacingSmall
+            anchors.topMargin: painterPage.toolbarTopMargin
             anchors.leftMargin: painterPage.spacingSmall
             anchors.rightMargin: painterPage.spacingSmall
             z: 10
