@@ -15,6 +15,8 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 ## 1a. Automated Local Build Script
 Use `./build.sh` or `./build.sh local` for local development validation. The default local mode configures `build/`, builds Vincent, runs `ctest --test-dir build --output-on-failure`, deploys Qt runtime files into `dist/Vincent.app`, and signs that app with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature if no development certificate is installed.
 
+The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`.
+
 Distribution modes must be requested explicitly:
 
 ```bash
