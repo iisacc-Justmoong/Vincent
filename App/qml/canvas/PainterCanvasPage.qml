@@ -120,6 +120,8 @@ Item {
                 pressureCurveMaximum: painterPage.vm ? painterPage.vm.pressureCurveMaximum : 1
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
+                textToolAccentColor: LV.Theme.primary
+                textToolFramePadding: painterPage.spacingSmall
                 canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : 1
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onBrushDeltaRequested: delta => painterPage.adjustBrush(delta)

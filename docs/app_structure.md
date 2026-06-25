@@ -1,6 +1,6 @@
 # Vincent 2.2.1 Application Structure
 
-This document captures the drawing-only architecture of Vincent 2.2.1 after replacing the local painting implementation with iiPaintEngine.
+This document captures the flat-raster architecture of Vincent 2.2.1 after replacing the local painting implementation with iiPaintEngine.
 
 ## Top-Level Layout
 
@@ -49,13 +49,13 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 ### `CanvasToolBar.qml`
 
-- Provides the drawing-only command bar.
+- Provides the flat-raster command bar.
 - Exposes actions for new, open, save, and clear, with open/save still available through shortcuts and dialogs.
 - Renders the command bar inside a full-height solid round cylinder background.
 - Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, `gutterCheckBox@14x14`, and `typeAlias` icons.
-- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, and eraser selects the eraser. The shape dropdown slot to the right of eraser is intentionally left as a no-op until shape tools exist.
+- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, eraser selects the eraser, and `typeAlias` selects the text tool. The shape dropdown slot to the right of eraser is intentionally left as a no-op until shape tools exist.
 - Uses app-local vector sources for the `translateObject` and `typeAlias` slots while preserving the Figma/LVRS icon names. `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
-- Restricts tools to brush and eraser.
+- Restricts tools to brush, eraser, and text.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
@@ -72,6 +72,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
+- Presents a paint-style text editor when the text tool is active; the editor sizes its frame from the longest text line within the remaining canvas width, uses the current brush size and brush color as its text size and color, then commits plain text into the flat raster through `DrawingSurfaceItem`.
 - Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
 - Presents only the fixed canvas area on a white paper background and leaves any resized viewport overflow in the LVRS workspace color, while keeping iiPaintEngine's raster layer semantics unchanged.
@@ -83,6 +84,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 
 - Inherits `CanvasAdapter` from iiPaintEngine.
 - Preserves Vincent's previous QML-facing commands such as `newCanvas`, `openRaster`, `saveToFile`, `undo`, `redo`, and compatibility stroke methods.
+- Exposes `commitText` so QML can pass text bounds, content, text size, and text color into Qt text layout and commit the result back through iiPaintEngine's raster replacement path.
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
 - Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
@@ -92,7 +94,7 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 - Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, and canvas dimensions to QML.
 - Sets the default brush hardness to the app's maximum anti-aliased edge setting for iiPaintEngine's coverage-based circular brush.
 - Clamps brush size, brush dynamics, pressure curve, stabilizer, and canvas dimensions to safe ranges.
-- Restricts tool mode to the drawing-only set.
+- Restricts tool mode to the flat-raster tool set: brush, eraser, and text.
 
 ### `CanvasViewModelBridge`
 
@@ -106,12 +108,12 @@ This document captures the drawing-only architecture of Vincent 2.2.1 after repl
 2. `PainterCanvasPage` binds to `CanvasDocumentViewModel` and passes brush state into `DrawingSurface`.
 3. `CanvasToolBar` emits user actions for file flow, tool selection, HSL color picker changes, brush size updates, and brush reselection settings.
 4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.
-5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save.
+5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save; Vincent renders text with Qt text layout and commits the result as a raster replacement.
 
 ## Testing Surface
 
-- `tests/tst_canvasdocumentviewmodel.cpp` validates the drawing-only document state and value clamping, including iiPaintEngine brush settings.
-- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings and HSL triangle color-picker usage.
+- `tests/tst_canvasdocumentviewmodel.cpp` validates the flat-raster document state and value clamping, including iiPaintEngine brush settings and supported tool modes.
+- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, text-tool selection, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, text raster commit, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

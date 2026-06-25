@@ -2,15 +2,28 @@
 
 #include "../canvas/canvasviewmodelbridge.h"
 
+#include <QAbstractTextDocumentLayout>
+#include <QDir>
 #include <QEvent>
+#include <QFont>
+#include <QImage>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPalette>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
+#include <QTemporaryFile>
+#include <QTextDocument>
+#include <QTextOption>
 #include <QUrl>
 #include <QtGlobal>
 
 namespace {
+
+constexpr qreal minimumTextFontPixelSize = 8.0;
+constexpr qreal maximumTextFontPixelSize = 144.0;
+constexpr qreal minimumTextBoxWidth = 8.0;
 
 QString localFileSource(const QString &fileUrl)
 {
@@ -26,6 +39,13 @@ bool isTabletEvent(QEvent::Type type)
     return type == QEvent::TabletPress
         || type == QEvent::TabletMove
         || type == QEvent::TabletRelease;
+}
+
+QImage transparentCanvasImage(const QSize &size)
+{
+    QImage image(size, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    return image;
 }
 
 } // namespace
@@ -212,8 +232,87 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
     CanvasAdapter::mouseReleaseEvent(&event);
 }
 
+bool DrawingSurfaceItem::commitText(qreal pointX,
+                                    qreal pointY,
+                                    qreal boxWidth,
+                                    const QString &text,
+                                    qreal fontPixelSize,
+                                    const QColor &color)
+{
+    if (!canMutateDocument() || text.trimmed().isEmpty()) {
+        return false;
+    }
+
+    syncCanvasSize();
+    const QSize targetSize = canvasSize();
+    if (targetSize.isEmpty()) {
+        return false;
+    }
+
+    QImage image;
+    QTemporaryFile snapshotFile(QDir::tempPath() + QStringLiteral("/vincent-text-canvas-XXXXXX.png"));
+    snapshotFile.setAutoRemove(true);
+    if (snapshotFile.open()) {
+        const QString snapshotPath = snapshotFile.fileName();
+        snapshotFile.close();
+        if (saveRasterCanvasToFile(snapshotPath)) {
+            image.load(snapshotPath);
+        }
+    }
+
+    if (image.isNull()) {
+        image = transparentCanvasImage(targetSize);
+    }
+    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+        image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
+
+    const qreal maxX = qMax<qreal>(0.0, image.width() - 1.0);
+    const qreal maxY = qMax<qreal>(0.0, image.height() - 1.0);
+    const qreal boundedX = qBound<qreal>(0.0, pointX, maxX);
+    const qreal boundedY = qBound<qreal>(0.0, pointY, maxY);
+    const qreal availableWidth = qMax<qreal>(1.0, image.width() - boundedX);
+    const qreal textWidth = qBound<qreal>(minimumTextBoxWidth, boxWidth, availableWidth);
+    const int boundedFontPixelSize = qRound(qBound<qreal>(minimumTextFontPixelSize,
+                                                          fontPixelSize,
+                                                          maximumTextFontPixelSize));
+
+    QFont font;
+    font.setPixelSize(boundedFontPixelSize);
+
+    QTextOption textOption;
+    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+
+    QTextDocument textDocument;
+    textDocument.setDocumentMargin(0);
+    textDocument.setDefaultFont(font);
+    textDocument.setDefaultTextOption(textOption);
+    textDocument.setPlainText(text);
+    textDocument.setTextWidth(textWidth);
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.translate(QPointF(boundedX, boundedY));
+
+    QAbstractTextDocumentLayout::PaintContext paintContext;
+    paintContext.palette.setColor(QPalette::Text, color.isValid() ? color : brushColor());
+    textDocument.documentLayout()->draw(&painter, paintContext);
+    painter.end();
+
+    const bool committed = replaceRasterCanvas(image);
+    if (committed) {
+        emitUndoRedoSignals();
+    }
+    return committed;
+}
+
 bool DrawingSurfaceItem::event(QEvent *event)
 {
+    if (event && isTabletEvent(event->type()) && isTextToolActive()) {
+        event->accept();
+        return true;
+    }
     if (event && isTabletEvent(event->type()) && !canMutateDocument()) {
         event->accept();
         return true;
@@ -223,6 +322,10 @@ bool DrawingSurfaceItem::event(QEvent *event)
 
 void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
 {
+    if (isTextToolActive()) {
+        event->accept();
+        return;
+    }
     if (!canMutateDocument()) {
         event->accept();
         return;
@@ -232,6 +335,10 @@ void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
 
 void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
 {
+    if (isTextToolActive()) {
+        event->accept();
+        return;
+    }
     if (!canMutateDocument()) {
         event->accept();
         return;
@@ -241,6 +348,10 @@ void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
 
 void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (isTextToolActive()) {
+        event->accept();
+        return;
+    }
     if (!canMutateDocument()) {
         event->accept();
         return;
@@ -268,6 +379,11 @@ QSize DrawingSurfaceItem::canvasSize() const
 bool DrawingSurfaceItem::canMutateDocument() const
 {
     return m_viewModelBridge->canMutateDocument();
+}
+
+bool DrawingSurfaceItem::isTextToolActive() const
+{
+    return toolMode() == QStringLiteral("text");
 }
 
 void DrawingSurfaceItem::syncCanvasSize()

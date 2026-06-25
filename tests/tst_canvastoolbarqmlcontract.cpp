@@ -10,6 +10,7 @@ private slots:
     void brushReselectionOpensBrushSettingsMenu();
     void colorSelectionUsesHslTrianglePicker();
     void leftToolbarMatchesFigmaDesignContract();
+    void drawingSurfaceProvidesPaintStyleTextToolEditor();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
     void toolbarUsesFullRoundSolidCylinderBackground();
     void toolbarIsOffsetBelowApplicationWindowTopChrome();
@@ -134,7 +135,9 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Shape tool\")")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.openColorPickerMenu(shapeToolButton)")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.openColorPickerMenu(colorMenuButton)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"text\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.typeAliasIconSource")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"text\")")));
 
     const QString qrcPath = QFINDTESTDATA("../App/resources.qrc");
     QVERIFY2(!qrcPath.isEmpty(), "resources.qrc test data was not found");
@@ -161,7 +164,54 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generalsave\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generaledit\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("toolbar.toolSelected(\"translate\")")));
-    QVERIFY(!toolbarSource.contains(QStringLiteral("toolbar.toolSelected(\"type\")")));
+}
+
+void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEditor()
+{
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+
+    QFile drawingSurfaceQml(drawingSurfaceQmlPath);
+    QVERIFY(drawingSurfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString surfaceSource = QString::fromUtf8(drawingSurfaceQml.readAll());
+
+    QVERIFY(surfaceSource.contains(QStringLiteral("property color textToolAccentColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property int textToolFramePadding")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int minimumTextToolFontPixelSize")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int textToolFontPixelSize: Math.max(surface.minimumTextToolFontPixelSize, Math.round(surface.brushSize))")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("readonly property int textToolFontPixelSize: 28")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function longestTextLine(textValue)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function textToolAvailableWidth()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function textToolMeasuredWidth()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function textToolResponsiveWidth()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginTextPlacement(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveText()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.commitText(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: textToolEditor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.toolMode === \"text\" ? Qt.LeftButton : Qt.NoButton")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.toolMode === \"text\" ? Qt.IBeamCursor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("border.color: surface.textToolAccentColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("selectionColor: surface.textToolAccentColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("TextMetrics")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: textToolLineMetrics")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("text: surface.longestTextLine(textToolEditor.text)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("width: surface.textToolResponsiveWidth()")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("width: surface.textToolDefaultWidth")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: !surface.textEditingActive")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"text\")")));
+
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+
+    QFile painterPageQml(painterPageQmlPath);
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString painterPageSource = QString::fromUtf8(painterPageQml.readAll());
+
+    QVERIFY(painterPageSource.contains(QStringLiteral("textToolAccentColor: LV.Theme.primary")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("textToolFramePadding: painterPage.spacingSmall")));
 }
 
 void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIncrease()

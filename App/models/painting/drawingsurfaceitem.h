@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QSize>
 #include <QString>
 #include <QtAdapter/CanvasAdapter.h>
@@ -38,6 +39,12 @@ public:
     Q_INVOKABLE void beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
     Q_INVOKABLE bool appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
     Q_INVOKABLE void endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive);
+    Q_INVOKABLE bool commitText(qreal pointX,
+                                qreal pointY,
+                                qreal boxWidth,
+                                const QString &text,
+                                qreal fontPixelSize,
+                                const QColor &color);
 
 signals:
     void documentViewModelChanged();
@@ -56,6 +63,7 @@ protected:
 private:
     [[nodiscard]] QSize canvasSize() const;
     [[nodiscard]] bool canMutateDocument() const;
+    [[nodiscard]] bool isTextToolActive() const;
     void syncCanvasSize();
     void emitUndoRedoSignals();
     QMouseEvent makeMouseEvent(QEvent::Type eventType,

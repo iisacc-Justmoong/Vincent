@@ -79,7 +79,9 @@ void CanvasViewModelBridge::syncToolState(CanvasBrushConfig &brushConfig, QStrin
     const QVariant toolModeValue = m_documentViewModel->property("toolMode");
     if (toolModeValue.isValid()) {
         const QString nextTool = toolModeValue.toString();
-        toolMode = nextTool == QStringLiteral("eraser") ? QStringLiteral("eraser") : QStringLiteral("brush");
+        toolMode = nextTool == QStringLiteral("eraser") || nextTool == QStringLiteral("text")
+            ? nextTool
+            : QStringLiteral("brush");
     }
 }
 

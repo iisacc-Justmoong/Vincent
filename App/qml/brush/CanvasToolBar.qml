@@ -487,11 +487,11 @@ Item {
                                 pressureCurveGraph.requestPointChange(pressurePointHandle.point, graphPoint.y);
                             }
 
-                            onPressed: function(mouse) {
+                            onPressed: function (mouse) {
                                 updateValue(mouse);
                             }
 
-                            onPositionChanged: function(mouse) {
+                            onPositionChanged: function (mouse) {
                                 if (pressed) {
                                     updateValue(mouse);
                                 }
@@ -826,9 +826,11 @@ Item {
                 }
 
                 FigmaToolbarButton {
+                    tone: toolbar.currentTool === "text" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
                     iconName: "typeAlias"
                     iconSource: toolbar.typeAliasIconSource
                     Accessible.name: qsTr("Type tool")
+                    onClicked: toolbar.toolSelected("text")
                 }
             }
         }

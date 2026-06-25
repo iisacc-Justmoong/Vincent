@@ -118,8 +118,11 @@ void tst_CanvasDocumentViewModel::acceptsOnlySupportedTools()
     QCOMPARE(viewModel.toolMode(), QStringLiteral("eraser"));
 
     viewModel.setToolMode(QStringLiteral("text"));
+    QCOMPARE(viewModel.toolMode(), QStringLiteral("text"));
+
+    viewModel.setToolMode(QStringLiteral("shape"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
-    QCOMPARE(toolSpy.count(), 2);
+    QCOMPARE(toolSpy.count(), 3);
 }
 
 void tst_CanvasDocumentViewModel::keepsCanvasDimensionsPositive()

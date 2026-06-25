@@ -20,6 +20,7 @@ private slots:
     void createsNewCanvasAtCurrentWorkspaceSize();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
+    void commitsTextToRasterCanvas();
     void supportsUndoRedo();
     void opensRasterBackground();
 };
@@ -353,6 +354,39 @@ void tst_DrawingSurfaceItem::erasesCommittedStrokePixels()
     QVERIFY(item.saveToFile(afterPath));
     const QImage after(afterPath);
     QVERIFY(qAlpha(after.pixel(48, 32)) < qAlpha(before.pixel(48, 32)));
+}
+
+void tst_DrawingSurfaceItem::commitsTextToRasterCanvas()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(180);
+    item.setHeight(96);
+    item.setBrushColor(QColor(QStringLiteral("#d32f2f")));
+    item.setDocumentViewModel(&viewModel);
+
+    QVERIFY(item.commitText(16, 18, 140, QStringLiteral("Vincent"), 28, QColor(QStringLiteral("#d32f2f"))));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString outputPath = dir.filePath(QStringLiteral("text-output.png"));
+    QVERIFY(item.saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(180, 96));
+
+    bool hasTextColorPixel = false;
+    for (int y = 0; y < saved.height() && !hasTextColorPixel; ++y) {
+        for (int x = 0; x < saved.width(); ++x) {
+            const QColor pixel = saved.pixelColor(x, y);
+            if (pixel.alpha() > 0 && pixel.red() > 140 && pixel.green() < 100 && pixel.blue() < 100) {
+                hasTextColorPixel = true;
+                break;
+            }
+        }
+    }
+    QVERIFY(hasTextColorPixel);
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()
