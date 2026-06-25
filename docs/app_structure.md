@@ -73,7 +73,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
-- Presents a drag-to-insert shape tool when shape mode is active; the QML preview follows the drag bounds, then commits the selected shape outline into the flat raster with the current brush color and brush size.
+- Presents a drag-to-insert shape tool when shape mode is active; the QML preview follows the drag bounds, Shift constrains the drag bounds to a 1:1 ratio, then commits the selected shape outline into the flat raster with the current brush color and brush size.
 - Presents a paint-style text editor when the text tool is active; the editor sizes its frame from the longest text line within the remaining canvas width, uses the current brush size and brush color as its text size and color, then commits plain text into the flat raster through `DrawingSurfaceItem`.
 - Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.

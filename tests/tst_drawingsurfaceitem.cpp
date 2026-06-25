@@ -1,7 +1,9 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QQmlComponent>
+#include <QQmlContext>
 #include <QQmlEngine>
+#include <QQmlExpression>
 #include <QQuickItem>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -18,6 +20,7 @@ class tst_DrawingSurfaceItem : public QObject
 private slots:
     void createsInitialCanvasInsideWorkspaceMargins();
     void createsNewCanvasAtCurrentWorkspaceSize();
+    void constrainsShapeDragWithShiftModifier();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
@@ -294,6 +297,64 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
     QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(compactCanvasSize.height()));
     QTRY_COMPARE(viewModel.canvasWidth(), compactCanvasSize.width());
     QTRY_COMPARE(viewModel.canvasHeight(), compactCanvasSize.height());
+}
+
+void tst_DrawingSurfaceItem::constrainsShapeDragWithShiftModifier()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("shape"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QTRY_VERIFY(canvasItem->width() > 160);
+    QTRY_VERIFY(canvasItem->height() > 160);
+
+    QQmlExpression constrainedDrag(engine.rootContext(),
+                                   object.data(),
+                                   QStringLiteral("beginShapeDrag(20, 20, false); updateShapeDrag(140, 70, true);"));
+    constrainedDrag.evaluate();
+    QVERIFY2(!constrainedDrag.hasError(), qPrintable(constrainedDrag.error().toString()));
+
+    QCOMPARE(rootItem->property("shapeAspectLocked").toBool(), true);
+    const qreal constrainedWidth = qAbs(rootItem->property("shapeCurrentX").toReal() - rootItem->property("shapeStartX").toReal());
+    const qreal constrainedHeight = qAbs(rootItem->property("shapeCurrentY").toReal() - rootItem->property("shapeStartY").toReal());
+    QCOMPARE(constrainedWidth, constrainedHeight);
+    QCOMPARE(constrainedWidth, 120.0);
+
+    QQmlExpression freeDrag(engine.rootContext(),
+                            object.data(),
+                            QStringLiteral("updateShapeDrag(140, 70, false);"));
+    freeDrag.evaluate();
+    QVERIFY2(!freeDrag.hasError(), qPrintable(freeDrag.error().toString()));
+
+    QCOMPARE(rootItem->property("shapeAspectLocked").toBool(), false);
+    const qreal freeWidth = qAbs(rootItem->property("shapeCurrentX").toReal() - rootItem->property("shapeStartX").toReal());
+    const qreal freeHeight = qAbs(rootItem->property("shapeCurrentY").toReal() - rootItem->property("shapeStartY").toReal());
+    QCOMPARE(freeWidth, 120.0);
+    QCOMPARE(freeHeight, 50.0);
 }
 
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()

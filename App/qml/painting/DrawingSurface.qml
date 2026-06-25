@@ -33,6 +33,7 @@ Rectangle {
     property bool textEditingActive: false
     property string shapeKind: "rectangle"
     property bool shapeDraggingActive: false
+    property bool shapeAspectLocked: false
     property real shapeStartX: 0
     property real shapeStartY: 0
     property real shapeCurrentX: 0
@@ -173,13 +174,65 @@ Rectangle {
         };
     }
 
+    function shapeAspectLockedFromMouse(mouse) {
+        return (mouse.modifiers & Qt.ShiftModifier) !== 0;
+    }
+
+    function shapeDragAxisDirection(delta, negativeLimit, positiveLimit) {
+        if (delta < 0) {
+            return -1;
+        }
+        if (delta > 0) {
+            return 1;
+        }
+        return positiveLimit >= negativeLimit ? 1 : -1;
+    }
+
+    function constrainedShapeDragPoint(pointX, pointY) {
+        const clampedX = clampedShapePointX(pointX);
+        const clampedY = clampedShapePointY(pointY);
+        const deltaX = clampedX - surface.shapeStartX;
+        const deltaY = clampedY - surface.shapeStartY;
+        const leftLimit = surface.shapeStartX;
+        const rightLimit = canvasSurface.width - surface.shapeStartX;
+        const topLimit = surface.shapeStartY;
+        const bottomLimit = canvasSurface.height - surface.shapeStartY;
+        const horizontalDirection = shapeDragAxisDirection(deltaX, leftLimit, rightLimit);
+        const verticalDirection = shapeDragAxisDirection(deltaY, topLimit, bottomLimit);
+        const horizontalLimit = horizontalDirection < 0 ? leftLimit : rightLimit;
+        const verticalLimit = verticalDirection < 0 ? topLimit : bottomLimit;
+        const side = Math.min(Math.max(Math.abs(deltaX), Math.abs(deltaY)), horizontalLimit, verticalLimit);
+        return {
+            x: surface.shapeStartX + horizontalDirection * side,
+            y: surface.shapeStartY + verticalDirection * side
+        };
+    }
+
+    function shapeDragPoint(pointX, pointY, aspectLocked) {
+        if (aspectLocked) {
+            return constrainedShapeDragPoint(pointX, pointY);
+        }
+        return {
+            x: clampedShapePointX(pointX),
+            y: clampedShapePointY(pointY)
+        };
+    }
+
+    function applyShapeDragPoint(pointX, pointY, aspectLocked) {
+        surface.shapeAspectLocked = aspectLocked === true;
+        const dragPoint = shapeDragPoint(pointX, pointY, surface.shapeAspectLocked);
+        surface.shapeCurrentX = dragPoint.x;
+        surface.shapeCurrentY = dragPoint.y;
+        requestShapePreviewPaint();
+    }
+
     function requestShapePreviewPaint() {
         if (shapePreviewCanvas.visible) {
             shapePreviewCanvas.requestPaint();
         }
     }
 
-    function beginShapeDrag(pointX, pointY) {
+    function beginShapeDrag(pointX, pointY, aspectLocked) {
         if (surface.toolMode !== "shape") {
             return;
         }
@@ -189,18 +242,17 @@ Rectangle {
         surface.shapeStartY = clampedShapePointY(pointY);
         surface.shapeCurrentX = surface.shapeStartX;
         surface.shapeCurrentY = surface.shapeStartY;
+        surface.shapeAspectLocked = aspectLocked === true;
         surface.shapeDraggingActive = true;
         requestShapePreviewPaint();
     }
 
-    function updateShapeDrag(pointX, pointY) {
+    function updateShapeDrag(pointX, pointY, aspectLocked) {
         if (!surface.shapeDraggingActive) {
             return;
         }
 
-        surface.shapeCurrentX = clampedShapePointX(pointX);
-        surface.shapeCurrentY = clampedShapePointY(pointY);
-        requestShapePreviewPaint();
+        applyShapeDragPoint(pointX, pointY, aspectLocked);
     }
 
     function commitActiveShape() {
@@ -210,6 +262,7 @@ Rectangle {
 
         const bounds = shapePreviewRect();
         surface.shapeDraggingActive = false;
+        surface.shapeAspectLocked = false;
         if (bounds.width >= surface.shapeToolMinimumDragDistance && bounds.height >= surface.shapeToolMinimumDragDistance) {
             canvasSurface.commitShape(bounds.x, bounds.y, bounds.width, bounds.height, surface.shapeKind, surface.brushColor, surface.shapeToolStrokeWidth);
         }
@@ -222,6 +275,7 @@ Rectangle {
         }
 
         surface.shapeDraggingActive = false;
+        surface.shapeAspectLocked = false;
         requestShapePreviewPaint();
     }
 
@@ -477,7 +531,8 @@ Rectangle {
 
         onPressed: function (mouse) {
             if (surface.toolMode === "shape") {
-                surface.beginShapeDrag(mouse.x, mouse.y);
+                const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
+                surface.beginShapeDrag(mouse.x, mouse.y, aspectLocked);
                 mouse.accepted = true;
                 return;
             }
@@ -490,14 +545,16 @@ Rectangle {
 
         onPositionChanged: function (mouse) {
             if (surface.toolMode === "shape" && surface.shapeDraggingActive) {
-                surface.updateShapeDrag(mouse.x, mouse.y);
+                const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
+                surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
                 mouse.accepted = true;
             }
         }
 
         onReleased: function (mouse) {
             if (surface.toolMode === "shape") {
-                surface.updateShapeDrag(mouse.x, mouse.y);
+                const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
+                surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
                 surface.commitActiveShape();
                 mouse.accepted = true;
             }

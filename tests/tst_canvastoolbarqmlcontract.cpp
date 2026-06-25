@@ -271,9 +271,16 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
 
     QVERIFY(surfaceSource.contains(QStringLiteral("property string shapeKind: \"rectangle\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property bool shapeDraggingActive: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool shapeAspectLocked: false")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int shapeToolStrokeWidth: Math.max(1, Math.round(surface.brushSize))")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("function beginShapeDrag(pointX, pointY)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("function updateShapeDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function shapeAspectLockedFromMouse(mouse)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("return (mouse.modifiers & Qt.ShiftModifier) !== 0;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function constrainedShapeDragPoint(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("const side = Math.min(Math.max(Math.abs(deltaX), Math.abs(deltaY)), horizontalLimit, verticalLimit);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function shapeDragPoint(pointX, pointY, aspectLocked)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function applyShapeDragPoint(pointX, pointY, aspectLocked)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginShapeDrag(pointX, pointY, aspectLocked)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function updateShapeDrag(pointX, pointY, aspectLocked)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function paintShapePreview(context, previewWidth, previewHeight)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: shapePreviewCanvas")));
@@ -283,8 +290,9 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeToolStrokeWidth")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" ? Qt.LeftButton")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" ? Qt.CrossCursor")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginShapeDrag(mouse.x, mouse.y);")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateShapeDrag(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginShapeDrag(mouse.x, mouse.y, aspectLocked);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitActiveShape();")));
 
     const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
