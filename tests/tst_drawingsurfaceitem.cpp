@@ -21,6 +21,7 @@ private slots:
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
+    void commitsShapeToRasterCanvas();
     void supportsUndoRedo();
     void opensRasterBackground();
 };
@@ -387,6 +388,53 @@ void tst_DrawingSurfaceItem::commitsTextToRasterCanvas()
         }
     }
     QVERIFY(hasTextColorPixel);
+}
+
+void tst_DrawingSurfaceItem::commitsShapeToRasterCanvas()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(180);
+    item.setHeight(120);
+    item.setBrushColor(QColor(QStringLiteral("#1976d2")));
+    item.setDocumentViewModel(&viewModel);
+
+    const QStringList shapeKinds{
+        QStringLiteral("rectangle"),
+        QStringLiteral("ellipse"),
+        QStringLiteral("triangle"),
+        QStringLiteral("diamond"),
+        QStringLiteral("star"),
+        QStringLiteral("rectanglebubble"),
+        QStringLiteral("ellipsebubble")
+    };
+
+    for (int index = 0; index < shapeKinds.size(); ++index) {
+        const qreal x = 10 + index % 4 * 40;
+        const qreal y = 12 + index / 4 * 48;
+        QVERIFY(item.commitShape(x, y, 30, 28, shapeKinds.at(index), QColor(QStringLiteral("#1976d2")), 3));
+    }
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString outputPath = dir.filePath(QStringLiteral("shape-output.png"));
+    QVERIFY(item.saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(180, 120));
+
+    bool hasShapeColorPixel = false;
+    for (int y = 0; y < saved.height() && !hasShapeColorPixel; ++y) {
+        for (int x = 0; x < saved.width(); ++x) {
+            const QColor pixel = saved.pixelColor(x, y);
+            if (pixel.alpha() > 0 && pixel.blue() > 120 && pixel.red() < 80 && pixel.green() > 70) {
+                hasShapeColorPixel = true;
+                break;
+            }
+        }
+    }
+    QVERIFY(hasShapeColorPixel);
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()

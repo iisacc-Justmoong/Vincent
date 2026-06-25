@@ -11,6 +11,7 @@ private slots:
     void colorSelectionUsesHslTrianglePicker();
     void leftToolbarMatchesFigmaDesignContract();
     void drawingSurfaceProvidesPaintStyleTextToolEditor();
+    void shapeToolProvidesSplitMenuAndDragInsertion();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
     void toolbarUsesFullRoundSolidCylinderBackground();
     void toolbarIsOffsetBelowApplicationWindowTopChrome();
@@ -43,10 +44,12 @@ void tst_CanvasToolBarQmlContract::colorSelectionUsesHslTrianglePicker()
     QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
     const qsizetype colorPickerIndex = toolbarSource.indexOf(QStringLiteral("id: colorPickerMenu"));
+    const qsizetype shapeMenuIndex = toolbarSource.indexOf(QStringLiteral("id: shapeMenu"));
     const qsizetype brushSettingsIndex = toolbarSource.indexOf(QStringLiteral("id: brushSettingsMenu"));
     QVERIFY(colorPickerIndex >= 0);
+    QVERIFY(shapeMenuIndex > colorPickerIndex);
     QVERIFY(brushSettingsIndex > colorPickerIndex);
-    const QString colorPickerSource = toolbarSource.mid(colorPickerIndex, brushSettingsIndex - colorPickerIndex);
+    const QString colorPickerSource = toolbarSource.mid(colorPickerIndex, shapeMenuIndex - colorPickerIndex);
 
     const QString pickerQmlPath = QFINDTESTDATA("../App/qml/brush/HslTriangleColorPicker.qml");
     QVERIFY2(!pickerQmlPath.isEmpty(), "HslTriangleColorPicker.qml test data was not found");
@@ -112,7 +115,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     const qsizetype translateIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"translateObject\""));
     const qsizetype brushIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"showCode\""));
     const qsizetype eraserIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"eraser\""));
-    const qsizetype shapeIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"gutterCheckBox@14x14\""));
+    const qsizetype shapeIndex = toolbarSource.indexOf(QStringLiteral("id: shapeToolButton"));
     const qsizetype typeIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"typeAlias\""));
 
     QVERIFY(addIndex >= 0);
@@ -132,7 +135,12 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.activateBrushTool(brushToolButton)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Eraser tool\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"eraser\")")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Shape tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("accessibleName: qsTr(\"Shape tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("menuAccessibleName: qsTr(\"Open shape menu\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"shape\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: toolbar.selectedShapeIconName(toolbar.currentShape)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onBodyClicked: toolbar.toolSelected(\"shape\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onMenuClicked: toolbar.openShapeMenu(shapeToolButton)")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.openColorPickerMenu(shapeToolButton)")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.openColorPickerMenu(colorMenuButton)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"text\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
@@ -191,8 +199,8 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("id: textToolEditor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.toolMode === \"text\" ? Qt.LeftButton : Qt.NoButton")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.toolMode === \"text\" ? Qt.IBeamCursor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.toolMode === \"shape\" ? Qt.LeftButton : surface.toolMode === \"text\" ? Qt.LeftButton : Qt.NoButton")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.toolMode === \"shape\" ? Qt.CrossCursor : surface.toolMode === \"text\" ? Qt.IBeamCursor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("border.color: surface.textToolAccentColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("selectionColor: surface.textToolAccentColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("TextMetrics")));
@@ -212,6 +220,85 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
 
     QVERIFY(painterPageSource.contains(QStringLiteral("textToolAccentColor: LV.Theme.primary")));
     QVERIFY(painterPageSource.contains(QStringLiteral("textToolFramePadding: painterPage.spacingSmall")));
+}
+
+void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
+{
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+
+    QFile toolbarQml(toolbarQmlPath);
+    QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
+
+    QVERIFY(toolbarSource.contains(QStringLiteral("property string currentShape: \"rectangle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("signal shapeSelected(string shapeKind)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("function openShapeMenu(triggerItem)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("function selectedShapeIconName(shapeKind)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("function selectShape(shapeKind)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("LV.ContextMenu")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: shapeMenu")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("items: toolbar.shapeMenuEntries")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("showIconSlot: true")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("selectedIndex: toolbar.shapeMenuEntries.findIndex(entry => entry.shape === toolbar.currentShape)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onItemTriggered: function (index, item)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("toolbar.selectShape(item.shape);")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"rectangle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"rectangle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"ellipse\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"ellipse\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"triangle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"triangle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"diamond\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"diamond\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"star\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"star\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"rectanglebubble\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"rectanglebubble\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"ellipsebubble\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"ellipsebubble\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("shapeSelected(shapeKind);")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("toolSelected(\"shape\");")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("return entry && entry.iconName ? entry.iconName : \"rectangle\";")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("id: shapeMenuRepeater")));
+
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+
+    QFile drawingSurfaceQml(drawingSurfaceQmlPath);
+    QVERIFY(drawingSurfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString surfaceSource = QString::fromUtf8(drawingSurfaceQml.readAll());
+
+    QVERIFY(surfaceSource.contains(QStringLiteral("property string shapeKind: \"rectangle\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool shapeDraggingActive: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int shapeToolStrokeWidth: Math.max(1, Math.round(surface.brushSize))")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginShapeDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function updateShapeDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveShape()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function paintShapePreview(context, previewWidth, previewHeight)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: shapePreviewCanvas")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.commitShape(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeKind")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeToolStrokeWidth")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" ? Qt.LeftButton")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" ? Qt.CrossCursor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginShapeDrag(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateShapeDrag(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitActiveShape();")));
+
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+
+    QFile painterPageQml(painterPageQmlPath);
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString painterPageSource = QString::fromUtf8(painterPageQml.readAll());
+
+    QVERIFY(painterPageSource.contains(QStringLiteral("function setShapeKind(shapeKind)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("painterPage.updateDocumentProperty(\"shapeKind\", shapeKind);")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("shapeKind: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("currentShape: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("onShapeSelected: shapeKind => painterPage.setShapeKind(shapeKind)")));
 }
 
 void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIncrease()

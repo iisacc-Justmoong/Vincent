@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QColor>
+#include <QImage>
 #include <QSize>
 #include <QString>
 #include <QtAdapter/CanvasAdapter.h>
@@ -45,6 +46,13 @@ public:
                                 const QString &text,
                                 qreal fontPixelSize,
                                 const QColor &color);
+    Q_INVOKABLE bool commitShape(qreal pointX,
+                                 qreal pointY,
+                                 qreal boxWidth,
+                                 qreal boxHeight,
+                                 const QString &shapeKind,
+                                 const QColor &color,
+                                 qreal strokeWidth);
 
 signals:
     void documentViewModelChanged();
@@ -64,6 +72,9 @@ private:
     [[nodiscard]] QSize canvasSize() const;
     [[nodiscard]] bool canMutateDocument() const;
     [[nodiscard]] bool isTextToolActive() const;
+    [[nodiscard]] bool isShapeToolActive() const;
+    [[nodiscard]] bool isOverlayToolActive() const;
+    [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
     void syncCanvasSize();
     void emitUndoRedoSignals();
     QMouseEvent makeMouseEvent(QEvent::Type eventType,

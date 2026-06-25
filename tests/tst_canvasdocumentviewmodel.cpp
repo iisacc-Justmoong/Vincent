@@ -13,6 +13,7 @@ private slots:
     void updatesBrushStateAndClampsValues();
     void updatesEngineBrushSettingsAndClampsValues();
     void acceptsOnlySupportedTools();
+    void acceptsOnlySupportedShapeKinds();
     void keepsCanvasDimensionsPositive();
 };
 
@@ -35,6 +36,7 @@ void tst_CanvasDocumentViewModel::exposesDefaultDocumentState()
     QCOMPARE(viewModel.pressureCurveMaximum(), 1.0);
     QCOMPARE(viewModel.stabilizerStrength(), 0.0);
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("rectangle"));
     QCOMPARE(viewModel.canvasWidth(), 1);
     QCOMPARE(viewModel.canvasHeight(), 1);
 }
@@ -121,8 +123,45 @@ void tst_CanvasDocumentViewModel::acceptsOnlySupportedTools()
     QCOMPARE(viewModel.toolMode(), QStringLiteral("text"));
 
     viewModel.setToolMode(QStringLiteral("shape"));
+    QCOMPARE(viewModel.toolMode(), QStringLiteral("shape"));
+
+    viewModel.setToolMode(QStringLiteral("translate"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
-    QCOMPARE(toolSpy.count(), 3);
+    QCOMPARE(toolSpy.count(), 4);
+}
+
+void tst_CanvasDocumentViewModel::acceptsOnlySupportedShapeKinds()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QSignalSpy shapeSpy(&viewModel, &CanvasDocumentViewModel::shapeKindChanged);
+
+    viewModel.setShapeKind(QStringLiteral("ellipse"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("ellipse"));
+
+    viewModel.setShapeKind(QStringLiteral("triangle"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("triangle"));
+
+    viewModel.setShapeKind(QStringLiteral("triagle"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("triangle"));
+
+    viewModel.setShapeKind(QStringLiteral("diamond"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("diamond"));
+
+    viewModel.setShapeKind(QStringLiteral("star"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("star"));
+
+    viewModel.setShapeKind(QStringLiteral("rectanglebubble"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("rectanglebubble"));
+
+    viewModel.setShapeKind(QStringLiteral("ellipsebubble"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("ellipsebubble"));
+
+    viewModel.setShapeKind(QStringLiteral("unsupported"));
+    QCOMPARE(viewModel.shapeKind(), QStringLiteral("rectangle"));
+
+    viewModel.setShapeKind(QStringLiteral("rectangle"));
+    QCOMPARE(shapeSpy.count(), 7);
 }
 
 void tst_CanvasDocumentViewModel::keepsCanvasDimensionsPositive()

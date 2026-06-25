@@ -52,10 +52,11 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Provides the flat-raster command bar.
 - Exposes actions for new, open, save, and clear, with open/save still available through shortcuts and dialogs.
 - Renders the command bar inside a full-height solid round cylinder background.
-- Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, `gutterCheckBox@14x14`, and `typeAlias` icons.
-- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, eraser selects the eraser, and `typeAlias` selects the text tool. The shape dropdown slot to the right of eraser is intentionally left as a no-op until shape tools exist.
+- Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generaldelete`, `translateObject`, `showCode`, `eraser`, selected shape-kind, and `typeAlias` icons.
+- Keeps existing behavior on the matching actionable icons: add creates a new canvas, delete clears the canvas, pencil selects or reopens brush settings, eraser selects the eraser, the shape split button selects the shape tool from its body and opens the shape menu from its chevron, and `typeAlias` selects the text tool.
+- Offers shape menu entries for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble insertion through `LV.ContextMenu`, shows each shape icon in the menu, and mirrors the selected shape on the split button icon.
 - Uses app-local vector sources for the `translateObject` and `typeAlias` slots while preserving the Figma/LVRS icon names. `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
-- Restricts tools to brush, eraser, and text.
+- Restricts tools to brush, eraser, shape, and text.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
@@ -72,6 +73,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 - Hosts `DrawingSurfaceItem` as the editable raster surface.
 - Lets iiPaintEngine handle mouse, tablet, live preview, stroke commit, eraser, undo, redo, open, and save behavior inside the item.
+- Presents a drag-to-insert shape tool when shape mode is active; the QML preview follows the drag bounds, then commits the selected shape outline into the flat raster with the current brush color and brush size.
 - Presents a paint-style text editor when the text tool is active; the editor sizes its frame from the longest text line within the remaining canvas width, uses the current brush size and brush color as its text size and color, then commits plain text into the flat raster through `DrawingSurfaceItem`.
 - Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
@@ -85,16 +87,17 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Inherits `CanvasAdapter` from iiPaintEngine.
 - Preserves Vincent's previous QML-facing commands such as `newCanvas`, `openRaster`, `saveToFile`, `undo`, `redo`, and compatibility stroke methods.
 - Exposes `commitText` so QML can pass text bounds, content, text size, and text color into Qt text layout and commit the result back through iiPaintEngine's raster replacement path.
+- Exposes `commitShape` so QML can pass shape bounds, selected shape kind, stroke color, and stroke width into Qt painter paths and commit the result back through iiPaintEngine's raster replacement path.
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
 - Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
 
 ### `CanvasDocumentViewModel`
 
-- Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, and canvas dimensions to QML.
+- Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, selected shape kind, and canvas dimensions to QML.
 - Sets the default brush hardness to the app's maximum anti-aliased edge setting for iiPaintEngine's coverage-based circular brush.
 - Clamps brush size, brush dynamics, pressure curve, stabilizer, and canvas dimensions to safe ranges.
-- Restricts tool mode to the flat-raster tool set: brush, eraser, and text.
+- Restricts tool mode to the flat-raster tool set: brush, eraser, shape, and text.
 
 ### `CanvasViewModelBridge`
 
@@ -106,14 +109,14 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 1. `main.cpp` launches the LVRS-backed QML application and registers the shared view model plus helper services.
 2. `PainterCanvasPage` binds to `CanvasDocumentViewModel` and passes brush state into `DrawingSurface`.
-3. `CanvasToolBar` emits user actions for file flow, tool selection, HSL color picker changes, brush size updates, and brush reselection settings.
+3. `CanvasToolBar` emits user actions for file flow, tool selection, shape selection, HSL color picker changes, brush size updates, and brush reselection settings.
 4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.
-5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save; Vincent renders text with Qt text layout and commits the result as a raster replacement.
+5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save; Vincent renders text and shape overlays with Qt painting APIs and commits the result as a raster replacement.
 
 ## Testing Surface
 
-- `tests/tst_canvasdocumentviewmodel.cpp` validates the flat-raster document state and value clamping, including iiPaintEngine brush settings and supported tool modes.
-- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, text-tool selection, and HSL triangle color-picker usage.
+- `tests/tst_canvasdocumentviewmodel.cpp` validates the flat-raster document state and value clamping, including iiPaintEngine brush settings, supported tool modes, and supported shape kinds.
+- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, shape split-menu selection, text-tool selection, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, text raster commit, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, text and shape raster commit, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

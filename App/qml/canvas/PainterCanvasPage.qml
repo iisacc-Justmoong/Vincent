@@ -87,6 +87,10 @@ Item {
         painterPage.updateDocumentProperty("toolMode", tool);
     }
 
+    function setShapeKind(shapeKind) {
+        painterPage.updateDocumentProperty("shapeKind", shapeKind);
+    }
+
     function saveCanvasAs(fileUrl) {
         drawingSurface.saveToFile(fileUrl);
     }
@@ -120,6 +124,7 @@ Item {
                 pressureCurveMaximum: painterPage.vm ? painterPage.vm.pressureCurveMaximum : 1
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
+                shapeKind: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
                 textToolAccentColor: LV.Theme.primary
                 textToolFramePadding: painterPage.spacingSmall
                 canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : 1
@@ -150,12 +155,14 @@ Item {
             stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
             currentColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
             currentTool: painterPage.vm ? painterPage.vm.toolMode : "brush"
+            currentShape: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
             onNewCanvasRequested: painterPage.newCanvas()
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)
             onBrushPropertyChangeRequested: (propertyName, value) => painterPage.setBrushProperty(propertyName, value)
             onColorPicked: swatchColor => painterPage.setBrushColor(swatchColor)
             onToolSelected: tool => painterPage.setToolMode(tool)
+            onShapeSelected: shapeKind => painterPage.setShapeKind(shapeKind)
             onSaveRequested: fileUrl => painterPage.saveCanvasAs(fileUrl)
             onOpenRequested: fileUrl => painterPage.openRaster(fileUrl)
         }

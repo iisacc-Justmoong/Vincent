@@ -31,6 +31,12 @@ Rectangle {
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
     property bool textEditingActive: false
+    property string shapeKind: "rectangle"
+    property bool shapeDraggingActive: false
+    property real shapeStartX: 0
+    property real shapeStartY: 0
+    property real shapeCurrentX: 0
+    property real shapeCurrentY: 0
     property color textToolAccentColor: "#A571E6"
     property int textToolFramePadding: 8
     readonly property real workspaceCanvasHorizontalInsetRatio: 0.09
@@ -45,6 +51,8 @@ Rectangle {
     readonly property int minimumTextToolFontPixelSize: 8
     readonly property int textToolFontPixelSize: Math.max(surface.minimumTextToolFontPixelSize, Math.round(surface.brushSize))
     readonly property int textToolMinimumWidth: 96
+    readonly property int shapeToolMinimumDragDistance: 2
+    readonly property int shapeToolStrokeWidth: Math.max(1, Math.round(surface.brushSize))
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
@@ -59,23 +67,27 @@ Rectangle {
 
     function newCanvas() {
         cancelActiveText();
+        cancelActiveShape();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.newCanvas();
     }
 
     function clearCanvas() {
         cancelActiveText();
+        cancelActiveShape();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
     }
 
     function openRaster(fileUrl) {
         cancelActiveText();
+        cancelActiveShape();
         return canvasSurface.openRaster(fileUrl ? fileUrl.toString() : "");
     }
 
     function saveToFile(fileUrl) {
         commitActiveText();
+        commitActiveShape();
         return canvasSurface.saveToFile(fileUrl ? fileUrl.toString() : "");
     }
 
@@ -142,9 +154,185 @@ Rectangle {
         textToolEditor.focus = false;
     }
 
+    function clampedShapePointX(pointX) {
+        return Math.max(0, Math.min(canvasSurface.width, pointX));
+    }
+
+    function clampedShapePointY(pointY) {
+        return Math.max(0, Math.min(canvasSurface.height, pointY));
+    }
+
+    function shapePreviewRect() {
+        const left = Math.min(surface.shapeStartX, surface.shapeCurrentX);
+        const top = Math.min(surface.shapeStartY, surface.shapeCurrentY);
+        return {
+            x: left,
+            y: top,
+            width: Math.abs(surface.shapeCurrentX - surface.shapeStartX),
+            height: Math.abs(surface.shapeCurrentY - surface.shapeStartY)
+        };
+    }
+
+    function requestShapePreviewPaint() {
+        if (shapePreviewCanvas.visible) {
+            shapePreviewCanvas.requestPaint();
+        }
+    }
+
+    function beginShapeDrag(pointX, pointY) {
+        if (surface.toolMode !== "shape") {
+            return;
+        }
+
+        commitActiveText();
+        surface.shapeStartX = clampedShapePointX(pointX);
+        surface.shapeStartY = clampedShapePointY(pointY);
+        surface.shapeCurrentX = surface.shapeStartX;
+        surface.shapeCurrentY = surface.shapeStartY;
+        surface.shapeDraggingActive = true;
+        requestShapePreviewPaint();
+    }
+
+    function updateShapeDrag(pointX, pointY) {
+        if (!surface.shapeDraggingActive) {
+            return;
+        }
+
+        surface.shapeCurrentX = clampedShapePointX(pointX);
+        surface.shapeCurrentY = clampedShapePointY(pointY);
+        requestShapePreviewPaint();
+    }
+
+    function commitActiveShape() {
+        if (!surface.shapeDraggingActive) {
+            return;
+        }
+
+        const bounds = shapePreviewRect();
+        surface.shapeDraggingActive = false;
+        if (bounds.width >= surface.shapeToolMinimumDragDistance && bounds.height >= surface.shapeToolMinimumDragDistance) {
+            canvasSurface.commitShape(bounds.x, bounds.y, bounds.width, bounds.height, surface.shapeKind, surface.brushColor, surface.shapeToolStrokeWidth);
+        }
+        requestShapePreviewPaint();
+    }
+
+    function cancelActiveShape() {
+        if (!surface.shapeDraggingActive) {
+            return;
+        }
+
+        surface.shapeDraggingActive = false;
+        requestShapePreviewPaint();
+    }
+
+    function traceEllipsePath(context, x, y, widthValue, heightValue) {
+        const kappa = 0.5522847498;
+        const ox = widthValue / 2 * kappa;
+        const oy = heightValue / 2 * kappa;
+        const xe = x + widthValue;
+        const ye = y + heightValue;
+        const xm = x + widthValue / 2;
+        const ym = y + heightValue / 2;
+
+        context.moveTo(x, ym);
+        context.bezierCurveTo(x, ym - oy, xm - ox, y, xm, y);
+        context.bezierCurveTo(xm + ox, y, xe, ym - oy, xe, ym);
+        context.bezierCurveTo(xe, ym + oy, xm + ox, ye, xm, ye);
+        context.bezierCurveTo(xm - ox, ye, x, ym + oy, x, ym);
+        context.closePath();
+    }
+
+    function traceStarPath(context, x, y, widthValue, heightValue) {
+        const centerX = x + widthValue / 2;
+        const centerY = y + heightValue / 2;
+        const outerRadiusX = widthValue / 2;
+        const outerRadiusY = heightValue / 2;
+        const innerRadiusX = outerRadiusX * 0.45;
+        const innerRadiusY = outerRadiusY * 0.45;
+
+        for (let index = 0; index < 10; ++index) {
+            const outerPoint = index % 2 === 0;
+            const radiusX = outerPoint ? outerRadiusX : innerRadiusX;
+            const radiusY = outerPoint ? outerRadiusY : innerRadiusY;
+            const angle = -Math.PI / 2 + index * Math.PI / 5;
+            const px = centerX + Math.cos(angle) * radiusX;
+            const py = centerY + Math.sin(angle) * radiusY;
+            if (index === 0) {
+                context.moveTo(px, py);
+            } else {
+                context.lineTo(px, py);
+            }
+        }
+        context.closePath();
+    }
+
+    function traceShapePath(context, shapeValue, x, y, widthValue, heightValue) {
+        const shape = shapeValue === "triagle" ? "triangle" : shapeValue;
+        if (shape === "ellipse") {
+            traceEllipsePath(context, x, y, widthValue, heightValue);
+            return;
+        }
+        if (shape === "triangle") {
+            context.moveTo(x + widthValue / 2, y);
+            context.lineTo(x + widthValue, y + heightValue);
+            context.lineTo(x, y + heightValue);
+            context.closePath();
+            return;
+        }
+        if (shape === "diamond") {
+            context.moveTo(x + widthValue / 2, y);
+            context.lineTo(x + widthValue, y + heightValue / 2);
+            context.lineTo(x + widthValue / 2, y + heightValue);
+            context.lineTo(x, y + heightValue / 2);
+            context.closePath();
+            return;
+        }
+        if (shape === "star") {
+            traceStarPath(context, x, y, widthValue, heightValue);
+            return;
+        }
+        if (shape === "rectanglebubble" || shape === "ellipsebubble") {
+            const tailHeight = Math.min(Math.max(4, heightValue * 0.22), heightValue * 0.35);
+            const bodyHeight = Math.max(surface.shapeToolMinimumDragDistance, heightValue - tailHeight);
+            if (shape === "ellipsebubble") {
+                traceEllipsePath(context, x, y, widthValue, bodyHeight);
+            } else {
+                context.rect(x, y, widthValue, bodyHeight);
+            }
+            context.moveTo(x + widthValue * 0.26, y + bodyHeight);
+            context.lineTo(x + widthValue * 0.18, y + heightValue);
+            context.lineTo(x + widthValue * 0.44, y + bodyHeight);
+            context.closePath();
+            return;
+        }
+
+        context.rect(x, y, widthValue, heightValue);
+    }
+
+    function paintShapePreview(context, previewWidth, previewHeight) {
+        context.clearRect(0, 0, previewWidth, previewHeight);
+        if (!surface.shapeDraggingActive) {
+            return;
+        }
+
+        const inset = surface.shapeToolStrokeWidth / 2;
+        const pathWidth = Math.max(1, previewWidth - surface.shapeToolStrokeWidth);
+        const pathHeight = Math.max(1, previewHeight - surface.shapeToolStrokeWidth);
+        context.beginPath();
+        traceShapePath(context, surface.shapeKind, inset, inset, pathWidth, pathHeight);
+        context.lineWidth = surface.shapeToolStrokeWidth;
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        context.strokeStyle = surface.brushColor.toString();
+        context.stroke();
+    }
+
     onToolModeChanged: {
         if (toolMode !== "text") {
             commitActiveText();
+        }
+        if (toolMode !== "shape") {
+            cancelActiveShape();
         }
     }
 
@@ -256,6 +444,27 @@ Rectangle {
                 }
             }
         }
+
+        Canvas {
+            id: shapePreviewCanvas
+            parent: canvasSurface
+            visible: surface.shapeDraggingActive
+            z: 4
+            x: surface.shapePreviewRect().x
+            y: surface.shapePreviewRect().y
+            width: Math.max(1, surface.shapePreviewRect().width)
+            height: Math.max(1, surface.shapePreviewRect().height)
+            renderTarget: Canvas.Image
+            opacity: 0.9
+
+            onPaint: {
+                const context = getContext("2d");
+                surface.paintShapePreview(context, width, height);
+            }
+            onVisibleChanged: requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+        }
     }
 
     MouseArea {
@@ -263,15 +472,38 @@ Rectangle {
         anchors.fill: parent
         z: 3
         hoverEnabled: true
-        acceptedButtons: surface.toolMode === "text" ? Qt.LeftButton : Qt.NoButton
-        cursorShape: surface.toolMode === "text" ? Qt.IBeamCursor : surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
+        acceptedButtons: surface.toolMode === "shape" ? Qt.LeftButton : surface.toolMode === "text" ? Qt.LeftButton : Qt.NoButton
+        cursorShape: surface.toolMode === "shape" ? Qt.CrossCursor : surface.toolMode === "text" ? Qt.IBeamCursor : surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
 
         onPressed: function (mouse) {
+            if (surface.toolMode === "shape") {
+                surface.beginShapeDrag(mouse.x, mouse.y);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "text") {
                 surface.beginTextPlacement(mouse.x, mouse.y);
                 mouse.accepted = true;
             }
         }
+
+        onPositionChanged: function (mouse) {
+            if (surface.toolMode === "shape" && surface.shapeDraggingActive) {
+                surface.updateShapeDrag(mouse.x, mouse.y);
+                mouse.accepted = true;
+            }
+        }
+
+        onReleased: function (mouse) {
+            if (surface.toolMode === "shape") {
+                surface.updateShapeDrag(mouse.x, mouse.y);
+                surface.commitActiveShape();
+                mouse.accepted = true;
+            }
+        }
+
+        onCanceled: surface.cancelActiveShape()
 
         onWheel: function (wheel) {
             surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);

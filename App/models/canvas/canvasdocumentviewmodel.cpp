@@ -38,6 +38,28 @@ bool setMinimumValue(qreal &storage, qreal value, qreal minimum)
     return true;
 }
 
+QString normalizedShapeKind(const QString &shapeKind)
+{
+    const QString normalized = shapeKind.trimmed().toLower();
+    if (normalized == QStringLiteral("triagle")) {
+        return QStringLiteral("triangle");
+    }
+
+    static const QStringList allowedShapes{
+        QStringLiteral("rectangle"),
+        QStringLiteral("ellipse"),
+        QStringLiteral("triangle"),
+        QStringLiteral("diamond"),
+        QStringLiteral("star"),
+        QStringLiteral("rectanglebubble"),
+        QStringLiteral("ellipsebubble")
+    };
+
+    return allowedShapes.contains(normalized)
+        ? normalized
+        : QStringLiteral("rectangle");
+}
+
 } // namespace
 
 CanvasDocumentViewModel::CanvasDocumentViewModel(PaletteUtils *paletteUtils, QObject *parent)
@@ -110,6 +132,11 @@ qreal CanvasDocumentViewModel::stabilizerStrength() const
 QString CanvasDocumentViewModel::toolMode() const
 {
     return m_toolMode;
+}
+
+QString CanvasDocumentViewModel::shapeKind() const
+{
+    return m_shapeKind;
 }
 
 int CanvasDocumentViewModel::canvasWidth() const
@@ -257,7 +284,8 @@ void CanvasDocumentViewModel::setToolMode(const QString &toolMode)
     static const QStringList allowedTools{
         QStringLiteral("brush"),
         QStringLiteral("eraser"),
-        QStringLiteral("text")
+        QStringLiteral("text"),
+        QStringLiteral("shape")
     };
 
     const QString normalizedTool = allowedTools.contains(toolMode)
@@ -269,6 +297,17 @@ void CanvasDocumentViewModel::setToolMode(const QString &toolMode)
 
     m_toolMode = normalizedTool;
     emit toolModeChanged();
+}
+
+void CanvasDocumentViewModel::setShapeKind(const QString &shapeKind)
+{
+    const QString normalizedKind = normalizedShapeKind(shapeKind);
+    if (m_shapeKind == normalizedKind) {
+        return;
+    }
+
+    m_shapeKind = normalizedKind;
+    emit shapeKindChanged();
 }
 
 void CanvasDocumentViewModel::setCanvasWidth(int canvasWidth)

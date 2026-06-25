@@ -22,6 +22,7 @@ class CanvasDocumentViewModel : public QObject
     Q_PROPERTY(qreal pressureCurveMaximum READ pressureCurveMaximum WRITE setPressureCurveMaximum NOTIFY pressureCurveMaximumChanged)
     Q_PROPERTY(qreal stabilizerStrength READ stabilizerStrength WRITE setStabilizerStrength NOTIFY stabilizerStrengthChanged)
     Q_PROPERTY(QString toolMode READ toolMode WRITE setToolMode NOTIFY toolModeChanged)
+    Q_PROPERTY(QString shapeKind READ shapeKind WRITE setShapeKind NOTIFY shapeKindChanged)
     Q_PROPERTY(int canvasWidth READ canvasWidth WRITE setCanvasWidth NOTIFY canvasWidthChanged)
     Q_PROPERTY(int canvasHeight READ canvasHeight WRITE setCanvasHeight NOTIFY canvasHeightChanged)
 
@@ -46,6 +47,7 @@ public:
     [[nodiscard]] qreal pressureCurveMaximum() const;
     [[nodiscard]] qreal stabilizerStrength() const;
     [[nodiscard]] QString toolMode() const;
+    [[nodiscard]] QString shapeKind() const;
     [[nodiscard]] int canvasWidth() const;
     [[nodiscard]] int canvasHeight() const;
 
@@ -61,6 +63,7 @@ public:
     void setPressureCurveMaximum(qreal pressureCurveMaximum);
     void setStabilizerStrength(qreal stabilizerStrength);
     void setToolMode(const QString &toolMode);
+    void setShapeKind(const QString &shapeKind);
     void setCanvasWidth(int canvasWidth);
     void setCanvasHeight(int canvasHeight);
 
@@ -78,6 +81,7 @@ signals:
     void pressureCurveMaximumChanged();
     void stabilizerStrengthChanged();
     void toolModeChanged();
+    void shapeKindChanged();
     void canvasWidthChanged();
     void canvasHeightChanged();
 
@@ -96,6 +100,7 @@ private:
     qreal m_pressureCurveMaximum = 1.0;
     qreal m_stabilizerStrength = 0.0;
     QString m_toolMode = QStringLiteral("brush");
+    QString m_shapeKind = QStringLiteral("rectangle");
     int m_canvasWidth = 1;
     int m_canvasHeight = 1;
 };

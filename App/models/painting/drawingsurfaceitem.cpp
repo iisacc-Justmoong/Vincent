@@ -9,7 +9,9 @@
 #include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
+#include <QPen>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
@@ -17,6 +19,7 @@
 #include <QTextDocument>
 #include <QTextOption>
 #include <QUrl>
+#include <QtMath>
 #include <QtGlobal>
 
 namespace {
@@ -24,6 +27,9 @@ namespace {
 constexpr qreal minimumTextFontPixelSize = 8.0;
 constexpr qreal maximumTextFontPixelSize = 144.0;
 constexpr qreal minimumTextBoxWidth = 8.0;
+constexpr qreal minimumShapeDimension = 2.0;
+constexpr qreal minimumShapeStrokeWidth = 1.0;
+constexpr qreal maximumShapeStrokeWidth = 96.0;
 
 QString localFileSource(const QString &fileUrl)
 {
@@ -46,6 +52,116 @@ QImage transparentCanvasImage(const QSize &size)
     QImage image(size, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     return image;
+}
+
+QString normalizedShapeKind(const QString &shapeKind)
+{
+    const QString normalized = shapeKind.trimmed().toLower();
+    if (normalized == QStringLiteral("triagle")) {
+        return QStringLiteral("triangle");
+    }
+    if (normalized == QStringLiteral("ellipse")
+        || normalized == QStringLiteral("triangle")
+        || normalized == QStringLiteral("diamond")
+        || normalized == QStringLiteral("star")
+        || normalized == QStringLiteral("rectanglebubble")
+        || normalized == QStringLiteral("ellipsebubble")) {
+        return normalized;
+    }
+    return QStringLiteral("rectangle");
+}
+
+QPainterPath starPath(const QRectF &rect)
+{
+    QPainterPath path;
+    const QPointF center = rect.center();
+    const qreal outerRadiusX = rect.width() / 2.0;
+    const qreal outerRadiusY = rect.height() / 2.0;
+    const qreal innerRadiusX = outerRadiusX * 0.45;
+    const qreal innerRadiusY = outerRadiusY * 0.45;
+
+    for (int index = 0; index < 10; ++index) {
+        const bool outerPoint = index % 2 == 0;
+        const qreal radiusX = outerPoint ? outerRadiusX : innerRadiusX;
+        const qreal radiusY = outerPoint ? outerRadiusY : innerRadiusY;
+        const qreal angle = -M_PI_2 + index * M_PI / 5.0;
+        const QPointF point(center.x() + qCos(angle) * radiusX,
+                            center.y() + qSin(angle) * radiusY);
+        if (index == 0) {
+            path.moveTo(point);
+        } else {
+            path.lineTo(point);
+        }
+    }
+    path.closeSubpath();
+    return path;
+}
+
+QPainterPath speechBubblePath(const QRectF &rect, bool ellipseBody)
+{
+    QPainterPath path;
+    const qreal tailHeight = qBound<qreal>(4.0, rect.height() * 0.22, rect.height() * 0.35);
+    QRectF bodyRect = rect;
+    bodyRect.setBottom(qMax(rect.top() + minimumShapeDimension, rect.bottom() - tailHeight));
+    if (bodyRect.height() < minimumShapeDimension * 2.0) {
+        bodyRect = rect;
+    }
+
+    if (ellipseBody) {
+        path.addEllipse(bodyRect);
+    } else {
+        const qreal radius = qMin(bodyRect.width(), bodyRect.height()) * 0.12;
+        path.addRoundedRect(bodyRect, radius, radius);
+    }
+
+    if (bodyRect.bottom() < rect.bottom()) {
+        QPainterPath tailPath;
+        tailPath.moveTo(bodyRect.left() + bodyRect.width() * 0.26, bodyRect.bottom());
+        tailPath.lineTo(rect.left() + rect.width() * 0.18, rect.bottom());
+        tailPath.lineTo(bodyRect.left() + bodyRect.width() * 0.44, bodyRect.bottom());
+        tailPath.closeSubpath();
+        path.addPath(tailPath);
+    }
+
+    return path;
+}
+
+QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
+{
+    QPainterPath path;
+    const QString kind = normalizedShapeKind(shapeKind);
+
+    if (kind == QStringLiteral("ellipse")) {
+        path.addEllipse(rect);
+        return path;
+    }
+    if (kind == QStringLiteral("triangle")) {
+        path.moveTo(rect.center().x(), rect.top());
+        path.lineTo(rect.right(), rect.bottom());
+        path.lineTo(rect.left(), rect.bottom());
+        path.closeSubpath();
+        return path;
+    }
+    if (kind == QStringLiteral("diamond")) {
+        path.moveTo(rect.center().x(), rect.top());
+        path.lineTo(rect.right(), rect.center().y());
+        path.lineTo(rect.center().x(), rect.bottom());
+        path.lineTo(rect.left(), rect.center().y());
+        path.closeSubpath();
+        return path;
+    }
+    if (kind == QStringLiteral("star")) {
+        return starPath(rect);
+    }
+    if (kind == QStringLiteral("rectanglebubble")) {
+        return speechBubblePath(rect, false);
+    }
+    if (kind == QStringLiteral("ellipsebubble")) {
+        return speechBubblePath(rect, true);
+    }
+
+    path.addRect(rect);
+    return path;
 }
 
 } // namespace
@@ -249,23 +365,7 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
         return false;
     }
 
-    QImage image;
-    QTemporaryFile snapshotFile(QDir::tempPath() + QStringLiteral("/vincent-text-canvas-XXXXXX.png"));
-    snapshotFile.setAutoRemove(true);
-    if (snapshotFile.open()) {
-        const QString snapshotPath = snapshotFile.fileName();
-        snapshotFile.close();
-        if (saveRasterCanvasToFile(snapshotPath)) {
-            image.load(snapshotPath);
-        }
-    }
-
-    if (image.isNull()) {
-        image = transparentCanvasImage(targetSize);
-    }
-    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
-        image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    }
+    QImage image = currentRasterCanvasImage(targetSize);
 
     const qreal maxX = qMax<qreal>(0.0, image.width() - 1.0);
     const qreal maxY = qMax<qreal>(0.0, image.height() - 1.0);
@@ -307,9 +407,67 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
     return committed;
 }
 
+bool DrawingSurfaceItem::commitShape(qreal pointX,
+                                     qreal pointY,
+                                     qreal boxWidth,
+                                     qreal boxHeight,
+                                     const QString &shapeKind,
+                                     const QColor &color,
+                                     qreal strokeWidth)
+{
+    if (!canMutateDocument()) {
+        return false;
+    }
+
+    syncCanvasSize();
+    const QSize targetSize = canvasSize();
+    if (targetSize.isEmpty()) {
+        return false;
+    }
+
+    QImage image = currentRasterCanvasImage(targetSize);
+    QRectF shapeRect(QPointF(pointX, pointY), QSizeF(boxWidth, boxHeight));
+    shapeRect = shapeRect.normalized().intersected(QRectF(0.0, 0.0, image.width(), image.height()));
+    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension) {
+        return false;
+    }
+
+    const qreal boundedStrokeWidth = qBound<qreal>(minimumShapeStrokeWidth,
+                                                   strokeWidth,
+                                                   maximumShapeStrokeWidth);
+    const qreal horizontalInset = qMin(boundedStrokeWidth / 2.0,
+                                      qMax<qreal>(0.0, shapeRect.width() / 2.0 - 0.5));
+    const qreal verticalInset = qMin(boundedStrokeWidth / 2.0,
+                                    qMax<qreal>(0.0, shapeRect.height() / 2.0 - 0.5));
+    const QRectF strokedRect = shapeRect.adjusted(horizontalInset,
+                                                  verticalInset,
+                                                  -horizontalInset,
+                                                  -verticalInset);
+    if (strokedRect.width() < minimumShapeDimension || strokedRect.height() < minimumShapeDimension) {
+        return false;
+    }
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(color.isValid() ? color : brushColor(),
+                        boundedStrokeWidth,
+                        Qt::SolidLine,
+                        Qt::RoundCap,
+                        Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(shapePath(strokedRect, shapeKind));
+    painter.end();
+
+    const bool committed = replaceRasterCanvas(image);
+    if (committed) {
+        emitUndoRedoSignals();
+    }
+    return committed;
+}
+
 bool DrawingSurfaceItem::event(QEvent *event)
 {
-    if (event && isTabletEvent(event->type()) && isTextToolActive()) {
+    if (event && isTabletEvent(event->type()) && isOverlayToolActive()) {
         event->accept();
         return true;
     }
@@ -322,7 +480,7 @@ bool DrawingSurfaceItem::event(QEvent *event)
 
 void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
 {
-    if (isTextToolActive()) {
+    if (isOverlayToolActive()) {
         event->accept();
         return;
     }
@@ -335,7 +493,7 @@ void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
 
 void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
 {
-    if (isTextToolActive()) {
+    if (isOverlayToolActive()) {
         event->accept();
         return;
     }
@@ -348,7 +506,7 @@ void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
 
 void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (isTextToolActive()) {
+    if (isOverlayToolActive()) {
         event->accept();
         return;
     }
@@ -384,6 +542,38 @@ bool DrawingSurfaceItem::canMutateDocument() const
 bool DrawingSurfaceItem::isTextToolActive() const
 {
     return toolMode() == QStringLiteral("text");
+}
+
+bool DrawingSurfaceItem::isShapeToolActive() const
+{
+    return toolMode() == QStringLiteral("shape");
+}
+
+bool DrawingSurfaceItem::isOverlayToolActive() const
+{
+    return isTextToolActive() || isShapeToolActive();
+}
+
+QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
+{
+    QImage image;
+    QTemporaryFile snapshotFile(QDir::tempPath() + QStringLiteral("/vincent-canvas-XXXXXX.png"));
+    snapshotFile.setAutoRemove(true);
+    if (snapshotFile.open()) {
+        const QString snapshotPath = snapshotFile.fileName();
+        snapshotFile.close();
+        if (saveRasterCanvasToFile(snapshotPath)) {
+            image.load(snapshotPath);
+        }
+    }
+
+    if (image.isNull()) {
+        image = transparentCanvasImage(targetSize);
+    }
+    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+        image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
+    return image;
 }
 
 void DrawingSurfaceItem::syncCanvasSize()

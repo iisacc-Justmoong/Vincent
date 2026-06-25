@@ -26,6 +26,7 @@ Item {
     property real stabilizerStrength: 0
     property color currentColor: "#1a1a1a"
     property string currentTool: "brush"
+    property string currentShape: "rectangle"
     readonly property bool dialogActive: openDialog.visible || saveDialog.visible
     readonly property string modifierKeyLabel: Qt.platform.os === "osx" ? "Cmd" : "Ctrl"
     readonly property string shortcutNew: modifierKeyLabel + "+N"
@@ -38,6 +39,43 @@ Item {
     readonly property int figmaToolbarIconSize: 16
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
     readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
+    readonly property var shapeMenuEntries: [
+        {
+            shape: "rectangle",
+            label: qsTr("Rectangle"),
+            iconName: "rectangle"
+        },
+        {
+            shape: "ellipse",
+            label: qsTr("Ellipse"),
+            iconName: "ellipse"
+        },
+        {
+            shape: "triangle",
+            label: qsTr("Triangle"),
+            iconName: "triangle"
+        },
+        {
+            shape: "diamond",
+            label: qsTr("Diamond"),
+            iconName: "diamond"
+        },
+        {
+            shape: "star",
+            label: qsTr("Star"),
+            iconName: "star"
+        },
+        {
+            shape: "rectanglebubble",
+            label: qsTr("Rectangle bubble"),
+            iconName: "rectanglebubble"
+        },
+        {
+            shape: "ellipsebubble",
+            label: qsTr("Ellipse bubble"),
+            iconName: "ellipsebubble"
+        }
+    ]
 
     implicitHeight: toolbarLayout.implicitHeight + spacingSmall * 4
     implicitWidth: toolbarLayout.implicitWidth + spacingSmall * 4
@@ -51,6 +89,7 @@ Item {
     signal brushPropertyChangeRequested(string propertyName, real value)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
+    signal shapeSelected(string shapeKind)
 
     function openFileDialog() {
         openDialog.open();
@@ -75,12 +114,28 @@ Item {
         colorPickerMenu.open();
     }
 
+    function openShapeMenu(triggerItem) {
+        shapeMenu.openFor(triggerItem, 0, triggerItem.height + toolbar.spacingSmall);
+    }
+
+    function selectedShapeIconName(shapeKind) {
+        const normalizedShape = shapeKind === "triagle" ? "triangle" : shapeKind;
+        const entry = toolbar.shapeMenuEntries.find(candidate => candidate.shape === normalizedShape);
+        return entry && entry.iconName ? entry.iconName : "rectangle";
+    }
+
     function activateBrushTool(triggerItem) {
         if (toolbar.currentTool === "brush") {
             toolbar.openBrushSettingsMenu(triggerItem);
             return;
         }
         toolbar.toolSelected("brush");
+    }
+
+    function selectShape(shapeKind) {
+        shapeSelected(shapeKind);
+        toolSelected("shape");
+        shapeMenu.close();
     }
 
     function requestBrushPropertyChange(propertyName, value) {
@@ -164,18 +219,19 @@ Item {
         Layout.alignment: Qt.AlignVCenter
     }
 
-    component FigmaToolbarMenuButton: LV.AbstractButton {
+    component FigmaToolbarMenuButton: Item {
         id: menuButton
 
         property string iconName: ""
+        property int tone: LV.AbstractButton.Borderless
+        property string accessibleName: ""
+        property string menuAccessibleName: ""
         readonly property url iconSource: LV.Theme.iconPath(iconName)
         readonly property url indicatorSource: LV.Theme.iconPath("generalchevronDownBorderless")
 
-        tone: LV.AbstractButton.Borderless
-        horizontalPadding: 2
-        verticalPadding: 2
-        spacing: -2
-        cornerRadius: LV.Theme.radiusSm
+        signal bodyClicked
+        signal menuClicked
+
         implicitWidth: toolbar.figmaToolbarMenuButtonWidth
         implicitHeight: toolbar.figmaToolbarButtonSize
         width: toolbar.figmaToolbarMenuButtonWidth
@@ -185,39 +241,59 @@ Item {
         Layout.preferredHeight: toolbar.figmaToolbarButtonSize
         Layout.alignment: Qt.AlignVCenter
 
-        contentItem: RowLayout {
-            spacing: -2
+        LV.AbstractButton {
+            id: menuButtonBody
 
-            Image {
-                source: menuButton.iconSource
-                sourceSize.width: toolbar.figmaToolbarIconSize
-                sourceSize.height: toolbar.figmaToolbarIconSize
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-                Layout.preferredWidth: toolbar.figmaToolbarIconSize
-                Layout.preferredHeight: toolbar.figmaToolbarIconSize
-                Layout.minimumWidth: toolbar.figmaToolbarIconSize
-                Layout.minimumHeight: toolbar.figmaToolbarIconSize
-                Layout.maximumWidth: toolbar.figmaToolbarIconSize
-                Layout.maximumHeight: toolbar.figmaToolbarIconSize
-                Layout.alignment: Qt.AlignVCenter
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: toolbar.figmaToolbarButtonSize
+            tone: menuButton.tone
+            horizontalPadding: 2
+            verticalPadding: 2
+            cornerRadius: LV.Theme.radiusSm
+            Accessible.name: menuButton.accessibleName
+            onClicked: menuButton.bodyClicked()
+
+            contentItem: Item {
+                Image {
+                    anchors.centerIn: parent
+                    source: menuButton.iconSource
+                    sourceSize.width: toolbar.figmaToolbarIconSize
+                    sourceSize.height: toolbar.figmaToolbarIconSize
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    mipmap: true
+                    width: toolbar.figmaToolbarIconSize
+                    height: toolbar.figmaToolbarIconSize
+                }
             }
+        }
 
-            Image {
-                source: menuButton.indicatorSource
-                sourceSize.width: toolbar.figmaToolbarIconSize
-                sourceSize.height: toolbar.figmaToolbarIconSize
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-                Layout.preferredWidth: toolbar.figmaToolbarIconSize
-                Layout.preferredHeight: toolbar.figmaToolbarIconSize
-                Layout.minimumWidth: toolbar.figmaToolbarIconSize
-                Layout.minimumHeight: toolbar.figmaToolbarIconSize
-                Layout.maximumWidth: toolbar.figmaToolbarIconSize
-                Layout.maximumHeight: toolbar.figmaToolbarIconSize
-                Layout.alignment: Qt.AlignVCenter
+        LV.AbstractButton {
+            anchors.left: menuButtonBody.right
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            tone: menuButton.tone
+            horizontalPadding: 0
+            verticalPadding: 2
+            cornerRadius: LV.Theme.radiusSm
+            Accessible.name: menuButton.menuAccessibleName
+            onClicked: menuButton.menuClicked()
+
+            contentItem: Item {
+                Image {
+                    anchors.centerIn: parent
+                    source: menuButton.indicatorSource
+                    sourceSize.width: 12
+                    sourceSize.height: 12
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    mipmap: true
+                    width: 12
+                    height: 12
+                }
             }
         }
     }
@@ -626,6 +702,17 @@ Item {
         }
     }
 
+    LV.ContextMenu {
+        id: shapeMenu
+        itemWidth: 196
+        showIconSlot: true
+        selectedIndex: toolbar.shapeMenuEntries.findIndex(entry => entry.shape === toolbar.currentShape)
+        items: toolbar.shapeMenuEntries
+        onItemTriggered: function (index, item) {
+            toolbar.selectShape(item.shape);
+        }
+    }
+
     Controls.Popup {
         id: brushSettingsMenu
         width: 340
@@ -821,8 +908,12 @@ Item {
 
                 FigmaToolbarMenuButton {
                     id: shapeToolButton
-                    iconName: "gutterCheckBox@14x14"
-                    Accessible.name: qsTr("Shape tool")
+                    tone: toolbar.currentTool === "shape" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: toolbar.selectedShapeIconName(toolbar.currentShape)
+                    accessibleName: qsTr("Shape tool")
+                    menuAccessibleName: qsTr("Open shape menu")
+                    onBodyClicked: toolbar.toolSelected("shape")
+                    onMenuClicked: toolbar.openShapeMenu(shapeToolButton)
                 }
 
                 FigmaToolbarButton {
