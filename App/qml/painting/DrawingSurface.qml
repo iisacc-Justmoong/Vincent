@@ -38,6 +38,10 @@ Rectangle {
     property real shapeStartY: 0
     property real shapeCurrentX: 0
     property real shapeCurrentY: 0
+    property real canvasZoomScale: 1
+    property bool zoomDraggingActive: false
+    property real zoomDragStartX: 0
+    property real zoomDragStartScale: 1
     property color textToolAccentColor: "#A571E6"
     property int textToolFramePadding: 8
     readonly property real workspaceCanvasHorizontalInsetRatio: 0.09
@@ -49,6 +53,8 @@ Rectangle {
     readonly property int workspaceCanvasBottomInset: Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasBottomInsetRatio))
     readonly property int workspaceCanvasWidth: Math.max(1, Math.round(width) - workspaceCanvasHorizontalInset * 2)
     readonly property int workspaceCanvasHeight: Math.max(1, Math.round(height) - workspaceCanvasTopInset - workspaceCanvasBottomInset)
+    readonly property int minimumCanvasDimension: 1
+    readonly property int maximumCanvasDimension: 8192
     readonly property int minimumTextToolFontPixelSize: 8
     readonly property int textToolFontPixelSize: Math.max(surface.minimumTextToolFontPixelSize, Math.round(surface.brushSize))
     readonly property int textToolMinimumWidth: 96
@@ -57,6 +63,9 @@ Rectangle {
     readonly property int drawableObjectMinimumDimension: 8
     readonly property int drawableObjectHandleSize: 8
     readonly property int drawableObjectHandleHitSize: 16
+    readonly property real minimumCanvasZoomScale: 0.25
+    readonly property real maximumCanvasZoomScale: 8
+    readonly property real zoomDragPixelsPerDoubling: 180
     readonly property var drawableObjectHandles: [
         {
             mode: "resize-nw",
@@ -99,11 +108,31 @@ Rectangle {
         canvasSizeCreated = true;
     }
 
-    function newCanvas() {
+    function normalizedCanvasDimension(value, fallbackValue) {
+        const parsedValue = Math.round(Number(value));
+        if (!isFinite(parsedValue)) {
+            return fallbackValue;
+        }
+        return Math.max(surface.minimumCanvasDimension, Math.min(surface.maximumCanvasDimension, parsedValue));
+    }
+
+    function resizeCanvasItemToDimensions(canvasWidth, canvasHeight) {
+        if (!canvasItemReady) {
+            return;
+        }
+        canvasSurface.resizeCanvasSurface(normalizedCanvasDimension(canvasWidth, workspaceCanvasWidth), normalizedCanvasDimension(canvasHeight, workspaceCanvasHeight));
+        canvasSizeCreated = true;
+    }
+
+    function newCanvas(canvasWidth, canvasHeight) {
         cancelActiveText();
         cancelActiveShape();
         clearDrawableObjects();
-        syncCanvasItemSizeToWorkspace();
+        if (arguments.length >= 2) {
+            resizeCanvasItemToDimensions(canvasWidth, canvasHeight);
+        } else {
+            syncCanvasItemSizeToWorkspace();
+        }
         canvasSurface.newCanvas();
     }
 
@@ -562,8 +591,50 @@ Rectangle {
         canvasSurface.fillAt(pointX, pointY, surface.brushColor);
     }
 
+    function boundedCanvasZoomScale(scaleValue) {
+        const parsedScale = Number(scaleValue);
+        if (!isFinite(parsedScale)) {
+            return 1;
+        }
+        return Math.max(surface.minimumCanvasZoomScale, Math.min(surface.maximumCanvasZoomScale, parsedScale));
+    }
+
+    function beginZoomDrag(pointX) {
+        if (surface.toolMode !== "zoom") {
+            return;
+        }
+
+        commitActiveText();
+        cancelActiveShape();
+        resetDrawableObjectTransform();
+        surface.zoomDragStartX = pointX;
+        surface.zoomDragStartScale = surface.canvasZoomScale;
+        surface.zoomDraggingActive = true;
+    }
+
+    function updateZoomDrag(pointX) {
+        if (!surface.zoomDraggingActive) {
+            return;
+        }
+
+        const deltaX = pointX - surface.zoomDragStartX;
+        surface.canvasZoomScale = boundedCanvasZoomScale(surface.zoomDragStartScale * Math.pow(2, deltaX / surface.zoomDragPixelsPerDoubling));
+    }
+
+    function commitZoomDrag() {
+        surface.zoomDraggingActive = false;
+    }
+
+    function cancelZoomDrag() {
+        if (!surface.zoomDraggingActive) {
+            return;
+        }
+        surface.canvasZoomScale = surface.zoomDragStartScale;
+        surface.zoomDraggingActive = false;
+    }
+
     function canvasMouseAcceptedButtons() {
-        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "fill" || surface.toolMode === "text") {
+        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
             return Qt.LeftButton;
         }
         return Qt.NoButton;
@@ -578,6 +649,9 @@ Rectangle {
         }
         if (surface.toolMode === "move") {
             return Qt.SizeAllCursor;
+        }
+        if (surface.toolMode === "zoom") {
+            return Qt.SizeHorCursor;
         }
         if (surface.toolMode === "fill" || surface.toolMode === "eraser") {
             return Qt.PointingHandCursor;
@@ -707,6 +781,9 @@ Rectangle {
         if (toolMode !== "move") {
             resetDrawableObjectTransform();
         }
+        if (toolMode !== "zoom") {
+            commitZoomDrag();
+        }
     }
 
     onWidthChanged: {
@@ -735,6 +812,8 @@ Rectangle {
             anchors.centerIn: parent
             width: canvasSurface.width
             height: canvasSurface.height
+            transformOrigin: Item.Center
+            scale: surface.canvasZoomScale
             color: surface.canvasColor
             border.color: "#b8bcc4"
             border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
@@ -746,6 +825,8 @@ Rectangle {
             z: 1
             width: 1
             height: 1
+            transformOrigin: Item.Center
+            scale: surface.canvasZoomScale
             brushColor: surface.brushColor
             brushSize: surface.brushSize
             brushFlow: surface.brushFlow
@@ -939,6 +1020,12 @@ Rectangle {
         cursorShape: surface.canvasCursorShape()
 
         onPressed: function (mouse) {
+            if (surface.toolMode === "zoom") {
+                surface.beginZoomDrag(mouse.x);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "move") {
                 surface.beginDrawableObjectTransform(mouse.x, mouse.y);
                 mouse.accepted = true;
@@ -965,6 +1052,12 @@ Rectangle {
         }
 
         onPositionChanged: function (mouse) {
+            if (surface.toolMode === "zoom" && surface.zoomDraggingActive) {
+                surface.updateZoomDrag(mouse.x);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "move" && surface.drawableObjectTransformActive) {
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y);
                 mouse.accepted = true;
@@ -979,6 +1072,13 @@ Rectangle {
         }
 
         onReleased: function (mouse) {
+            if (surface.toolMode === "zoom") {
+                surface.updateZoomDrag(mouse.x);
+                surface.commitZoomDrag();
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "move") {
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y);
                 surface.commitDrawableObjectTransform();
@@ -997,6 +1097,7 @@ Rectangle {
         onCanceled: {
             surface.cancelActiveShape();
             surface.cancelActiveDrawableObjectTransform();
+            surface.cancelZoomDrag();
         }
 
         onWheel: function (wheel) {

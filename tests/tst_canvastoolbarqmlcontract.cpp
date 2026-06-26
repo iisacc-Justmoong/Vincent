@@ -114,6 +114,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     const qsizetype openIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalopen\""));
     const qsizetype saveIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalsave\""));
     const qsizetype translateIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"translateObject\""));
+    const qsizetype zoomIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalsearch\""));
     const qsizetype brushIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"showCode\""));
     const qsizetype eraserIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"eraser\""));
     const qsizetype shapeIndex = toolbarSource.indexOf(QStringLiteral("id: shapeToolButton"));
@@ -124,14 +125,24 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(openIndex > addIndex);
     QVERIFY(saveIndex > openIndex);
     QVERIFY(translateIndex > saveIndex);
-    QVERIFY(brushIndex > translateIndex);
+    QVERIFY(zoomIndex > translateIndex);
+    QVERIFY(brushIndex > zoomIndex);
     QVERIFY(eraserIndex > brushIndex);
     QVERIFY(shapeIndex > eraserIndex);
     QVERIFY(fillIndex > shapeIndex);
     QVERIFY(typeIndex > fillIndex);
 
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"New canvas\")")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("signal newCanvasRequested(int canvasWidth, int canvasHeight)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("function openNewCanvasDialog()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasDialog")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("modal: true")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasWidthField")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasHeightField")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("toolbar.newCanvasRequested(nextWidth, nextHeight);")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openNewCanvasDialog()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onActivated: toolbar.openNewCanvasDialog()")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Open image\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openFileDialog()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Save image\")")));
@@ -142,6 +153,9 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"move\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.translateObjectIconSource")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"move\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"zoom\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Zoom tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"zoom\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Brush tool\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.activateBrushTool(brushToolButton)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Eraser tool\")")));
@@ -216,11 +230,13 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.canvasMouseAcceptedButtons()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasCursorShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"move\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.SizeAllCursor;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"zoom\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.SizeHorCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"fill\" || surface.toolMode === \"eraser\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.canvasCursorShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("border.color: surface.textToolAccentColor")));
@@ -310,7 +326,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeKind")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeToolStrokeWidth")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.CrossCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
@@ -321,6 +337,14 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode !== \"fill\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.fillAt(pointX, pointY, surface.brushColor);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.fillAt(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasZoomScale: 1")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginZoomDrag(pointX)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function updateZoomDrag(pointX)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function cancelZoomDrag()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("scale: surface.canvasZoomScale")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginZoomDrag(mouse.x);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateZoomDrag(mouse.x);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitZoomDrag();")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.modelData.type === \"image\" ? drawableObjectDelegate.modelData.source : \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
@@ -340,6 +364,11 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     const QString painterPageSource = QString::fromUtf8(painterPageQml.readAll());
 
     QVERIFY(painterPageSource.contains(QStringLiteral("function setShapeKind(shapeKind)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("function newCanvas(canvasWidth, canvasHeight)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("drawingSurface.newCanvas(canvasWidth, canvasHeight);")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : painterPage.fallbackNewCanvasWidth")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : painterPage.fallbackNewCanvasHeight")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("onNewCanvasRequested: (canvasWidth, canvasHeight) => painterPage.newCanvas(canvasWidth, canvasHeight)")));
     QVERIFY(painterPageSource.contains(QStringLiteral("painterPage.updateDocumentProperty(\"shapeKind\", shapeKind);")));
     QVERIFY(painterPageSource.contains(QStringLiteral("shapeKind: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));
     QVERIFY(painterPageSource.contains(QStringLiteral("currentShape: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));

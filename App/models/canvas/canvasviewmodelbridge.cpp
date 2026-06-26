@@ -81,6 +81,7 @@ void CanvasViewModelBridge::syncToolState(CanvasBrushConfig &brushConfig, QStrin
         const QString nextTool = toolModeValue.toString();
         toolMode = nextTool == QStringLiteral("eraser")
                 || nextTool == QStringLiteral("move")
+                || nextTool == QStringLiteral("zoom")
                 || nextTool == QStringLiteral("fill")
                 || nextTool == QStringLiteral("text")
                 || nextTool == QStringLiteral("shape")

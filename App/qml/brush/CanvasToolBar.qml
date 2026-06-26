@@ -27,13 +27,19 @@ Item {
     property color currentColor: "#1a1a1a"
     property string currentTool: "brush"
     property string currentShape: "rectangle"
-    readonly property bool dialogActive: openDialog.visible || saveDialog.visible
+    property int canvasWidth: fallbackNewCanvasWidth
+    property int canvasHeight: fallbackNewCanvasHeight
+    readonly property bool dialogActive: newCanvasDialog.visible || openDialog.visible || saveDialog.visible
     readonly property string modifierKeyLabel: Qt.platform.os === "osx" ? "Cmd" : "Ctrl"
     readonly property string shortcutNew: modifierKeyLabel + "+N"
     readonly property string shortcutOpen: modifierKeyLabel + "+O"
     readonly property string shortcutSave: modifierKeyLabel + "+S"
     readonly property string shortcutClear: modifierKeyLabel + "+Shift+K"
     readonly property color accentColor: LV.Theme.primary
+    readonly property int minimumCanvasDimension: 1
+    readonly property int maximumCanvasDimension: 8192
+    readonly property int fallbackNewCanvasWidth: 1024
+    readonly property int fallbackNewCanvasHeight: 768
     readonly property int figmaToolbarButtonSize: 20
     readonly property int figmaToolbarMenuButtonWidth: 34
     readonly property int figmaToolbarIconSize: 16
@@ -81,7 +87,7 @@ Item {
     implicitWidth: toolbarLayout.implicitWidth + spacingSmall * 4
     height: implicitHeight
 
-    signal newCanvasRequested
+    signal newCanvasRequested(int canvasWidth, int canvasHeight)
     signal clearCanvasRequested
     signal openRequested(string fileUrl)
     signal saveRequested(string fileUrl)
@@ -93,6 +99,11 @@ Item {
 
     function openFileDialog() {
         openDialog.open();
+    }
+
+    function openNewCanvasDialog() {
+        resetNewCanvasDialogFields();
+        newCanvasDialog.open();
     }
 
     function openSaveDialog() {
@@ -146,6 +157,38 @@ Item {
         brushPropertyChangeRequested(propertyName, value);
     }
 
+    function normalizedCanvasDimension(value, fallbackValue) {
+        const parsedValue = Math.round(Number(value));
+        if (!isFinite(parsedValue)) {
+            return fallbackValue;
+        }
+        return Math.max(toolbar.minimumCanvasDimension, Math.min(toolbar.maximumCanvasDimension, parsedValue));
+    }
+
+    function currentCanvasDimension(value, fallbackValue) {
+        return normalizedCanvasDimension(value > 0 ? value : fallbackValue, fallbackValue);
+    }
+
+    function isCanvasDimensionTextValid(textValue) {
+        const parsedValue = Math.round(Number(textValue));
+        return isFinite(parsedValue) && parsedValue >= toolbar.minimumCanvasDimension && parsedValue <= toolbar.maximumCanvasDimension;
+    }
+
+    function resetNewCanvasDialogFields() {
+        newCanvasWidthField.text = String(currentCanvasDimension(toolbar.canvasWidth, toolbar.fallbackNewCanvasWidth));
+        newCanvasHeightField.text = String(currentCanvasDimension(toolbar.canvasHeight, toolbar.fallbackNewCanvasHeight));
+    }
+
+    function acceptNewCanvasDialog() {
+        if (!isCanvasDimensionTextValid(newCanvasWidthField.text) || !isCanvasDimensionTextValid(newCanvasHeightField.text)) {
+            return;
+        }
+        const nextWidth = normalizedCanvasDimension(newCanvasWidthField.text, toolbar.fallbackNewCanvasWidth);
+        const nextHeight = normalizedCanvasDimension(newCanvasHeightField.text, toolbar.fallbackNewCanvasHeight);
+        newCanvasDialog.close();
+        toolbar.newCanvasRequested(nextWidth, nextHeight);
+    }
+
     function selectedDialogFileUrl(dialog) {
         const selected = dialog.selectedFile;
         return selected ? selected.toString() : "";
@@ -173,7 +216,7 @@ Item {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.New
         enabled: !toolbar.dialogActive
-        onActivated: toolbar.newCanvasRequested()
+        onActivated: toolbar.openNewCanvasDialog()
     }
 
     Shortcut {
@@ -658,6 +701,106 @@ Item {
         }
     }
 
+    Controls.Popup {
+        id: newCanvasDialog
+        objectName: "newCanvasDialog"
+        parent: Controls.Overlay.overlay
+        x: parent ? Math.round((parent.width - width) / 2) : 0
+        y: parent ? Math.round((parent.height - height) / 2) : 0
+        width: 360
+        padding: toolbar.spacingLarge
+        modal: true
+        focus: true
+        closePolicy: Controls.Popup.CloseOnEscape | Controls.Popup.CloseOnPressOutside
+
+        onOpened: {
+            newCanvasWidthField.forceInputFocus();
+            newCanvasWidthField.selectAll();
+        }
+
+        background: Rectangle {
+            radius: LV.Theme.radiusLg
+            color: LV.Theme.panelBackground08
+            border.width: 1
+            border.color: Qt.rgba(255, 255, 255, 0.12)
+        }
+
+        contentItem: ColumnLayout {
+            spacing: toolbar.spacingMedium
+
+            LV.Label {
+                text: qsTr("Canvas size")
+                style: title2
+                Layout.fillWidth: true
+            }
+
+            GridLayout {
+                columns: 2
+                columnSpacing: toolbar.spacingMedium
+                rowSpacing: toolbar.spacingSmall
+                Layout.fillWidth: true
+
+                LV.Label {
+                    text: qsTr("Width")
+                    style: body
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                LV.InputField {
+                    id: newCanvasWidthField
+                    objectName: "newCanvasWidthField"
+                    text: String(toolbar.fallbackNewCanvasWidth)
+                    placeholderText: String(toolbar.fallbackNewCanvasWidth)
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    maximumLength: 5
+                    Layout.fillWidth: true
+                    onAccepted: toolbar.acceptNewCanvasDialog()
+                }
+
+                LV.Label {
+                    text: qsTr("Height")
+                    style: body
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                LV.InputField {
+                    id: newCanvasHeightField
+                    objectName: "newCanvasHeightField"
+                    text: String(toolbar.fallbackNewCanvasHeight)
+                    placeholderText: String(toolbar.fallbackNewCanvasHeight)
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    maximumLength: 5
+                    Layout.fillWidth: true
+                    onAccepted: toolbar.acceptNewCanvasDialog()
+                }
+            }
+
+            LV.Label {
+                text: qsTr("1-8192 px")
+                style: caption
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                spacing: toolbar.spacingSmall
+                Layout.alignment: Qt.AlignRight
+
+                LV.LabelButton {
+                    text: qsTr("Cancel")
+                    tone: LV.AbstractButton.Default
+                    onClicked: newCanvasDialog.close()
+                }
+
+                LV.LabelButton {
+                    text: qsTr("Create")
+                    tone: LV.AbstractButton.Primary
+                    enabled: toolbar.isCanvasDimensionTextValid(newCanvasWidthField.text) && toolbar.isCanvasDimensionTextValid(newCanvasHeightField.text)
+                    onClicked: toolbar.acceptNewCanvasDialog()
+                }
+            }
+        }
+    }
+
     Dialogs.FileDialog {
         id: saveDialog
         title: qsTr("Save Image As")
@@ -870,7 +1013,7 @@ Item {
                 FigmaToolbarButton {
                     iconName: "addFile"
                     Accessible.name: qsTr("New canvas")
-                    onClicked: toolbar.newCanvasRequested()
+                    onClicked: toolbar.openNewCanvasDialog()
                 }
 
                 FigmaToolbarButton {
@@ -897,6 +1040,13 @@ Item {
                     iconSource: toolbar.translateObjectIconSource
                     Accessible.name: qsTr("Move tool")
                     onClicked: toolbar.toolSelected("move")
+                }
+
+                FigmaToolbarButton {
+                    tone: toolbar.currentTool === "zoom" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: "generalsearch"
+                    Accessible.name: qsTr("Zoom tool")
+                    onClicked: toolbar.toolSelected("zoom")
                 }
 
                 FigmaToolbarButton {

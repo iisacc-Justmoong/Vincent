@@ -828,9 +828,14 @@ bool DrawingSurfaceItem::isMoveToolActive() const
     return toolMode() == QStringLiteral("move");
 }
 
+bool DrawingSurfaceItem::isZoomToolActive() const
+{
+    return toolMode() == QStringLiteral("zoom");
+}
+
 bool DrawingSurfaceItem::isOverlayToolActive() const
 {
-    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isMoveToolActive();
+    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isMoveToolActive() || isZoomToolActive();
 }
 
 QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)

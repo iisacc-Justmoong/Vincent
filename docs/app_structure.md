@@ -52,11 +52,12 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Provides the flat-raster command bar.
 - Exposes left toolbar file actions for new, open, and save, with clear still available through the keyboard shortcut.
 - Renders the command bar inside a full-height solid round cylinder background.
-- Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generalopen`, `generalsave`, `translateObject`, `showCode`, `eraser`, selected shape-kind, `fillbucket`, and `typeAlias` icons.
-- Keeps existing behavior on the matching actionable icons: add creates a new canvas, open shows the image-open dialog, save shows the image-save dialog, `translateObject` selects the move tool, pencil selects or reopens brush settings, eraser selects the eraser, the shape split button selects the shape tool from its body and opens the shape menu from its chevron, `fillbucket` selects the fill tool, and `typeAlias` selects the text tool.
+- Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generalopen`, `generalsave`, `translateObject`, `generalsearch`, `showCode`, `eraser`, selected shape-kind, `fillbucket`, and `typeAlias` icons.
+- Keeps existing behavior on the matching actionable icons: add opens the new-canvas size modal, open shows the image-open dialog, save shows the image-save dialog, `translateObject` selects the move tool, `generalsearch` selects the zoom tool, pencil selects or reopens brush settings, eraser selects the eraser, the shape split button selects the shape tool from its body and opens the shape menu from its chevron, `fillbucket` selects the fill tool, and `typeAlias` selects the text tool.
+- Uses an LVRS-styled modal with width and height inputs before emitting the new-canvas request.
 - Offers shape menu entries for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble insertion through `LV.ContextMenu`, shows each shape icon in the menu, and mirrors the selected shape on the split button icon.
 - Uses app-local vector sources for the `translateObject` and `typeAlias` slots while preserving the Figma/LVRS icon names. `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
-- Restricts tools to brush, eraser, move, shape, fill, and text.
+- Restricts tools to brush, eraser, move, zoom, shape, fill, and text.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
@@ -77,7 +78,8 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Presents a fill tool between shape and text; clicking the canvas flood-fills the contiguous same-color raster region with the current brush color through `DrawingSurfaceItem`.
 - Presents a paint-style text editor when the text tool is active; the editor sizes its frame from the longest text line within the remaining canvas width, uses the current brush size and brush color as its text size and color, then stores plain text as a transformable session object.
 - Presents a move tool for inserted image, text, and shape objects; clicking an object selects it, dragging the body moves it, dragging a corner handle resizes its bounds, and Delete or Backspace removes the selected object before export.
-- Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
+- Uses a proportional workspace inset to create initial and cleared canvases below the toolbar with visible dark margins instead of filling the window.
+- Creates new canvases from explicit width and height values passed by the toolbar modal, clamped to the supported raster dimension range.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
 - Presents only the fixed canvas area on a white paper background and leaves any resized viewport overflow in the LVRS workspace color, while keeping iiPaintEngine's raster layer semantics unchanged.
 - Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, and toolbar state binding.
@@ -121,7 +123,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 ## Testing Surface
 
 - `tests/tst_canvasdocumentviewmodel.cpp` validates the flat-raster document state and value clamping, including iiPaintEngine brush settings, supported tool modes, and supported shape kinds.
-- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, move-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform and keyboard-delete hooks, and HSL triangle color-picker usage.
+- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including the new-canvas size modal, brush reselection settings, move-tool selection, zoom-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform and keyboard-delete hooks, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, composite object saving, undo/redo, saving, image-object opening within workspace bounds, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, horizontal-drag canvas zooming, composite object saving, undo/redo, saving, image-object opening within workspace bounds, explicit-size new canvas creation, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

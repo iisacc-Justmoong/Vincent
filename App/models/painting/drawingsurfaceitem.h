@@ -84,6 +84,7 @@ private:
     [[nodiscard]] bool isShapeToolActive() const;
     [[nodiscard]] bool isFillToolActive() const;
     [[nodiscard]] bool isMoveToolActive() const;
+    [[nodiscard]] bool isZoomToolActive() const;
     [[nodiscard]] bool isOverlayToolActive() const;
     [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
     void syncCanvasSize();

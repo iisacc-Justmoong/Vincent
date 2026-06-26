@@ -285,6 +285,7 @@ void CanvasDocumentViewModel::setToolMode(const QString &toolMode)
         QStringLiteral("brush"),
         QStringLiteral("eraser"),
         QStringLiteral("move"),
+        QStringLiteral("zoom"),
         QStringLiteral("shape"),
         QStringLiteral("fill"),
         QStringLiteral("text"),

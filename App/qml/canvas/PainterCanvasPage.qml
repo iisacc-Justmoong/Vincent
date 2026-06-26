@@ -14,6 +14,8 @@ Item {
     readonly property string viewId: "PainterCanvasPage"
     readonly property real maximumAntialiasingBrushHardness: 1
     readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall
+    readonly property int fallbackNewCanvasWidth: 1024
+    readonly property int fallbackNewCanvasHeight: 768
 
     property int topChromeReservedHeight: 0
     property var vm: null
@@ -58,8 +60,8 @@ Item {
         }
     }
 
-    function newCanvas() {
-        drawingSurface.newCanvas();
+    function newCanvas(canvasWidth, canvasHeight) {
+        drawingSurface.newCanvas(canvasWidth, canvasHeight);
     }
 
     function clearCanvas() {
@@ -156,7 +158,9 @@ Item {
             currentColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
             currentTool: painterPage.vm ? painterPage.vm.toolMode : "brush"
             currentShape: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
-            onNewCanvasRequested: painterPage.newCanvas()
+            canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : painterPage.fallbackNewCanvasWidth
+            canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : painterPage.fallbackNewCanvasHeight
+            onNewCanvasRequested: (canvasWidth, canvasHeight) => painterPage.newCanvas(canvasWidth, canvasHeight)
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)
             onBrushPropertyChangeRequested: (propertyName, value) => painterPage.setBrushProperty(propertyName, value)

@@ -131,9 +131,12 @@ void tst_CanvasDocumentViewModel::acceptsOnlySupportedTools()
     viewModel.setToolMode(QStringLiteral("move"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("move"));
 
+    viewModel.setToolMode(QStringLiteral("zoom"));
+    QCOMPARE(viewModel.toolMode(), QStringLiteral("zoom"));
+
     viewModel.setToolMode(QStringLiteral("translate"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
-    QCOMPARE(toolSpy.count(), 6);
+    QCOMPARE(toolSpy.count(), 7);
 }
 
 void tst_CanvasDocumentViewModel::acceptsOnlySupportedShapeKinds()
