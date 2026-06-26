@@ -823,6 +823,11 @@ bool DrawingSurfaceItem::isFillToolActive() const
     return toolMode() == QStringLiteral("fill");
 }
 
+bool DrawingSurfaceItem::isPanToolActive() const
+{
+    return toolMode() == QStringLiteral("pan");
+}
+
 bool DrawingSurfaceItem::isMoveToolActive() const
 {
     return toolMode() == QStringLiteral("move");
@@ -835,7 +840,7 @@ bool DrawingSurfaceItem::isZoomToolActive() const
 
 bool DrawingSurfaceItem::isOverlayToolActive() const
 {
-    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isMoveToolActive() || isZoomToolActive();
+    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isPanToolActive() || isMoveToolActive() || isZoomToolActive();
 }
 
 QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)

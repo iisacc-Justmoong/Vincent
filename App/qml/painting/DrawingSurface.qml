@@ -42,6 +42,13 @@ Rectangle {
     property bool zoomDraggingActive: false
     property real zoomDragStartX: 0
     property real zoomDragStartScale: 1
+    property real canvasPanOffsetX: 0
+    property real canvasPanOffsetY: 0
+    property bool panDraggingActive: false
+    property real panDragStartX: 0
+    property real panDragStartY: 0
+    property real panDragStartOffsetX: 0
+    property real panDragStartOffsetY: 0
     property color textToolAccentColor: "#A571E6"
     property int textToolFramePadding: 8
     readonly property real workspaceCanvasHorizontalInsetRatio: 0.09
@@ -127,6 +134,7 @@ Rectangle {
     function newCanvas(canvasWidth, canvasHeight) {
         cancelActiveText();
         cancelActiveShape();
+        resetCanvasPan();
         clearDrawableObjects();
         if (arguments.length >= 2) {
             resizeCanvasItemToDimensions(canvasWidth, canvasHeight);
@@ -139,6 +147,7 @@ Rectangle {
     function clearCanvas() {
         cancelActiveText();
         cancelActiveShape();
+        resetCanvasPan();
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
@@ -147,6 +156,7 @@ Rectangle {
     function openRaster(fileUrl) {
         cancelActiveText();
         cancelActiveShape();
+        resetCanvasPan();
         const sourceUrl = fileUrl ? fileUrl.toString() : "";
         const imageObject = canvasSurface.imageObjectForFile(sourceUrl, surface.workspaceCanvasWidth, surface.workspaceCanvasHeight);
         if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
@@ -591,6 +601,50 @@ Rectangle {
         canvasSurface.fillAt(pointX, pointY, surface.brushColor);
     }
 
+    function resetCanvasPan() {
+        surface.canvasPanOffsetX = 0;
+        surface.canvasPanOffsetY = 0;
+        surface.panDraggingActive = false;
+    }
+
+    function beginPanDrag(pointX, pointY) {
+        if (surface.toolMode !== "pan") {
+            return;
+        }
+
+        commitActiveText();
+        cancelActiveShape();
+        resetDrawableObjectTransform();
+        commitZoomDrag();
+        surface.panDragStartX = pointX;
+        surface.panDragStartY = pointY;
+        surface.panDragStartOffsetX = surface.canvasPanOffsetX;
+        surface.panDragStartOffsetY = surface.canvasPanOffsetY;
+        surface.panDraggingActive = true;
+    }
+
+    function updatePanDrag(pointX, pointY) {
+        if (!surface.panDraggingActive) {
+            return;
+        }
+
+        surface.canvasPanOffsetX = surface.panDragStartOffsetX + (pointX - surface.panDragStartX) * surface.canvasZoomScale;
+        surface.canvasPanOffsetY = surface.panDragStartOffsetY + (pointY - surface.panDragStartY) * surface.canvasZoomScale;
+    }
+
+    function commitPanDrag() {
+        surface.panDraggingActive = false;
+    }
+
+    function cancelPanDrag() {
+        if (!surface.panDraggingActive) {
+            return;
+        }
+        surface.canvasPanOffsetX = surface.panDragStartOffsetX;
+        surface.canvasPanOffsetY = surface.panDragStartOffsetY;
+        surface.panDraggingActive = false;
+    }
+
     function boundedCanvasZoomScale(scaleValue) {
         const parsedScale = Number(scaleValue);
         if (!isFinite(parsedScale)) {
@@ -634,7 +688,7 @@ Rectangle {
     }
 
     function canvasMouseAcceptedButtons() {
-        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
+        if (surface.toolMode === "shape" || surface.toolMode === "pan" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
             return Qt.LeftButton;
         }
         return Qt.NoButton;
@@ -646,6 +700,9 @@ Rectangle {
         }
         if (surface.toolMode === "text") {
             return Qt.IBeamCursor;
+        }
+        if (surface.toolMode === "pan") {
+            return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;
         }
         if (surface.toolMode === "move") {
             return Qt.SizeAllCursor;
@@ -781,6 +838,9 @@ Rectangle {
         if (toolMode !== "move") {
             resetDrawableObjectTransform();
         }
+        if (toolMode !== "pan") {
+            commitPanDrag();
+        }
         if (toolMode !== "zoom") {
             commitZoomDrag();
         }
@@ -810,6 +870,8 @@ Rectangle {
             id: canvasPaper
             objectName: "canvasPaper"
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: surface.canvasPanOffsetX
+            anchors.verticalCenterOffset: surface.canvasPanOffsetY
             width: canvasSurface.width
             height: canvasSurface.height
             transformOrigin: Item.Center
@@ -822,6 +884,8 @@ Rectangle {
         DrawingSurfaceItem {
             id: canvasSurface
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: surface.canvasPanOffsetX
+            anchors.verticalCenterOffset: surface.canvasPanOffsetY
             z: 1
             width: 1
             height: 1
@@ -1020,6 +1084,12 @@ Rectangle {
         cursorShape: surface.canvasCursorShape()
 
         onPressed: function (mouse) {
+            if (surface.toolMode === "pan") {
+                surface.beginPanDrag(mouse.x, mouse.y);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "zoom") {
                 surface.beginZoomDrag(mouse.x);
                 mouse.accepted = true;
@@ -1052,6 +1122,12 @@ Rectangle {
         }
 
         onPositionChanged: function (mouse) {
+            if (surface.toolMode === "pan" && surface.panDraggingActive) {
+                surface.updatePanDrag(mouse.x, mouse.y);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "zoom" && surface.zoomDraggingActive) {
                 surface.updateZoomDrag(mouse.x);
                 mouse.accepted = true;
@@ -1072,6 +1148,13 @@ Rectangle {
         }
 
         onReleased: function (mouse) {
+            if (surface.toolMode === "pan") {
+                surface.updatePanDrag(mouse.x, mouse.y);
+                surface.commitPanDrag();
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "zoom") {
                 surface.updateZoomDrag(mouse.x);
                 surface.commitZoomDrag();
@@ -1097,6 +1180,7 @@ Rectangle {
         onCanceled: {
             surface.cancelActiveShape();
             surface.cancelActiveDrawableObjectTransform();
+            surface.cancelPanDrag();
             surface.cancelZoomDrag();
         }
 

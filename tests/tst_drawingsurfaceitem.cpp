@@ -23,6 +23,7 @@ private slots:
     void createsInitialCanvasInsideWorkspaceMargins();
     void createsNewCanvasAtCurrentWorkspaceSize();
     void constrainsShapeDragWithShiftModifier();
+    void pansCanvasWithHandToolDrag();
     void zoomsCanvasWithHorizontalDrag();
     void movesAndResizesDrawableObjects();
     void deletesSelectedDrawableObject();
@@ -387,6 +388,73 @@ void tst_DrawingSurfaceItem::constrainsShapeDragWithShiftModifier()
     const qreal freeHeight = qAbs(rootItem->property("shapeCurrentY").toReal() - rootItem->property("shapeStartY").toReal());
     QCOMPARE(freeWidth, 120.0);
     QCOMPARE(freeHeight, 50.0);
+}
+
+void tst_DrawingSurfaceItem::pansCanvasWithHandToolDrag()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("pan"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
+    QVERIFY(canvasPaper);
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetX").toReal(), 0.0);
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetY").toReal(), 0.0);
+
+    const qreal initialCanvasX = canvasItem->x();
+    const qreal initialCanvasY = canvasItem->y();
+    const qreal initialPaperX = canvasPaper->x();
+    const qreal initialPaperY = canvasPaper->y();
+
+    QQmlExpression panRightUp(engine.rootContext(),
+                              object.data(),
+                              QStringLiteral("beginPanDrag(100, 120); updatePanDrag(145, 85); commitPanDrag();"));
+    panRightUp.evaluate();
+    QVERIFY2(!panRightUp.hasError(), qPrintable(panRightUp.error().toString()));
+
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetX").toReal(), 45.0);
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetY").toReal(), -35.0);
+    QTRY_COMPARE(canvasItem->x(), initialCanvasX + 45.0);
+    QTRY_COMPARE(canvasItem->y(), initialCanvasY - 35.0);
+    QTRY_COMPARE(canvasPaper->x(), initialPaperX + 45.0);
+    QTRY_COMPARE(canvasPaper->y(), initialPaperY - 35.0);
+
+    QQmlExpression resetPan(engine.rootContext(),
+                            object.data(),
+                            QStringLiteral("resetCanvasPan();"));
+    resetPan.evaluate();
+    QVERIFY2(!resetPan.hasError(), qPrintable(resetPan.error().toString()));
+
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetX").toReal(), 0.0);
+    QTRY_COMPARE(rootItem->property("canvasPanOffsetY").toReal(), 0.0);
+    QTRY_COMPARE(canvasItem->x(), initialCanvasX);
+    QTRY_COMPARE(canvasItem->y(), initialCanvasY);
+    QTRY_COMPARE(canvasPaper->x(), initialPaperX);
+    QTRY_COMPARE(canvasPaper->y(), initialPaperY);
 }
 
 void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()

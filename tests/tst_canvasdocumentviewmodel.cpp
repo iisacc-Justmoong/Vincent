@@ -128,6 +128,9 @@ void tst_CanvasDocumentViewModel::acceptsOnlySupportedTools()
     viewModel.setToolMode(QStringLiteral("fill"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("fill"));
 
+    viewModel.setToolMode(QStringLiteral("pan"));
+    QCOMPARE(viewModel.toolMode(), QStringLiteral("pan"));
+
     viewModel.setToolMode(QStringLiteral("move"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("move"));
 
@@ -136,7 +139,7 @@ void tst_CanvasDocumentViewModel::acceptsOnlySupportedTools()
 
     viewModel.setToolMode(QStringLiteral("translate"));
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
-    QCOMPARE(toolSpy.count(), 7);
+    QCOMPARE(toolSpy.count(), 8);
 }
 
 void tst_CanvasDocumentViewModel::acceptsOnlySupportedShapeKinds()

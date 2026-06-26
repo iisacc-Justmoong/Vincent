@@ -44,6 +44,7 @@ Item {
     readonly property int figmaToolbarMenuButtonWidth: 34
     readonly property int figmaToolbarIconSize: 16
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
+    readonly property url panHandIconSource: "qrc:/Vincent/resources/icons/panHand.svg"
     readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
     readonly property var shapeMenuEntries: [
         {
@@ -1033,6 +1034,14 @@ Item {
                 id: figmaToolActionsRow
                 spacing: 0
                 Layout.alignment: Qt.AlignVCenter
+
+                FigmaToolbarButton {
+                    tone: toolbar.currentTool === "pan" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: "panHand"
+                    iconSource: toolbar.panHandIconSource
+                    Accessible.name: qsTr("Pan tool")
+                    onClicked: toolbar.toolSelected("pan")
+                }
 
                 FigmaToolbarButton {
                     tone: toolbar.currentTool === "move" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless

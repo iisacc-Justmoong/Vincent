@@ -27,7 +27,8 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 - Flat raster save flow that composites the iiPaintEngine raster canvas with current image, text, and shape objects
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
 - Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster
-- Move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with the Figma-aligned left toolbar, HSL color picker, and brush controls that also set shape stroke width, fill color, text size, and text color
+- Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with the Figma-aligned left toolbar, HSL color picker, and brush controls that also set shape stroke width, fill color, text size, and text color
+- Pan mode moves the canvas in the workspace by grabbing it with the hand tool
 - Zoom mode scales the canvas by dragging horizontally: right to zoom in, left to zoom out
 - Drag-to-insert shape outlines for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds
 - Inserted image, shape, and text objects can be selected with the move tool, dragged, resized from corner transform handles, and deleted with Delete or Backspace before raster export

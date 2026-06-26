@@ -96,6 +96,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarIconSize: 16")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url translateObjectIconSource: \"qrc:/Vincent/resources/icons/translateObject.svg\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url panHandIconSource: \"qrc:/Vincent/resources/icons/panHand.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url typeAliasIconSource: \"qrc:/Vincent/resources/icons/typeAlias.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: leftToolbarActions")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: floatingBackground")));
@@ -113,6 +114,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     const qsizetype addIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"addFile\""));
     const qsizetype openIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalopen\""));
     const qsizetype saveIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalsave\""));
+    const qsizetype panIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"panHand\""));
     const qsizetype translateIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"translateObject\""));
     const qsizetype zoomIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalsearch\""));
     const qsizetype brushIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"showCode\""));
@@ -124,7 +126,8 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(addIndex >= 0);
     QVERIFY(openIndex > addIndex);
     QVERIFY(saveIndex > openIndex);
-    QVERIFY(translateIndex > saveIndex);
+    QVERIFY(panIndex > saveIndex);
+    QVERIFY(translateIndex > panIndex);
     QVERIFY(zoomIndex > translateIndex);
     QVERIFY(brushIndex > zoomIndex);
     QVERIFY(eraserIndex > brushIndex);
@@ -150,6 +153,10 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generaldelete\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Clear canvas\")")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.clearCanvasRequested()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"pan\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.panHandIconSource")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Pan tool\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"pan\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"move\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.translateObjectIconSource")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"move\")")));
@@ -180,7 +187,16 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QFile qrcFile(qrcPath);
     QVERIFY(qrcFile.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString qrcSource = QString::fromUtf8(qrcFile.readAll());
+    QVERIFY(qrcSource.contains(QStringLiteral("resources/icons/panHand.svg")));
     QVERIFY(qrcSource.contains(QStringLiteral("resources/icons/typeAlias.svg")));
+
+    const QString panHandSvgPath = QFINDTESTDATA("../App/resources/icons/panHand.svg");
+    QVERIFY2(!panHandSvgPath.isEmpty(), "panHand.svg test data was not found");
+    QFile panHandSvg(panHandSvgPath);
+    QVERIFY(panHandSvg.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString panHandSvgSource = QString::fromUtf8(panHandSvg.readAll());
+    QVERIFY(panHandSvgSource.contains(QStringLiteral("stroke=\"#CED0D6\"")));
+    QVERIFY(panHandSvgSource.contains(QStringLiteral("fill=\"#2F2936\"")));
 
     const QString typeAliasSvgPath = QFINDTESTDATA("../App/resources/icons/typeAlias.svg");
     QVERIFY2(!typeAliasSvgPath.isEmpty(), "typeAlias.svg test data was not found");
@@ -230,9 +246,11 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"pan\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.canvasMouseAcceptedButtons()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasCursorShape()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"pan\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"move\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.SizeAllCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"zoom\"")));
@@ -326,7 +344,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeKind")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeToolStrokeWidth")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"pan\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.CrossCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
@@ -345,6 +363,15 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginZoomDrag(mouse.x);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateZoomDrag(mouse.x);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitZoomDrag();")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasPanOffsetX: 0")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginPanDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function updatePanDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function resetCanvasPan()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("anchors.horizontalCenterOffset: surface.canvasPanOffsetX")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("anchors.verticalCenterOffset: surface.canvasPanOffsetY")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginPanDrag(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.updatePanDrag(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitPanDrag();")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.modelData.type === \"image\" ? drawableObjectDelegate.modelData.source : \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));

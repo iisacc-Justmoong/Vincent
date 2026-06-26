@@ -83,6 +83,7 @@ private:
     [[nodiscard]] bool isTextToolActive() const;
     [[nodiscard]] bool isShapeToolActive() const;
     [[nodiscard]] bool isFillToolActive() const;
+    [[nodiscard]] bool isPanToolActive() const;
     [[nodiscard]] bool isMoveToolActive() const;
     [[nodiscard]] bool isZoomToolActive() const;
     [[nodiscard]] bool isOverlayToolActive() const;
