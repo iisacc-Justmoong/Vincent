@@ -57,6 +57,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Uses an LVRS-styled modal with width and height inputs before emitting the new-canvas request.
 - Offers shape menu entries for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble insertion through `LV.ContextMenu`, shows each shape icon in the menu, and mirrors the selected shape on the split button icon.
 - Uses app-local vector sources for the `panHand`, `translateObject`, and `typeAlias` slots while preserving the Figma/LVRS icon names where available. `panHand` covers the hand-pan tool missing from the LVRS icon set, `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
+- Keeps pan input on the fixed canvas viewport and applies pan movement with direct item `x`/`y` offsets instead of anchor center offsets, avoiding anchor relayout during every drag frame.
 - Restricts tools to brush, eraser, pan, move, zoom, shape, fill, and text.
 - Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.

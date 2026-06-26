@@ -246,7 +246,7 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"pan\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.canvasMouseAcceptedButtons()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasCursorShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"pan\"")));
@@ -344,7 +344,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeKind")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeToolStrokeWidth")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"pan\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.CrossCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
@@ -367,8 +367,12 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginPanDrag(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updatePanDrag(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resetCanvasPan()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("anchors.horizontalCenterOffset: surface.canvasPanOffsetX")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("anchors.verticalCenterOffset: surface.canvasPanOffsetY")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: canvasPanMouseArea")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.toolMode === \"pan\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("x: Math.round((parent.width - width) / 2 + surface.canvasPanOffsetX)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("y: Math.round((parent.height - height) / 2 + surface.canvasPanOffsetY)")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("anchors.horizontalCenterOffset: surface.canvasPanOffsetX")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("anchors.verticalCenterOffset: surface.canvasPanOffsetY")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginPanDrag(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.updatePanDrag(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitPanDrag();")));

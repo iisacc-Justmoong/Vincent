@@ -628,8 +628,8 @@ Rectangle {
             return;
         }
 
-        surface.canvasPanOffsetX = surface.panDragStartOffsetX + (pointX - surface.panDragStartX) * surface.canvasZoomScale;
-        surface.canvasPanOffsetY = surface.panDragStartOffsetY + (pointY - surface.panDragStartY) * surface.canvasZoomScale;
+        surface.canvasPanOffsetX = surface.panDragStartOffsetX + pointX - surface.panDragStartX;
+        surface.canvasPanOffsetY = surface.panDragStartOffsetY + pointY - surface.panDragStartY;
     }
 
     function commitPanDrag() {
@@ -688,7 +688,7 @@ Rectangle {
     }
 
     function canvasMouseAcceptedButtons() {
-        if (surface.toolMode === "shape" || surface.toolMode === "pan" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
+        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
             return Qt.LeftButton;
         }
         return Qt.NoButton;
@@ -869,9 +869,8 @@ Rectangle {
         Rectangle {
             id: canvasPaper
             objectName: "canvasPaper"
-            anchors.centerIn: parent
-            anchors.horizontalCenterOffset: surface.canvasPanOffsetX
-            anchors.verticalCenterOffset: surface.canvasPanOffsetY
+            x: Math.round((parent.width - width) / 2 + surface.canvasPanOffsetX)
+            y: Math.round((parent.height - height) / 2 + surface.canvasPanOffsetY)
             width: canvasSurface.width
             height: canvasSurface.height
             transformOrigin: Item.Center
@@ -883,9 +882,8 @@ Rectangle {
 
         DrawingSurfaceItem {
             id: canvasSurface
-            anchors.centerIn: parent
-            anchors.horizontalCenterOffset: surface.canvasPanOffsetX
-            anchors.verticalCenterOffset: surface.canvasPanOffsetY
+            x: Math.round((parent.width - width) / 2 + surface.canvasPanOffsetX)
+            y: Math.round((parent.height - height) / 2 + surface.canvasPanOffsetY)
             z: 1
             width: 1
             height: 1
@@ -1073,6 +1071,36 @@ Rectangle {
                 }
             }
         }
+
+        MouseArea {
+            id: canvasPanMouseArea
+            anchors.fill: parent
+            z: 6
+            enabled: surface.toolMode === "pan"
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+            cursorShape: surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+            onPressed: function (mouse) {
+                surface.beginPanDrag(mouse.x, mouse.y);
+                mouse.accepted = true;
+            }
+
+            onPositionChanged: function (mouse) {
+                if (surface.panDraggingActive) {
+                    surface.updatePanDrag(mouse.x, mouse.y);
+                    mouse.accepted = true;
+                }
+            }
+
+            onReleased: function (mouse) {
+                surface.updatePanDrag(mouse.x, mouse.y);
+                surface.commitPanDrag();
+                mouse.accepted = true;
+            }
+
+            onCanceled: surface.cancelPanDrag()
+        }
     }
 
     MouseArea {
@@ -1084,12 +1112,6 @@ Rectangle {
         cursorShape: surface.canvasCursorShape()
 
         onPressed: function (mouse) {
-            if (surface.toolMode === "pan") {
-                surface.beginPanDrag(mouse.x, mouse.y);
-                mouse.accepted = true;
-                return;
-            }
-
             if (surface.toolMode === "zoom") {
                 surface.beginZoomDrag(mouse.x);
                 mouse.accepted = true;
@@ -1122,12 +1144,6 @@ Rectangle {
         }
 
         onPositionChanged: function (mouse) {
-            if (surface.toolMode === "pan" && surface.panDraggingActive) {
-                surface.updatePanDrag(mouse.x, mouse.y);
-                mouse.accepted = true;
-                return;
-            }
-
             if (surface.toolMode === "zoom" && surface.zoomDraggingActive) {
                 surface.updateZoomDrag(mouse.x);
                 mouse.accepted = true;
@@ -1148,13 +1164,6 @@ Rectangle {
         }
 
         onReleased: function (mouse) {
-            if (surface.toolMode === "pan") {
-                surface.updatePanDrag(mouse.x, mouse.y);
-                surface.commitPanDrag();
-                mouse.accepted = true;
-                return;
-            }
-
             if (surface.toolMode === "zoom") {
                 surface.updateZoomDrag(mouse.x);
                 surface.commitZoomDrag();
