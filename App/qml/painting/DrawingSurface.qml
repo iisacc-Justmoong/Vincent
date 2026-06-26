@@ -54,6 +54,39 @@ Rectangle {
     readonly property int textToolMinimumWidth: 96
     readonly property int shapeToolMinimumDragDistance: 2
     readonly property int shapeToolStrokeWidth: Math.max(1, Math.round(surface.brushSize))
+    readonly property int drawableObjectMinimumDimension: 8
+    readonly property int drawableObjectHandleSize: 8
+    readonly property int drawableObjectHandleHitSize: 16
+    readonly property var drawableObjectHandles: [
+        {
+            mode: "resize-nw",
+            xRatio: 0,
+            yRatio: 0
+        },
+        {
+            mode: "resize-ne",
+            xRatio: 1,
+            yRatio: 0
+        },
+        {
+            mode: "resize-se",
+            xRatio: 1,
+            yRatio: 1
+        },
+        {
+            mode: "resize-sw",
+            xRatio: 0,
+            yRatio: 1
+        }
+    ]
+    property var drawableObjects: []
+    property int nextDrawableObjectId: 1
+    property int selectedDrawableObjectId: -1
+    property bool drawableObjectTransformActive: false
+    property string drawableObjectTransformMode: ""
+    property real drawableObjectTransformStartX: 0
+    property real drawableObjectTransformStartY: 0
+    property var drawableObjectTransformOriginal: null
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
@@ -69,6 +102,7 @@ Rectangle {
     function newCanvas() {
         cancelActiveText();
         cancelActiveShape();
+        clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.newCanvas();
     }
@@ -76,6 +110,7 @@ Rectangle {
     function clearCanvas() {
         cancelActiveText();
         cancelActiveShape();
+        clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
     }
@@ -83,13 +118,14 @@ Rectangle {
     function openRaster(fileUrl) {
         cancelActiveText();
         cancelActiveShape();
+        clearDrawableObjects();
         return canvasSurface.openRaster(fileUrl ? fileUrl.toString() : "");
     }
 
     function saveToFile(fileUrl) {
         commitActiveText();
         commitActiveShape();
-        return canvasSurface.saveToFile(fileUrl ? fileUrl.toString() : "");
+        return canvasSurface.saveToFileWithObjects(fileUrl ? fileUrl.toString() : "", surface.drawableObjects);
     }
 
     function longestTextLine(textValue) {
@@ -139,7 +175,17 @@ Rectangle {
         const shouldCommit = committedText.trim().length > 0;
         surface.textEditingActive = false;
         if (shouldCommit) {
-            canvasSurface.commitText(textToolEditorFrame.x, textToolEditorFrame.y, textToolEditorFrame.width, committedText, surface.textToolFontPixelSize, surface.brushColor);
+            appendDrawableObject({
+                id: surface.nextDrawableObjectId++,
+                type: "text",
+                x: textToolEditorFrame.x,
+                y: textToolEditorFrame.y,
+                width: textToolEditorFrame.width,
+                height: textToolEditorFrame.height,
+                text: committedText,
+                fontPixelSize: surface.textToolFontPixelSize,
+                color: surface.brushColor.toString()
+            });
         }
         textToolEditor.text = "";
         textToolEditor.focus = false;
@@ -264,9 +310,231 @@ Rectangle {
         surface.shapeDraggingActive = false;
         surface.shapeAspectLocked = false;
         if (bounds.width >= surface.shapeToolMinimumDragDistance && bounds.height >= surface.shapeToolMinimumDragDistance) {
-            canvasSurface.commitShape(bounds.x, bounds.y, bounds.width, bounds.height, surface.shapeKind, surface.brushColor, surface.shapeToolStrokeWidth);
+            appendDrawableObject({
+                id: surface.nextDrawableObjectId++,
+                type: "shape",
+                x: bounds.x,
+                y: bounds.y,
+                width: bounds.width,
+                height: bounds.height,
+                shapeKind: surface.shapeKind,
+                color: surface.brushColor.toString(),
+                strokeWidth: surface.shapeToolStrokeWidth
+            });
         }
         requestShapePreviewPaint();
+    }
+
+    function clearDrawableObjects() {
+        surface.drawableObjects = [];
+        surface.selectedDrawableObjectId = -1;
+        resetDrawableObjectTransform();
+    }
+
+    function cloneDrawableObject(drawableObject) {
+        const copy = {};
+        for (const key in drawableObject) {
+            copy[key] = drawableObject[key];
+        }
+        return copy;
+    }
+
+    function appendDrawableObject(drawableObject) {
+        const nextObjects = surface.drawableObjects.slice();
+        nextObjects.push(drawableObject);
+        surface.drawableObjects = nextObjects;
+        surface.selectedDrawableObjectId = drawableObject.id;
+    }
+
+    function replaceDrawableObjectById(objectId, drawableObject) {
+        const nextObjects = surface.drawableObjects.slice();
+        for (let index = 0; index < nextObjects.length; ++index) {
+            if (nextObjects[index].id === objectId) {
+                nextObjects[index] = drawableObject;
+                surface.drawableObjects = nextObjects;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function selectedDrawableObject() {
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            if (surface.drawableObjects[index].id === surface.selectedDrawableObjectId) {
+                return surface.drawableObjects[index];
+            }
+        }
+        return null;
+    }
+
+    function hasSelectedDrawableObject() {
+        return selectedDrawableObject() !== null;
+    }
+
+    function selectedDrawableObjectProperty(propertyName, fallbackValue) {
+        const drawableObject = selectedDrawableObject();
+        return drawableObject ? drawableObject[propertyName] : fallbackValue;
+    }
+
+    function drawableObjectIndexAt(pointX, pointY) {
+        for (let index = surface.drawableObjects.length - 1; index >= 0; --index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (pointX >= drawableObject.x && pointX <= drawableObject.x + drawableObject.width && pointY >= drawableObject.y && pointY <= drawableObject.y + drawableObject.height) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    function drawableObjectHandleAt(pointX, pointY) {
+        const drawableObject = selectedDrawableObject();
+        if (!drawableObject) {
+            return "";
+        }
+
+        const halfHitSize = surface.drawableObjectHandleHitSize / 2;
+        for (let index = 0; index < surface.drawableObjectHandles.length; ++index) {
+            const handle = surface.drawableObjectHandles[index];
+            const handleX = drawableObject.x + drawableObject.width * handle.xRatio;
+            const handleY = drawableObject.y + drawableObject.height * handle.yRatio;
+            if (pointX >= handleX - halfHitSize && pointX <= handleX + halfHitSize && pointY >= handleY - halfHitSize && pointY <= handleY + halfHitSize) {
+                return handle.mode;
+            }
+        }
+        return "";
+    }
+
+    function resetDrawableObjectTransform() {
+        surface.drawableObjectTransformActive = false;
+        surface.drawableObjectTransformMode = "";
+        surface.drawableObjectTransformOriginal = null;
+    }
+
+    function cancelActiveDrawableObjectTransform() {
+        if (surface.drawableObjectTransformActive && surface.drawableObjectTransformOriginal) {
+            replaceDrawableObjectById(surface.drawableObjectTransformOriginal.id, surface.drawableObjectTransformOriginal);
+        }
+        resetDrawableObjectTransform();
+    }
+
+    function beginDrawableObjectTransform(pointX, pointY) {
+        if (surface.toolMode !== "move") {
+            return false;
+        }
+
+        commitActiveText();
+        cancelActiveShape();
+        const handleMode = drawableObjectHandleAt(pointX, pointY);
+        if (handleMode.length > 0) {
+            surface.drawableObjectTransformMode = handleMode;
+        } else {
+            const objectIndex = drawableObjectIndexAt(pointX, pointY);
+            if (objectIndex < 0) {
+                surface.selectedDrawableObjectId = -1;
+                resetDrawableObjectTransform();
+                return false;
+            }
+            surface.selectedDrawableObjectId = surface.drawableObjects[objectIndex].id;
+            surface.drawableObjectTransformMode = "move";
+        }
+
+        const drawableObject = selectedDrawableObject();
+        if (!drawableObject) {
+            resetDrawableObjectTransform();
+            return false;
+        }
+
+        surface.drawableObjectTransformStartX = pointX;
+        surface.drawableObjectTransformStartY = pointY;
+        surface.drawableObjectTransformOriginal = cloneDrawableObject(drawableObject);
+        surface.drawableObjectTransformActive = true;
+        return true;
+    }
+
+    function movedDrawableObject(originalObject, pointX, pointY) {
+        const deltaX = pointX - surface.drawableObjectTransformStartX;
+        const deltaY = pointY - surface.drawableObjectTransformStartY;
+        const movedObject = cloneDrawableObject(originalObject);
+        const maxX = Math.max(0, canvasSurface.width - movedObject.width);
+        const maxY = Math.max(0, canvasSurface.height - movedObject.height);
+        movedObject.x = Math.max(0, Math.min(maxX, originalObject.x + deltaX));
+        movedObject.y = Math.max(0, Math.min(maxY, originalObject.y + deltaY));
+        return movedObject;
+    }
+
+    function resizedDrawableObject(originalObject, pointX, pointY) {
+        const deltaX = pointX - surface.drawableObjectTransformStartX;
+        const deltaY = pointY - surface.drawableObjectTransformStartY;
+        var left = originalObject.x;
+        var top = originalObject.y;
+        var right = originalObject.x + originalObject.width;
+        var bottom = originalObject.y + originalObject.height;
+
+        if (surface.drawableObjectTransformMode.indexOf("w") >= 0) {
+            left = Math.max(0, Math.min(right - surface.drawableObjectMinimumDimension, originalObject.x + deltaX));
+        }
+        if (surface.drawableObjectTransformMode.indexOf("e") >= 0) {
+            right = Math.min(canvasSurface.width, Math.max(left + surface.drawableObjectMinimumDimension, originalObject.x + originalObject.width + deltaX));
+        }
+        if (surface.drawableObjectTransformMode.indexOf("n") >= 0) {
+            top = Math.max(0, Math.min(bottom - surface.drawableObjectMinimumDimension, originalObject.y + deltaY));
+        }
+        if (surface.drawableObjectTransformMode.indexOf("s") >= 0) {
+            bottom = Math.min(canvasSurface.height, Math.max(top + surface.drawableObjectMinimumDimension, originalObject.y + originalObject.height + deltaY));
+        }
+
+        const resizedObject = cloneDrawableObject(originalObject);
+        resizedObject.x = left;
+        resizedObject.y = top;
+        resizedObject.width = right - left;
+        resizedObject.height = bottom - top;
+        return resizedObject;
+    }
+
+    function updateDrawableObjectTransform(pointX, pointY) {
+        if (!surface.drawableObjectTransformActive || !surface.drawableObjectTransformOriginal) {
+            return;
+        }
+
+        const nextObject = surface.drawableObjectTransformMode === "move" ? movedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY) : resizedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY);
+        replaceDrawableObjectById(nextObject.id, nextObject);
+    }
+
+    function commitDrawableObjectTransform() {
+        resetDrawableObjectTransform();
+    }
+
+    function fillAt(pointX, pointY) {
+        if (surface.toolMode !== "fill") {
+            return;
+        }
+
+        commitActiveText();
+        cancelActiveShape();
+        canvasSurface.fillAt(pointX, pointY, surface.brushColor);
+    }
+
+    function canvasMouseAcceptedButtons() {
+        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "fill" || surface.toolMode === "text") {
+            return Qt.LeftButton;
+        }
+        return Qt.NoButton;
+    }
+
+    function canvasCursorShape() {
+        if (surface.toolMode === "shape") {
+            return Qt.CrossCursor;
+        }
+        if (surface.toolMode === "text") {
+            return Qt.IBeamCursor;
+        }
+        if (surface.toolMode === "move") {
+            return Qt.SizeAllCursor;
+        }
+        if (surface.toolMode === "fill" || surface.toolMode === "eraser") {
+            return Qt.PointingHandCursor;
+        }
+        return Qt.CrossCursor;
     }
 
     function cancelActiveShape() {
@@ -387,6 +655,9 @@ Rectangle {
         }
         if (toolMode !== "shape") {
             cancelActiveShape();
+        }
+        if (toolMode !== "move") {
+            resetDrawableObjectTransform();
         }
     }
 
@@ -519,6 +790,88 @@ Rectangle {
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
         }
+
+        Repeater {
+            model: surface.drawableObjects
+
+            delegate: Item {
+                id: drawableObjectDelegate
+                required property var modelData
+
+                parent: canvasSurface
+                z: 2
+                x: modelData.x
+                y: modelData.y
+                width: Math.max(1, modelData.width)
+                height: Math.max(1, modelData.height)
+
+                Canvas {
+                    anchors.fill: parent
+                    visible: drawableObjectDelegate.modelData.type === "shape"
+                    renderTarget: Canvas.Image
+
+                    onPaint: {
+                        const context = getContext("2d");
+                        context.clearRect(0, 0, width, height);
+                        const strokeWidth = Math.max(1, drawableObjectDelegate.modelData.strokeWidth);
+                        const inset = strokeWidth / 2;
+                        const pathWidth = Math.max(1, width - strokeWidth);
+                        const pathHeight = Math.max(1, height - strokeWidth);
+                        context.beginPath();
+                        surface.traceShapePath(context, drawableObjectDelegate.modelData.shapeKind, inset, inset, pathWidth, pathHeight);
+                        context.lineWidth = strokeWidth;
+                        context.lineJoin = "round";
+                        context.lineCap = "round";
+                        context.strokeStyle = drawableObjectDelegate.modelData.color;
+                        context.stroke();
+                    }
+                    onVisibleChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    Component.onCompleted: requestPaint()
+                }
+
+                Text {
+                    anchors.fill: parent
+                    visible: drawableObjectDelegate.modelData.type === "text"
+                    text: drawableObjectDelegate.modelData.text
+                    color: drawableObjectDelegate.modelData.color
+                    font.pixelSize: drawableObjectDelegate.modelData.fontPixelSize
+                    wrapMode: Text.Wrap
+                    clip: true
+                }
+            }
+        }
+
+        Rectangle {
+            id: drawableObjectSelectionFrame
+            parent: canvasSurface
+            visible: surface.toolMode === "move" && surface.hasSelectedDrawableObject()
+            z: 5
+            x: surface.selectedDrawableObjectProperty("x", 0)
+            y: surface.selectedDrawableObjectProperty("y", 0)
+            width: Math.max(1, surface.selectedDrawableObjectProperty("width", 1))
+            height: Math.max(1, surface.selectedDrawableObjectProperty("height", 1))
+            color: "transparent"
+            border.width: 1
+            border.color: surface.textToolAccentColor
+
+            Repeater {
+                model: surface.drawableObjectHandles
+
+                delegate: Rectangle {
+                    required property var modelData
+
+                    width: surface.drawableObjectHandleSize
+                    height: surface.drawableObjectHandleSize
+                    x: drawableObjectSelectionFrame.width * modelData.xRatio - width / 2
+                    y: drawableObjectSelectionFrame.height * modelData.yRatio - height / 2
+                    color: surface.canvasColor
+                    border.width: 1
+                    border.color: surface.textToolAccentColor
+                }
+            }
+        }
     }
 
     MouseArea {
@@ -526,13 +879,25 @@ Rectangle {
         anchors.fill: parent
         z: 3
         hoverEnabled: true
-        acceptedButtons: surface.toolMode === "shape" ? Qt.LeftButton : surface.toolMode === "text" ? Qt.LeftButton : Qt.NoButton
-        cursorShape: surface.toolMode === "shape" ? Qt.CrossCursor : surface.toolMode === "text" ? Qt.IBeamCursor : surface.toolMode === "eraser" ? Qt.PointingHandCursor : Qt.CrossCursor
+        acceptedButtons: surface.canvasMouseAcceptedButtons()
+        cursorShape: surface.canvasCursorShape()
 
         onPressed: function (mouse) {
+            if (surface.toolMode === "move") {
+                surface.beginDrawableObjectTransform(mouse.x, mouse.y);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "shape") {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.beginShapeDrag(mouse.x, mouse.y, aspectLocked);
+                mouse.accepted = true;
+                return;
+            }
+
+            if (surface.toolMode === "fill") {
+                surface.fillAt(mouse.x, mouse.y);
                 mouse.accepted = true;
                 return;
             }
@@ -544,6 +909,12 @@ Rectangle {
         }
 
         onPositionChanged: function (mouse) {
+            if (surface.toolMode === "move" && surface.drawableObjectTransformActive) {
+                surface.updateDrawableObjectTransform(mouse.x, mouse.y);
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "shape" && surface.shapeDraggingActive) {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
@@ -552,6 +923,13 @@ Rectangle {
         }
 
         onReleased: function (mouse) {
+            if (surface.toolMode === "move") {
+                surface.updateDrawableObjectTransform(mouse.x, mouse.y);
+                surface.commitDrawableObjectTransform();
+                mouse.accepted = true;
+                return;
+            }
+
             if (surface.toolMode === "shape") {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
@@ -560,7 +938,10 @@ Rectangle {
             }
         }
 
-        onCanceled: surface.cancelActiveShape()
+        onCanceled: {
+            surface.cancelActiveShape();
+            surface.cancelActiveDrawableObjectTransform();
+        }
 
         onWheel: function (wheel) {
             surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);

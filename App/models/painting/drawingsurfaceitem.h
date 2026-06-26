@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QSize>
 #include <QString>
+#include <QVariantList>
 #include <QtAdapter/CanvasAdapter.h>
 
 class CanvasViewModelBridge;
@@ -34,6 +35,7 @@ public:
     Q_INVOKABLE void clearCanvas();
     Q_INVOKABLE bool openRaster(const QString &fileUrl);
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
+    Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void resizeCanvasSurface(qreal canvasWidth, qreal canvasHeight);
@@ -53,6 +55,7 @@ public:
                                  const QString &shapeKind,
                                  const QColor &color,
                                  qreal strokeWidth);
+    Q_INVOKABLE bool fillAt(qreal pointX, qreal pointY, const QColor &color);
 
 signals:
     void documentViewModelChanged();
@@ -73,6 +76,8 @@ private:
     [[nodiscard]] bool canMutateDocument() const;
     [[nodiscard]] bool isTextToolActive() const;
     [[nodiscard]] bool isShapeToolActive() const;
+    [[nodiscard]] bool isFillToolActive() const;
+    [[nodiscard]] bool isMoveToolActive() const;
     [[nodiscard]] bool isOverlayToolActive() const;
     [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
     void syncCanvasSize();

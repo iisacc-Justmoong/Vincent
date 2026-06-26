@@ -886,9 +886,11 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
 
                 FigmaToolbarButton {
+                    tone: toolbar.currentTool === "move" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
                     iconName: "translateObject"
                     iconSource: toolbar.translateObjectIconSource
                     Accessible.name: qsTr("Move tool")
+                    onClicked: toolbar.toolSelected("move")
                 }
 
                 FigmaToolbarButton {
@@ -914,6 +916,13 @@ Item {
                     menuAccessibleName: qsTr("Open shape menu")
                     onBodyClicked: toolbar.toolSelected("shape")
                     onMenuClicked: toolbar.openShapeMenu(shapeToolButton)
+                }
+
+                FigmaToolbarButton {
+                    tone: toolbar.currentTool === "fill" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    iconName: "fillbucket"
+                    Accessible.name: qsTr("Fill tool")
+                    onClicked: toolbar.toolSelected("fill")
                 }
 
                 FigmaToolbarButton {

@@ -12,6 +12,7 @@
 #include <QPainterPath>
 #include <QPalette>
 #include <QPen>
+#include <QPoint>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
@@ -19,6 +20,8 @@
 #include <QTextDocument>
 #include <QTextOption>
 #include <QUrl>
+#include <QVariantMap>
+#include <QVector>
 #include <QtMath>
 #include <QtGlobal>
 
@@ -38,6 +41,15 @@ QString localFileSource(const QString &fileUrl)
         return url.toString();
     }
     return QUrl::fromLocalFile(fileUrl).toString();
+}
+
+QString localFilePath(const QString &fileUrl)
+{
+    const QUrl url(fileUrl);
+    if (url.isValid() && url.isLocalFile()) {
+        return url.toLocalFile();
+    }
+    return fileUrl;
 }
 
 bool isTabletEvent(QEvent::Type type)
@@ -164,6 +176,100 @@ QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
     return path;
 }
 
+void drawTextObject(QPainter &painter, const QVariantMap &object)
+{
+    const QString text = object.value(QStringLiteral("text")).toString();
+    if (text.trimmed().isEmpty()) {
+        return;
+    }
+
+    QRectF textRect(object.value(QStringLiteral("x")).toReal(),
+                    object.value(QStringLiteral("y")).toReal(),
+                    qMax<qreal>(minimumTextBoxWidth, object.value(QStringLiteral("width")).toReal()),
+                    qMax<qreal>(minimumTextFontPixelSize, object.value(QStringLiteral("height")).toReal()));
+    if (textRect.isEmpty()) {
+        return;
+    }
+
+    const int fontPixelSize = qRound(qBound<qreal>(minimumTextFontPixelSize,
+                                                  object.value(QStringLiteral("fontPixelSize")).toReal(),
+                                                  maximumTextFontPixelSize));
+    QFont font;
+    font.setPixelSize(fontPixelSize);
+
+    QTextOption textOption;
+    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+
+    QTextDocument textDocument;
+    textDocument.setDocumentMargin(0);
+    textDocument.setDefaultFont(font);
+    textDocument.setDefaultTextOption(textOption);
+    textDocument.setPlainText(text);
+    textDocument.setTextWidth(textRect.width());
+
+    painter.save();
+    painter.setClipRect(textRect);
+    painter.translate(textRect.topLeft());
+
+    QAbstractTextDocumentLayout::PaintContext paintContext;
+    const QColor color(object.value(QStringLiteral("color")).toString());
+    paintContext.palette.setColor(QPalette::Text, color.isValid() ? color : QColor(QStringLiteral("#1a1a1a")));
+    textDocument.documentLayout()->draw(&painter, paintContext);
+    painter.restore();
+}
+
+void drawShapeObject(QPainter &painter, const QVariantMap &object)
+{
+    QRectF shapeRect(object.value(QStringLiteral("x")).toReal(),
+                     object.value(QStringLiteral("y")).toReal(),
+                     object.value(QStringLiteral("width")).toReal(),
+                     object.value(QStringLiteral("height")).toReal());
+    shapeRect = shapeRect.normalized();
+    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension) {
+        return;
+    }
+
+    const qreal boundedStrokeWidth = qBound<qreal>(minimumShapeStrokeWidth,
+                                                   object.value(QStringLiteral("strokeWidth")).toReal(),
+                                                   maximumShapeStrokeWidth);
+    const qreal horizontalInset = qMin(boundedStrokeWidth / 2.0,
+                                      qMax<qreal>(0.0, shapeRect.width() / 2.0 - 0.5));
+    const qreal verticalInset = qMin(boundedStrokeWidth / 2.0,
+                                    qMax<qreal>(0.0, shapeRect.height() / 2.0 - 0.5));
+    const QRectF strokedRect = shapeRect.adjusted(horizontalInset,
+                                                  verticalInset,
+                                                  -horizontalInset,
+                                                  -verticalInset);
+    if (strokedRect.width() < minimumShapeDimension || strokedRect.height() < minimumShapeDimension) {
+        return;
+    }
+
+    const QColor color(object.value(QStringLiteral("color")).toString());
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(color.isValid() ? color : QColor(QStringLiteral("#1a1a1a")),
+                        boundedStrokeWidth,
+                        Qt::SolidLine,
+                        Qt::RoundCap,
+                        Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(shapePath(strokedRect, object.value(QStringLiteral("shapeKind")).toString()));
+    painter.restore();
+}
+
+void drawObject(QPainter &painter, const QVariant &objectValue)
+{
+    const QVariantMap object = objectValue.toMap();
+    const QString type = object.value(QStringLiteral("type")).toString();
+    if (type == QStringLiteral("text")) {
+        drawTextObject(painter, object);
+        return;
+    }
+    if (type == QStringLiteral("shape")) {
+        drawShapeObject(painter, object);
+    }
+}
+
 } // namespace
 
 DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
@@ -264,6 +370,29 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl)
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
     return CanvasAdapter::saveToFile(fileUrl);
+}
+
+bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects)
+{
+    if (objects.isEmpty()) {
+        return saveToFile(fileUrl);
+    }
+
+    syncCanvasSize();
+    QImage image = currentRasterCanvasImage(canvasSize());
+    if (image.isNull()) {
+        return false;
+    }
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    for (const QVariant &object : objects) {
+        drawObject(painter, object);
+    }
+    painter.end();
+
+    return image.save(localFilePath(fileUrl));
 }
 
 void DrawingSurfaceItem::undo()
@@ -465,6 +594,61 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
     return committed;
 }
 
+bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
+{
+    if (!canMutateDocument()) {
+        return false;
+    }
+
+    syncCanvasSize();
+    const QSize targetSize = canvasSize();
+    if (targetSize.isEmpty()) {
+        return false;
+    }
+
+    QImage image = currentRasterCanvasImage(targetSize);
+    if (image.isNull()) {
+        return false;
+    }
+
+    const int seedX = qBound(0, static_cast<int>(qFloor(pointX)), image.width() - 1);
+    const int seedY = qBound(0, static_cast<int>(qFloor(pointY)), image.height() - 1);
+    const QColor targetColor = image.pixelColor(seedX, seedY);
+    QColor replacementColor = color.isValid() ? color : brushColor();
+    if (!replacementColor.isValid()) {
+        replacementColor = QColor(Qt::transparent);
+    }
+    if (targetColor.rgba() == replacementColor.rgba()) {
+        return false;
+    }
+
+    QVector<QPoint> pending;
+    pending.reserve(qMin(image.width() * image.height(), 4096));
+    pending.append(QPoint(seedX, seedY));
+
+    while (!pending.isEmpty()) {
+        const QPoint point = pending.takeLast();
+        if (point.x() < 0 || point.x() >= image.width() || point.y() < 0 || point.y() >= image.height()) {
+            continue;
+        }
+        if (image.pixelColor(point).rgba() != targetColor.rgba()) {
+            continue;
+        }
+
+        image.setPixelColor(point, replacementColor);
+        pending.append(QPoint(point.x() + 1, point.y()));
+        pending.append(QPoint(point.x() - 1, point.y()));
+        pending.append(QPoint(point.x(), point.y() + 1));
+        pending.append(QPoint(point.x(), point.y() - 1));
+    }
+
+    const bool committed = replaceRasterCanvas(image);
+    if (committed) {
+        emitUndoRedoSignals();
+    }
+    return committed;
+}
+
 bool DrawingSurfaceItem::event(QEvent *event)
 {
     if (event && isTabletEvent(event->type()) && isOverlayToolActive()) {
@@ -549,9 +733,19 @@ bool DrawingSurfaceItem::isShapeToolActive() const
     return toolMode() == QStringLiteral("shape");
 }
 
+bool DrawingSurfaceItem::isFillToolActive() const
+{
+    return toolMode() == QStringLiteral("fill");
+}
+
+bool DrawingSurfaceItem::isMoveToolActive() const
+{
+    return toolMode() == QStringLiteral("move");
+}
+
 bool DrawingSurfaceItem::isOverlayToolActive() const
 {
-    return isTextToolActive() || isShapeToolActive();
+    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isMoveToolActive();
 }
 
 QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)

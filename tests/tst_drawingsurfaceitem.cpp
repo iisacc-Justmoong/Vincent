@@ -7,6 +7,8 @@
 #include <QQuickItem>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QVariantList>
+#include <QVariantMap>
 #include <QtTest>
 
 #include "canvasdocumentviewmodel.h"
@@ -21,10 +23,13 @@ private slots:
     void createsInitialCanvasInsideWorkspaceMargins();
     void createsNewCanvasAtCurrentWorkspaceSize();
     void constrainsShapeDragWithShiftModifier();
+    void movesAndResizesDrawableObjects();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
     void commitsShapeToRasterCanvas();
+    void fillsContiguousRasterRegion();
+    void savesCompositeDrawableObjectsWithoutFlatteningRaster();
     void supportsUndoRedo();
     void opensRasterBackground();
 };
@@ -357,6 +362,64 @@ void tst_DrawingSurfaceItem::constrainsShapeDragWithShiftModifier()
     QCOMPARE(freeHeight, 50.0);
 }
 
+void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression moveObject(engine.rootContext(),
+                              object.data(),
+                              QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\", strokeWidth: 3 });"
+                                             "beginDrawableObjectTransform(20, 30); updateDrawableObjectTransform(40, 60); commitDrawableObjectTransform();"));
+    moveObject.evaluate();
+    QVERIFY2(!moveObject.hasError(), qPrintable(moveObject.error().toString()));
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    QVariantMap movedObject = objects.first().toMap();
+    QCOMPARE(movedObject.value(QStringLiteral("x")).toReal(), 30.0);
+    QCOMPARE(movedObject.value(QStringLiteral("y")).toReal(), 50.0);
+    QCOMPARE(movedObject.value(QStringLiteral("width")).toReal(), 30.0);
+    QCOMPARE(movedObject.value(QStringLiteral("height")).toReal(), 28.0);
+
+    QQmlExpression resizeObject(engine.rootContext(),
+                                object.data(),
+                                QStringLiteral("beginDrawableObjectTransform(60, 78); updateDrawableObjectTransform(90, 100); commitDrawableObjectTransform();"));
+    resizeObject.evaluate();
+    QVERIFY2(!resizeObject.hasError(), qPrintable(resizeObject.error().toString()));
+
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    const QVariantMap resizedObject = objects.first().toMap();
+    QCOMPARE(resizedObject.value(QStringLiteral("x")).toReal(), 30.0);
+    QCOMPARE(resizedObject.value(QStringLiteral("y")).toReal(), 50.0);
+    QCOMPARE(resizedObject.value(QStringLiteral("width")).toReal(), 60.0);
+    QCOMPARE(resizedObject.value(QStringLiteral("height")).toReal(), 50.0);
+}
+
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()
 {
     PaletteUtils paletteUtils;
@@ -496,6 +559,87 @@ void tst_DrawingSurfaceItem::commitsShapeToRasterCanvas()
         }
     }
     QVERIFY(hasShapeColorPixel);
+}
+
+void tst_DrawingSurfaceItem::fillsContiguousRasterRegion()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    viewModel.setBrushSize(5);
+    viewModel.setBrushColor(QColor(QStringLiteral("#101010")));
+    DrawingSurfaceItem item;
+    item.setWidth(96);
+    item.setHeight(64);
+    item.setDocumentViewModel(&viewModel);
+
+    item.beginStroke(48, 0, 1.0, false);
+    QVERIFY(item.appendStrokePoint(48, 63, 1.0, false));
+    item.endStroke(48, 63, 1.0, false);
+    QTRY_COMPARE(item.strokeCount(), 1);
+
+    const QColor fillColor(QStringLiteral("#43a047"));
+    QVERIFY(item.fillAt(12, 12, fillColor));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString outputPath = dir.filePath(QStringLiteral("fill-output.png"));
+    QVERIFY(item.saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(96, 64));
+    QCOMPARE(saved.pixelColor(12, 12).rgba(), fillColor.rgba());
+    QCOMPARE(saved.pixelColor(84, 12).alpha(), 0);
+    QVERIFY(saved.pixelColor(48, 32).alpha() > 0);
+}
+
+void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaster()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(120);
+    item.setHeight(90);
+    item.setDocumentViewModel(&viewModel);
+
+    QVariantMap shapeObject;
+    shapeObject.insert(QStringLiteral("id"), 1);
+    shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
+    shapeObject.insert(QStringLiteral("x"), 16);
+    shapeObject.insert(QStringLiteral("y"), 18);
+    shapeObject.insert(QStringLiteral("width"), 48);
+    shapeObject.insert(QStringLiteral("height"), 36);
+    shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
+    shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
+    shapeObject.insert(QStringLiteral("strokeWidth"), 5);
+    QVariantList objects;
+    objects.append(shapeObject);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString compositePath = dir.filePath(QStringLiteral("composite-output.png"));
+    QVERIFY(item.saveToFileWithObjects(compositePath, objects));
+
+    const QImage composite(compositePath);
+    QVERIFY(!composite.isNull());
+    QCOMPARE(composite.size(), QSize(120, 90));
+
+    bool hasShapeColorPixel = false;
+    for (int y = 0; y < composite.height() && !hasShapeColorPixel; ++y) {
+        for (int x = 0; x < composite.width(); ++x) {
+            const QColor pixel = composite.pixelColor(x, y);
+            if (pixel.alpha() > 0 && pixel.blue() > 120 && pixel.red() < 80 && pixel.green() > 70) {
+                hasShapeColorPixel = true;
+                break;
+            }
+        }
+    }
+    QVERIFY(hasShapeColorPixel);
+
+    const QString rasterOnlyPath = dir.filePath(QStringLiteral("raster-only-output.png"));
+    QVERIFY(item.saveToFile(rasterOnlyPath));
+    const QImage rasterOnly(rasterOnlyPath);
+    QVERIFY(!rasterOnly.isNull());
+    QVERIFY(rasterOnly.pixelColor(16, 18).alpha() == 0);
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()
