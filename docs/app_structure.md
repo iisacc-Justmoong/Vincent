@@ -76,7 +76,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Presents a drag-to-insert shape tool when shape mode is active; the QML preview follows the drag bounds, Shift constrains the drag bounds to a 1:1 ratio, then stores the selected shape outline as a transformable session object with the current brush color and brush size.
 - Presents a fill tool between shape and text; clicking the canvas flood-fills the contiguous same-color raster region with the current brush color through `DrawingSurfaceItem`.
 - Presents a paint-style text editor when the text tool is active; the editor sizes its frame from the longest text line within the remaining canvas width, uses the current brush size and brush color as its text size and color, then stores plain text as a transformable session object.
-- Presents a move tool for inserted text and shape objects; clicking an object selects it, dragging the body moves it, and dragging a corner handle resizes its bounds before export.
+- Presents a move tool for inserted text and shape objects; clicking an object selects it, dragging the body moves it, dragging a corner handle resizes its bounds, and Delete or Backspace removes the selected object before export.
 - Uses a proportional workspace inset to create initial, new, and cleared canvases below the toolbar with visible dark margins instead of filling the window.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
 - Presents only the fixed canvas area on a white paper background and leaves any resized viewport overflow in the LVRS workspace color, while keeping iiPaintEngine's raster layer semantics unchanged.
@@ -120,7 +120,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 ## Testing Surface
 
 - `tests/tst_canvasdocumentviewmodel.cpp` validates the flat-raster document state and value clamping, including iiPaintEngine brush settings, supported tool modes, and supported shape kinds.
-- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, move-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform hooks, and HSL triangle color-picker usage.
+- `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including brush reselection settings, move-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform and keyboard-delete hooks, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable object movement/resizing, composite object saving, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable object movement/resizing/deletion, composite object saving, undo/redo, saving, opening rasters, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

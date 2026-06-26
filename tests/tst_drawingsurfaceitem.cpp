@@ -24,6 +24,7 @@ private slots:
     void createsNewCanvasAtCurrentWorkspaceSize();
     void constrainsShapeDragWithShiftModifier();
     void movesAndResizesDrawableObjects();
+    void deletesSelectedDrawableObject();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
@@ -418,6 +419,60 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QCOMPARE(resizedObject.value(QStringLiteral("y")).toReal(), 50.0);
     QCOMPARE(resizedObject.value(QStringLiteral("width")).toReal(), 60.0);
     QCOMPARE(resizedObject.value(QStringLiteral("height")).toReal(), 50.0);
+}
+
+void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression deleteObject(engine.rootContext(),
+                                object.data(),
+                                QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\", strokeWidth: 3 });"
+                                               "appendDrawableObject({ id: 2, type: \"text\", x: 40, y: 50, width: 120, height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"
+                                               "deleteSelectedDrawableObject();"));
+    const QVariant deleteResult = deleteObject.evaluate();
+    QVERIFY2(!deleteObject.hasError(), qPrintable(deleteObject.error().toString()));
+    QCOMPARE(deleteResult.toBool(), true);
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    const QVariantMap remainingObject = objects.first().toMap();
+    QCOMPARE(remainingObject.value(QStringLiteral("id")).toInt(), 1);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), -1);
+
+    QQmlExpression deleteWithoutSelection(engine.rootContext(),
+                                          object.data(),
+                                          QStringLiteral("deleteSelectedDrawableObject();"));
+    const QVariant deleteWithoutSelectionResult = deleteWithoutSelection.evaluate();
+    QVERIFY2(!deleteWithoutSelection.hasError(), qPrintable(deleteWithoutSelection.error().toString()));
+    QCOMPARE(deleteWithoutSelectionResult.toBool(), false);
+
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
 }
 
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()

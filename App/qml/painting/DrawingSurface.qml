@@ -371,6 +371,35 @@ Rectangle {
         return selectedDrawableObject() !== null;
     }
 
+    function deleteSelectedDrawableObject() {
+        const selectedObjectId = surface.selectedDrawableObjectId;
+        if (selectedObjectId < 0) {
+            return false;
+        }
+
+        const nextObjects = [];
+        var removed = false;
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (drawableObject.id === selectedObjectId) {
+                removed = true;
+                continue;
+            }
+            nextObjects.push(drawableObject);
+        }
+
+        if (!removed) {
+            surface.selectedDrawableObjectId = -1;
+            resetDrawableObjectTransform();
+            return false;
+        }
+
+        surface.drawableObjects = nextObjects;
+        surface.selectedDrawableObjectId = -1;
+        resetDrawableObjectTransform();
+        return true;
+    }
+
     function selectedDrawableObjectProperty(propertyName, fallbackValue) {
         const drawableObject = selectedDrawableObject();
         return drawableObject ? drawableObject[propertyName] : fallbackValue;
@@ -995,5 +1024,12 @@ Rectangle {
         sequence: StandardKey.Redo
         enabled: !surface.textEditingActive
         onActivated: canvasSurface.redo()
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["Delete", "Backspace"]
+        enabled: !surface.textEditingActive && !surface.shapeDraggingActive && !surface.drawableObjectTransformActive && surface.hasSelectedDrawableObject()
+        onActivated: surface.deleteSelectedDrawableObject()
     }
 }

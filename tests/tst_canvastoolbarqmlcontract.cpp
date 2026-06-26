@@ -318,6 +318,9 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resizedDrawableObject(originalObject, pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function deleteSelectedDrawableObject()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"Delete\", \"Backspace\"]")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.deleteSelectedDrawableObject()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: drawableObjectSelectionFrame")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginDrawableObjectTransform(mouse.x, mouse.y);")));
 
