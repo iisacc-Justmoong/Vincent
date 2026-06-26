@@ -5,6 +5,7 @@
 #include <QSize>
 #include <QString>
 #include <QVariantList>
+#include <QVariantMap>
 #include <QtAdapter/CanvasAdapter.h>
 
 class CanvasViewModelBridge;
@@ -33,7 +34,12 @@ public:
 
     Q_INVOKABLE void newCanvas();
     Q_INVOKABLE void clearCanvas();
-    Q_INVOKABLE bool openRaster(const QString &fileUrl);
+    Q_INVOKABLE bool openRaster(const QString &fileUrl,
+                                qreal maximumCanvasWidth = 0,
+                                qreal maximumCanvasHeight = 0);
+    Q_INVOKABLE QVariantMap imageObjectForFile(const QString &fileUrl,
+                                               qreal maximumObjectWidth = 0,
+                                               qreal maximumObjectHeight = 0) const;
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
     Q_INVOKABLE void undo();

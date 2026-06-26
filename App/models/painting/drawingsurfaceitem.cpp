@@ -66,6 +66,21 @@ QImage transparentCanvasImage(const QSize &size)
     return image;
 }
 
+QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
+{
+    if (imageSize.isEmpty()) {
+        return {};
+    }
+
+    const QSize boundedMaximum(qMax(1, maximumSize.width()), qMax(1, maximumSize.height()));
+    if (imageSize.width() <= boundedMaximum.width() && imageSize.height() <= boundedMaximum.height()) {
+        return imageSize;
+    }
+
+    const QSize fitted = imageSize.scaled(boundedMaximum, Qt::KeepAspectRatio);
+    return QSize(qMax(1, fitted.width()), qMax(1, fitted.height()));
+}
+
 QString normalizedShapeKind(const QString &shapeKind)
 {
     const QString normalized = shapeKind.trimmed().toLower();
@@ -257,6 +272,28 @@ void drawShapeObject(QPainter &painter, const QVariantMap &object)
     painter.restore();
 }
 
+void drawImageObject(QPainter &painter, const QVariantMap &object)
+{
+    const QImage image(localFilePath(object.value(QStringLiteral("source")).toString()));
+    if (image.isNull()) {
+        return;
+    }
+
+    QRectF imageRect(object.value(QStringLiteral("x")).toReal(),
+                     object.value(QStringLiteral("y")).toReal(),
+                     object.value(QStringLiteral("width")).toReal(),
+                     object.value(QStringLiteral("height")).toReal());
+    imageRect = imageRect.normalized();
+    if (imageRect.width() < 1.0 || imageRect.height() < 1.0) {
+        return;
+    }
+
+    painter.save();
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.drawImage(imageRect, image);
+    painter.restore();
+}
+
 void drawObject(QPainter &painter, const QVariant &objectValue)
 {
     const QVariantMap object = objectValue.toMap();
@@ -267,6 +304,10 @@ void drawObject(QPainter &painter, const QVariant &objectValue)
     }
     if (type == QStringLiteral("shape")) {
         drawShapeObject(painter, object);
+        return;
+    }
+    if (type == QStringLiteral("image")) {
+        drawImageObject(painter, object);
     }
 }
 
@@ -349,13 +390,30 @@ void DrawingSurfaceItem::clearCanvas()
     newCanvas();
 }
 
-bool DrawingSurfaceItem::openRaster(const QString &fileUrl)
+bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasWidth, qreal maximumCanvasHeight)
 {
     if (!canMutateDocument()) {
         return false;
     }
 
-    const bool opened = CanvasAdapter::openRaster(fileUrl);
+    QImage image(localFilePath(fileUrl));
+    if (image.isNull()) {
+        return false;
+    }
+
+    const QSize maximumSize(
+            maximumCanvasWidth > 0 ? qRound(maximumCanvasWidth) : canvasSize().width(),
+            maximumCanvasHeight > 0 ? qRound(maximumCanvasHeight) : canvasSize().height());
+    const QSize rasterSize = fittedOpenedRasterSize(image.size(), maximumSize);
+    if (rasterSize.isEmpty()) {
+        return false;
+    }
+
+    if (image.size() != rasterSize) {
+        image = image.scaled(rasterSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+
+    const bool opened = replaceRasterCanvas(image);
     if (!opened) {
         return false;
     }
@@ -363,8 +421,35 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl)
     m_backgroundSource = localFileSource(fileUrl);
     m_hasBackground = true;
     syncCanvasSize();
+    emit undoRedoChanged();
     emit backgroundChanged();
     return true;
+}
+
+QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
+                                                   qreal maximumObjectWidth,
+                                                   qreal maximumObjectHeight) const
+{
+    const QImage image(localFilePath(fileUrl));
+    if (image.isNull()) {
+        return {};
+    }
+
+    const QSize maximumSize(
+            maximumObjectWidth > 0 ? qRound(maximumObjectWidth) : canvasSize().width(),
+            maximumObjectHeight > 0 ? qRound(maximumObjectHeight) : canvasSize().height());
+    const QSize objectSize = fittedOpenedRasterSize(image.size(), maximumSize);
+    if (objectSize.isEmpty()) {
+        return {};
+    }
+
+    QVariantMap object;
+    object.insert(QStringLiteral("source"), localFileSource(fileUrl));
+    object.insert(QStringLiteral("width"), objectSize.width());
+    object.insert(QStringLiteral("height"), objectSize.height());
+    object.insert(QStringLiteral("originalWidth"), image.width());
+    object.insert(QStringLiteral("originalHeight"), image.height());
+    return object;
 }
 
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)

@@ -23,12 +23,13 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
 - Flat raster document model with a single canvas and engine-managed undo/redo
-- Flat raster open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF
-- Flat raster save flow that composites the iiPaintEngine raster canvas with current text and shape objects
+- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
+- Flat raster save flow that composites the iiPaintEngine raster canvas with current image, text, and shape objects
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
+- Toolbar file actions expose new canvas, open image, and save image buttons
 - Move, brush, eraser, shape, fill bucket, and paint-style text tools with the Figma-aligned left toolbar, HSL color picker, and brush controls that also set shape stroke width, fill color, text size, and text color
 - Drag-to-insert shape outlines for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds
-- Inserted shape and text objects can be selected with the move tool, dragged, resized from corner transform handles, and deleted with Delete or Backspace before raster export
+- Inserted image, shape, and text objects can be selected with the move tool, dragged, resized from corner transform handles, and deleted with Delete or Backspace before raster export
 - Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting
 - LVRS solid chrome keeps the top window drag handle logically active without adding a visible title strip, while the toolbar is offset below that reserved chrome area
 - New and initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible
@@ -42,6 +43,6 @@ ctest --test-dir build --output-on-failure
 
 ## Known Limitations
 - No layer stack, PSD import/export, blend modes, or persisted vector-object document format
-- Opened raster images replace the current flat raster canvas and adopt the image dimensions
+- Opened image objects are session overlays, not persisted vector/layer document records
 - Palette is fixed to the built-in colors
 - Canvas size follows the current drawing surface when you create a new canvas

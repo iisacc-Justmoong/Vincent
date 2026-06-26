@@ -874,9 +874,15 @@ Item {
                 }
 
                 FigmaToolbarButton {
-                    iconName: "generaldelete"
-                    Accessible.name: qsTr("Clear canvas")
-                    onClicked: toolbar.clearCanvasRequested()
+                    iconName: "generalopen"
+                    Accessible.name: qsTr("Open image")
+                    onClicked: toolbar.openFileDialog()
+                }
+
+                FigmaToolbarButton {
+                    iconName: "generalsave"
+                    Accessible.name: qsTr("Save image")
+                    onClicked: toolbar.openSaveDialog()
                 }
             }
 

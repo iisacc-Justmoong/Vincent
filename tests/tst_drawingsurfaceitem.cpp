@@ -33,6 +33,8 @@ private slots:
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
     void supportsUndoRedo();
     void opensRasterBackground();
+    void opensLargeRasterWithinCurrentCanvasBounds();
+    void opensRasterThroughQmlAsDrawableImageObjectWithinWorkspaceBounds();
 };
 
 namespace {
@@ -656,6 +658,9 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     item.setHeight(90);
     item.setDocumentViewModel(&viewModel);
 
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
     QVariantMap shapeObject;
     shapeObject.insert(QStringLiteral("id"), 1);
     shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
@@ -666,11 +671,26 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
     shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
     shapeObject.insert(QStringLiteral("strokeWidth"), 5);
+
+    const QColor imageObjectColor(QStringLiteral("#f4511e"));
+    QImage imageObjectRaster(18, 14, QImage::Format_ARGB32);
+    imageObjectRaster.fill(imageObjectColor);
+    const QString imageObjectPath = dir.filePath(QStringLiteral("image-object.png"));
+    QVERIFY(imageObjectRaster.save(imageObjectPath));
+
+    QVariantMap imageObject;
+    imageObject.insert(QStringLiteral("id"), 2);
+    imageObject.insert(QStringLiteral("type"), QStringLiteral("image"));
+    imageObject.insert(QStringLiteral("x"), 72);
+    imageObject.insert(QStringLiteral("y"), 24);
+    imageObject.insert(QStringLiteral("width"), 18);
+    imageObject.insert(QStringLiteral("height"), 14);
+    imageObject.insert(QStringLiteral("source"), QUrl::fromLocalFile(imageObjectPath).toString());
+
     QVariantList objects;
     objects.append(shapeObject);
+    objects.append(imageObject);
 
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
     const QString compositePath = dir.filePath(QStringLiteral("composite-output.png"));
     QVERIFY(item.saveToFileWithObjects(compositePath, objects));
 
@@ -689,12 +709,14 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
         }
     }
     QVERIFY(hasShapeColorPixel);
+    QCOMPARE(composite.pixelColor(76, 28).rgba(), imageObjectColor.rgba());
 
     const QString rasterOnlyPath = dir.filePath(QStringLiteral("raster-only-output.png"));
     QVERIFY(item.saveToFile(rasterOnlyPath));
     const QImage rasterOnly(rasterOnlyPath);
     QVERIFY(!rasterOnly.isNull());
     QVERIFY(rasterOnly.pixelColor(16, 18).alpha() == 0);
+    QVERIFY(rasterOnly.pixelColor(76, 28).alpha() == 0);
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()
@@ -742,6 +764,128 @@ void tst_DrawingSurfaceItem::opensRasterBackground()
     QCOMPARE(item.backgroundSource(), QUrl::fromLocalFile(inputPath).toString());
     QCOMPARE(item.width(), 32.0);
     QCOMPARE(item.height(), 24.0);
+}
+
+void tst_DrawingSurfaceItem::opensLargeRasterWithinCurrentCanvasBounds()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(320);
+    item.setHeight(180);
+    item.setDocumentViewModel(&viewModel);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    QImage image(1200, 600, QImage::Format_ARGB32);
+    image.fill(QColor(QStringLiteral("#26c6da")));
+    const QString inputPath = dir.filePath(QStringLiteral("large-background.png"));
+    QVERIFY(image.save(inputPath));
+
+    QVERIFY(item.openRaster(inputPath));
+    QVERIFY(item.hasBackground());
+    QCOMPARE(item.backgroundSource(), QUrl::fromLocalFile(inputPath).toString());
+    QCOMPARE(item.width(), 320.0);
+    QCOMPARE(item.height(), 160.0);
+    QCOMPARE(viewModel.canvasWidth(), 320);
+    QCOMPARE(viewModel.canvasHeight(), 160);
+
+    const QString outputPath = dir.filePath(QStringLiteral("large-background-output.png"));
+    QVERIFY(item.saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(320, 160));
+}
+
+void tst_DrawingSurfaceItem::opensRasterThroughQmlAsDrawableImageObjectWithinWorkspaceBounds()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    const QSize workspaceSize = workspaceCanvasSize(720, 480);
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(workspaceSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(workspaceSize.height()));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    QImage image(1600, 1200, QImage::Format_ARGB32);
+    image.fill(QColor(QStringLiteral("#26c6da")));
+    const QString inputPath = dir.filePath(QStringLiteral("oversized-open.png"));
+    QVERIFY(image.save(inputPath));
+    engine.rootContext()->setContextProperty(QStringLiteral("testOpenImageUrl"),
+                                             QUrl::fromLocalFile(inputPath).toString());
+
+    QQmlExpression openImage(engine.rootContext(),
+                             object.data(),
+                             QStringLiteral("openRaster(testOpenImageUrl);"));
+    const QVariant openResult = openImage.evaluate();
+    QVERIFY2(!openImage.hasError(), qPrintable(openImage.error().toString()));
+    QCOMPARE(openResult.toBool(), true);
+
+    QVERIFY(canvasItem->width() < rootItem->width());
+    QVERIFY(canvasItem->height() < rootItem->height());
+    QCOMPARE(canvasItem->width(), static_cast<qreal>(workspaceSize.width()));
+    QCOMPARE(canvasItem->height(), static_cast<qreal>(workspaceSize.height()));
+
+    const QSize expectedOpenedSize = image.size().scaled(workspaceSize, Qt::KeepAspectRatio);
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    QVariantMap imageObject = objects.first().toMap();
+    QCOMPARE(imageObject.value(QStringLiteral("type")).toString(), QStringLiteral("image"));
+    QCOMPARE(imageObject.value(QStringLiteral("source")).toString(), QUrl::fromLocalFile(inputPath).toString());
+    QCOMPARE(imageObject.value(QStringLiteral("width")).toInt(), expectedOpenedSize.width());
+    QCOMPARE(imageObject.value(QStringLiteral("height")).toInt(), expectedOpenedSize.height());
+    QVERIFY(imageObject.value(QStringLiteral("width")).toInt() <= workspaceSize.width());
+    QVERIFY(imageObject.value(QStringLiteral("height")).toInt() <= workspaceSize.height());
+    QCOMPARE(imageObject.value(QStringLiteral("x")).toInt(), qRound((workspaceSize.width() - expectedOpenedSize.width()) / 2.0));
+    QCOMPARE(imageObject.value(QStringLiteral("y")).toInt(), qRound((workspaceSize.height() - expectedOpenedSize.height()) / 2.0));
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), imageObject.value(QStringLiteral("id")).toInt());
+    QCOMPARE(viewModel.canvasWidth(), workspaceSize.width());
+    QCOMPARE(viewModel.canvasHeight(), workspaceSize.height());
+
+    const qreal startX = imageObject.value(QStringLiteral("x")).toReal();
+    const qreal startY = imageObject.value(QStringLiteral("y")).toReal();
+    QQmlExpression moveImage(engine.rootContext(),
+                             object.data(),
+                             QStringLiteral("const imageObject = drawableObjects[0];"
+                                            "beginDrawableObjectTransform(imageObject.x + 4, imageObject.y + 4);"
+                                            "updateDrawableObjectTransform(imageObject.x + 24, imageObject.y + 4);"
+                                            "commitDrawableObjectTransform();"));
+    moveImage.evaluate();
+    QVERIFY2(!moveImage.hasError(), qPrintable(moveImage.error().toString()));
+
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    imageObject = objects.first().toMap();
+    QCOMPARE(imageObject.value(QStringLiteral("x")).toReal(), startX + 20.0);
+    QCOMPARE(imageObject.value(QStringLiteral("y")).toReal(), startY);
 }
 
 QTEST_MAIN(tst_DrawingSurfaceItem)

@@ -118,8 +118,27 @@ Rectangle {
     function openRaster(fileUrl) {
         cancelActiveText();
         cancelActiveShape();
+        const sourceUrl = fileUrl ? fileUrl.toString() : "";
+        const imageObject = canvasSurface.imageObjectForFile(sourceUrl, surface.workspaceCanvasWidth, surface.workspaceCanvasHeight);
+        if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
+            return false;
+        }
+
         clearDrawableObjects();
-        return canvasSurface.openRaster(fileUrl ? fileUrl.toString() : "");
+        syncCanvasItemSizeToWorkspace();
+        canvasSurface.clearCanvas();
+        appendDrawableObject({
+            id: surface.nextDrawableObjectId++,
+            type: "image",
+            x: Math.max(0, Math.round((canvasSurface.width - imageObject.width) / 2)),
+            y: Math.max(0, Math.round((canvasSurface.height - imageObject.height) / 2)),
+            width: imageObject.width,
+            height: imageObject.height,
+            source: imageObject.source,
+            originalWidth: imageObject.originalWidth,
+            originalHeight: imageObject.originalHeight
+        });
+        return true;
     }
 
     function saveToFile(fileUrl) {
@@ -833,6 +852,14 @@ Rectangle {
                 y: modelData.y
                 width: Math.max(1, modelData.width)
                 height: Math.max(1, modelData.height)
+
+                Image {
+                    anchors.fill: parent
+                    visible: drawableObjectDelegate.modelData.type === "image"
+                    source: drawableObjectDelegate.modelData.type === "image" ? drawableObjectDelegate.modelData.source : ""
+                    fillMode: Image.Stretch
+                    smooth: true
+                }
 
                 Canvas {
                     anchors.fill: parent

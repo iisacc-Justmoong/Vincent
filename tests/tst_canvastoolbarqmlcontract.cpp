@@ -111,7 +111,8 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("color: toolbar.figmaToolbarBackground")));
 
     const qsizetype addIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"addFile\""));
-    const qsizetype deleteIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generaldelete\""));
+    const qsizetype openIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalopen\""));
+    const qsizetype saveIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"generalsave\""));
     const qsizetype translateIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"translateObject\""));
     const qsizetype brushIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"showCode\""));
     const qsizetype eraserIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"eraser\""));
@@ -120,8 +121,9 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     const qsizetype typeIndex = toolbarSource.indexOf(QStringLiteral("iconName: \"typeAlias\""));
 
     QVERIFY(addIndex >= 0);
-    QVERIFY(deleteIndex > addIndex);
-    QVERIFY(translateIndex > deleteIndex);
+    QVERIFY(openIndex > addIndex);
+    QVERIFY(saveIndex > openIndex);
+    QVERIFY(translateIndex > saveIndex);
     QVERIFY(brushIndex > translateIndex);
     QVERIFY(eraserIndex > brushIndex);
     QVERIFY(shapeIndex > eraserIndex);
@@ -130,8 +132,13 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
 
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"New canvas\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Clear canvas\")")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.clearCanvasRequested()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Open image\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openFileDialog()")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Save image\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openSaveDialog()")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generaldelete\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Clear canvas\")")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.clearCanvasRequested()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("tone: toolbar.currentTool === \"move\" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSource: toolbar.translateObjectIconSource")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.toolSelected(\"move\")")));
@@ -175,8 +182,6 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"imageClassification\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"rendererKit\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"clearOutputs\"")));
-    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generalopen\"")));
-    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generalsave\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"generaledit\"")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("toolbar.toolSelected(\"translate\")")));
 }
@@ -201,7 +206,9 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("function textToolResponsiveWidth()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginTextPlacement(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveText()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.imageObjectForFile(")));
     QVERIFY(surfaceSource.contains(QStringLiteral("appendDrawableObject({")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"image\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.saveToFileWithObjects(")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
@@ -315,6 +322,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.fillAt(pointX, pointY, surface.brushColor);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.fillAt(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.modelData.type === \"image\" ? drawableObjectDelegate.modelData.source : \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resizedDrawableObject(originalObject, pointX, pointY)")));
