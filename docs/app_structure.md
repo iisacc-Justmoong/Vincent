@@ -59,7 +59,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Uses app-local vector sources for the `panHand`, `translateObject`, and `typeAlias` slots while preserving the Figma/LVRS icon names where available. `panHand` covers the hand-pan tool missing from the LVRS icon set, `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
 - Keeps pan input on the fixed canvas viewport and applies pan movement with direct item `x`/`y` offsets instead of anchor center offsets, avoiding anchor relayout during every drag frame.
 - Restricts tools to brush, eraser, pan, move, zoom, shape, fill, and text.
-- Opens an HSL triangle color wheel from an RGB rainbow ball button instead of presenting enumerated palette swatches.
+- Opens an HSL triangle color wheel from a current-color swatch button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
 - Restricts open/save dialogs to flat raster formats and handles default save extensions.

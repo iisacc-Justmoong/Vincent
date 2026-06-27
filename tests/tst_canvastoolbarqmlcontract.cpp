@@ -46,10 +46,15 @@ void tst_CanvasToolBarQmlContract::colorSelectionUsesHslTrianglePicker()
     const qsizetype colorPickerIndex = toolbarSource.indexOf(QStringLiteral("id: colorPickerMenu"));
     const qsizetype shapeMenuIndex = toolbarSource.indexOf(QStringLiteral("id: shapeMenu"));
     const qsizetype brushSettingsIndex = toolbarSource.indexOf(QStringLiteral("id: brushSettingsMenu"));
+    const qsizetype currentColorButtonIndex = toolbarSource.indexOf(QStringLiteral("id: currentColorButton"));
+    const qsizetype colorButtonMouseAreaIndex = toolbarSource.indexOf(QStringLiteral("id: colorButtonMouseArea"));
     QVERIFY(colorPickerIndex >= 0);
     QVERIFY(shapeMenuIndex > colorPickerIndex);
     QVERIFY(brushSettingsIndex > colorPickerIndex);
+    QVERIFY(currentColorButtonIndex > brushSettingsIndex);
+    QVERIFY(colorButtonMouseAreaIndex > currentColorButtonIndex);
     const QString colorPickerSource = toolbarSource.mid(colorPickerIndex, shapeMenuIndex - colorPickerIndex);
+    const QString currentColorButtonSource = toolbarSource.mid(currentColorButtonIndex, colorButtonMouseAreaIndex - currentColorButtonIndex);
 
     const QString pickerQmlPath = QFINDTESTDATA("../App/qml/brush/HslTriangleColorPicker.qml");
     QVERIFY2(!pickerQmlPath.isEmpty(), "HslTriangleColorPicker.qml test data was not found");
@@ -64,9 +69,11 @@ void tst_CanvasToolBarQmlContract::colorSelectionUsesHslTrianglePicker()
     QVERIFY(toolbarSource.contains(QStringLiteral("HslTriangleColorPicker")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onColorSelected: selectedColor => toolbar.colorPicked(selectedColor)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Brush color\")")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("id: colorPickerBall")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("function paintRgbRainbowBall()")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("onPaint: colorPickerBall.paintRgbRainbowBall()")));
+    QVERIFY(currentColorButtonSource.contains(QStringLiteral("id: colorPickerBall")));
+    QVERIFY(currentColorButtonSource.contains(QStringLiteral("color: toolbar.currentColor")));
+    QVERIFY(!currentColorButtonSource.contains(QStringLiteral("Canvas")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("function paintRgbRainbowBall()")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("onPaint: colorPickerBall.paintRgbRainbowBall()")));
     QVERIFY(!colorPickerSource.contains(QStringLiteral("Repeater")));
     QVERIFY(!colorPickerSource.contains(QStringLiteral("model: toolbar.palette")));
     QVERIFY(!colorPickerSource.contains(QStringLiteral("component ColorSwatch")));

@@ -1210,64 +1210,15 @@ Item {
             border.width: colorPickerMenu.opened ? 2 : 1
             border.color: colorPickerMenu.opened ? toolbar.accentColor : Qt.rgba(255, 255, 255, 0.15)
 
-            Canvas {
+            Rectangle {
                 id: colorPickerBall
                 anchors.centerIn: parent
                 width: 24
                 height: 24
-                renderTarget: Canvas.Image
-
-                function paintRgbRainbowBall() {
-                    const context = getContext("2d");
-                    context.clearRect(0, 0, width, height);
-
-                    const centerX = width / 2;
-                    const centerY = height / 2;
-                    const radius = Math.min(width, height) / 2 - 1;
-                    for (let y = 0; y < height; ++y) {
-                        for (let x = 0; x < width; ++x) {
-                            const dx = x + 0.5 - centerX;
-                            const dy = y + 0.5 - centerY;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-                            if (distance > radius) {
-                                continue;
-                            }
-
-                            const hue = (Math.atan2(dy, dx) / (Math.PI * 2) + 1) % 1;
-                            const saturation = Math.min(1, distance / radius);
-                            const lightness = 0.58 - saturation * 0.08;
-                            context.fillStyle = Qt.hsla(hue, saturation, lightness, 1).toString();
-                            context.fillRect(x, y, 1, 1);
-                        }
-                    }
-
-                    context.save();
-                    context.beginPath();
-                    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                    context.clip();
-
-                    var highlight = context.createRadialGradient(centerX - radius * 0.4, centerY - radius * 0.45, 0, centerX - radius * 0.35, centerY - radius * 0.35, radius * 0.75);
-                    highlight.addColorStop(0, "rgba(255, 255, 255, 0.62)");
-                    highlight.addColorStop(0.45, "rgba(255, 255, 255, 0.16)");
-                    highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
-                    context.fillStyle = highlight;
-                    context.fillRect(0, 0, width, height);
-
-                    var shade = context.createRadialGradient(centerX + radius * 0.42, centerY + radius * 0.48, 0, centerX + radius * 0.2, centerY + radius * 0.2, radius * 1.2);
-                    shade.addColorStop(0, "rgba(0, 0, 0, 0.18)");
-                    shade.addColorStop(1, "rgba(0, 0, 0, 0)");
-                    context.fillStyle = shade;
-                    context.fillRect(0, 0, width, height);
-
-                    context.restore();
-                    context.beginPath();
-                    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                    context.lineWidth = 1;
-                    context.strokeStyle = "rgba(255, 255, 255, 0.55)";
-                    context.stroke();
-                }
-
-                onPaint: colorPickerBall.paintRgbRainbowBall()
+                radius: 12
+                color: toolbar.currentColor
+                border.width: 1
+                border.color: Qt.rgba(0, 0, 0, 0.32)
             }
 
             Rectangle {
