@@ -582,6 +582,7 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
 
     QVERIFY(surfaceSource.contains(QStringLiteral("property var layerHierarchyRows: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int layerHierarchyThumbnailRefreshDelayMs: 1000")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int brushLivePreviewFrameIntervalMs: 16")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property bool backgroundLayerThumbnailRefreshPending: false")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var pendingRasterLayerThumbnailRefreshes: ({})")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property string backgroundLayerThumbnailSource: \"\"")));
@@ -619,6 +620,7 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(surfaceSource.contains(QStringLiteral("function unregisterRasterLayerItem(objectId, surfaceItem)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("cacheDrawableObjectThumbnailSource(drawableObject, surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("livePreviewFrameIntervalMs: surface.brushLivePreviewFrameIntervalMs")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.requestBackgroundLayerThumbnailRefresh()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId)")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()")));

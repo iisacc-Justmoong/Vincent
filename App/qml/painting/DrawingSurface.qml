@@ -111,6 +111,7 @@ Rectangle {
     property var layerHierarchyRows: []
     readonly property int layerHierarchyThumbnailSize: 32
     readonly property int layerHierarchyThumbnailRefreshDelayMs: 1000
+    readonly property int brushLivePreviewFrameIntervalMs: 16
     property bool layerHierarchyRowsRebuildScheduled: false
     property bool backgroundLayerThumbnailRefreshPending: false
     property var pendingRasterLayerThumbnailRefreshes: ({})
@@ -1579,6 +1580,7 @@ Rectangle {
             brushHardness: surface.brushHardness
             brushSpacing: surface.brushSpacing
             brushSpacingRatio: surface.brushSpacingRatio
+            livePreviewFrameIntervalMs: surface.brushLivePreviewFrameIntervalMs
             pressureCurveMinimum: surface.pressureCurveMinimum
             pressureCurveCenter: surface.pressureCurveCenter
             pressureCurveMaximum: surface.pressureCurveMaximum
@@ -1739,6 +1741,7 @@ Rectangle {
                         brushHardness: surface.brushHardness
                         brushSpacing: surface.brushSpacing
                         brushSpacingRatio: surface.brushSpacingRatio
+                        livePreviewFrameIntervalMs: surface.brushLivePreviewFrameIntervalMs
                         pressureCurveMinimum: surface.pressureCurveMinimum
                         pressureCurveCenter: surface.pressureCurveCenter
                         pressureCurveMaximum: surface.pressureCurveMaximum
