@@ -110,7 +110,10 @@ Rectangle {
     property int selectedDrawableObjectId: -1
     property var layerHierarchyRows: []
     readonly property int layerHierarchyThumbnailSize: 32
+    readonly property int layerHierarchyThumbnailRefreshDelayMs: 1000
     property bool layerHierarchyRowsRebuildScheduled: false
+    property bool backgroundLayerThumbnailRefreshPending: false
+    property var pendingRasterLayerThumbnailRefreshes: ({})
     property string backgroundLayerThumbnailSource: ""
     property var drawableObjectThumbnailSources: ({})
     property var rasterLayerItems: ({})
@@ -423,6 +426,9 @@ Rectangle {
         surface.rasterLayerSnapshotSources = {};
         surface.rasterLayerThumbnailSources = {};
         surface.drawableObjectThumbnailSources = {};
+        surface.pendingRasterLayerThumbnailRefreshes = {};
+        surface.backgroundLayerThumbnailRefreshPending = false;
+        layerThumbnailRefreshTimer.stop();
         surface.persistRasterLayerSnapshots = true;
         surface.nextEmptyLayerNumber = 1;
         surface.selectedDrawableObjectId = -1;
@@ -465,6 +471,49 @@ Rectangle {
         });
     }
 
+    function scheduleLayerThumbnailRefreshFlush() {
+        layerThumbnailRefreshTimer.restart();
+    }
+
+    function requestBackgroundLayerThumbnailRefresh() {
+        surface.backgroundLayerThumbnailRefreshPending = true;
+        scheduleLayerThumbnailRefreshFlush();
+    }
+
+    function requestRasterLayerThumbnailRefresh(objectId) {
+        const nextPending = copyStringMap(surface.pendingRasterLayerThumbnailRefreshes);
+        nextPending[String(objectId)] = true;
+        surface.pendingRasterLayerThumbnailRefreshes = nextPending;
+        scheduleLayerThumbnailRefreshFlush();
+    }
+
+    function clearPendingRasterLayerThumbnailRefresh(objectId) {
+        const key = String(objectId);
+        if (surface.pendingRasterLayerThumbnailRefreshes[key] === undefined) {
+            return;
+        }
+        const nextPending = copyStringMap(surface.pendingRasterLayerThumbnailRefreshes);
+        delete nextPending[key];
+        surface.pendingRasterLayerThumbnailRefreshes = nextPending;
+    }
+
+    function flushPendingLayerThumbnailRefreshes() {
+        layerThumbnailRefreshTimer.stop();
+        if (surface.backgroundLayerThumbnailRefreshPending) {
+            surface.backgroundLayerThumbnailRefreshPending = false;
+            refreshBackgroundLayerThumbnailSource();
+        }
+
+        const pendingLayerIds = Object.keys(surface.pendingRasterLayerThumbnailRefreshes);
+        if (pendingLayerIds.length === 0) {
+            return;
+        }
+        surface.pendingRasterLayerThumbnailRefreshes = {};
+        for (let index = 0; index < pendingLayerIds.length; ++index) {
+            refreshRasterLayerThumbnailSource(Number(pendingLayerIds[index]));
+        }
+    }
+
     function setDrawableObjectThumbnailSource(objectId, source) {
         const key = String(objectId);
         if ((surface.drawableObjectThumbnailSources[key] || "") === source) {
@@ -493,6 +542,46 @@ Rectangle {
         surface.rasterLayerThumbnailSources = nextSources;
     }
 
+    function clearRasterLayerThumbnailState(objectId) {
+        clearPendingRasterLayerThumbnailRefresh(objectId);
+        setRasterLayerThumbnailSource(objectId, "");
+    }
+
+    function fallbackRasterThumbnailSource(surfaceItem) {
+        if (!surfaceItem || !surfaceItem.cacheRasterThumbnailSource) {
+            return "";
+        }
+        return surfaceItem.cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize) || "";
+    }
+
+    function refreshRasterSurfaceThumbnailSource(surfaceItem, applySource) {
+        if (!surfaceItem) {
+            return "";
+        }
+
+        if (surfaceItem.grabToImage) {
+            const accepted = surfaceItem.grabToImage(function (result) {
+                const grabbedSource = result && surfaceItem.cacheGrabbedThumbnailSource ? surfaceItem.cacheGrabbedThumbnailSource(result) : "";
+                if (grabbedSource.length > 0) {
+                    applySource(grabbedSource);
+                    scheduleLayerHierarchyRowsRebuild();
+                    return;
+                }
+
+                applySource(fallbackRasterThumbnailSource(surfaceItem));
+                scheduleLayerHierarchyRowsRebuild();
+            }, Qt.size(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize));
+            if (accepted) {
+                return "";
+            }
+        }
+
+        const source = fallbackRasterThumbnailSource(surfaceItem);
+        applySource(source);
+        scheduleLayerHierarchyRowsRebuild();
+        return source;
+    }
+
     function invalidateDrawableObjectThumbnailSource(objectId) {
         setDrawableObjectThumbnailSource(objectId, "");
     }
@@ -511,19 +600,20 @@ Rectangle {
         if (!item) {
             return "";
         }
-        const source = item.cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize);
-        setRasterLayerThumbnailSource(objectId, source || "");
-        scheduleLayerHierarchyRowsRebuild();
-        return source || "";
+        clearPendingRasterLayerThumbnailRefresh(objectId);
+        return refreshRasterSurfaceThumbnailSource(item, function (source) {
+            if (rasterLayerItemById(objectId) !== item) {
+                return;
+            }
+            setRasterLayerThumbnailSource(objectId, source || "");
+        });
     }
 
     function refreshBackgroundLayerThumbnailSource() {
-        const source = canvasSurface.cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize);
-        if (surface.backgroundLayerThumbnailSource !== (source || "")) {
+        surface.backgroundLayerThumbnailRefreshPending = false;
+        return refreshRasterSurfaceThumbnailSource(canvasSurface, function (source) {
             surface.backgroundLayerThumbnailSource = source || "";
-            scheduleLayerHierarchyRowsRebuild();
-        }
-        return surface.backgroundLayerThumbnailSource;
+        });
     }
 
     function layerIconSourceForDrawableObject(drawableObject) {
@@ -565,6 +655,7 @@ Rectangle {
         }
 
         delete surface.rasterLayerItems[String(objectId)];
+        clearRasterLayerThumbnailState(objectId);
     }
 
     function resizeRasterLayerItems(canvasWidth, canvasHeight) {
@@ -977,7 +1068,7 @@ Rectangle {
             if (removedObject && removedObject.type === "layer") {
                 surface.persistRasterLayerSnapshots = false;
                 delete surface.rasterLayerSnapshotSources[String(selectedObjectId)];
-                setRasterLayerThumbnailSource(selectedObjectId, "");
+                clearRasterLayerThumbnailState(selectedObjectId);
             }
             invalidateDrawableObjectThumbnailSource(selectedObjectId);
             drawableObjectVisualModel.remove(removedIndex);
@@ -1503,7 +1594,14 @@ Rectangle {
                 surface.rebuildLayerHierarchyRows();
             }
 
-            onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()
+            onRasterContentChanged: surface.requestBackgroundLayerThumbnailRefresh()
+        }
+
+        Timer {
+            id: layerThumbnailRefreshTimer
+            interval: surface.layerHierarchyThumbnailRefreshDelayMs
+            repeat: false
+            onTriggered: surface.flushPendingLayerThumbnailRefreshes()
         }
 
         Rectangle {
@@ -1649,7 +1747,7 @@ Rectangle {
                         documentViewModel: surface.documentViewModel
                         viewId: surface.viewId
 
-                        onRasterContentChanged: surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)
+                        onRasterContentChanged: surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId)
                     }
                 }
 

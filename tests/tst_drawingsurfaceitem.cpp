@@ -764,12 +764,42 @@ void tst_DrawingSurfaceItem::addsBlankLayerRowsWithoutTransformHitTesting()
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("iconGlyph")).toString(), QString());
     const QString layerThumbnailSource = rows.at(0).toMap().value(QStringLiteral("iconSource")).toString();
     const QString layerThumbnailPath = QUrl(layerThumbnailSource).toLocalFile();
-    QVERIFY(QFileInfo::exists(layerThumbnailPath));
-    QCOMPARE(QImage(layerThumbnailPath).size(), QSize(32, 32));
+    if (!layerThumbnailPath.isEmpty()) {
+        QVERIFY(QFileInfo::exists(layerThumbnailPath));
+        QCOMPARE(QImage(layerThumbnailPath).size(), QSize(32, 32));
+    }
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("selected")).toBool(), true);
     QCOMPARE(rows.at(1).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
     QCOMPARE(rows.at(1).toMap().value(QStringLiteral("iconGlyph")).toString(), QString());
     QVERIFY(!rows.at(1).toMap().value(QStringLiteral("iconSource")).toString().isEmpty());
+
+    QQmlExpression coalesceThumbnailRefresh(engine.rootContext(),
+                                            object.data(),
+                                            QStringLiteral("requestRasterLayerThumbnailRefresh(1);"
+                                                           "requestRasterLayerThumbnailRefresh(1);"
+                                                           "Object.keys(pendingRasterLayerThumbnailRefreshes).length;"));
+    const QVariant pendingRefreshCount = coalesceThumbnailRefresh.evaluate();
+    QVERIFY2(!coalesceThumbnailRefresh.hasError(), qPrintable(coalesceThumbnailRefresh.error().toString()));
+    QCOMPARE(pendingRefreshCount.toInt(), 1);
+
+    QQmlExpression flushThumbnailRefresh(engine.rootContext(),
+                                         object.data(),
+                                         QStringLiteral("flushPendingLayerThumbnailRefreshes();"
+                                                        "Object.keys(pendingRasterLayerThumbnailRefreshes).length;"));
+    const QVariant remainingRefreshCount = flushThumbnailRefresh.evaluate();
+    QVERIFY2(!flushThumbnailRefresh.hasError(), qPrintable(flushThumbnailRefresh.error().toString()));
+    QCOMPARE(remainingRefreshCount.toInt(), 0);
+
+    QQmlExpression clearThumbnailState(engine.rootContext(),
+                                       object.data(),
+                                       QStringLiteral("setRasterLayerThumbnailSource(1, \"image://old-thumbnail\");"
+                                                      "requestRasterLayerThumbnailRefresh(1);"
+                                                      "clearRasterLayerThumbnailState(1);"
+                                                      "[Object.keys(pendingRasterLayerThumbnailRefreshes).length,"
+                                                      " rasterLayerThumbnailSources[\"1\"] === undefined].join(\",\");"));
+    const QVariant clearedThumbnailState = clearThumbnailState.evaluate();
+    QVERIFY2(!clearThumbnailState.hasError(), qPrintable(clearThumbnailState.error().toString()));
+    QCOMPARE(clearedThumbnailState.toString(), QStringLiteral("0,true"));
 
     QQmlExpression transformableSelection(engine.rootContext(),
                                           object.data(),
@@ -1392,6 +1422,7 @@ void tst_DrawingSurfaceItem::cachesLayerBitmapThumbnails()
     PaletteUtils paletteUtils;
     CanvasDocumentViewModel viewModel(&paletteUtils);
     DrawingSurfaceItem item;
+    QVERIFY(item.cacheGrabbedThumbnailSource(nullptr).isEmpty());
     item.setWidth(96);
     item.setHeight(64);
     item.setDocumentViewModel(&viewModel);

@@ -11,6 +11,7 @@
 class CanvasViewModelBridge;
 class QEvent;
 class QMouseEvent;
+class QObject;
 
 class DrawingSurfaceItem : public CanvasAdapter
 {
@@ -47,6 +48,7 @@ public:
                                                           const QVariantList &rasterLayers);
     Q_INVOKABLE QString cacheRasterSnapshotSource();
     Q_INVOKABLE QString cacheRasterThumbnailSource(qreal maximumWidth = 32, qreal maximumHeight = 32);
+    Q_INVOKABLE QString cacheGrabbedThumbnailSource(QObject *grabResult);
     Q_INVOKABLE QString cacheDrawableObjectThumbnailSource(const QVariantMap &object,
                                                            qreal maximumWidth = 32,
                                                            qreal maximumHeight = 32) const;

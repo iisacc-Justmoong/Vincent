@@ -23,6 +23,7 @@
 #include <QPalette>
 #include <QPoint>
 #include <QPointF>
+#include <QQuickItemGrabResult>
 #include <QRectF>
 #include <QSize>
 #include <QStandardPaths>
@@ -884,6 +885,26 @@ QString DrawingSurfaceItem::cacheRasterThumbnailSource(qreal maximumWidth, qreal
 
     const QImage thumbnail = thumbnailImage(image, boundedThumbnailMaximumSize(maximumWidth, maximumHeight));
     return cachedPngSourceForImage(QStringLiteral("layer-thumbnails"), thumbnail);
+}
+
+QString DrawingSurfaceItem::cacheGrabbedThumbnailSource(QObject *grabResult)
+{
+    auto *result = qobject_cast<QQuickItemGrabResult *>(grabResult);
+    if (!result) {
+        return {};
+    }
+
+    const QString thumbnailPath = writableCacheFilePath(QStringLiteral("layer-thumbnails"),
+                                                        QStringLiteral("grab-XXXXXX.png"));
+    if (thumbnailPath.isEmpty()) {
+        return {};
+    }
+
+    if (!result->saveToFile(thumbnailPath)) {
+        QFile::remove(thumbnailPath);
+        return {};
+    }
+    return QUrl::fromLocalFile(thumbnailPath).toString();
 }
 
 QString DrawingSurfaceItem::cacheDrawableObjectThumbnailSource(const QVariantMap &object,
