@@ -101,6 +101,7 @@ set(QT_MIN_VERSION "6.8.0")
 # 기본 설치 경로 및 요약
 include(GNUInstallDirs)
 include(FeatureSummary)
+include(FetchContent)
 
 # Qt6
 find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
@@ -109,6 +110,34 @@ if(BUILD_TESTING)
 endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
+
+FetchContent_Declare(psd_sdk
+        GIT_REPOSITORY https://github.com/MolecularMatters/psd_sdk.git
+        GIT_TAG f51449543273cbf12058ae92b230e0c4209f5066
+)
+FetchContent_GetProperties(psd_sdk)
+if(NOT psd_sdk_POPULATED)
+    if(POLICY CMP0169)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+    FetchContent_Populate(psd_sdk)
+    if(POLICY CMP0169)
+        cmake_policy(POP)
+    endif()
+endif()
+file(GLOB _vincent_psd_sdk_sources CONFIGURE_DEPENDS
+        "${psd_sdk_SOURCE_DIR}/src/Psd/*.cpp"
+        "${psd_sdk_SOURCE_DIR}/src/Psd/*.c"
+)
+list(REMOVE_ITEM _vincent_psd_sdk_sources
+        "${psd_sdk_SOURCE_DIR}/src/Psd/PsdNativeFile.cpp"
+        "${psd_sdk_SOURCE_DIR}/src/Psd/PsdNativeFile_Linux.cpp"
+        "${psd_sdk_SOURCE_DIR}/src/Psd/PsdStringUtil.cpp"
+)
+add_library(vincent_psd_sdk STATIC ${_vincent_psd_sdk_sources})
+target_include_directories(vincent_psd_sdk PUBLIC "${psd_sdk_SOURCE_DIR}/src/Psd")
+target_compile_features(vincent_psd_sdk PUBLIC cxx_std_11)
 
 set(_vincent_local_dependency_runtime_paths)
 foreach(_vincent_runtime_prefix IN ITEMS
@@ -199,6 +228,7 @@ endif()
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
         iiPaintEngine::iiPaintEngine
+        vincent_psd_sdk
 )
 vincent_configure_local_runtime_paths(Vincent)
 

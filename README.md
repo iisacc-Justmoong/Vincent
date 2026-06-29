@@ -23,7 +23,7 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
 - Flat raster document model with a single canvas and engine-managed undo/redo
-- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
+- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
 - Flat raster save flow that composites the iiPaintEngine raster canvas with current image, text, and shape objects
 - Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records for future import/export work
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
@@ -48,7 +48,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 ## Known Limitations
-- No PSD import, layered PSD export, blend modes, layer effects, masks, or persisted vector-object project file yet; the PSD compatibility layer is an internal manifest contract and `.psd` save currently exports a flat composite
+- PSD import currently reads the merged/flat image only; no layered PSD import/export, blend modes, layer effects, masks, or persisted vector-object project file yet. The PSD compatibility layer is an internal manifest contract and `.psd` save currently exports a flat composite
 - Opened image objects are session overlays, not persisted vector/layer document records
 - Palette is fixed to the built-in colors
 - Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal

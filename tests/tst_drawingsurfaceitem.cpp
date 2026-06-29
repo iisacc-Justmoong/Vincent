@@ -36,6 +36,8 @@ private slots:
     void fillsContiguousRasterRegion();
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
     void savesCompositeDrawableObjectsAsFlatPsd();
+    void opensFlatPsdThroughPsdSdkReader();
+    void createsPsdDrawablePreviewForQmlImage();
     void supportsUndoRedo();
     void opensRasterBackground();
     void opensLargeRasterWithinCurrentCanvasBounds();
@@ -998,6 +1000,84 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsFlatPsd()
     QCOMPARE(readUInt32(header, 34), 0U);
     QCOMPARE(readUInt16(header, 38), 0);
     QCOMPARE(psdFile.size(), static_cast<qint64>(40 + 20 * 12 * 4));
+}
+
+void tst_DrawingSurfaceItem::opensFlatPsdThroughPsdSdkReader()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(24);
+    item.setHeight(16);
+    item.setDocumentViewModel(&viewModel);
+
+    QVariantMap shapeObject;
+    shapeObject.insert(QStringLiteral("id"), 1);
+    shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
+    shapeObject.insert(QStringLiteral("x"), 4);
+    shapeObject.insert(QStringLiteral("y"), 5);
+    shapeObject.insert(QStringLiteral("width"), 12);
+    shapeObject.insert(QStringLiteral("height"), 8);
+    shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
+    shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("roundtrip.psd"));
+    QVERIFY(item.saveToFileWithObjects(psdPath, {shapeObject}));
+
+    DrawingSurfaceItem openedItem;
+    openedItem.setWidth(24);
+    openedItem.setHeight(16);
+    openedItem.setDocumentViewModel(&viewModel);
+    QVERIFY(openedItem.openRaster(psdPath));
+    QCOMPARE(openedItem.width(), 24.0);
+    QCOMPARE(openedItem.height(), 16.0);
+
+    const QString outputPath = dir.filePath(QStringLiteral("roundtrip-output.png"));
+    QVERIFY(openedItem.saveToFile(outputPath));
+    const QImage opened(outputPath);
+    QVERIFY(!opened.isNull());
+    QCOMPARE(opened.size(), QSize(24, 16));
+    QVERIFY(isBlueShapePixel(opened.pixelColor(8, 8)));
+}
+
+void tst_DrawingSurfaceItem::createsPsdDrawablePreviewForQmlImage()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(32);
+    item.setHeight(20);
+    item.setDocumentViewModel(&viewModel);
+
+    QVariantMap shapeObject;
+    shapeObject.insert(QStringLiteral("id"), 1);
+    shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
+    shapeObject.insert(QStringLiteral("x"), 0);
+    shapeObject.insert(QStringLiteral("y"), 0);
+    shapeObject.insert(QStringLiteral("width"), 32);
+    shapeObject.insert(QStringLiteral("height"), 20);
+    shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
+    shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("preview-source.psd"));
+    QVERIFY(item.saveToFileWithObjects(psdPath, {shapeObject}));
+
+    const QVariantMap object = item.imageObjectForFile(psdPath, 128, 128);
+    QCOMPARE(object.value(QStringLiteral("sourceFormat")).toString(), QStringLiteral("psd"));
+    QCOMPARE(object.value(QStringLiteral("originalSource")).toString(), QUrl::fromLocalFile(psdPath).toString());
+    QCOMPARE(object.value(QStringLiteral("width")).toInt(), 32);
+    QCOMPARE(object.value(QStringLiteral("height")).toInt(), 20);
+
+    const QUrl previewUrl(object.value(QStringLiteral("source")).toString());
+    QVERIFY(previewUrl.isLocalFile());
+    const QImage preview(previewUrl.toLocalFile());
+    QVERIFY(!preview.isNull());
+    QCOMPARE(preview.size(), QSize(32, 20));
+    QVERIFY(isBlueShapePixel(preview.pixelColor(4, 4)));
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()

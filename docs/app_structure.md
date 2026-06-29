@@ -10,13 +10,14 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - `App/models/canvas/canvasviewmodelbridge.*` gates drawing mutations through the LVRS document view model and synchronizes canvas metadata.
 - `App/models/brush/paletteutils.*` provides palette ordering helpers exposed to QML.
 - `App/models/document/psdcompatibilitydocument.*` defines the internal Photoshop-style document/layer manifest used as the boundary for future PSD import/export.
+- `App/models/document/psdimagereader.*` wraps `psd_sdk` so Vincent can read PSD merged image data without relying on Qt image plugins.
 - `App/models/painting/drawingsurfaceitem.*` adapts Vincent's QML surface contract to `CanvasAdapter` from iiPaintEngine.
 - `App/qml/` contains the LVRS UI for the main window, toolbar, and drawing surface.
 - `tests/` contains Qt Test targets for the document view model and iiPaintEngine drawing surface integration.
 
 ## Build System Overview
 
-1. The root `CMakeLists.txt` sets up Qt 6, LVRS, iiPaintEngine, install paths, packaging metadata, and the `Vincent` executable target.
+1. The root `CMakeLists.txt` sets up Qt 6, LVRS, iiPaintEngine, `psd_sdk`, install paths, packaging metadata, and the `Vincent` executable target.
 2. `App/CMakeLists.txt` attaches the C++ sources and headers to the `Vincent` target.
 3. `qt_add_qml_module` registers the `Vincent` QML module and exposes `Main.qml`, `PainterCanvasPage.qml`, `CanvasToolBar.qml`, `HslTriangleColorPicker.qml`, and `DrawingSurface.qml`.
 4. The executable links against Qt Core, QML, Quick, Quick Controls 2, SVG, and `iiPaintEngine::iiPaintEngine`, then LVRS configures runtime QML import handling.
@@ -64,7 +65,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Opens an HSL triangle color wheel from a current-color swatch button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
-- Restricts open dialogs to supported Qt image inputs and lets the save dialog default to Photoshop PSD while still offering PNG, JPEG, BMP, WebP, and TIFF, with default extension handling per selected filter.
+- Restricts open dialogs to supported Qt image inputs plus PSD files and lets the save dialog default to Photoshop PSD while still offering PNG, JPEG, BMP, WebP, and TIFF, with default extension handling per selected filter.
 
 ### `HslTriangleColorPicker.qml`
 
@@ -101,6 +102,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Exposes `saveToFileWithObjects` so QML can save a composite of the current raster canvas plus transformable image, text, and shape session objects without flattening those objects into the live raster state.
 - Writes `.psd` paths as flat 8-bit RGB/RGBA Photoshop documents containing the current visible composite.
 - Exposes `psdCompatibilityManifest` so QML can retrieve a Photoshop-style manifest for the current raster canvas and transformable session objects without promising layered PSD round-tripping yet.
+- Routes `.psd` imports through `PsdImageReader`; QML image-object imports receive a cached PNG preview source while retaining the original PSD source metadata.
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
 - Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
@@ -119,6 +121,12 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Creates a bottom `Raster Canvas` layer and maps current image, text, and shape session objects into ordered layer records above it.
 - Clamps layer bounds to the current canvas and flags canvases larger than PSD's 30,000 px edge limit as not PSD-compatible.
 
+### `PsdImageReader`
+
+- Uses the BSD-2-Clause `psd_sdk` parser to read Photoshop PSD files directly inside Vincent.
+- Converts 8-bit RGB/RGBA merged image data into `QImage`; files without merged image data remain unsupported until layer compositing is implemented.
+- Supplies PSD image data to both direct raster opening and QML transformable image-object preview generation.
+
 ### `CanvasViewModelBridge`
 
 - Resolves the active LVRS document view model.
@@ -133,6 +141,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.
 5. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save; Vincent keeps opened images plus inserted text and shape as QML session objects, renders them as overlays, applies fill replacements with Qt image APIs, and composites objects with the raster canvas during save.
 6. When PSD work needs document structure, `PsdCompatibilityDocument` converts the same raster canvas and session objects into a PSD-style layer manifest; current `.psd` save writes the visible composite as a flat PSD file while layered import/export remains future work.
+7. When opening PSD, `PsdImageReader` reads the merged image data through `psd_sdk`; QML displays a cached PNG preview for transformable PSD image objects.
 
 ## Testing Surface
 
@@ -140,5 +149,5 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - `tests/tst_psdcompatibilitydocument.cpp` validates the PSD compatibility manifest, including canvas metadata, raster base layer creation, session object layer mapping, PSD bounds, opacity, visibility, and PSD canvas-size limits.
 - `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar contracts, including the new-canvas size modal, brush reselection settings, pan-tool selection, move-tool selection, zoom-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform and keyboard-delete hooks, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, hand-tool canvas panning, horizontal-drag canvas zooming, composite object saving including flat PSD output, undo/redo, saving, image-object opening within workspace bounds, explicit-size new canvas creation, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, hand-tool canvas panning, horizontal-drag canvas zooming, composite object saving including flat PSD output, flat PSD reopening through `psd_sdk`, undo/redo, saving, image-object opening within workspace bounds, explicit-size new canvas creation, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

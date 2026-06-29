@@ -86,6 +86,8 @@ add_executable(tests_drawingsurfaceitem
         ../App/models/canvas/canvasviewmodelbridge.h
         ../App/models/document/psdcompatibilitydocument.cpp
         ../App/models/document/psdcompatibilitydocument.h
+        ../App/models/document/psdimagereader.cpp
+        ../App/models/document/psdimagereader.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
 )
@@ -105,6 +107,7 @@ target_link_libraries(tests_drawingsurfaceitem PRIVATE
         Qt6::Quick
         Qt6::Test
         iiPaintEngine::iiPaintEngine
+        vincent_psd_sdk
 )
 vincent_configure_local_runtime_paths(tests_drawingsurfaceitem)
 

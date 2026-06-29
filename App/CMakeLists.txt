@@ -31,6 +31,8 @@ target_sources(Vincent PRIVATE
         models/canvas/canvasviewmodelbridge.h
         models/document/psdcompatibilitydocument.cpp
         models/document/psdcompatibilitydocument.h
+        models/document/psdimagereader.cpp
+        models/document/psdimagereader.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
         resources.qrc

@@ -2,12 +2,15 @@
 
 #include "../canvas/canvasviewmodelbridge.h"
 #include "../document/psdcompatibilitydocument.h"
+#include "../document/psdimagereader.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QByteArray>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
+#include <QFileInfo>
 #include <QFont>
 #include <QImage>
 #include <QMouseEvent>
@@ -18,6 +21,7 @@
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
+#include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTextDocument>
 #include <QTextOption>
@@ -64,6 +68,46 @@ QString localFilePath(const QString &fileUrl)
 bool hasPsdSuffix(const QString &fileUrl)
 {
     return localFilePath(fileUrl).endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
+}
+
+QImage imageFromFileUrl(const QString &fileUrl)
+{
+    const QString filePath = localFilePath(fileUrl);
+    if (PsdImageReader::canReadPath(filePath)) {
+        return PsdImageReader::readMergedImage(filePath);
+    }
+
+    return QImage(filePath);
+}
+
+QString cachedPsdPreviewSource(const QString &fileUrl, const QImage &image)
+{
+    const QString filePath = localFilePath(fileUrl);
+    if (!PsdImageReader::canReadPath(filePath) || image.isNull()) {
+        return localFileSource(fileUrl);
+    }
+
+    QFileInfo fileInfo(filePath);
+    const QByteArray key = (filePath
+                            + QStringLiteral("|")
+                            + QString::number(fileInfo.size())
+                            + QStringLiteral("|")
+                            + QString::number(fileInfo.lastModified().toMSecsSinceEpoch()))
+            .toUtf8();
+    const QString digest = QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex());
+    const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
+        ? QDir::tempPath()
+        : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QDir cacheDir(cacheRoot + QStringLiteral("/psd-previews"));
+    if (!cacheDir.exists()) {
+        cacheDir.mkpath(QStringLiteral("."));
+    }
+
+    const QString previewPath = cacheDir.filePath(digest + QStringLiteral(".png"));
+    if (!QFileInfo::exists(previewPath)) {
+        image.save(previewPath, "PNG");
+    }
+    return QUrl::fromLocalFile(previewPath).toString();
 }
 
 bool isTabletEvent(QEvent::Type type)
@@ -301,7 +345,7 @@ void drawShapeObject(QPainter &painter, const QVariantMap &object)
 
 void drawImageObject(QPainter &painter, const QVariantMap &object)
 {
-    const QImage image(localFilePath(object.value(QStringLiteral("source")).toString()));
+    const QImage image = imageFromFileUrl(object.value(QStringLiteral("source")).toString());
     if (image.isNull()) {
         return;
     }
@@ -491,7 +535,7 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasW
         return false;
     }
 
-    QImage image(localFilePath(fileUrl));
+    QImage image = imageFromFileUrl(fileUrl);
     if (image.isNull()) {
         return false;
     }
@@ -525,7 +569,7 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
                                                    qreal maximumObjectWidth,
                                                    qreal maximumObjectHeight) const
 {
-    const QImage image(localFilePath(fileUrl));
+    const QImage image = imageFromFileUrl(fileUrl);
     if (image.isNull()) {
         return {};
     }
@@ -539,7 +583,11 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
     }
 
     QVariantMap object;
-    object.insert(QStringLiteral("source"), localFileSource(fileUrl));
+    object.insert(QStringLiteral("source"), cachedPsdPreviewSource(fileUrl, image));
+    if (hasPsdSuffix(fileUrl)) {
+        object.insert(QStringLiteral("originalSource"), localFileSource(fileUrl));
+        object.insert(QStringLiteral("sourceFormat"), QStringLiteral("psd"));
+    }
     object.insert(QStringLiteral("width"), objectSize.width());
     object.insert(QStringLiteral("height"), objectSize.height());
     object.insert(QStringLiteral("originalWidth"), image.width());
