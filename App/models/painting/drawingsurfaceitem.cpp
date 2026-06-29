@@ -641,6 +641,7 @@ DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
     , m_viewModelBridge(new CanvasViewModelBridge())
 {
     connect(this, &CanvasAdapter::undoRedoChanged, this, &DrawingSurfaceItem::emitUndoRedoSignals);
+    connect(this, &PaintCanvasItem::strokeCountChanged, this, &DrawingSurfaceItem::rasterContentChanged);
 }
 
 DrawingSurfaceItem::~DrawingSurfaceItem()
@@ -1023,7 +1024,6 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
                                        Qt::LeftButton,
                                        Qt::NoButton);
     CanvasAdapter::mouseReleaseEvent(&event);
-    emit rasterContentChanged();
 }
 
 bool DrawingSurfaceItem::commitText(qreal pointX,
@@ -1232,7 +1232,6 @@ void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     CanvasAdapter::mouseReleaseEvent(event);
-    emit rasterContentChanged();
 }
 
 void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)

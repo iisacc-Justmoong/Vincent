@@ -112,7 +112,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
 - Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
-- Emits `rasterContentChanged` when raster pixels change and exposes thumbnail cache helpers used by the hierarchy panel for `Background`, added raster layers, and rasterized object rows.
+- Emits `rasterContentChanged` when raster pixels change, wiring brush strokes through iiPaintEngine's post-commit `strokeCountChanged` signal, and exposes thumbnail cache helpers used by the hierarchy panel for `Background`, added raster layers, and rasterized object rows.
 
 ### `CanvasDocumentViewModel`
 

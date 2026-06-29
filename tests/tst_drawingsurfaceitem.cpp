@@ -1191,11 +1191,13 @@ void tst_DrawingSurfaceItem::drawsAndSavesStroke()
     item.setHeight(96);
     item.setDocumentViewModel(&viewModel);
 
+    QSignalSpy contentChanged(&item, &DrawingSurfaceItem::rasterContentChanged);
     item.beginStroke(10, 10, 1.0, false);
     QVERIFY(item.appendStrokePoint(40, 40, 1.0, false));
     item.endStroke(60, 48, 1.0, false);
 
     QTRY_COMPARE(item.strokeCount(), 1);
+    QTRY_VERIFY(contentChanged.count() > 0);
 
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
