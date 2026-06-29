@@ -172,7 +172,7 @@ PsdLayerRecord PsdLayerRecord::rasterCanvas(const QSize &canvasSize)
 {
     PsdLayerRecord record;
     record.m_kind = Kind::Raster;
-    record.m_name = QStringLiteral("Raster Canvas");
+    record.m_name = QStringLiteral("Background");
     record.m_bounds = QRect(0, 0, qMax(1, canvasSize.width()), qMax(1, canvasSize.height()));
     return record;
 }

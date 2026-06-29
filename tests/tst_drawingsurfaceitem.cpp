@@ -28,6 +28,11 @@ private slots:
     void zoomsCanvasWithHorizontalDrag();
     void movesAndResizesDrawableObjects();
     void deletesSelectedDrawableObject();
+    void addsBlankLayerRowsWithoutTransformHitTesting();
+    void savesRasterLayerItemsAsIndependentCanvasLayers();
+    void deletingRasterLayerRemovesItsPaintFromQmlComposite();
+    void addsManyRasterLayersWithoutSnapshotChurn();
+    void renamesLayerRowsAndDrawableObjectMetadata();
     void layersExposeHierarchyRowsAndReorderDrawableObjects();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
@@ -695,6 +700,389 @@ void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
     QCOMPARE(objects.size(), 1);
 }
 
+void tst_DrawingSurfaceItem::addsBlankLayerRowsWithoutTransformHitTesting()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QTRY_VERIFY(canvasItem->width() > 1);
+    QTRY_VERIFY(canvasItem->height() > 1);
+
+    QQmlExpression addLayer(engine.rootContext(),
+                            object.data(),
+                            QStringLiteral("addEmptyLayer();"));
+    const QVariant addedLayerId = addLayer.evaluate();
+    QVERIFY2(!addLayer.hasError(), qPrintable(addLayer.error().toString()));
+    QCOMPARE(addedLayerId.toInt(), 1);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), 1);
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    const QVariantMap layerObject = objects.first().toMap();
+    QCOMPARE(layerObject.value(QStringLiteral("type")).toString(), QStringLiteral("layer"));
+    QCOMPARE(layerObject.value(QStringLiteral("name")).toString(), QStringLiteral("Layer 1"));
+    QCOMPARE(layerObject.value(QStringLiteral("x")).toReal(), 0.0);
+    QCOMPARE(layerObject.value(QStringLiteral("y")).toReal(), 0.0);
+    QCOMPARE(layerObject.value(QStringLiteral("width")).toReal(), canvasItem->width());
+    QCOMPARE(layerObject.value(QStringLiteral("height")).toReal(), canvasItem->height());
+
+    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 2);
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("object-1"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Layer 1"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("iconGlyph")).toString(), QStringLiteral("L"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("selected")).toBool(), true);
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+
+    QQmlExpression transformableSelection(engine.rootContext(),
+                                          object.data(),
+                                          QStringLiteral("hasTransformableSelectedDrawableObject();"));
+    const QVariant transformableSelectionResult = transformableSelection.evaluate();
+    QVERIFY2(!transformableSelection.hasError(), qPrintable(transformableSelection.error().toString()));
+    QCOMPARE(transformableSelectionResult.toBool(), false);
+
+    QQmlExpression beginBlankLayerTransform(engine.rootContext(),
+                                            object.data(),
+                                            QStringLiteral("beginDrawableObjectTransform(10, 10);"));
+    const QVariant beginBlankLayerTransformResult = beginBlankLayerTransform.evaluate();
+    QVERIFY2(!beginBlankLayerTransform.hasError(), qPrintable(beginBlankLayerTransform.error().toString()));
+    QCOMPARE(beginBlankLayerTransformResult.toBool(), false);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), -1);
+
+    QQmlExpression deleteLayer(engine.rootContext(),
+                               object.data(),
+                               QStringLiteral("deleteLayerByKey(\"object-1\");"));
+    const QVariant deleteResult = deleteLayer.evaluate();
+    QVERIFY2(!deleteLayer.hasError(), qPrintable(deleteLayer.error().toString()));
+    QCOMPARE(deleteResult.toBool(), true);
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 0);
+}
+
+void tst_DrawingSurfaceItem::savesRasterLayerItemsAsIndependentCanvasLayers()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    viewModel.setBrushSize(10);
+    viewModel.setBrushColor(QColor(QStringLiteral("#1976d2")));
+
+    DrawingSurfaceItem baseItem;
+    baseItem.setWidth(48);
+    baseItem.setHeight(36);
+    baseItem.setDocumentViewModel(&viewModel);
+
+    DrawingSurfaceItem layerItem;
+    layerItem.setWidth(48);
+    layerItem.setHeight(36);
+    layerItem.setDocumentViewModel(&viewModel);
+
+    layerItem.beginStroke(18, 18, 1.0, false);
+    layerItem.endStroke(18, 18, 1.0, false);
+    QTRY_COMPARE(layerItem.strokeCount(), 1);
+
+    QVariantMap layerObject;
+    layerObject.insert(QStringLiteral("id"), 1);
+    layerObject.insert(QStringLiteral("type"), QStringLiteral("layer"));
+    layerObject.insert(QStringLiteral("name"), QStringLiteral("Layer 1"));
+    layerObject.insert(QStringLiteral("x"), 0);
+    layerObject.insert(QStringLiteral("y"), 0);
+    layerObject.insert(QStringLiteral("width"), 48);
+    layerObject.insert(QStringLiteral("height"), 36);
+    layerObject.insert(QStringLiteral("opacity"), 1);
+    layerObject.insert(QStringLiteral("visible"), true);
+
+    QVariantMap rasterLayerDescriptor;
+    rasterLayerDescriptor.insert(QStringLiteral("objectId"), 1);
+    rasterLayerDescriptor.insert(QStringLiteral("item"),
+                                 QVariant::fromValue(static_cast<QObject *>(&layerItem)));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString layeredPath = dir.filePath(QStringLiteral("layered-output.png"));
+    QVERIFY(baseItem.saveToFileWithObjectsAndRasterLayers(layeredPath, {layerObject}, {rasterLayerDescriptor}));
+    const QImage layered(layeredPath);
+    QVERIFY(!layered.isNull());
+    QCOMPARE(layered.size(), QSize(48, 36));
+    QVERIFY(layered.pixelColor(18, 18).alpha() > 0);
+    QVERIFY(layered.pixelColor(18, 18).blue() > 120);
+
+    const QString baseOnlyPath = dir.filePath(QStringLiteral("base-only-output.png"));
+    QVERIFY(baseItem.saveToFileWithObjectsAndRasterLayers(baseOnlyPath, {}, {}));
+    const QImage baseOnly(baseOnlyPath);
+    QVERIFY(!baseOnly.isNull());
+    QCOMPARE(baseOnly.pixelColor(18, 18).alpha(), 0);
+}
+
+void tst_DrawingSurfaceItem::deletingRasterLayerRemovesItsPaintFromQmlComposite()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("brushColor"), QColor(QStringLiteral("#1976d2")));
+    initialProperties.insert(QStringLiteral("brushSize"), 10);
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+
+    QQmlExpression addLayer(engine.rootContext(),
+                            object.data(),
+                            QStringLiteral("addEmptyLayer();"));
+    const QVariant addedLayerId = addLayer.evaluate();
+    QVERIFY2(!addLayer.hasError(), qPrintable(addLayer.error().toString()));
+    QCOMPARE(addedLayerId.toInt(), 1);
+
+    QTRY_VERIFY([&]() {
+        QQmlExpression layerReady(engine.rootContext(),
+                                  object.data(),
+                                  QStringLiteral("rasterLayerItemById(1) !== null && rasterLayerItemById(1).width > 1"));
+        const QVariant result = layerReady.evaluate();
+        return !layerReady.hasError() && result.toBool();
+    }());
+
+    QQmlExpression paintLayer(engine.rootContext(),
+                              object.data(),
+                              QStringLiteral("var rasterSurface = rasterLayerItemById(1);"
+                                             "rasterSurface.beginStroke(24, 24, 1.0, false);"
+                                             "rasterSurface.endStroke(24, 24, 1.0, false);"));
+    paintLayer.evaluate();
+    QVERIFY2(!paintLayer.hasError(), qPrintable(paintLayer.error().toString()));
+
+    QTRY_VERIFY([&]() {
+        QQmlExpression strokeCommitted(engine.rootContext(),
+                                       object.data(),
+                                       QStringLiteral("rasterLayerItemById(1) !== null && rasterLayerItemById(1).strokeCount === 1"));
+        const QVariant result = strokeCommitted.evaluate();
+        return !strokeCommitted.hasError() && result.toBool();
+    }());
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString beforeDeletePath = dir.filePath(QStringLiteral("before-delete.png"));
+    QQmlExpression saveBeforeDelete(engine.rootContext(),
+                                    object.data(),
+                                    QStringLiteral("saveToFile(\"%1\");").arg(QUrl::fromLocalFile(beforeDeletePath).toString()));
+    const QVariant saveBeforeResult = saveBeforeDelete.evaluate();
+    QVERIFY2(!saveBeforeDelete.hasError(), qPrintable(saveBeforeDelete.error().toString()));
+    QCOMPARE(saveBeforeResult.toBool(), true);
+
+    const QImage beforeDelete(beforeDeletePath);
+    QVERIFY(!beforeDelete.isNull());
+    QVERIFY(beforeDelete.pixelColor(24, 24).alpha() > 0);
+
+    QQmlExpression deleteLayer(engine.rootContext(),
+                               object.data(),
+                               QStringLiteral("deleteLayerByKey(\"object-1\");"));
+    const QVariant deleteResult = deleteLayer.evaluate();
+    QVERIFY2(!deleteLayer.hasError(), qPrintable(deleteLayer.error().toString()));
+    QCOMPARE(deleteResult.toBool(), true);
+
+    const QString afterDeletePath = dir.filePath(QStringLiteral("after-delete.png"));
+    QQmlExpression saveAfterDelete(engine.rootContext(),
+                                   object.data(),
+                                   QStringLiteral("saveToFile(\"%1\");").arg(QUrl::fromLocalFile(afterDeletePath).toString()));
+    const QVariant saveAfterResult = saveAfterDelete.evaluate();
+    QVERIFY2(!saveAfterDelete.hasError(), qPrintable(saveAfterDelete.error().toString()));
+    QCOMPARE(saveAfterResult.toBool(), true);
+
+    const QImage afterDelete(afterDeletePath);
+    QVERIFY(!afterDelete.isNull());
+    QCOMPARE(afterDelete.pixelColor(24, 24).alpha(), 0);
+}
+
+void tst_DrawingSurfaceItem::addsManyRasterLayersWithoutSnapshotChurn()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression addLayers(engine.rootContext(),
+                             object.data(),
+                             QStringLiteral("for (let index = 0; index < 32; ++index) { addEmptyLayer(); } true;"));
+    const QVariant addLayersResult = addLayers.evaluate();
+    QVERIFY2(!addLayers.hasError(), qPrintable(addLayers.error().toString()));
+    QCOMPARE(addLayersResult.toBool(), true);
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 32);
+    QCOMPARE(objects.first().toMap().value(QStringLiteral("name")).toString(), QStringLiteral("Layer 1"));
+    QCOMPARE(objects.last().toMap().value(QStringLiteral("name")).toString(), QStringLiteral("Layer 32"));
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), 32);
+
+    QQmlExpression visualModelCount(engine.rootContext(),
+                                    object.data(),
+                                    QStringLiteral("drawableObjectVisualModelCount();"));
+    const QVariant visualModelCountResult = visualModelCount.evaluate();
+    QVERIFY2(!visualModelCount.hasError(), qPrintable(visualModelCount.error().toString()));
+    QCOMPARE(visualModelCountResult.toInt(), 32);
+
+    QTRY_VERIFY([&]() {
+        QQmlExpression rasterLayerItemCount(engine.rootContext(),
+                                            object.data(),
+                                            QStringLiteral("Object.keys(rasterLayerItems).length;"));
+        const QVariant result = rasterLayerItemCount.evaluate();
+        return !rasterLayerItemCount.hasError() && result.toInt() == 32;
+    }());
+
+    QQmlExpression snapshotCount(engine.rootContext(),
+                                 object.data(),
+                                 QStringLiteral("Object.keys(rasterLayerSnapshotSources).length;"));
+    const QVariant snapshotCountResult = snapshotCount.evaluate();
+    QVERIFY2(!snapshotCount.hasError(), qPrintable(snapshotCount.error().toString()));
+    QCOMPARE(snapshotCountResult.toInt(), 0);
+
+    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 33);
+    QCOMPARE(rows.first().toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Layer 32"));
+    QCOMPARE(rows.first().toMap().value(QStringLiteral("selected")).toBool(), true);
+    QCOMPARE(rows.last().toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+}
+
+void tst_DrawingSurfaceItem::renamesLayerRowsAndDrawableObjectMetadata()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression addLayer(engine.rootContext(),
+                            object.data(),
+                            QStringLiteral("addEmptyLayer();"));
+    const QVariant layerId = addLayer.evaluate();
+    QVERIFY2(!addLayer.hasError(), qPrintable(addLayer.error().toString()));
+    QCOMPARE(layerId.toInt(), 1);
+
+    QQmlExpression canRenameLayer(engine.rootContext(),
+                                  object.data(),
+                                  QStringLiteral("canRenameLayerByKey(\"object-1\");"));
+    const QVariant canRenameResult = canRenameLayer.evaluate();
+    QVERIFY2(!canRenameLayer.hasError(), qPrintable(canRenameLayer.error().toString()));
+    QCOMPARE(canRenameResult.toBool(), true);
+
+    QQmlExpression rasterRenameCheck(engine.rootContext(),
+                                     object.data(),
+                                     QStringLiteral("canRenameLayerByKey(\"raster-canvas\");"));
+    const QVariant rasterRenameCheckResult = rasterRenameCheck.evaluate();
+    QVERIFY2(!rasterRenameCheck.hasError(), qPrintable(rasterRenameCheck.error().toString()));
+    QCOMPARE(rasterRenameCheckResult.toBool(), false);
+
+    QQmlExpression renameLayer(engine.rootContext(),
+                               object.data(),
+                               QStringLiteral("renameLayerByKey(\"object-1\", \"  Ink pass  \");"));
+    const QVariant renameResult = renameLayer.evaluate();
+    QVERIFY2(!renameLayer.hasError(), qPrintable(renameLayer.error().toString()));
+    QCOMPARE(renameResult.toBool(), true);
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    QCOMPARE(objects.first().toMap().value(QStringLiteral("name")).toString(), QStringLiteral("Ink pass"));
+
+    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 2);
+    QCOMPARE(rows.first().toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Ink pass"));
+
+    QQmlExpression layerName(engine.rootContext(),
+                             object.data(),
+                             QStringLiteral("layerNameByKey(\"object-1\");"));
+    const QVariant layerNameResult = layerName.evaluate();
+    QVERIFY2(!layerName.hasError(), qPrintable(layerName.error().toString()));
+    QCOMPARE(layerNameResult.toString(), QStringLiteral("Ink pass"));
+
+    QQmlExpression rejectBlankRename(engine.rootContext(),
+                                     object.data(),
+                                     QStringLiteral("renameLayerByKey(\"object-1\", \"   \");"));
+    const QVariant rejectBlankRenameResult = rejectBlankRename.evaluate();
+    QVERIFY2(!rejectBlankRename.hasError(), qPrintable(rejectBlankRename.error().toString()));
+    QCOMPARE(rejectBlankRenameResult.toBool(), false);
+
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.first().toMap().value(QStringLiteral("name")).toString(), QStringLiteral("Ink pass"));
+}
+
 void tst_DrawingSurfaceItem::layersExposeHierarchyRowsAndReorderDrawableObjects()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
@@ -1111,7 +1499,7 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsLayeredPsdWithMetada
     const quint32 layerInfoLength = readUInt32(psd, static_cast<int>(layerOffset + 4));
     QVERIFY(layerInfoLength > 0);
     QCOMPARE(readUInt16(psd, static_cast<int>(layerOffset + 8)), 2);
-    QVERIFY(psd.contains("Raster Canvas"));
+    QVERIFY(psd.contains("Background"));
     QVERIFY(psd.contains("Rectangle"));
 }
 

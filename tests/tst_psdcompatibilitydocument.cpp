@@ -23,7 +23,7 @@ void tst_PsdCompatibilityDocument::createsRasterBaseLayerForEmptyCanvas()
     const PsdLayerRecord rasterLayer = document.layers().constFirst();
     QCOMPARE(rasterLayer.kind(), PsdLayerRecord::Kind::Raster);
     QCOMPARE(rasterLayer.kindName(), QStringLiteral("raster"));
-    QCOMPARE(rasterLayer.name(), QStringLiteral("Raster Canvas"));
+    QCOMPARE(rasterLayer.name(), QStringLiteral("Background"));
     QCOMPARE(rasterLayer.bounds(), QRect(0, 0, 640, 480));
     QCOMPARE(rasterLayer.blendModeKey(), QStringLiteral("norm"));
     QCOMPARE(rasterLayer.opacity(), 255);

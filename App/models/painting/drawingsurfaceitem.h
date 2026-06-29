@@ -42,6 +42,11 @@ public:
                                                qreal maximumObjectHeight = 0) const;
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
+    Q_INVOKABLE bool saveToFileWithObjectsAndRasterLayers(const QString &fileUrl,
+                                                          const QVariantList &objects,
+                                                          const QVariantList &rasterLayers);
+    Q_INVOKABLE QString cacheRasterSnapshotSource();
+    Q_INVOKABLE bool restoreRasterSnapshot(const QString &fileUrl);
     Q_INVOKABLE QVariantMap psdCompatibilityManifest(const QVariantList &objects) const;
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();

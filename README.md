@@ -22,14 +22,15 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
-- Flat raster document model with a single canvas and engine-managed undo/redo
+- Layered raster document model with a base raster canvas plus selectable transparent raster layers, each backed by its own iiPaintEngine surface and undo/redo state
 - Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
-- Flat raster save flow that composites the iiPaintEngine raster canvas with current image, text, and shape objects
+- Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects
 - Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
 - Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster
-- Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus separate rasterized layers for the raster canvas and current image, text, and shape objects, with Vincent layer metadata embedded as XMP
-- A left-side LVRS hierarchy panel lists the raster canvas and current image, shape, and text object layers; selecting a row selects the canvas object, dragging rows changes layer order, and the delete button removes the selected object layer
+- Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus separate rasterized layers for the raster canvas, current raster layers, and current image/text/shape objects, with Vincent layer metadata embedded as XMP
+- A left-side LVRS hierarchy panel lists the raster canvas and current image, shape, text, and raster layers; selecting a raster layer makes it the active paint target, double-clicking a layer name edits it inline, dragging rows changes layer order, and the plus/minus footer buttons create or remove layers
+- Layer creation uses an incremental visual model so adding many raster layers does not recreate existing layer surfaces or write PNG snapshots for unchanged layers
 - Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with the Figma-aligned left toolbar, a current-color swatch that opens the HSL color picker, and brush controls that also set text size and text color
 - Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging
 - Zoom mode scales the canvas by dragging horizontally: right to zoom in, left to zoom out
@@ -50,6 +51,6 @@ ctest --test-dir build --output-on-failure
 
 ## Known Limitations
 - PSD import currently reads the merged/flat image only; layered PSD import, blend modes, layer effects, masks, and persisted editable vector/text project records are not implemented yet. PSD export stores rasterized layers and XMP metadata for the current Vincent session stack
-- Opened image objects are session overlays, not persisted vector/layer document records
+- Opened image objects remain session overlays, while added paint layers own their own raster pixels for deletion and export
 - Palette is fixed to the built-in colors
 - Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal

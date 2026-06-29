@@ -10,11 +10,14 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QEvent>
+#include <QFile>
 #include <QFileInfo>
 #include <QFont>
+#include <QHash>
 #include <QImage>
 #include <QList>
 #include <QMouseEvent>
+#include <QObject>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
@@ -123,6 +126,27 @@ QImage transparentCanvasImage(const QSize &size)
     QImage image(size, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     return image;
+}
+
+QString writableCacheFilePath(const QString &subdirectoryName, const QString &fileTemplate)
+{
+    const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
+        ? QDir::tempPath()
+        : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    QDir cacheDir(cacheRoot + QLatin1Char('/') + subdirectoryName);
+    if (!cacheDir.exists()) {
+        cacheDir.mkpath(QStringLiteral("."));
+    }
+
+    QTemporaryFile file(cacheDir.filePath(fileTemplate));
+    file.setAutoRemove(false);
+    if (!file.open()) {
+        return {};
+    }
+
+    const QString filePath = file.fileName();
+    file.close();
+    return filePath;
 }
 
 QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
@@ -366,10 +390,42 @@ void drawImageObject(QPainter &painter, const QVariantMap &object)
     painter.restore();
 }
 
-void drawObject(QPainter &painter, const QVariant &objectValue)
+void drawRasterLayerObject(QPainter &painter,
+                           const QVariantMap &object,
+                           const QHash<int, QImage> &rasterLayersByObjectId)
+{
+    const int objectId = object.value(QStringLiteral("id")).toInt();
+    const QImage image = rasterLayersByObjectId.value(objectId);
+    if (image.isNull()) {
+        return;
+    }
+
+    const bool visible = !object.contains(QStringLiteral("visible"))
+        || object.value(QStringLiteral("visible")).toBool();
+    if (!visible) {
+        return;
+    }
+
+    const qreal opacity = object.contains(QStringLiteral("opacity"))
+        ? qBound<qreal>(0.0, object.value(QStringLiteral("opacity")).toReal(), 1.0)
+        : 1.0;
+
+    painter.save();
+    painter.setOpacity(opacity);
+    painter.drawImage(QPointF(0.0, 0.0), image);
+    painter.restore();
+}
+
+void drawObject(QPainter &painter,
+                const QVariant &objectValue,
+                const QHash<int, QImage> &rasterLayersByObjectId = {})
 {
     const QVariantMap object = objectValue.toMap();
     const QString type = object.value(QStringLiteral("type")).toString();
+    if (type == QStringLiteral("layer")) {
+        drawRasterLayerObject(painter, object, rasterLayersByObjectId);
+        return;
+    }
     if (type == QStringLiteral("text")) {
         drawTextObject(painter, object);
         return;
@@ -383,7 +439,9 @@ void drawObject(QPainter &painter, const QVariant &objectValue)
     }
 }
 
-QImage compositeImageWithObjects(QImage image, const QVariantList &objects)
+QImage compositeImageWithObjects(QImage image,
+                                 const QVariantList &objects,
+                                 const QHash<int, QImage> &rasterLayersByObjectId = {})
 {
     if (image.isNull()) {
         return {};
@@ -394,7 +452,7 @@ QImage compositeImageWithObjects(QImage image, const QVariantList &objects)
     painter.setRenderHint(QPainter::TextAntialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     for (const QVariant &object : objects) {
-        drawObject(painter, object);
+        drawObject(painter, object, rasterLayersByObjectId);
     }
     painter.end();
     return image;
@@ -415,9 +473,25 @@ QImage rasterizedObjectLayer(const QVariant &objectValue, const QRect &bounds)
     return image;
 }
 
+QImage rasterizedRasterLayer(const QImage &layerImage, const QRect &bounds)
+{
+    QImage image(bounds.size(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    if (layerImage.isNull()) {
+        return image;
+    }
+
+    QPainter painter(&image);
+    painter.translate(-bounds.topLeft());
+    painter.drawImage(QPointF(0.0, 0.0), layerImage);
+    painter.end();
+    return image;
+}
+
 QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
                                                   const QVariantList &objects,
-                                                  const PsdCompatibilityDocument &document)
+                                                  const PsdCompatibilityDocument &document,
+                                                  const QHash<int, QImage> &rasterLayersByObjectId = {})
 {
     const QList<PsdLayerRecord> records = document.layers();
     if (records.isEmpty()) {
@@ -438,26 +512,32 @@ QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
         }
 
         const PsdLayerRecord record = records.at(recordIndex);
-        layers.append(PsdImageWriter::Layer{record.name(),
-                                            record.bounds(),
-                                            rasterizedObjectLayer(objectValue, record.bounds())});
+        const QVariantMap object = objectValue.toMap();
+        const QImage rasterLayerImage = object.value(QStringLiteral("type")).toString() == QStringLiteral("layer")
+            ? rasterizedRasterLayer(rasterLayersByObjectId.value(object.value(QStringLiteral("id")).toInt()),
+                                    record.bounds())
+            : rasterizedObjectLayer(objectValue, record.bounds());
+        layers.append(PsdImageWriter::Layer{record.name(), record.bounds(), rasterLayerImage});
         ++recordIndex;
     }
 
     return layers;
 }
 
-bool writeLayeredPsdFile(const QString &filePath, const QImage &rasterImage, const QVariantList &objects)
+bool writeLayeredPsdFile(const QString &filePath,
+                         const QImage &rasterImage,
+                         const QVariantList &objects,
+                         const QHash<int, QImage> &rasterLayersByObjectId = {})
 {
     const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(rasterImage.size(), objects);
     if (!document.isPsdCanvasSizeCompatible()) {
         return false;
     }
 
-    const QImage mergedImage = compositeImageWithObjects(rasterImage, objects);
+    const QImage mergedImage = compositeImageWithObjects(rasterImage, objects, rasterLayersByObjectId);
     return PsdImageWriter::writeLayeredImage(filePath,
                                             mergedImage,
-                                            psdLayersFromSession(rasterImage, objects, document),
+                                            psdLayersFromSession(rasterImage, objects, document, rasterLayersByObjectId),
                                             document.toManifest());
 }
 
@@ -618,6 +698,13 @@ bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 
 bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects)
 {
+    return saveToFileWithObjectsAndRasterLayers(fileUrl, objects, {});
+}
+
+bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fileUrl,
+                                                              const QVariantList &objects,
+                                                              const QVariantList &rasterLayers)
+{
     if (objects.isEmpty()) {
         return saveToFile(fileUrl);
     }
@@ -628,12 +715,95 @@ bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVa
         return false;
     }
 
-    if (hasPsdSuffix(fileUrl)) {
-        return writeLayeredPsdFile(localFilePath(fileUrl), rasterImage, objects);
+    QHash<int, QImage> rasterLayersByObjectId;
+    for (const QVariant &layerValue : rasterLayers) {
+        const QVariantMap layerDescriptor = layerValue.toMap();
+        const int objectId = layerDescriptor.value(QStringLiteral("objectId")).toInt();
+        if (objectId <= 0) {
+            continue;
+        }
+
+        QImage layerImage;
+        if (auto *layerItem = qobject_cast<DrawingSurfaceItem *>(
+                    layerDescriptor.value(QStringLiteral("item")).value<QObject *>())) {
+            layerItem->syncCanvasSize();
+            layerImage = layerItem->currentRasterCanvasImage(canvasSize());
+        }
+        if (layerImage.isNull()) {
+            layerImage = imageFromFileUrl(layerDescriptor.value(QStringLiteral("snapshotSource")).toString());
+        }
+        if (layerImage.isNull()) {
+            continue;
+        }
+        if (layerImage.size() != canvasSize()) {
+            QImage resizedLayer = transparentCanvasImage(canvasSize());
+            QPainter painter(&resizedLayer);
+            painter.drawImage(QPointF(0.0, 0.0), layerImage);
+            painter.end();
+            layerImage = resizedLayer;
+        }
+        if (layerImage.format() != QImage::Format_ARGB32_Premultiplied) {
+            layerImage = layerImage.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        }
+        rasterLayersByObjectId.insert(objectId, layerImage);
     }
 
-    const QImage image = compositeImageWithObjects(rasterImage, objects);
+    if (hasPsdSuffix(fileUrl)) {
+        return writeLayeredPsdFile(localFilePath(fileUrl), rasterImage, objects, rasterLayersByObjectId);
+    }
+
+    const QImage image = compositeImageWithObjects(rasterImage, objects, rasterLayersByObjectId);
     return image.save(localFilePath(fileUrl));
+}
+
+QString DrawingSurfaceItem::cacheRasterSnapshotSource()
+{
+    syncCanvasSize();
+    const QImage image = currentRasterCanvasImage(canvasSize());
+    if (image.isNull()) {
+        return {};
+    }
+
+    const QString snapshotPath = writableCacheFilePath(QStringLiteral("raster-layer-snapshots"),
+                                                       QStringLiteral("layer-XXXXXX.png"));
+    if (snapshotPath.isEmpty()) {
+        return {};
+    }
+    if (!image.save(snapshotPath, "PNG")) {
+        QFile::remove(snapshotPath);
+        return {};
+    }
+    return QUrl::fromLocalFile(snapshotPath).toString();
+}
+
+bool DrawingSurfaceItem::restoreRasterSnapshot(const QString &fileUrl)
+{
+    if (!canMutateDocument()) {
+        return false;
+    }
+
+    QImage image = imageFromFileUrl(fileUrl);
+    if (image.isNull()) {
+        return false;
+    }
+
+    syncCanvasSize();
+    if (image.size() != canvasSize()) {
+        QImage resizedLayer = transparentCanvasImage(canvasSize());
+        QPainter painter(&resizedLayer);
+        painter.drawImage(QPointF(0.0, 0.0), image);
+        painter.end();
+        image = resizedLayer;
+    }
+    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+        image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
+
+    const bool restored = replaceRasterCanvas(image);
+    if (restored) {
+        emitUndoRedoSignals();
+    }
+    return restored;
 }
 
 QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &objects) const

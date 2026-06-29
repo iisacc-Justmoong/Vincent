@@ -106,8 +106,12 @@ Rectangle {
     ]
     property var drawableObjects: []
     property int nextDrawableObjectId: 1
+    property int nextEmptyLayerNumber: 1
     property int selectedDrawableObjectId: -1
     property var layerHierarchyRows: []
+    property var rasterLayerItems: ({})
+    property var rasterLayerSnapshotSources: ({})
+    property bool persistRasterLayerSnapshots: true
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
     property real drawableObjectTransformStartX: 0
@@ -117,7 +121,6 @@ Rectangle {
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
 
-    onDrawableObjectsChanged: rebuildLayerHierarchyRows()
     onSelectedDrawableObjectIdChanged: rebuildLayerHierarchyRows()
 
     function syncCanvasItemSizeToWorkspace() {
@@ -125,6 +128,7 @@ Rectangle {
             return;
         }
         canvasSurface.resizeCanvasSurface(workspaceCanvasWidth, workspaceCanvasHeight);
+        resizeRasterLayerItems(workspaceCanvasWidth, workspaceCanvasHeight);
         canvasSizeCreated = true;
         fitCanvasZoomToCurrentCanvas();
     }
@@ -141,7 +145,10 @@ Rectangle {
         if (!canvasItemReady) {
             return;
         }
-        canvasSurface.resizeCanvasSurface(normalizedCanvasDimension(canvasWidth, workspaceCanvasWidth), normalizedCanvasDimension(canvasHeight, workspaceCanvasHeight));
+        const nextCanvasWidth = normalizedCanvasDimension(canvasWidth, workspaceCanvasWidth);
+        const nextCanvasHeight = normalizedCanvasDimension(canvasHeight, workspaceCanvasHeight);
+        canvasSurface.resizeCanvasSurface(nextCanvasWidth, nextCanvasHeight);
+        resizeRasterLayerItems(nextCanvasWidth, nextCanvasHeight);
         canvasSizeCreated = true;
         fitCanvasZoomToCurrentCanvas();
     }
@@ -198,7 +205,7 @@ Rectangle {
     function saveToFile(fileUrl) {
         commitActiveText();
         commitActiveShape();
-        return canvasSurface.saveToFileWithObjects(fileUrl ? fileUrl.toString() : "", surface.drawableObjects);
+        return canvasSurface.saveToFileWithObjectsAndRasterLayers(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors());
     }
 
     function psdCompatibilityManifest() {
@@ -404,9 +411,136 @@ Rectangle {
     }
 
     function clearDrawableObjects() {
+        surface.persistRasterLayerSnapshots = false;
+        drawableObjectVisualModel.clear();
         surface.drawableObjects = [];
+        surface.rasterLayerItems = {};
+        surface.rasterLayerSnapshotSources = {};
+        surface.persistRasterLayerSnapshots = true;
+        surface.nextEmptyLayerNumber = 1;
         surface.selectedDrawableObjectId = -1;
         resetDrawableObjectTransform();
+        rebuildLayerHierarchyRows();
+    }
+
+    function rasterLayerObjectSelected() {
+        const drawableObject = selectedDrawableObject();
+        return drawableObject !== null && drawableObject.type === "layer";
+    }
+
+    function rasterLayerItemById(objectId) {
+        return surface.rasterLayerItems[String(objectId)] || null;
+    }
+
+    function rasterLayerSnapshotSource(objectId) {
+        return surface.rasterLayerSnapshotSources[String(objectId)] || "";
+    }
+
+    function registerRasterLayerItem(objectId, surfaceItem) {
+        if (!surfaceItem) {
+            return;
+        }
+
+        surface.rasterLayerItems[String(objectId)] = surfaceItem;
+
+        surfaceItem.resizeCanvasSurface(canvasSurface.width, canvasSurface.height);
+        const snapshotSource = rasterLayerSnapshotSource(objectId);
+        if (snapshotSource.length > 0) {
+            surfaceItem.restoreRasterSnapshot(snapshotSource);
+        } else {
+            surfaceItem.newCanvas();
+        }
+    }
+
+    function unregisterRasterLayerItem(objectId, surfaceItem) {
+        if (surface.persistRasterLayerSnapshots && surfaceItem) {
+            const snapshotSource = surfaceItem.cacheRasterSnapshotSource();
+            if (snapshotSource.length > 0) {
+                surface.rasterLayerSnapshotSources[String(objectId)] = snapshotSource;
+            }
+        }
+
+        delete surface.rasterLayerItems[String(objectId)];
+    }
+
+    function resizeRasterLayerItems(canvasWidth, canvasHeight) {
+        for (const key in surface.rasterLayerItems) {
+            const item = surface.rasterLayerItems[key];
+            if (item) {
+                item.resizeCanvasSurface(canvasWidth, canvasHeight);
+            }
+        }
+    }
+
+    function activeRasterSurface() {
+        if (rasterLayerObjectSelected()) {
+            const item = rasterLayerItemById(surface.selectedDrawableObjectId);
+            if (item) {
+                return item;
+            }
+        }
+        return canvasSurface;
+    }
+
+    function rasterLayerDescriptors() {
+        const layers = [];
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (!drawableObject || drawableObject.type !== "layer") {
+                continue;
+            }
+            layers.push({
+                objectId: drawableObject.id,
+                item: rasterLayerItemById(drawableObject.id),
+                snapshotSource: rasterLayerSnapshotSource(drawableObject.id)
+            });
+        }
+        return layers;
+    }
+
+    function drawableObjectVisualModelEntry(drawableObject) {
+        return {
+            objectId: drawableObject.id,
+            objectType: drawableObject.type || "",
+            objectX: Number(drawableObject.x || 0),
+            objectY: Number(drawableObject.y || 0),
+            objectWidth: Math.max(1, Number(drawableObject.width || 1)),
+            objectHeight: Math.max(1, Number(drawableObject.height || 1)),
+            objectSource: drawableObject.source || "",
+            objectShapeKind: drawableObject.shapeKind || "",
+            objectColor: drawableObject.color || "",
+            objectText: drawableObject.text || "",
+            objectFontPixelSize: Math.max(1, Number(drawableObject.fontPixelSize || 1))
+        };
+    }
+
+    function drawableObjectVisualModelIndexForObjectId(objectId) {
+        for (let index = 0; index < drawableObjectVisualModel.count; ++index) {
+            if (drawableObjectVisualModel.get(index).objectId === objectId) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    function drawableObjectVisualModelCount() {
+        return drawableObjectVisualModel.count;
+    }
+
+    function setDrawableObjectVisualModelEntry(drawableObject) {
+        const index = drawableObjectVisualModelIndexForObjectId(drawableObject.id);
+        if (index >= 0) {
+            drawableObjectVisualModel.set(index, drawableObjectVisualModelEntry(drawableObject));
+        }
+    }
+
+    function reorderDrawableObjectVisualModel(orderedObjects) {
+        for (let targetIndex = 0; targetIndex < orderedObjects.length; ++targetIndex) {
+            const currentIndex = drawableObjectVisualModelIndexForObjectId(orderedObjects[targetIndex].id);
+            if (currentIndex >= 0 && currentIndex !== targetIndex) {
+                drawableObjectVisualModel.move(currentIndex, targetIndex, 1);
+            }
+        }
     }
 
     function cloneDrawableObject(drawableObject) {
@@ -415,6 +549,14 @@ Rectangle {
             copy[key] = drawableObject[key];
         }
         return copy;
+    }
+
+    function explicitLayerName(drawableObject) {
+        if (!drawableObject) {
+            return "";
+        }
+        const name = drawableObject.name === undefined || drawableObject.name === null ? "" : String(drawableObject.name).trim();
+        return name;
     }
 
     function titleCaseLayerLabel(value, fallbackValue) {
@@ -451,6 +593,10 @@ Rectangle {
             return qsTr("Layer");
         }
 
+        const explicitName = explicitLayerName(drawableObject);
+        if (explicitName.length > 0) {
+            return explicitName;
+        }
         if (drawableObject.type === "image") {
             const fileName = fileNameFromLayerSource(drawableObject.originalSource || drawableObject.source);
             return fileName.length > 0 ? fileName : qsTr("Image");
@@ -460,6 +606,9 @@ Rectangle {
         }
         if (drawableObject.type === "shape") {
             return titleCaseLayerLabel(drawableObject.shapeKind, qsTr("Shape"));
+        }
+        if (drawableObject.type === "layer") {
+            return qsTr("Layer %1").arg(drawableObject.id);
         }
         return qsTr("Layer %1").arg(drawableObject.id);
     }
@@ -477,11 +626,25 @@ Rectangle {
         if (drawableObject.type === "shape") {
             return "S";
         }
+        if (drawableObject.type === "layer") {
+            return "L";
+        }
         return "L";
     }
 
     function layerKeyForDrawableObjectId(objectId) {
         return "object-" + objectId;
+    }
+
+    function drawableObjectForLayerKey(layerKey) {
+        const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (layerKeyForDrawableObjectId(drawableObject.id) === normalizedKey) {
+                return drawableObject;
+            }
+        }
+        return null;
     }
 
     function currentLayerKey() {
@@ -517,7 +680,7 @@ Rectangle {
             depth: 0,
             parentKey: "",
             parentItemKey: "",
-            label: qsTr("Raster Canvas"),
+            label: qsTr("Background"),
             iconGlyph: "R",
             selected: surface.selectedDrawableObjectId < 0,
             enabled: true,
@@ -532,7 +695,32 @@ Rectangle {
         const nextObjects = surface.drawableObjects.slice();
         nextObjects.push(drawableObject);
         surface.drawableObjects = nextObjects;
+        drawableObjectVisualModel.append(drawableObjectVisualModelEntry(drawableObject));
         surface.selectedDrawableObjectId = drawableObject.id;
+    }
+
+    function nextEmptyLayerName() {
+        return qsTr("Layer %1").arg(surface.nextEmptyLayerNumber++);
+    }
+
+    function addEmptyLayer() {
+        commitActiveText();
+        cancelActiveShape();
+        resetDrawableObjectTransform();
+
+        const layerId = surface.nextDrawableObjectId++;
+        appendDrawableObject({
+            id: layerId,
+            type: "layer",
+            name: nextEmptyLayerName(),
+            x: 0,
+            y: 0,
+            width: Math.max(1, canvasSurface.width),
+            height: Math.max(1, canvasSurface.height),
+            opacity: 1,
+            visible: true
+        });
+        return layerId;
     }
 
     function replaceDrawableObjectById(objectId, drawableObject) {
@@ -541,6 +729,7 @@ Rectangle {
             if (nextObjects[index].id === objectId) {
                 nextObjects[index] = drawableObject;
                 surface.drawableObjects = nextObjects;
+                setDrawableObjectVisualModelEntry(drawableObject);
                 return true;
             }
         }
@@ -573,6 +762,38 @@ Rectangle {
         return deleteSelectedDrawableObject();
     }
 
+    function canRenameLayerByKey(layerKey) {
+        return drawableObjectForLayerKey(layerKey) !== null;
+    }
+
+    function layerNameByKey(layerKey) {
+        const drawableObject = drawableObjectForLayerKey(layerKey);
+        return drawableObject ? layerLabelForDrawableObject(drawableObject) : "";
+    }
+
+    function renameLayerByKey(layerKey, layerName) {
+        const normalizedName = layerName === undefined || layerName === null ? "" : String(layerName).trim();
+        if (normalizedName.length === 0) {
+            return false;
+        }
+
+        const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        const nextObjects = surface.drawableObjects.slice();
+        for (let index = 0; index < nextObjects.length; ++index) {
+            const drawableObject = nextObjects[index];
+            if (layerKeyForDrawableObjectId(drawableObject.id) === normalizedKey) {
+                const renamedObject = cloneDrawableObject(drawableObject);
+                renamedObject.name = normalizedName;
+                nextObjects[index] = renamedObject;
+                surface.drawableObjects = nextObjects;
+                setDrawableObjectVisualModelEntry(renamedObject);
+                rebuildLayerHierarchyRows();
+                return true;
+            }
+        }
+        return false;
+    }
+
     function applyLayerHierarchyOrder(layerRows) {
         const rows = Array.isArray(layerRows) ? layerRows : surface.layerHierarchyRows;
         const objectById = {};
@@ -602,6 +823,7 @@ Rectangle {
             nextObjects.push(topToBottomObjects[index]);
         }
         surface.drawableObjects = nextObjects;
+        reorderDrawableObjectVisualModel(nextObjects);
         if (surface.selectedDrawableObjectId >= 0 && objectById[String(surface.selectedDrawableObjectId)] === undefined) {
             surface.selectedDrawableObjectId = -1;
         }
@@ -622,6 +844,17 @@ Rectangle {
         return selectedDrawableObject() !== null;
     }
 
+    function drawableObjectIsTransformable(drawableObject) {
+        if (!drawableObject) {
+            return false;
+        }
+        return drawableObject.type === "image" || drawableObject.type === "text" || drawableObject.type === "shape";
+    }
+
+    function hasTransformableSelectedDrawableObject() {
+        return drawableObjectIsTransformable(selectedDrawableObject());
+    }
+
     function deleteSelectedDrawableObject() {
         const selectedObjectId = surface.selectedDrawableObjectId;
         if (selectedObjectId < 0) {
@@ -630,10 +863,14 @@ Rectangle {
 
         const nextObjects = [];
         var removed = false;
+        var removedIndex = -1;
+        var removedObject = null;
         for (let index = 0; index < surface.drawableObjects.length; ++index) {
             const drawableObject = surface.drawableObjects[index];
             if (drawableObject.id === selectedObjectId) {
                 removed = true;
+                removedIndex = index;
+                removedObject = drawableObject;
                 continue;
             }
             nextObjects.push(drawableObject);
@@ -646,6 +883,15 @@ Rectangle {
         }
 
         surface.drawableObjects = nextObjects;
+        if (removedIndex >= 0) {
+            const previousPersistRasterLayerSnapshots = surface.persistRasterLayerSnapshots;
+            if (removedObject && removedObject.type === "layer") {
+                surface.persistRasterLayerSnapshots = false;
+                delete surface.rasterLayerSnapshotSources[String(selectedObjectId)];
+            }
+            drawableObjectVisualModel.remove(removedIndex);
+            surface.persistRasterLayerSnapshots = previousPersistRasterLayerSnapshots;
+        }
         surface.selectedDrawableObjectId = -1;
         resetDrawableObjectTransform();
         return true;
@@ -659,6 +905,9 @@ Rectangle {
     function drawableObjectIndexAt(pointX, pointY) {
         for (let index = surface.drawableObjects.length - 1; index >= 0; --index) {
             const drawableObject = surface.drawableObjects[index];
+            if (!drawableObjectIsTransformable(drawableObject)) {
+                continue;
+            }
             if (pointX >= drawableObject.x && pointX <= drawableObject.x + drawableObject.width && pointY >= drawableObject.y && pointY <= drawableObject.y + drawableObject.height) {
                 return index;
             }
@@ -668,7 +917,7 @@ Rectangle {
 
     function drawableObjectHandleAt(pointX, pointY) {
         const drawableObject = selectedDrawableObject();
-        if (!drawableObject) {
+        if (!drawableObjectIsTransformable(drawableObject)) {
             return "";
         }
 
@@ -719,7 +968,7 @@ Rectangle {
         }
 
         const drawableObject = selectedDrawableObject();
-        if (!drawableObject) {
+        if (!drawableObjectIsTransformable(drawableObject)) {
             resetDrawableObjectTransform();
             return false;
         }
@@ -791,7 +1040,7 @@ Rectangle {
 
         commitActiveText();
         cancelActiveShape();
-        canvasSurface.fillAt(pointX, pointY, surface.brushColor);
+        activeRasterSurface().fillAt(pointX, pointY, surface.brushColor);
     }
 
     function resetCanvasPan() {
@@ -1230,39 +1479,98 @@ Rectangle {
             onHeightChanged: requestPaint()
         }
 
+        ListModel {
+            id: drawableObjectVisualModel
+        }
+
         Repeater {
-            model: surface.drawableObjects
+            parent: canvasSurface
+            model: drawableObjectVisualModel
 
             delegate: Item {
                 id: drawableObjectDelegate
-                required property var modelData
+                required property int objectId
+                required property string objectType
+                required property real objectX
+                required property real objectY
+                required property real objectWidth
+                required property real objectHeight
+                required property string objectSource
+                required property string objectShapeKind
+                required property string objectColor
+                required property string objectText
+                required property real objectFontPixelSize
+                readonly property bool isRasterLayer: objectType === "layer"
+                readonly property int rasterLayerObjectId: objectId
 
-                parent: canvasSurface
-                z: 2
-                x: modelData.x
-                y: modelData.y
-                width: Math.max(1, modelData.width)
-                height: Math.max(1, modelData.height)
+                z: isRasterLayer && surface.selectedDrawableObjectId === rasterLayerObjectId && (surface.toolMode === "brush" || surface.toolMode === "eraser") ? 4 : 2
+                x: objectX
+                y: objectY
+                width: Math.max(1, objectWidth)
+                height: Math.max(1, objectHeight)
+
+                Loader {
+                    id: rasterLayerLoader
+                    anchors.fill: parent
+                    active: drawableObjectDelegate.isRasterLayer
+                    sourceComponent: rasterLayerSurfaceComponent
+
+                    onLoaded: {
+                        if (item) {
+                            surface.registerRasterLayerItem(drawableObjectDelegate.rasterLayerObjectId, item);
+                        }
+                    }
+
+                    Component.onDestruction: {
+                        if (item) {
+                            surface.unregisterRasterLayerItem(drawableObjectDelegate.rasterLayerObjectId, item);
+                        }
+                    }
+                }
+
+                Component {
+                    id: rasterLayerSurfaceComponent
+
+                    DrawingSurfaceItem {
+                        anchors.fill: parent
+                        enabled: surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.toolMode === "brush" || surface.toolMode === "eraser")
+                        objectName: "rasterLayerSurface-" + drawableObjectDelegate.rasterLayerObjectId
+                        brushColor: surface.brushColor
+                        brushSize: surface.brushSize
+                        brushFlow: surface.brushFlow
+                        brushOpacity: surface.brushOpacity
+                        brushHardness: surface.brushHardness
+                        brushSpacing: surface.brushSpacing
+                        brushSpacingRatio: surface.brushSpacingRatio
+                        pressureCurveMinimum: surface.pressureCurveMinimum
+                        pressureCurveCenter: surface.pressureCurveCenter
+                        pressureCurveMaximum: surface.pressureCurveMaximum
+                        stabilizerStrength: surface.stabilizerStrength
+                        toolMode: surface.toolMode
+                        documentViewModel: surface.documentViewModel
+                        viewId: surface.viewId
+                    }
+                }
 
                 Image {
                     anchors.fill: parent
-                    visible: drawableObjectDelegate.modelData.type === "image"
-                    source: drawableObjectDelegate.modelData.type === "image" ? drawableObjectDelegate.modelData.source : ""
+                    visible: drawableObjectDelegate.objectType === "image"
+                    source: drawableObjectDelegate.objectType === "image" ? drawableObjectDelegate.objectSource : ""
                     fillMode: Image.Stretch
                     smooth: true
                 }
 
                 Canvas {
                     anchors.fill: parent
-                    visible: drawableObjectDelegate.modelData.type === "shape"
+                    visible: drawableObjectDelegate.objectType === "shape"
                     renderTarget: Canvas.Image
 
                     onPaint: {
                         const context = getContext("2d");
                         context.clearRect(0, 0, width, height);
                         context.beginPath();
-                        surface.traceShapePath(context, drawableObjectDelegate.modelData.shapeKind, 0, 0, width, height);
-                        context.fillStyle = drawableObjectDelegate.modelData.color;
+                        surface.traceShapePath(context, drawableObjectDelegate.objectShapeKind, 0, 0, width, height);
+                        context.fillStyle = drawableObjectDelegate.objectColor;
                         context.fill();
                     }
                     onVisibleChanged: requestPaint()
@@ -1273,10 +1581,10 @@ Rectangle {
 
                 Text {
                     anchors.fill: parent
-                    visible: drawableObjectDelegate.modelData.type === "text"
-                    text: drawableObjectDelegate.modelData.text
-                    color: drawableObjectDelegate.modelData.color
-                    font.pixelSize: drawableObjectDelegate.modelData.fontPixelSize
+                    visible: drawableObjectDelegate.objectType === "text"
+                    text: drawableObjectDelegate.objectText
+                    color: drawableObjectDelegate.objectColor
+                    font.pixelSize: drawableObjectDelegate.objectFontPixelSize
                     wrapMode: Text.Wrap
                     clip: true
                 }
@@ -1286,7 +1594,7 @@ Rectangle {
         Rectangle {
             id: drawableObjectSelectionFrame
             parent: canvasSurface
-            visible: surface.toolMode === "move" && surface.hasSelectedDrawableObject()
+            visible: surface.toolMode === "move" && surface.hasTransformableSelectedDrawableObject()
             z: 5
             x: surface.selectedDrawableObjectProperty("x", 0)
             y: surface.selectedDrawableObjectProperty("y", 0)
@@ -1513,14 +1821,14 @@ Rectangle {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Undo
         enabled: !surface.textEditingActive
-        onActivated: canvasSurface.undo()
+        onActivated: surface.activeRasterSurface().undo()
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Redo
         enabled: !surface.textEditingActive
-        onActivated: canvasSurface.redo()
+        onActivated: surface.activeRasterSurface().redo()
     }
 
     Shortcut {

@@ -265,7 +265,8 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("appendDrawableObject({")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"image\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"text\"")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.saveToFileWithObjects(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.saveToFileWithObjectsAndRasterLayers(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function rasterLayerDescriptors()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: textToolEditor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
@@ -371,7 +372,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.shapeKind")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("context.fillStyle = surface.brushColor.toString();")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("context.fillStyle = drawableObjectDelegate.modelData.color;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("context.fillStyle = drawableObjectDelegate.objectColor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("context.fill();")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("strokeWidth")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("context.stroke();")));
@@ -385,7 +386,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitActiveShape();")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function fillAt(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode !== \"fill\"")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.fillAt(pointX, pointY, surface.brushColor);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("activeRasterSurface().fillAt(pointX, pointY, surface.brushColor);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.fillAt(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasZoomScale: 1")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property real defaultCanvasZoomScale: 1")));
@@ -432,7 +433,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function psdCompatibilityManifest()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdCompatibilityManifest(surface.drawableObjects)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.modelData.type === \"image\" ? drawableObjectDelegate.modelData.source : \"\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.objectType === \"image\" ? drawableObjectDelegate.objectSource : \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resizedDrawableObject(originalObject, pointX, pointY)")));
@@ -529,19 +530,48 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     const QString pageSource = QString::fromUtf8(pageQml.readAll());
 
     QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerPanelWidth")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerRenameActivationWindowMs")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerRenameRepeatActivationThreshold")));
+    QVERIFY(pageSource.contains(QStringLiteral("property bool layerRenameActive: false")));
     QVERIFY(pageSource.contains(QStringLiteral("id: layerHierarchyPanel")));
     QVERIFY(pageSource.contains(QStringLiteral("objectName: \"layerHierarchyPanel\"")));
     QVERIFY(pageSource.contains(QStringLiteral("LV.Hierarchy")));
     QVERIFY(pageSource.contains(QStringLiteral("anchors.left: parent.left")));
     QVERIFY(pageSource.contains(QStringLiteral("model: drawingSurface.layerHierarchyRows")));
     QVERIFY(pageSource.contains(QStringLiteral("editable: true")));
-    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.activateLayerByKey(item.itemKey);")));
+    QVERIFY(pageSource.contains(QStringLiteral("footerVisible: true")));
+    QVERIFY(pageSource.contains(QStringLiteral("footerButton1")));
+    QVERIFY(pageSource.contains(QStringLiteral("iconName: \"add\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("footerButton2")));
+    QVERIFY(pageSource.contains(QStringLiteral("iconName: \"remove\"")));
+    QVERIFY(!pageSource.contains(QStringLiteral("iconName: \"delete\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("footerButton3")));
+    QVERIFY(pageSource.contains(QStringLiteral("visible: false")));
+    QVERIFY(pageSource.contains(QStringLiteral("function handleLayerHierarchyItemActivated(item)")));
+    QVERIFY(pageSource.contains(QStringLiteral("painterPage.layerRenameActivationCount >= painterPage.layerRenameRepeatActivationThreshold")));
+    QVERIFY(pageSource.contains(QStringLiteral("painterPage.beginLayerRename(item);")));
+    QVERIFY(pageSource.contains(QStringLiteral("function beginLayerRename(item)")));
+    QVERIFY(pageSource.contains(QStringLiteral("function commitLayerRename()")));
+    QVERIFY(pageSource.contains(QStringLiteral("function cancelLayerRename()")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.activateLayerByKey(itemKey);")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.canRenameLayerByKey(itemKey)")));
+    QVERIFY(pageSource.contains(QStringLiteral("layerRenameField.text = drawingSurface.layerNameByKey(itemKey);")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.renameLayerByKey(itemKey, nextName);")));
+    QVERIFY(pageSource.contains(QStringLiteral("painterPage.handleLayerHierarchyItemActivated(item);")));
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.applyLayerHierarchyOrder(layerHierarchyPanel.model);")));
+    QVERIFY(pageSource.contains(QStringLiteral("onFooterButtonTriggered: function (index)")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.addEmptyLayer();")));
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.deleteSelectedDrawableObject();")));
     QVERIFY(pageSource.contains(QStringLiteral("layerHierarchyPanel.activateListItemByKey(drawingSurface.currentLayerKey())")));
     QVERIFY(pageSource.contains(QStringLiteral("LV.ToolbarButton")));
-    QVERIFY(pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
+    QVERIFY(!pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
     QVERIFY(pageSource.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: layerRenameEditorFrame")));
+    QVERIFY(pageSource.contains(QStringLiteral("parent: layerHierarchyPanel")));
+    QVERIFY(pageSource.contains(QStringLiteral("TextInput")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: layerRenameField")));
+    QVERIFY(pageSource.contains(QStringLiteral("onAccepted: painterPage.commitLayerRename()")));
+    QVERIFY(pageSource.contains(QStringLiteral("Keys.onEscapePressed: function (event)")));
 
     const QString surfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
     QVERIFY2(!surfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
@@ -552,11 +582,35 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
 
     QVERIFY(surfaceSource.contains(QStringLiteral("property var layerHierarchyRows: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function rebuildLayerHierarchyRows()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function addEmptyLayer()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property int nextEmptyLayerNumber: 1")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: drawableObjectVisualModel")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("model: drawableObjectVisualModel")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("model: surface.drawableObjects")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectVisualModelEntry(drawableObject)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function reorderDrawableObjectVisualModel(orderedObjects)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectVisualModelCount()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("parent: canvasSurface")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property var rasterLayerItems: ({})")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function registerRasterLayerItem(objectId, surfaceItem)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function unregisterRasterLayerItem(objectId, surfaceItem)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function activeRasterSurface()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function nextEmptyLayerName()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectForLayerKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function activateLayerByKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function deleteLayerByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function canRenameLayerByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function layerNameByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function renameLayerByKey(layerKey, layerName)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("renamedObject.name = normalizedName;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function applyLayerHierarchyOrder(layerRows)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("label: qsTr(\"Raster Canvas\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function hasTransformableSelectedDrawableObject()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"layer\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"rasterLayerSurface-\" + drawableObjectDelegate.rasterLayerObjectId")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.toolMode === \"brush\" || surface.toolMode === \"eraser\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("label: qsTr(\"Background\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("draggable: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"move\" && surface.hasTransformableSelectedDrawableObject()")));
 }
 
 void tst_CanvasToolBarQmlContract::pressureCurveControlsUseThreePointGraphAtBottom()
