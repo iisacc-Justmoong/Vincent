@@ -88,6 +88,8 @@ add_executable(tests_drawingsurfaceitem
         ../App/models/document/psdcompatibilitydocument.h
         ../App/models/document/psdimagereader.cpp
         ../App/models/document/psdimagereader.h
+        ../App/models/document/psdimagewriter.cpp
+        ../App/models/document/psdimagewriter.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
 )

@@ -25,10 +25,10 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 - Flat raster document model with a single canvas and engine-managed undo/redo
 - Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
 - Flat raster save flow that composites the iiPaintEngine raster canvas with current image, text, and shape objects
-- Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records for future import/export work
+- Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
 - Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster
-- Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes the current visible composite as a flat 8-bit RGB/RGBA document
+- Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus separate rasterized layers for the raster canvas and current image, text, and shape objects, with Vincent layer metadata embedded as XMP
 - Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with the Figma-aligned left toolbar, a current-color swatch that opens the HSL color picker, and brush controls that also set text size and text color
 - Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging
 - Zoom mode scales the canvas by dragging horizontally: right to zoom in, left to zoom out
@@ -48,7 +48,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 ## Known Limitations
-- PSD import currently reads the merged/flat image only; no layered PSD import/export, blend modes, layer effects, masks, or persisted vector-object project file yet. The PSD compatibility layer is an internal manifest contract and `.psd` save currently exports a flat composite
+- PSD import currently reads the merged/flat image only; layered PSD import, blend modes, layer effects, masks, and persisted editable vector/text project records are not implemented yet. PSD export stores rasterized layers and XMP metadata for the current Vincent session stack
 - Opened image objects are session overlays, not persisted vector/layer document records
 - Palette is fixed to the built-in colors
 - Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal

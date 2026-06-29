@@ -33,6 +33,8 @@ target_sources(Vincent PRIVATE
         models/document/psdcompatibilitydocument.h
         models/document/psdimagereader.cpp
         models/document/psdimagereader.h
+        models/document/psdimagewriter.cpp
+        models/document/psdimagewriter.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
         resources.qrc

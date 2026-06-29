@@ -3,16 +3,17 @@
 #include "../canvas/canvasviewmodelbridge.h"
 #include "../document/psdcompatibilitydocument.h"
 #include "../document/psdimagereader.h"
+#include "../document/psdimagewriter.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QByteArray>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QEvent>
-#include <QFile>
 #include <QFileInfo>
 #include <QFont>
 #include <QImage>
+#include <QList>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -365,74 +366,6 @@ void drawImageObject(QPainter &painter, const QVariantMap &object)
     painter.restore();
 }
 
-bool writeUInt16(QFile &file, quint16 value)
-{
-    const char bytes[] = {
-        static_cast<char>((value >> 8) & 0xff),
-        static_cast<char>(value & 0xff)
-    };
-    return file.write(bytes, sizeof(bytes)) == sizeof(bytes);
-}
-
-bool writeUInt32(QFile &file, quint32 value)
-{
-    const char bytes[] = {
-        static_cast<char>((value >> 24) & 0xff),
-        static_cast<char>((value >> 16) & 0xff),
-        static_cast<char>((value >> 8) & 0xff),
-        static_cast<char>(value & 0xff)
-    };
-    return file.write(bytes, sizeof(bytes)) == sizeof(bytes);
-}
-
-bool writeFlatPsdFile(const QString &filePath, const QImage &sourceImage)
-{
-    if (sourceImage.isNull()
-        || sourceImage.width() > PsdCompatibilityDocument::maximumPsdCanvasEdge()
-        || sourceImage.height() > PsdCompatibilityDocument::maximumPsdCanvasEdge()) {
-        return false;
-    }
-
-    const QImage image = sourceImage.convertToFormat(QImage::Format_RGBA8888);
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        return false;
-    }
-
-    const char signature[] = {'8', 'B', 'P', 'S'};
-    const char reserved[] = {0, 0, 0, 0, 0, 0};
-    if (file.write(signature, sizeof(signature)) != sizeof(signature)
-        || !writeUInt16(file, 1)
-        || file.write(reserved, sizeof(reserved)) != sizeof(reserved)
-        || !writeUInt16(file, 4)
-        || !writeUInt32(file, static_cast<quint32>(image.height()))
-        || !writeUInt32(file, static_cast<quint32>(image.width()))
-        || !writeUInt16(file, PsdCompatibilityDocument::bitsPerChannel())
-        || !writeUInt16(file, PsdCompatibilityDocument::rgbColorMode())
-        || !writeUInt32(file, 0)
-        || !writeUInt32(file, 0)
-        || !writeUInt32(file, 0)
-        || !writeUInt16(file, 0)) {
-        return false;
-    }
-
-    QByteArray row;
-    row.resize(image.width());
-    for (int channel = 0; channel < 4; ++channel) {
-        for (int y = 0; y < image.height(); ++y) {
-            const uchar *scanLine = image.constScanLine(y);
-            for (int x = 0; x < image.width(); ++x) {
-                row[x] = static_cast<char>(scanLine[x * 4 + channel]);
-            }
-            if (file.write(row) != row.size()) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
 void drawObject(QPainter &painter, const QVariant &objectValue)
 {
     const QVariantMap object = objectValue.toMap();
@@ -448,6 +381,84 @@ void drawObject(QPainter &painter, const QVariant &objectValue)
     if (type == QStringLiteral("image")) {
         drawImageObject(painter, object);
     }
+}
+
+QImage compositeImageWithObjects(QImage image, const QVariantList &objects)
+{
+    if (image.isNull()) {
+        return {};
+    }
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    for (const QVariant &object : objects) {
+        drawObject(painter, object);
+    }
+    painter.end();
+    return image;
+}
+
+QImage rasterizedObjectLayer(const QVariant &objectValue, const QRect &bounds)
+{
+    QImage image(bounds.size(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.translate(-bounds.topLeft());
+    drawObject(painter, objectValue);
+    painter.end();
+    return image;
+}
+
+QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
+                                                  const QVariantList &objects,
+                                                  const PsdCompatibilityDocument &document)
+{
+    const QList<PsdLayerRecord> records = document.layers();
+    if (records.isEmpty()) {
+        return {};
+    }
+
+    QList<PsdImageWriter::Layer> layers;
+    layers.reserve(records.size());
+    layers.append(PsdImageWriter::Layer{records.constFirst().name(), records.constFirst().bounds(), rasterImage});
+
+    int recordIndex = 1;
+    for (const QVariant &objectValue : objects) {
+        if (objectValue.toMap().isEmpty()) {
+            continue;
+        }
+        if (recordIndex >= records.size()) {
+            break;
+        }
+
+        const PsdLayerRecord record = records.at(recordIndex);
+        layers.append(PsdImageWriter::Layer{record.name(),
+                                            record.bounds(),
+                                            rasterizedObjectLayer(objectValue, record.bounds())});
+        ++recordIndex;
+    }
+
+    return layers;
+}
+
+bool writeLayeredPsdFile(const QString &filePath, const QImage &rasterImage, const QVariantList &objects)
+{
+    const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(rasterImage.size(), objects);
+    if (!document.isPsdCanvasSizeCompatible()) {
+        return false;
+    }
+
+    const QImage mergedImage = compositeImageWithObjects(rasterImage, objects);
+    return PsdImageWriter::writeLayeredImage(filePath,
+                                            mergedImage,
+                                            psdLayersFromSession(rasterImage, objects, document),
+                                            document.toManifest());
 }
 
 } // namespace
@@ -599,7 +610,7 @@ bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
     if (hasPsdSuffix(fileUrl)) {
         syncCanvasSize();
-        return writeFlatPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()));
+        return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()), {});
     }
 
     return CanvasAdapter::saveToFile(fileUrl);
@@ -612,23 +623,16 @@ bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVa
     }
 
     syncCanvasSize();
-    QImage image = currentRasterCanvasImage(canvasSize());
-    if (image.isNull()) {
+    const QImage rasterImage = currentRasterCanvasImage(canvasSize());
+    if (rasterImage.isNull()) {
         return false;
     }
 
-    QPainter painter(&image);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
-    for (const QVariant &object : objects) {
-        drawObject(painter, object);
-    }
-    painter.end();
-
     if (hasPsdSuffix(fileUrl)) {
-        return writeFlatPsdFile(localFilePath(fileUrl), image);
+        return writeLayeredPsdFile(localFilePath(fileUrl), rasterImage, objects);
     }
 
+    const QImage image = compositeImageWithObjects(rasterImage, objects);
     return image.save(localFilePath(fileUrl));
 }
 

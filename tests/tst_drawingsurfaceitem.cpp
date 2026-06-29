@@ -35,8 +35,8 @@ private slots:
     void commitsSpeechBubbleTailsAsIntegratedSolidShapes();
     void fillsContiguousRasterRegion();
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
-    void savesCompositeDrawableObjectsAsFlatPsd();
-    void opensFlatPsdThroughPsdSdkReader();
+    void savesCompositeDrawableObjectsAsLayeredPsdWithMetadata();
+    void opensLayeredPsdThroughPsdSdkReader();
     void createsPsdDrawablePreviewForQmlImage();
     void supportsUndoRedo();
     void opensRasterBackground();
@@ -139,6 +139,17 @@ quint32 readUInt32(const QByteArray &bytes, int offset)
         | (static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 1))) << 16)
         | (static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 2))) << 8)
         | static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 3)));
+}
+
+qsizetype imageResourcesLengthOffset(const QByteArray &psd)
+{
+    return 30 + readUInt32(psd, 26);
+}
+
+qsizetype layerMaskLengthOffset(const QByteArray &psd)
+{
+    const qsizetype resourcesOffset = imageResourcesLengthOffset(psd);
+    return resourcesOffset + 4 + readUInt32(psd, static_cast<int>(resourcesOffset));
 }
 
 } // namespace
@@ -960,7 +971,7 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     QVERIFY(rasterOnly.pixelColor(76, 28).alpha() == 0);
 }
 
-void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsFlatPsd()
+void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsLayeredPsdWithMetadata()
 {
     PaletteUtils paletteUtils;
     CanvasDocumentViewModel viewModel(&paletteUtils);
@@ -986,23 +997,37 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsFlatPsd()
 
     QFile psdFile(psdPath);
     QVERIFY(psdFile.open(QIODevice::ReadOnly));
-    const QByteArray header = psdFile.read(40);
-    QCOMPARE(header.size(), 40);
-    QCOMPARE(header.mid(0, 4), QByteArray("8BPS"));
-    QCOMPARE(readUInt16(header, 4), 1);
-    QCOMPARE(readUInt16(header, 12), 4);
-    QCOMPARE(readUInt32(header, 14), 12U);
-    QCOMPARE(readUInt32(header, 18), 20U);
-    QCOMPARE(readUInt16(header, 22), 8);
-    QCOMPARE(readUInt16(header, 24), 3);
-    QCOMPARE(readUInt32(header, 26), 0U);
-    QCOMPARE(readUInt32(header, 30), 0U);
-    QCOMPARE(readUInt32(header, 34), 0U);
-    QCOMPARE(readUInt16(header, 38), 0);
-    QCOMPARE(psdFile.size(), static_cast<qint64>(40 + 20 * 12 * 4));
+    const QByteArray psd = psdFile.readAll();
+    QVERIFY(psd.size() > 40);
+    QCOMPARE(psd.mid(0, 4), QByteArray("8BPS"));
+    QCOMPARE(readUInt16(psd, 4), 1);
+    QCOMPARE(readUInt16(psd, 12), 4);
+    QCOMPARE(readUInt32(psd, 14), 12U);
+    QCOMPARE(readUInt32(psd, 18), 20U);
+    QCOMPARE(readUInt16(psd, 22), 8);
+    QCOMPARE(readUInt16(psd, 24), 3);
+    QCOMPARE(readUInt32(psd, 26), 0U);
+
+    const qsizetype resourcesOffset = imageResourcesLengthOffset(psd);
+    QVERIFY(resourcesOffset + 4 < psd.size());
+    const quint32 imageResourcesLength = readUInt32(psd, static_cast<int>(resourcesOffset));
+    QVERIFY(imageResourcesLength > 0);
+    QVERIFY(psd.contains("VincentLayerManifestBase64"));
+    QVERIFY(psd.contains("VincentLayerCount"));
+    QVERIFY(psd.contains("base64-json"));
+
+    const qsizetype layerOffset = layerMaskLengthOffset(psd);
+    QVERIFY(layerOffset + 10 < psd.size());
+    const quint32 layerMaskLength = readUInt32(psd, static_cast<int>(layerOffset));
+    QVERIFY(layerMaskLength > 0);
+    const quint32 layerInfoLength = readUInt32(psd, static_cast<int>(layerOffset + 4));
+    QVERIFY(layerInfoLength > 0);
+    QCOMPARE(readUInt16(psd, static_cast<int>(layerOffset + 8)), 2);
+    QVERIFY(psd.contains("Raster Canvas"));
+    QVERIFY(psd.contains("Rectangle"));
 }
 
-void tst_DrawingSurfaceItem::opensFlatPsdThroughPsdSdkReader()
+void tst_DrawingSurfaceItem::opensLayeredPsdThroughPsdSdkReader()
 {
     PaletteUtils paletteUtils;
     CanvasDocumentViewModel viewModel(&paletteUtils);
