@@ -1,3 +1,4 @@
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QQmlComponent>
@@ -31,8 +32,10 @@ private slots:
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
     void commitsShapeToRasterCanvas();
+    void commitsSpeechBubbleTailsAsIntegratedSolidShapes();
     void fillsContiguousRasterRegion();
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
+    void savesCompositeDrawableObjectsAsFlatPsd();
     void supportsUndoRedo();
     void opensRasterBackground();
     void opensLargeRasterWithinCurrentCanvasBounds();
@@ -110,6 +113,30 @@ QSize workspaceCanvasSize(qreal width, qreal height)
 {
     return QSize(qMax(1, qRound(width) - workspaceHorizontalInset(width) * 2),
                  qMax(1, qRound(height) - workspaceTopInset(height) - workspaceBottomInset(height)));
+}
+
+qreal fittedCanvasZoomScale(qreal viewportWidth, qreal viewportHeight, qreal canvasWidth, qreal canvasHeight)
+{
+    return qMin<qreal>(1.0, qMin(viewportWidth / canvasWidth, viewportHeight / canvasHeight));
+}
+
+bool isBlueShapePixel(const QColor &pixel)
+{
+    return pixel.alpha() > 0 && pixel.blue() > 120 && pixel.red() < 80 && pixel.green() > 70;
+}
+
+quint16 readUInt16(const QByteArray &bytes, int offset)
+{
+    return static_cast<quint16>((static_cast<uchar>(bytes.at(offset)) << 8)
+                               | static_cast<uchar>(bytes.at(offset + 1)));
+}
+
+quint32 readUInt32(const QByteArray &bytes, int offset)
+{
+    return (static_cast<quint32>(static_cast<uchar>(bytes.at(offset))) << 24)
+        | (static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 1))) << 16)
+        | (static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 2))) << 8)
+        | static_cast<quint32>(static_cast<uchar>(bytes.at(offset + 3)));
 }
 
 } // namespace
@@ -301,6 +328,7 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
     QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(explicitCanvasSize.height()));
     QTRY_COMPARE(viewModel.canvasWidth(), explicitCanvasSize.width());
     QTRY_COMPARE(viewModel.canvasHeight(), explicitCanvasSize.height());
+    QCOMPARE(rootItem->property("canvasZoomScale").toReal(), 1.0);
 
     const QString explicitOutputPath = dir.filePath(QStringLiteral("new-explicit-sized-canvas.png"));
     QVERIFY(canvasItem->saveToFile(explicitOutputPath));
@@ -323,6 +351,30 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
     QCOMPARE(canvasPaper->width(), static_cast<qreal>(explicitCanvasSize.width()));
     QCOMPARE(canvasPaper->height(), static_cast<qreal>(explicitCanvasSize.height()));
 
+    const QSize highResolutionCanvasSize(4096, 3072);
+    QQmlExpression createHighResolutionCanvas(engine.rootContext(),
+                                              object.data(),
+                                              QStringLiteral("newCanvas(4096, 3072);"));
+    createHighResolutionCanvas.evaluate();
+    QVERIFY2(!createHighResolutionCanvas.hasError(), qPrintable(createHighResolutionCanvas.error().toString()));
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(highResolutionCanvasSize.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(highResolutionCanvasSize.height()));
+    QTRY_COMPARE(canvasPaper->width(), static_cast<qreal>(highResolutionCanvasSize.width()));
+    QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(highResolutionCanvasSize.height()));
+    QTRY_COMPARE(viewModel.canvasWidth(), highResolutionCanvasSize.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), highResolutionCanvasSize.height());
+
+    const qreal expectedHighResolutionZoom = fittedCanvasZoomScale(canvasViewport->width(),
+                                                                   canvasViewport->height(),
+                                                                   highResolutionCanvasSize.width(),
+                                                                   highResolutionCanvasSize.height());
+    QVERIFY(expectedHighResolutionZoom < 1.0);
+    QVERIFY(qAbs(rootItem->property("canvasZoomScale").toReal() - expectedHighResolutionZoom) < 0.0001);
+    QCOMPARE(canvasItem->scale(), rootItem->property("canvasZoomScale").toReal());
+    QCOMPARE(canvasPaper->scale(), rootItem->property("canvasZoomScale").toReal());
+    QVERIFY(canvasItem->width() * canvasItem->scale() <= canvasViewport->width() + 0.5);
+    QVERIFY(canvasItem->height() * canvasItem->scale() <= canvasViewport->height() + 0.5);
+
     QVERIFY(QMetaObject::invokeMethod(rootItem, "clearCanvas", Qt::DirectConnection));
     QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(compactCanvasSize.width()));
     QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(compactCanvasSize.height()));
@@ -330,6 +382,7 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
     QTRY_COMPARE(canvasPaper->height(), static_cast<qreal>(compactCanvasSize.height()));
     QTRY_COMPARE(viewModel.canvasWidth(), compactCanvasSize.width());
     QTRY_COMPARE(viewModel.canvasHeight(), compactCanvasSize.height());
+    QCOMPARE(rootItem->property("canvasZoomScale").toReal(), 1.0);
 }
 
 void tst_DrawingSurfaceItem::constrainsShapeDragWithShiftModifier()
@@ -546,7 +599,7 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
 
     QQmlExpression moveObject(engine.rootContext(),
                               object.data(),
-                              QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\", strokeWidth: 3 });"
+                              QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
                                              "beginDrawableObjectTransform(20, 30); updateDrawableObjectTransform(40, 60); commitDrawableObjectTransform();"));
     moveObject.evaluate();
     QVERIFY2(!moveObject.hasError(), qPrintable(moveObject.error().toString()));
@@ -604,7 +657,7 @@ void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
 
     QQmlExpression deleteObject(engine.rootContext(),
                                 object.data(),
-                                QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\", strokeWidth: 3 });"
+                                QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
                                                "appendDrawableObject({ id: 2, type: \"text\", x: 40, y: 50, width: 120, height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"
                                                "deleteSelectedDrawableObject();"));
     const QVariant deleteResult = deleteObject.evaluate();
@@ -745,7 +798,7 @@ void tst_DrawingSurfaceItem::commitsShapeToRasterCanvas()
     for (int index = 0; index < shapeKinds.size(); ++index) {
         const qreal x = 10 + index % 4 * 40;
         const qreal y = 12 + index / 4 * 48;
-        QVERIFY(item.commitShape(x, y, 30, 28, shapeKinds.at(index), QColor(QStringLiteral("#1976d2")), 3));
+        QVERIFY(item.commitShape(x, y, 30, 28, shapeKinds.at(index), QColor(QStringLiteral("#1976d2"))));
     }
 
     QTemporaryDir dir;
@@ -767,6 +820,37 @@ void tst_DrawingSurfaceItem::commitsShapeToRasterCanvas()
         }
     }
     QVERIFY(hasShapeColorPixel);
+    const QColor filledRectangleCenter = saved.pixelColor(25, 26);
+    QVERIFY(filledRectangleCenter.alpha() > 0);
+    QVERIFY(filledRectangleCenter.blue() > 120);
+    QVERIFY(filledRectangleCenter.red() < 80);
+    QVERIFY(filledRectangleCenter.green() > 70);
+}
+
+void tst_DrawingSurfaceItem::commitsSpeechBubbleTailsAsIntegratedSolidShapes()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(180);
+    item.setHeight(96);
+    item.setDocumentViewModel(&viewModel);
+
+    const QColor shapeColor(QStringLiteral("#1976d2"));
+    QVERIFY(item.commitShape(16, 16, 64, 56, QStringLiteral("rectanglebubble"), shapeColor));
+    QVERIFY(item.commitShape(96, 16, 64, 56, QStringLiteral("ellipsebubble"), shapeColor));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString outputPath = dir.filePath(QStringLiteral("speech-bubble-output.png"));
+    QVERIFY(item.saveToFile(outputPath));
+    const QImage saved(outputPath);
+    QVERIFY(!saved.isNull());
+    QCOMPARE(saved.size(), QSize(180, 96));
+
+    QVERIFY(isBlueShapePixel(saved.pixelColor(36, 62)));
+    QVERIFY(isBlueShapePixel(saved.pixelColor(116, 59)));
+    QVERIFY(isBlueShapePixel(saved.pixelColor(108, 68)));
 }
 
 void tst_DrawingSurfaceItem::fillsContiguousRasterRegion()
@@ -821,7 +905,6 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     shapeObject.insert(QStringLiteral("height"), 36);
     shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
     shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
-    shapeObject.insert(QStringLiteral("strokeWidth"), 5);
 
     const QColor imageObjectColor(QStringLiteral("#f4511e"));
     QImage imageObjectRaster(18, 14, QImage::Format_ARGB32);
@@ -860,6 +943,11 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
         }
     }
     QVERIFY(hasShapeColorPixel);
+    const QColor filledShapeCenter = composite.pixelColor(40, 36);
+    QVERIFY(filledShapeCenter.alpha() > 0);
+    QVERIFY(filledShapeCenter.blue() > 120);
+    QVERIFY(filledShapeCenter.red() < 80);
+    QVERIFY(filledShapeCenter.green() > 70);
     QCOMPARE(composite.pixelColor(76, 28).rgba(), imageObjectColor.rgba());
 
     const QString rasterOnlyPath = dir.filePath(QStringLiteral("raster-only-output.png"));
@@ -868,6 +956,48 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     QVERIFY(!rasterOnly.isNull());
     QVERIFY(rasterOnly.pixelColor(16, 18).alpha() == 0);
     QVERIFY(rasterOnly.pixelColor(76, 28).alpha() == 0);
+}
+
+void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsFlatPsd()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(20);
+    item.setHeight(12);
+    item.setDocumentViewModel(&viewModel);
+
+    QVariantMap shapeObject;
+    shapeObject.insert(QStringLiteral("id"), 1);
+    shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
+    shapeObject.insert(QStringLiteral("x"), 2);
+    shapeObject.insert(QStringLiteral("y"), 3);
+    shapeObject.insert(QStringLiteral("width"), 10);
+    shapeObject.insert(QStringLiteral("height"), 6);
+    shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("rectangle"));
+    shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("composite-output.psd"));
+    QVERIFY(item.saveToFileWithObjects(psdPath, {shapeObject}));
+
+    QFile psdFile(psdPath);
+    QVERIFY(psdFile.open(QIODevice::ReadOnly));
+    const QByteArray header = psdFile.read(40);
+    QCOMPARE(header.size(), 40);
+    QCOMPARE(header.mid(0, 4), QByteArray("8BPS"));
+    QCOMPARE(readUInt16(header, 4), 1);
+    QCOMPARE(readUInt16(header, 12), 4);
+    QCOMPARE(readUInt32(header, 14), 12U);
+    QCOMPARE(readUInt32(header, 18), 20U);
+    QCOMPARE(readUInt16(header, 22), 8);
+    QCOMPARE(readUInt16(header, 24), 3);
+    QCOMPARE(readUInt32(header, 26), 0U);
+    QCOMPARE(readUInt32(header, 30), 0U);
+    QCOMPARE(readUInt32(header, 34), 0U);
+    QCOMPARE(readUInt16(header, 38), 0);
+    QCOMPARE(psdFile.size(), static_cast<qint64>(40 + 20 * 12 * 4));
 }
 
 void tst_DrawingSurfaceItem::supportsUndoRedo()

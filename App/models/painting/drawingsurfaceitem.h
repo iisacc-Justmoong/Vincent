@@ -42,6 +42,7 @@ public:
                                                qreal maximumObjectHeight = 0) const;
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
+    Q_INVOKABLE QVariantMap psdCompatibilityManifest(const QVariantList &objects) const;
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void resizeCanvasSurface(qreal canvasWidth, qreal canvasHeight);
@@ -59,8 +60,7 @@ public:
                                  qreal boxWidth,
                                  qreal boxHeight,
                                  const QString &shapeKind,
-                                 const QColor &color,
-                                 qreal strokeWidth);
+                                 const QColor &color);
     Q_INVOKABLE bool fillAt(qreal pointX, qreal pointY, const QColor &color);
 
 signals:

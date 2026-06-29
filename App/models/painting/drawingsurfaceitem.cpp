@@ -1,17 +1,19 @@
 #include "drawingsurfaceitem.h"
 
 #include "../canvas/canvasviewmodelbridge.h"
+#include "../document/psdcompatibilitydocument.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QByteArray>
 #include <QDir>
 #include <QEvent>
+#include <QFile>
 #include <QFont>
 #include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
-#include <QPen>
 #include <QPoint>
 #include <QPointF>
 #include <QRectF>
@@ -31,8 +33,15 @@ constexpr qreal minimumTextFontPixelSize = 8.0;
 constexpr qreal maximumTextFontPixelSize = 144.0;
 constexpr qreal minimumTextBoxWidth = 8.0;
 constexpr qreal minimumShapeDimension = 2.0;
-constexpr qreal minimumShapeStrokeWidth = 1.0;
-constexpr qreal maximumShapeStrokeWidth = 96.0;
+constexpr qreal speechBubbleTailMinimumHeight = 4.0;
+constexpr qreal speechBubbleTailHeightRatio = 0.24;
+constexpr qreal speechBubbleTailMaximumHeightRatio = 0.35;
+constexpr qreal speechBubbleTailLeftBaseXRatio = 0.26;
+constexpr qreal speechBubbleTailTipXRatio = 0.18;
+constexpr qreal speechBubbleTailRightBaseXRatio = 0.44;
+constexpr qreal ellipseBubbleTailLeftAngle = 2.15;
+constexpr qreal ellipseBubbleTailRightAngle = 1.70;
+constexpr int ellipseBubbleArcSegmentCount = 32;
 
 QString localFileSource(const QString &fileUrl)
 {
@@ -50,6 +59,11 @@ QString localFilePath(const QString &fileUrl)
         return url.toLocalFile();
     }
     return fileUrl;
+}
+
+bool hasPsdSuffix(const QString &fileUrl)
+{
+    return localFilePath(fileUrl).endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
 }
 
 bool isTabletEvent(QEvent::Type type)
@@ -124,32 +138,63 @@ QPainterPath starPath(const QRectF &rect)
     return path;
 }
 
-QPainterPath speechBubblePath(const QRectF &rect, bool ellipseBody)
+qreal speechBubbleTailHeight(qreal height)
 {
+    return qMin(qMax(speechBubbleTailMinimumHeight, height * speechBubbleTailHeightRatio),
+                height * speechBubbleTailMaximumHeightRatio);
+}
+
+qreal speechBubbleBodyHeight(qreal height)
+{
+    return qMax(minimumShapeDimension, height - speechBubbleTailHeight(height));
+}
+
+QPointF ellipsePoint(const QRectF &rect, qreal angle)
+{
+    return QPointF(rect.center().x() + qCos(angle) * rect.width() / 2.0,
+                   rect.center().y() + qSin(angle) * rect.height() / 2.0);
+}
+
+void appendEllipseArc(QPainterPath &path, const QRectF &rect, qreal startAngle, qreal endAngle)
+{
+    for (int index = 1; index <= ellipseBubbleArcSegmentCount; ++index) {
+        const qreal angle = startAngle + (endAngle - startAngle) * index / ellipseBubbleArcSegmentCount;
+        path.lineTo(ellipsePoint(rect, angle));
+    }
+}
+
+QPainterPath rectangleBubblePath(const QRectF &rect)
+{
+    const qreal bodyBottom = rect.top() + speechBubbleBodyHeight(rect.height());
+    const qreal tailLeftX = rect.left() + rect.width() * speechBubbleTailLeftBaseXRatio;
+    const qreal tailTipX = rect.left() + rect.width() * speechBubbleTailTipXRatio;
+    const qreal tailRightX = rect.left() + rect.width() * speechBubbleTailRightBaseXRatio;
+
     QPainterPath path;
-    const qreal tailHeight = qBound<qreal>(4.0, rect.height() * 0.22, rect.height() * 0.35);
+    path.moveTo(rect.topLeft());
+    path.lineTo(rect.topRight());
+    path.lineTo(rect.right(), bodyBottom);
+    path.lineTo(tailRightX, bodyBottom);
+    path.lineTo(tailTipX, rect.bottom());
+    path.lineTo(tailLeftX, bodyBottom);
+    path.lineTo(rect.left(), bodyBottom);
+    path.closeSubpath();
+    return path;
+}
+
+QPainterPath ellipseBubblePath(const QRectF &rect)
+{
     QRectF bodyRect = rect;
-    bodyRect.setBottom(qMax(rect.top() + minimumShapeDimension, rect.bottom() - tailHeight));
-    if (bodyRect.height() < minimumShapeDimension * 2.0) {
-        bodyRect = rect;
-    }
+    bodyRect.setHeight(speechBubbleBodyHeight(rect.height()));
 
-    if (ellipseBody) {
-        path.addEllipse(bodyRect);
-    } else {
-        const qreal radius = qMin(bodyRect.width(), bodyRect.height()) * 0.12;
-        path.addRoundedRect(bodyRect, radius, radius);
-    }
+    const QPointF tailLeftPoint = ellipsePoint(bodyRect, ellipseBubbleTailLeftAngle);
+    const QPointF tailTip(rect.left() + rect.width() * speechBubbleTailTipXRatio, rect.bottom());
 
-    if (bodyRect.bottom() < rect.bottom()) {
-        QPainterPath tailPath;
-        tailPath.moveTo(bodyRect.left() + bodyRect.width() * 0.26, bodyRect.bottom());
-        tailPath.lineTo(rect.left() + rect.width() * 0.18, rect.bottom());
-        tailPath.lineTo(bodyRect.left() + bodyRect.width() * 0.44, bodyRect.bottom());
-        tailPath.closeSubpath();
-        path.addPath(tailPath);
-    }
-
+    QPainterPath path;
+    path.moveTo(tailLeftPoint);
+    appendEllipseArc(path, bodyRect, ellipseBubbleTailLeftAngle, ellipseBubbleTailRightAngle + M_PI * 2.0);
+    path.lineTo(tailTip);
+    path.closeSubpath();
     return path;
 }
 
@@ -181,10 +226,10 @@ QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
         return starPath(rect);
     }
     if (kind == QStringLiteral("rectanglebubble")) {
-        return speechBubblePath(rect, false);
+        return rectangleBubblePath(rect);
     }
     if (kind == QStringLiteral("ellipsebubble")) {
-        return speechBubblePath(rect, true);
+        return ellipseBubblePath(rect);
     }
 
     path.addRect(rect);
@@ -244,31 +289,13 @@ void drawShapeObject(QPainter &painter, const QVariantMap &object)
         return;
     }
 
-    const qreal boundedStrokeWidth = qBound<qreal>(minimumShapeStrokeWidth,
-                                                   object.value(QStringLiteral("strokeWidth")).toReal(),
-                                                   maximumShapeStrokeWidth);
-    const qreal horizontalInset = qMin(boundedStrokeWidth / 2.0,
-                                      qMax<qreal>(0.0, shapeRect.width() / 2.0 - 0.5));
-    const qreal verticalInset = qMin(boundedStrokeWidth / 2.0,
-                                    qMax<qreal>(0.0, shapeRect.height() / 2.0 - 0.5));
-    const QRectF strokedRect = shapeRect.adjusted(horizontalInset,
-                                                  verticalInset,
-                                                  -horizontalInset,
-                                                  -verticalInset);
-    if (strokedRect.width() < minimumShapeDimension || strokedRect.height() < minimumShapeDimension) {
-        return;
-    }
-
     const QColor color(object.value(QStringLiteral("color")).toString());
+    const QColor fillColor = color.isValid() ? color : QColor(QStringLiteral("#1a1a1a"));
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(color.isValid() ? color : QColor(QStringLiteral("#1a1a1a")),
-                        boundedStrokeWidth,
-                        Qt::SolidLine,
-                        Qt::RoundCap,
-                        Qt::RoundJoin));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawPath(shapePath(strokedRect, object.value(QStringLiteral("shapeKind")).toString()));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(fillColor);
+    painter.drawPath(shapePath(shapeRect, object.value(QStringLiteral("shapeKind")).toString()));
     painter.restore();
 }
 
@@ -292,6 +319,74 @@ void drawImageObject(QPainter &painter, const QVariantMap &object)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter.drawImage(imageRect, image);
     painter.restore();
+}
+
+bool writeUInt16(QFile &file, quint16 value)
+{
+    const char bytes[] = {
+        static_cast<char>((value >> 8) & 0xff),
+        static_cast<char>(value & 0xff)
+    };
+    return file.write(bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
+bool writeUInt32(QFile &file, quint32 value)
+{
+    const char bytes[] = {
+        static_cast<char>((value >> 24) & 0xff),
+        static_cast<char>((value >> 16) & 0xff),
+        static_cast<char>((value >> 8) & 0xff),
+        static_cast<char>(value & 0xff)
+    };
+    return file.write(bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
+bool writeFlatPsdFile(const QString &filePath, const QImage &sourceImage)
+{
+    if (sourceImage.isNull()
+        || sourceImage.width() > PsdCompatibilityDocument::maximumPsdCanvasEdge()
+        || sourceImage.height() > PsdCompatibilityDocument::maximumPsdCanvasEdge()) {
+        return false;
+    }
+
+    const QImage image = sourceImage.convertToFormat(QImage::Format_RGBA8888);
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return false;
+    }
+
+    const char signature[] = {'8', 'B', 'P', 'S'};
+    const char reserved[] = {0, 0, 0, 0, 0, 0};
+    if (file.write(signature, sizeof(signature)) != sizeof(signature)
+        || !writeUInt16(file, 1)
+        || file.write(reserved, sizeof(reserved)) != sizeof(reserved)
+        || !writeUInt16(file, 4)
+        || !writeUInt32(file, static_cast<quint32>(image.height()))
+        || !writeUInt32(file, static_cast<quint32>(image.width()))
+        || !writeUInt16(file, PsdCompatibilityDocument::bitsPerChannel())
+        || !writeUInt16(file, PsdCompatibilityDocument::rgbColorMode())
+        || !writeUInt32(file, 0)
+        || !writeUInt32(file, 0)
+        || !writeUInt32(file, 0)
+        || !writeUInt16(file, 0)) {
+        return false;
+    }
+
+    QByteArray row;
+    row.resize(image.width());
+    for (int channel = 0; channel < 4; ++channel) {
+        for (int y = 0; y < image.height(); ++y) {
+            const uchar *scanLine = image.constScanLine(y);
+            for (int x = 0; x < image.width(); ++x) {
+                row[x] = static_cast<char>(scanLine[x * 4 + channel]);
+            }
+            if (file.write(row) != row.size()) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 void drawObject(QPainter &painter, const QVariant &objectValue)
@@ -454,6 +549,11 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
 
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
+    if (hasPsdSuffix(fileUrl)) {
+        syncCanvasSize();
+        return writeFlatPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()));
+    }
+
     return CanvasAdapter::saveToFile(fileUrl);
 }
 
@@ -477,7 +577,16 @@ bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVa
     }
     painter.end();
 
+    if (hasPsdSuffix(fileUrl)) {
+        return writeFlatPsdFile(localFilePath(fileUrl), image);
+    }
+
     return image.save(localFilePath(fileUrl));
+}
+
+QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &objects) const
+{
+    return PsdCompatibilityDocument::fromVincentSession(canvasSize(), objects).toManifest();
 }
 
 void DrawingSurfaceItem::undo()
@@ -626,8 +735,7 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
                                      qreal boxWidth,
                                      qreal boxHeight,
                                      const QString &shapeKind,
-                                     const QColor &color,
-                                     qreal strokeWidth)
+                                     const QColor &color)
 {
     if (!canMutateDocument()) {
         return false;
@@ -646,30 +754,12 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
         return false;
     }
 
-    const qreal boundedStrokeWidth = qBound<qreal>(minimumShapeStrokeWidth,
-                                                   strokeWidth,
-                                                   maximumShapeStrokeWidth);
-    const qreal horizontalInset = qMin(boundedStrokeWidth / 2.0,
-                                      qMax<qreal>(0.0, shapeRect.width() / 2.0 - 0.5));
-    const qreal verticalInset = qMin(boundedStrokeWidth / 2.0,
-                                    qMax<qreal>(0.0, shapeRect.height() / 2.0 - 0.5));
-    const QRectF strokedRect = shapeRect.adjusted(horizontalInset,
-                                                  verticalInset,
-                                                  -horizontalInset,
-                                                  -verticalInset);
-    if (strokedRect.width() < minimumShapeDimension || strokedRect.height() < minimumShapeDimension) {
-        return false;
-    }
-
+    const QColor fillColor = color.isValid() ? color : brushColor();
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(color.isValid() ? color : brushColor(),
-                        boundedStrokeWidth,
-                        Qt::SolidLine,
-                        Qt::RoundCap,
-                        Qt::RoundJoin));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawPath(shapePath(strokedRect, shapeKind));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(fillColor);
+    painter.drawPath(shapePath(shapeRect, shapeKind));
     painter.end();
 
     const bool committed = replaceRasterCanvas(image);

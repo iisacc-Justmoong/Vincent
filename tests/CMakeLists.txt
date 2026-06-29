@@ -21,6 +21,25 @@ vincent_configure_local_runtime_paths(tests_canvasdocumentviewmodel)
 
 add_test(NAME tests_canvasdocumentviewmodel COMMAND tests_canvasdocumentviewmodel)
 
+add_executable(tests_psdcompatibilitydocument
+        tst_psdcompatibilitydocument.cpp
+        ../App/models/document/psdcompatibilitydocument.cpp
+        ../App/models/document/psdcompatibilitydocument.h
+)
+
+target_include_directories(tests_psdcompatibilitydocument PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/document
+)
+
+target_link_libraries(tests_psdcompatibilitydocument PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_psdcompatibilitydocument)
+
+add_test(NAME tests_psdcompatibilitydocument COMMAND tests_psdcompatibilitydocument)
+
 add_executable(tests_canvastoolbarqmlcontract
         tst_canvastoolbarqmlcontract.cpp
 )
@@ -65,6 +84,8 @@ add_executable(tests_drawingsurfaceitem
         ../App/models/canvas/canvasdocumentviewmodel.h
         ../App/models/canvas/canvasviewmodelbridge.cpp
         ../App/models/canvas/canvasviewmodelbridge.h
+        ../App/models/document/psdcompatibilitydocument.cpp
+        ../App/models/document/psdcompatibilitydocument.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
 )
@@ -73,6 +94,7 @@ target_include_directories(tests_drawingsurfaceitem PRIVATE
         ${CMAKE_SOURCE_DIR}/App
         ${CMAKE_SOURCE_DIR}/App/models/brush
         ${CMAKE_SOURCE_DIR}/App/models/canvas
+        ${CMAKE_SOURCE_DIR}/App/models/document
         ${CMAKE_SOURCE_DIR}/App/models/painting
 )
 
@@ -99,6 +121,7 @@ set(_vincent_test_environment
 
 set_tests_properties(
         tests_canvasdocumentviewmodel
+        tests_psdcompatibilitydocument
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
         tests_macosbuildworkflowcontract

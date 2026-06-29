@@ -204,13 +204,25 @@ Item {
 
     function defaultSaveExtension(nameFilter) {
         const suffix = (nameFilter || "").toLowerCase();
+        if (suffix.indexOf("photoshop") !== -1 || suffix.indexOf("psd") !== -1) {
+            return ".psd";
+        }
+        if (suffix.indexOf("webp") !== -1) {
+            return ".webp";
+        }
+        if (suffix.indexOf("tiff") !== -1 || suffix.indexOf("tif") !== -1) {
+            return ".tif";
+        }
         if (suffix.indexOf("jpeg") !== -1 || suffix.indexOf("jpg") !== -1) {
             return ".jpg";
         }
         if (suffix.indexOf("bmp") !== -1) {
             return ".bmp";
         }
-        return ".png";
+        if (suffix.indexOf("png") !== -1) {
+            return ".png";
+        }
+        return ".psd";
     }
 
     Shortcut {
@@ -806,7 +818,7 @@ Item {
         id: saveDialog
         title: qsTr("Save Image As")
         fileMode: Dialogs.FileDialog.SaveFile
-        nameFilters: [qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)")]
+        nameFilters: [qsTr("Photoshop Document (*.psd)"), qsTr("PNG Image (*.png)"), qsTr("JPEG Image (*.jpg *.jpeg)"), qsTr("Bitmap Image (*.bmp)"), qsTr("WebP Image (*.webp)"), qsTr("TIFF Image (*.tif *.tiff)")]
         onAccepted: {
             var urlString = toolbar.selectedDialogFileUrl(saveDialog);
             if (!urlString.length) {

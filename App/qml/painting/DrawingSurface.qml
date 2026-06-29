@@ -66,11 +66,20 @@ Rectangle {
     readonly property int textToolFontPixelSize: Math.max(surface.minimumTextToolFontPixelSize, Math.round(surface.brushSize))
     readonly property int textToolMinimumWidth: 96
     readonly property int shapeToolMinimumDragDistance: 2
-    readonly property int shapeToolStrokeWidth: Math.max(1, Math.round(surface.brushSize))
+    readonly property int speechBubbleTailMinimumHeight: 4
+    readonly property real speechBubbleTailHeightRatio: 0.24
+    readonly property real speechBubbleTailMaximumHeightRatio: 0.35
+    readonly property real speechBubbleTailLeftBaseXRatio: 0.26
+    readonly property real speechBubbleTailTipXRatio: 0.18
+    readonly property real speechBubbleTailRightBaseXRatio: 0.44
+    readonly property real ellipseBubbleTailLeftAngle: 2.15
+    readonly property real ellipseBubbleTailRightAngle: 1.70
+    readonly property int ellipseBubbleArcSegmentCount: 32
     readonly property int drawableObjectMinimumDimension: 8
     readonly property int drawableObjectHandleSize: 8
     readonly property int drawableObjectHandleHitSize: 16
-    readonly property real minimumCanvasZoomScale: 0.25
+    readonly property real defaultCanvasZoomScale: 1
+    readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
     readonly property real zoomDragPixelsPerDoubling: 180
     readonly property var drawableObjectHandles: [
@@ -113,6 +122,7 @@ Rectangle {
         }
         canvasSurface.resizeCanvasSurface(workspaceCanvasWidth, workspaceCanvasHeight);
         canvasSizeCreated = true;
+        fitCanvasZoomToCurrentCanvas();
     }
 
     function normalizedCanvasDimension(value, fallbackValue) {
@@ -129,6 +139,7 @@ Rectangle {
         }
         canvasSurface.resizeCanvasSurface(normalizedCanvasDimension(canvasWidth, workspaceCanvasWidth), normalizedCanvasDimension(canvasHeight, workspaceCanvasHeight));
         canvasSizeCreated = true;
+        fitCanvasZoomToCurrentCanvas();
     }
 
     function newCanvas(canvasWidth, canvasHeight) {
@@ -184,6 +195,12 @@ Rectangle {
         commitActiveText();
         commitActiveShape();
         return canvasSurface.saveToFileWithObjects(fileUrl ? fileUrl.toString() : "", surface.drawableObjects);
+    }
+
+    function psdCompatibilityManifest() {
+        commitActiveText();
+        commitActiveShape();
+        return canvasSurface.psdCompatibilityManifest(surface.drawableObjects);
     }
 
     function longestTextLine(textValue) {
@@ -376,8 +393,7 @@ Rectangle {
                 width: bounds.width,
                 height: bounds.height,
                 shapeKind: surface.shapeKind,
-                color: surface.brushColor.toString(),
-                strokeWidth: surface.shapeToolStrokeWidth
+                color: surface.brushColor.toString()
             });
         }
         requestShapePreviewPaint();
@@ -648,9 +664,24 @@ Rectangle {
     function boundedCanvasZoomScale(scaleValue) {
         const parsedScale = Number(scaleValue);
         if (!isFinite(parsedScale)) {
-            return 1;
+            return surface.defaultCanvasZoomScale;
         }
         return Math.max(surface.minimumCanvasZoomScale, Math.min(surface.maximumCanvasZoomScale, parsedScale));
+    }
+
+    function fittedCanvasZoomScale(canvasWidth, canvasHeight) {
+        const normalizedWidth = Math.max(surface.minimumCanvasDimension, Number(canvasWidth));
+        const normalizedHeight = Math.max(surface.minimumCanvasDimension, Number(canvasHeight));
+        if (!isFinite(normalizedWidth) || !isFinite(normalizedHeight)) {
+            return surface.defaultCanvasZoomScale;
+        }
+
+        return boundedCanvasZoomScale(Math.min(surface.defaultCanvasZoomScale, surface.workspaceCanvasWidth / normalizedWidth, surface.workspaceCanvasHeight / normalizedHeight));
+    }
+
+    function fitCanvasZoomToCurrentCanvas() {
+        surface.zoomDraggingActive = false;
+        surface.canvasZoomScale = fittedCanvasZoomScale(canvasSurface.width, canvasSurface.height);
     }
 
     function beginZoomDrag(pointX) {
@@ -767,6 +798,57 @@ Rectangle {
         context.closePath();
     }
 
+    function speechBubbleTailHeight(heightValue) {
+        return Math.min(Math.max(surface.speechBubbleTailMinimumHeight, heightValue * surface.speechBubbleTailHeightRatio), heightValue * surface.speechBubbleTailMaximumHeightRatio);
+    }
+
+    function speechBubbleBodyHeight(heightValue) {
+        return Math.max(surface.shapeToolMinimumDragDistance, heightValue - speechBubbleTailHeight(heightValue));
+    }
+
+    function ellipsePoint(x, y, widthValue, heightValue, angle) {
+        return {
+            x: x + widthValue / 2 + Math.cos(angle) * widthValue / 2,
+            y: y + heightValue / 2 + Math.sin(angle) * heightValue / 2
+        };
+    }
+
+    function traceEllipseArcPath(context, x, y, widthValue, heightValue, startAngle, endAngle) {
+        for (let index = 1; index <= surface.ellipseBubbleArcSegmentCount; ++index) {
+            const angle = startAngle + (endAngle - startAngle) * index / surface.ellipseBubbleArcSegmentCount;
+            const point = ellipsePoint(x, y, widthValue, heightValue, angle);
+            context.lineTo(point.x, point.y);
+        }
+    }
+
+    function traceRectangleBubblePath(context, x, y, widthValue, heightValue) {
+        const bodyHeight = speechBubbleBodyHeight(heightValue);
+        const bodyBottom = y + bodyHeight;
+        const tailLeftX = x + widthValue * surface.speechBubbleTailLeftBaseXRatio;
+        const tailTipX = x + widthValue * surface.speechBubbleTailTipXRatio;
+        const tailRightX = x + widthValue * surface.speechBubbleTailRightBaseXRatio;
+
+        context.moveTo(x, y);
+        context.lineTo(x + widthValue, y);
+        context.lineTo(x + widthValue, bodyBottom);
+        context.lineTo(tailRightX, bodyBottom);
+        context.lineTo(tailTipX, y + heightValue);
+        context.lineTo(tailLeftX, bodyBottom);
+        context.lineTo(x, bodyBottom);
+        context.closePath();
+    }
+
+    function traceEllipseBubblePath(context, x, y, widthValue, heightValue) {
+        const bodyHeight = speechBubbleBodyHeight(heightValue);
+        const tailLeftPoint = ellipsePoint(x, y, widthValue, bodyHeight, surface.ellipseBubbleTailLeftAngle);
+        const tailTipX = x + widthValue * surface.speechBubbleTailTipXRatio;
+
+        context.moveTo(tailLeftPoint.x, tailLeftPoint.y);
+        traceEllipseArcPath(context, x, y, widthValue, bodyHeight, surface.ellipseBubbleTailLeftAngle, surface.ellipseBubbleTailRightAngle + Math.PI * 2);
+        context.lineTo(tailTipX, y + heightValue);
+        context.closePath();
+    }
+
     function traceShapePath(context, shapeValue, x, y, widthValue, heightValue) {
         const shape = shapeValue === "triagle" ? "triangle" : shapeValue;
         if (shape === "ellipse") {
@@ -792,18 +874,12 @@ Rectangle {
             traceStarPath(context, x, y, widthValue, heightValue);
             return;
         }
-        if (shape === "rectanglebubble" || shape === "ellipsebubble") {
-            const tailHeight = Math.min(Math.max(4, heightValue * 0.22), heightValue * 0.35);
-            const bodyHeight = Math.max(surface.shapeToolMinimumDragDistance, heightValue - tailHeight);
-            if (shape === "ellipsebubble") {
-                traceEllipsePath(context, x, y, widthValue, bodyHeight);
-            } else {
-                context.rect(x, y, widthValue, bodyHeight);
-            }
-            context.moveTo(x + widthValue * 0.26, y + bodyHeight);
-            context.lineTo(x + widthValue * 0.18, y + heightValue);
-            context.lineTo(x + widthValue * 0.44, y + bodyHeight);
-            context.closePath();
+        if (shape === "rectanglebubble") {
+            traceRectangleBubblePath(context, x, y, widthValue, heightValue);
+            return;
+        }
+        if (shape === "ellipsebubble") {
+            traceEllipseBubblePath(context, x, y, widthValue, heightValue);
             return;
         }
 
@@ -816,16 +892,10 @@ Rectangle {
             return;
         }
 
-        const inset = surface.shapeToolStrokeWidth / 2;
-        const pathWidth = Math.max(1, previewWidth - surface.shapeToolStrokeWidth);
-        const pathHeight = Math.max(1, previewHeight - surface.shapeToolStrokeWidth);
         context.beginPath();
-        traceShapePath(context, surface.shapeKind, inset, inset, pathWidth, pathHeight);
-        context.lineWidth = surface.shapeToolStrokeWidth;
-        context.lineJoin = "round";
-        context.lineCap = "round";
-        context.strokeStyle = surface.brushColor.toString();
-        context.stroke();
+        traceShapePath(context, surface.shapeKind, 0, 0, previewWidth, previewHeight);
+        context.fillStyle = surface.brushColor.toString();
+        context.fill();
     }
 
     onToolModeChanged: {
@@ -1012,17 +1082,10 @@ Rectangle {
                     onPaint: {
                         const context = getContext("2d");
                         context.clearRect(0, 0, width, height);
-                        const strokeWidth = Math.max(1, drawableObjectDelegate.modelData.strokeWidth);
-                        const inset = strokeWidth / 2;
-                        const pathWidth = Math.max(1, width - strokeWidth);
-                        const pathHeight = Math.max(1, height - strokeWidth);
                         context.beginPath();
-                        surface.traceShapePath(context, drawableObjectDelegate.modelData.shapeKind, inset, inset, pathWidth, pathHeight);
-                        context.lineWidth = strokeWidth;
-                        context.lineJoin = "round";
-                        context.lineCap = "round";
-                        context.strokeStyle = drawableObjectDelegate.modelData.color;
-                        context.stroke();
+                        surface.traceShapePath(context, drawableObjectDelegate.modelData.shapeKind, 0, 0, width, height);
+                        context.fillStyle = drawableObjectDelegate.modelData.color;
+                        context.fill();
                     }
                     onVisibleChanged: requestPaint()
                     onWidthChanged: requestPaint()
@@ -1210,6 +1273,41 @@ Rectangle {
         sequences: ["E", "ㄷ"]
         enabled: !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("eraser")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["H", "ㅗ"]
+        enabled: !surface.textEditingActive
+        onActivated: surface.toolShortcutRequested("pan")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["V", "ㅍ"]
+        enabled: !surface.textEditingActive
+        onActivated: surface.toolShortcutRequested("move")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["Z", "ㅋ"]
+        enabled: !surface.textEditingActive
+        onActivated: surface.toolShortcutRequested("zoom")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["U", "ㅕ"]
+        enabled: !surface.textEditingActive
+        onActivated: surface.toolShortcutRequested("shape")
+    }
+
+    Shortcut {
+        context: Qt.ApplicationShortcut
+        sequences: ["G", "ㅎ"]
+        enabled: !surface.textEditingActive
+        onActivated: surface.toolShortcutRequested("fill")
     }
 
     Shortcut {
