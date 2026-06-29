@@ -28,6 +28,7 @@ private slots:
     void zoomsCanvasWithHorizontalDrag();
     void movesAndResizesDrawableObjects();
     void deletesSelectedDrawableObject();
+    void layersExposeHierarchyRowsAndReorderDrawableObjects();
     void drawsAndSavesStroke();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
@@ -692,6 +693,93 @@ void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
 
     objects = rootItem->property("drawableObjects").toList();
     QCOMPARE(objects.size(), 1);
+}
+
+void tst_DrawingSurfaceItem::layersExposeHierarchyRowsAndReorderDrawableObjects()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression appendObjects(engine.rootContext(),
+                                 object.data(),
+                                 QStringLiteral("appendDrawableObject({ id: 1, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                                                "appendDrawableObject({ id: 2, type: \"text\", x: 40, y: 50, width: 120, height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"));
+    appendObjects.evaluate();
+    QVERIFY2(!appendObjects.hasError(), qPrintable(appendObjects.error().toString()));
+
+    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 3);
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("objectId")).toInt(), 2);
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Label"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("selected")).toBool(), true);
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("objectId")).toInt(), 1);
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Rectangle"));
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("draggable")).toBool(), true);
+    QCOMPARE(rows.at(2).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+    QCOMPARE(rows.at(2).toMap().value(QStringLiteral("draggable")).toBool(), false);
+
+    QQmlExpression selectLayer(engine.rootContext(),
+                               object.data(),
+                               QStringLiteral("activateLayerByKey(\"object-1\");"));
+    const QVariant selectResult = selectLayer.evaluate();
+    QVERIFY2(!selectLayer.hasError(), qPrintable(selectLayer.error().toString()));
+    QCOMPARE(selectResult.toBool(), true);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), 1);
+
+    QQmlExpression reorderLayers(engine.rootContext(),
+                                 object.data(),
+                                 QStringLiteral("applyLayerHierarchyOrder(["
+                                                "{ key: \"object-1\", objectId: 1, layerKind: \"object\", depth: 0 },"
+                                                "{ key: \"object-2\", objectId: 2, layerKind: \"object\", depth: 0 },"
+                                                "{ key: \"raster-canvas\", objectId: -1, layerKind: \"raster\", depth: 0 }"
+                                                "]);"));
+    const QVariant reorderResult = reorderLayers.evaluate();
+    QVERIFY2(!reorderLayers.hasError(), qPrintable(reorderLayers.error().toString()));
+    QCOMPARE(reorderResult.toBool(), true);
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 2);
+    QCOMPARE(objects.at(0).toMap().value(QStringLiteral("id")).toInt(), 2);
+    QCOMPARE(objects.at(1).toMap().value(QStringLiteral("id")).toInt(), 1);
+
+    rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("objectId")).toInt(), 1);
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("objectId")).toInt(), 2);
+    QCOMPARE(rows.at(2).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+
+    QQmlExpression deleteLayer(engine.rootContext(),
+                               object.data(),
+                               QStringLiteral("deleteLayerByKey(\"object-1\");"));
+    const QVariant deleteResult = deleteLayer.evaluate();
+    QVERIFY2(!deleteLayer.hasError(), qPrintable(deleteLayer.error().toString()));
+    QCOMPARE(deleteResult.toBool(), true);
+
+    objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    QCOMPARE(objects.first().toMap().value(QStringLiteral("id")).toInt(), 2);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), -1);
 }
 
 void tst_DrawingSurfaceItem::drawsAndSavesStroke()

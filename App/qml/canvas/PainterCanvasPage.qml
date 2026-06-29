@@ -16,6 +16,8 @@ Item {
     readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
+    readonly property int layerPanelWidth: Math.min(260, Math.max(220, Math.round(width * 0.22)))
+    readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height + spacingSmall
 
     property int topChromeReservedHeight: 0
     property var vm: null
@@ -101,6 +103,13 @@ Item {
         drawingSurface.openRaster(fileUrl);
     }
 
+    function syncLayerHierarchySelection() {
+        if (!layerHierarchyPanel.visible) {
+            return;
+        }
+        layerHierarchyPanel.activateListItemByKey(drawingSurface.currentLayerKey());
+    }
+
     Item {
         anchors.fill: parent
 
@@ -108,9 +117,62 @@ Item {
             anchors.fill: parent
             color: LV.Theme.window
 
+            LV.Hierarchy {
+                id: layerHierarchyPanel
+                objectName: "layerHierarchyPanel"
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.topMargin: painterPage.layerPanelTopMargin
+                anchors.leftMargin: painterPage.spacingSmall
+                anchors.bottomMargin: painterPage.spacingSmall
+                width: painterPage.layerPanelWidth
+                z: 4
+                minimumPanelWidth: painterPage.layerPanelWidth
+                minimumPanelHeight: 160
+                panelColor: LV.Theme.panelBackground05
+                editable: true
+                model: drawingSurface.layerHierarchyRows
+                footerVisible: false
+
+                onListItemActivated: function (item) {
+                    if (item && item.itemKey !== undefined) {
+                        drawingSurface.activateLayerByKey(item.itemKey);
+                    }
+                }
+
+                onListItemMoved: function () {
+                    drawingSurface.applyLayerHierarchyOrder(layerHierarchyPanel.model);
+                    Qt.callLater(painterPage.syncLayerHierarchySelection);
+                }
+
+                onToolbarButtonTriggered: function (button, buttonId) {
+                    if (buttonId === "delete") {
+                        drawingSurface.deleteSelectedDrawableObject();
+                        Qt.callLater(painterPage.syncLayerHierarchySelection);
+                    }
+                }
+
+                LV.ToolbarButton {
+                    buttonId: "layers"
+                    iconName: "projectStructure"
+                    enabled: false
+                }
+
+                LV.ToolbarButton {
+                    buttonId: "delete"
+                    iconName: "delete"
+                    enabled: drawingSurface.hasSelectedDrawableObject()
+                }
+            }
+
             Painting.DrawingSurface {
                 id: drawingSurface
-                anchors.fill: parent
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.left: layerHierarchyPanel.right
+                anchors.leftMargin: painterPage.spacingSmall
                 workspaceColor: LV.Theme.window
                 documentViewModel: painterPage.vm
                 viewId: painterPage.viewId
@@ -133,6 +195,18 @@ Item {
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onBrushDeltaRequested: delta => painterPage.adjustBrush(delta)
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
+            }
+
+            Connections {
+                target: drawingSurface
+
+                function onLayerHierarchyRowsChanged() {
+                    Qt.callLater(painterPage.syncLayerHierarchySelection);
+                }
+
+                function onSelectedDrawableObjectIdChanged() {
+                    Qt.callLater(painterPage.syncLayerHierarchySelection);
+                }
             }
         }
 

@@ -107,6 +107,7 @@ Rectangle {
     property var drawableObjects: []
     property int nextDrawableObjectId: 1
     property int selectedDrawableObjectId: -1
+    property var layerHierarchyRows: []
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
     property real drawableObjectTransformStartX: 0
@@ -115,6 +116,9 @@ Rectangle {
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
+
+    onDrawableObjectsChanged: rebuildLayerHierarchyRows()
+    onSelectedDrawableObjectIdChanged: rebuildLayerHierarchyRows()
 
     function syncCanvasItemSizeToWorkspace() {
         if (!canvasItemReady || surface.width <= 0 || surface.height <= 0) {
@@ -413,6 +417,117 @@ Rectangle {
         return copy;
     }
 
+    function titleCaseLayerLabel(value, fallbackValue) {
+        const textValue = value === undefined || value === null ? "" : String(value).trim();
+        if (textValue.length === 0) {
+            return fallbackValue;
+        }
+        return textValue.charAt(0).toUpperCase() + textValue.slice(1);
+    }
+
+    function fileNameFromLayerSource(sourceValue) {
+        const sourceText = sourceValue === undefined || sourceValue === null ? "" : String(sourceValue);
+        const pathText = sourceText.split("?")[0].split("#")[0];
+        const lastSlashIndex = pathText.lastIndexOf("/");
+        const fileName = lastSlashIndex >= 0 ? pathText.substring(lastSlashIndex + 1) : pathText;
+        try {
+            return decodeURIComponent(fileName);
+        } catch (error) {
+            return fileName;
+        }
+    }
+
+    function firstLayerTextLine(textValue) {
+        const text = textValue === undefined || textValue === null ? "" : String(textValue).trim();
+        if (text.length === 0) {
+            return qsTr("Text");
+        }
+        const firstLine = text.split(/\r?\n/)[0].trim();
+        return (firstLine.length > 0 ? firstLine : qsTr("Text")).slice(0, 32);
+    }
+
+    function layerLabelForDrawableObject(drawableObject) {
+        if (!drawableObject) {
+            return qsTr("Layer");
+        }
+
+        if (drawableObject.type === "image") {
+            const fileName = fileNameFromLayerSource(drawableObject.originalSource || drawableObject.source);
+            return fileName.length > 0 ? fileName : qsTr("Image");
+        }
+        if (drawableObject.type === "text") {
+            return firstLayerTextLine(drawableObject.text);
+        }
+        if (drawableObject.type === "shape") {
+            return titleCaseLayerLabel(drawableObject.shapeKind, qsTr("Shape"));
+        }
+        return qsTr("Layer %1").arg(drawableObject.id);
+    }
+
+    function layerIconGlyphForDrawableObject(drawableObject) {
+        if (!drawableObject) {
+            return "L";
+        }
+        if (drawableObject.type === "image") {
+            return "I";
+        }
+        if (drawableObject.type === "text") {
+            return "T";
+        }
+        if (drawableObject.type === "shape") {
+            return "S";
+        }
+        return "L";
+    }
+
+    function layerKeyForDrawableObjectId(objectId) {
+        return "object-" + objectId;
+    }
+
+    function currentLayerKey() {
+        return surface.selectedDrawableObjectId >= 0 ? layerKeyForDrawableObjectId(surface.selectedDrawableObjectId) : "raster-canvas";
+    }
+
+    function rebuildLayerHierarchyRows() {
+        const rows = [];
+        for (let index = surface.drawableObjects.length - 1; index >= 0; --index) {
+            const drawableObject = surface.drawableObjects[index];
+            rows.push({
+                key: layerKeyForDrawableObjectId(drawableObject.id),
+                itemId: drawableObject.id,
+                objectId: drawableObject.id,
+                layerKind: "object",
+                depth: 0,
+                parentKey: "",
+                parentItemKey: "",
+                label: layerLabelForDrawableObject(drawableObject),
+                iconGlyph: layerIconGlyphForDrawableObject(drawableObject),
+                selected: drawableObject.id === surface.selectedDrawableObjectId,
+                enabled: true,
+                activatable: true,
+                draggable: true,
+                showChevron: false
+            });
+        }
+        rows.push({
+            key: "raster-canvas",
+            itemId: 0,
+            objectId: -1,
+            layerKind: "raster",
+            depth: 0,
+            parentKey: "",
+            parentItemKey: "",
+            label: qsTr("Raster Canvas"),
+            iconGlyph: "R",
+            selected: surface.selectedDrawableObjectId < 0,
+            enabled: true,
+            activatable: true,
+            draggable: false,
+            showChevron: false
+        });
+        surface.layerHierarchyRows = rows;
+    }
+
     function appendDrawableObject(drawableObject) {
         const nextObjects = surface.drawableObjects.slice();
         nextObjects.push(drawableObject);
@@ -430,6 +545,68 @@ Rectangle {
             }
         }
         return false;
+    }
+
+    function activateLayerByKey(layerKey) {
+        const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        if (normalizedKey === "raster-canvas") {
+            surface.selectedDrawableObjectId = -1;
+            resetDrawableObjectTransform();
+            return true;
+        }
+
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (layerKeyForDrawableObjectId(drawableObject.id) === normalizedKey) {
+                surface.selectedDrawableObjectId = drawableObject.id;
+                resetDrawableObjectTransform();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function deleteLayerByKey(layerKey) {
+        if (!activateLayerByKey(layerKey) || surface.selectedDrawableObjectId < 0) {
+            return false;
+        }
+        return deleteSelectedDrawableObject();
+    }
+
+    function applyLayerHierarchyOrder(layerRows) {
+        const rows = Array.isArray(layerRows) ? layerRows : surface.layerHierarchyRows;
+        const objectById = {};
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            objectById[String(drawableObject.id)] = drawableObject;
+        }
+
+        const topToBottomObjects = [];
+        for (let rowIndex = 0; rowIndex < rows.length; ++rowIndex) {
+            const row = rows[rowIndex];
+            if (!row || row.layerKind !== "object") {
+                continue;
+            }
+            const objectId = String(row.objectId);
+            if (objectById[objectId] !== undefined) {
+                topToBottomObjects.push(objectById[objectId]);
+            }
+        }
+        if (topToBottomObjects.length !== surface.drawableObjects.length) {
+            rebuildLayerHierarchyRows();
+            return false;
+        }
+
+        const nextObjects = [];
+        for (let index = topToBottomObjects.length - 1; index >= 0; --index) {
+            nextObjects.push(topToBottomObjects[index]);
+        }
+        surface.drawableObjects = nextObjects;
+        if (surface.selectedDrawableObjectId >= 0 && objectById[String(surface.selectedDrawableObjectId)] === undefined) {
+            surface.selectedDrawableObjectId = -1;
+        }
+        rebuildLayerHierarchyRows();
+        return true;
     }
 
     function selectedDrawableObject() {
@@ -976,6 +1153,7 @@ Rectangle {
 
             Component.onCompleted: {
                 surface.canvasItemReady = true;
+                surface.rebuildLayerHierarchyRows();
                 surface.syncCanvasItemSizeToWorkspace();
             }
         }

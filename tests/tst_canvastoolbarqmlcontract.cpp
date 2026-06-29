@@ -15,6 +15,7 @@ private slots:
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
     void toolbarUsesFullRoundSolidCylinderBackground();
     void toolbarIsOffsetBelowApplicationWindowTopChrome();
+    void painterPageUsesLvHierarchyLayerPanel();
     void pressureCurveControlsUseThreePointGraphAtBottom();
 };
 
@@ -516,6 +517,46 @@ void tst_CanvasToolBarQmlContract::toolbarIsOffsetBelowApplicationWindowTopChrom
     QVERIFY(pageSource.contains(QStringLiteral("readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall")));
     QVERIFY(pageSource.contains(QStringLiteral("anchors.topMargin: painterPage.toolbarTopMargin")));
     QVERIFY(!pageSource.contains(QStringLiteral("anchors.topMargin: painterPage.spacingSmall")));
+}
+
+void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
+{
+    const QString pageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!pageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+
+    QFile pageQml(pageQmlPath);
+    QVERIFY(pageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString pageSource = QString::fromUtf8(pageQml.readAll());
+
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerPanelWidth")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: layerHierarchyPanel")));
+    QVERIFY(pageSource.contains(QStringLiteral("objectName: \"layerHierarchyPanel\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("LV.Hierarchy")));
+    QVERIFY(pageSource.contains(QStringLiteral("anchors.left: parent.left")));
+    QVERIFY(pageSource.contains(QStringLiteral("model: drawingSurface.layerHierarchyRows")));
+    QVERIFY(pageSource.contains(QStringLiteral("editable: true")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.activateLayerByKey(item.itemKey);")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.applyLayerHierarchyOrder(layerHierarchyPanel.model);")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.deleteSelectedDrawableObject();")));
+    QVERIFY(pageSource.contains(QStringLiteral("layerHierarchyPanel.activateListItemByKey(drawingSurface.currentLayerKey())")));
+    QVERIFY(pageSource.contains(QStringLiteral("LV.ToolbarButton")));
+    QVERIFY(pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
+
+    const QString surfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!surfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+
+    QFile surfaceQml(surfaceQmlPath);
+    QVERIFY(surfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString surfaceSource = QString::fromUtf8(surfaceQml.readAll());
+
+    QVERIFY(surfaceSource.contains(QStringLiteral("property var layerHierarchyRows: []")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function rebuildLayerHierarchyRows()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function activateLayerByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function deleteLayerByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function applyLayerHierarchyOrder(layerRows)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("label: qsTr(\"Raster Canvas\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("draggable: false")));
 }
 
 void tst_CanvasToolBarQmlContract::pressureCurveControlsUseThreePointGraphAtBottom()
