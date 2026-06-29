@@ -109,8 +109,13 @@ Rectangle {
     property int nextEmptyLayerNumber: 1
     property int selectedDrawableObjectId: -1
     property var layerHierarchyRows: []
+    readonly property int layerHierarchyThumbnailSize: 32
+    property bool layerHierarchyRowsRebuildScheduled: false
+    property string backgroundLayerThumbnailSource: ""
+    property var drawableObjectThumbnailSources: ({})
     property var rasterLayerItems: ({})
     property var rasterLayerSnapshotSources: ({})
+    property var rasterLayerThumbnailSources: ({})
     property bool persistRasterLayerSnapshots: true
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
@@ -416,6 +421,8 @@ Rectangle {
         surface.drawableObjects = [];
         surface.rasterLayerItems = {};
         surface.rasterLayerSnapshotSources = {};
+        surface.rasterLayerThumbnailSources = {};
+        surface.drawableObjectThumbnailSources = {};
         surface.persistRasterLayerSnapshots = true;
         surface.nextEmptyLayerNumber = 1;
         surface.selectedDrawableObjectId = -1;
@@ -436,6 +443,102 @@ Rectangle {
         return surface.rasterLayerSnapshotSources[String(objectId)] || "";
     }
 
+    function copyStringMap(mapValue) {
+        const copied = {};
+        if (!mapValue) {
+            return copied;
+        }
+        for (const key in mapValue) {
+            copied[key] = mapValue[key];
+        }
+        return copied;
+    }
+
+    function scheduleLayerHierarchyRowsRebuild() {
+        if (surface.layerHierarchyRowsRebuildScheduled) {
+            return;
+        }
+        surface.layerHierarchyRowsRebuildScheduled = true;
+        Qt.callLater(function () {
+            surface.layerHierarchyRowsRebuildScheduled = false;
+            surface.rebuildLayerHierarchyRows();
+        });
+    }
+
+    function setDrawableObjectThumbnailSource(objectId, source) {
+        const key = String(objectId);
+        if ((surface.drawableObjectThumbnailSources[key] || "") === source) {
+            return;
+        }
+        const nextSources = copyStringMap(surface.drawableObjectThumbnailSources);
+        if (source.length > 0) {
+            nextSources[key] = source;
+        } else {
+            delete nextSources[key];
+        }
+        surface.drawableObjectThumbnailSources = nextSources;
+    }
+
+    function setRasterLayerThumbnailSource(objectId, source) {
+        const key = String(objectId);
+        if ((surface.rasterLayerThumbnailSources[key] || "") === source) {
+            return;
+        }
+        const nextSources = copyStringMap(surface.rasterLayerThumbnailSources);
+        if (source.length > 0) {
+            nextSources[key] = source;
+        } else {
+            delete nextSources[key];
+        }
+        surface.rasterLayerThumbnailSources = nextSources;
+    }
+
+    function invalidateDrawableObjectThumbnailSource(objectId) {
+        setDrawableObjectThumbnailSource(objectId, "");
+    }
+
+    function refreshDrawableObjectThumbnailSource(drawableObject) {
+        if (!drawableObject || drawableObject.type === "layer") {
+            return "";
+        }
+        const source = canvasSurface.cacheDrawableObjectThumbnailSource(drawableObject, surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize);
+        setDrawableObjectThumbnailSource(drawableObject.id, source || "");
+        return source || "";
+    }
+
+    function refreshRasterLayerThumbnailSource(objectId) {
+        const item = rasterLayerItemById(objectId);
+        if (!item) {
+            return "";
+        }
+        const source = item.cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize);
+        setRasterLayerThumbnailSource(objectId, source || "");
+        scheduleLayerHierarchyRowsRebuild();
+        return source || "";
+    }
+
+    function refreshBackgroundLayerThumbnailSource() {
+        const source = canvasSurface.cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize);
+        if (surface.backgroundLayerThumbnailSource !== (source || "")) {
+            surface.backgroundLayerThumbnailSource = source || "";
+            scheduleLayerHierarchyRowsRebuild();
+        }
+        return surface.backgroundLayerThumbnailSource;
+    }
+
+    function layerIconSourceForDrawableObject(drawableObject) {
+        if (!drawableObject) {
+            return "";
+        }
+        if (drawableObject.type === "layer") {
+            return surface.rasterLayerThumbnailSources[String(drawableObject.id)] || "";
+        }
+
+        const key = String(drawableObject.id);
+        const cachedSource = surface.drawableObjectThumbnailSources[key] || "";
+        return cachedSource.length > 0 ? cachedSource : refreshDrawableObjectThumbnailSource(drawableObject);
+    }
+
     function registerRasterLayerItem(objectId, surfaceItem) {
         if (!surfaceItem) {
             return;
@@ -450,6 +553,7 @@ Rectangle {
         } else {
             surfaceItem.newCanvas();
         }
+        refreshRasterLayerThumbnailSource(objectId);
     }
 
     function unregisterRasterLayerItem(objectId, surfaceItem) {
@@ -613,25 +717,6 @@ Rectangle {
         return qsTr("Layer %1").arg(drawableObject.id);
     }
 
-    function layerIconGlyphForDrawableObject(drawableObject) {
-        if (!drawableObject) {
-            return "L";
-        }
-        if (drawableObject.type === "image") {
-            return "I";
-        }
-        if (drawableObject.type === "text") {
-            return "T";
-        }
-        if (drawableObject.type === "shape") {
-            return "S";
-        }
-        if (drawableObject.type === "layer") {
-            return "L";
-        }
-        return "L";
-    }
-
     function layerKeyForDrawableObjectId(objectId) {
         return "object-" + objectId;
     }
@@ -664,7 +749,8 @@ Rectangle {
                 parentKey: "",
                 parentItemKey: "",
                 label: layerLabelForDrawableObject(drawableObject),
-                iconGlyph: layerIconGlyphForDrawableObject(drawableObject),
+                iconSource: layerIconSourceForDrawableObject(drawableObject),
+                iconGlyph: "",
                 selected: drawableObject.id === surface.selectedDrawableObjectId,
                 enabled: true,
                 activatable: true,
@@ -681,7 +767,8 @@ Rectangle {
             parentKey: "",
             parentItemKey: "",
             label: qsTr("Background"),
-            iconGlyph: "R",
+            iconSource: surface.backgroundLayerThumbnailSource,
+            iconGlyph: "",
             selected: surface.selectedDrawableObjectId < 0,
             enabled: true,
             activatable: true,
@@ -695,6 +782,7 @@ Rectangle {
         const nextObjects = surface.drawableObjects.slice();
         nextObjects.push(drawableObject);
         surface.drawableObjects = nextObjects;
+        refreshDrawableObjectThumbnailSource(drawableObject);
         drawableObjectVisualModel.append(drawableObjectVisualModelEntry(drawableObject));
         surface.selectedDrawableObjectId = drawableObject.id;
     }
@@ -729,6 +817,7 @@ Rectangle {
             if (nextObjects[index].id === objectId) {
                 nextObjects[index] = drawableObject;
                 surface.drawableObjects = nextObjects;
+                invalidateDrawableObjectThumbnailSource(objectId);
                 setDrawableObjectVisualModelEntry(drawableObject);
                 return true;
             }
@@ -888,7 +977,9 @@ Rectangle {
             if (removedObject && removedObject.type === "layer") {
                 surface.persistRasterLayerSnapshots = false;
                 delete surface.rasterLayerSnapshotSources[String(selectedObjectId)];
+                setRasterLayerThumbnailSource(selectedObjectId, "");
             }
+            invalidateDrawableObjectThumbnailSource(selectedObjectId);
             drawableObjectVisualModel.remove(removedIndex);
             surface.persistRasterLayerSnapshots = previousPersistRasterLayerSnapshots;
         }
@@ -1030,6 +1121,11 @@ Rectangle {
     }
 
     function commitDrawableObjectTransform() {
+        const drawableObject = selectedDrawableObject();
+        if (drawableObject) {
+            refreshDrawableObjectThumbnailSource(drawableObject);
+            rebuildLayerHierarchyRows();
+        }
         resetDrawableObjectTransform();
     }
 
@@ -1402,9 +1498,12 @@ Rectangle {
 
             Component.onCompleted: {
                 surface.canvasItemReady = true;
-                surface.rebuildLayerHierarchyRows();
                 surface.syncCanvasItemSizeToWorkspace();
+                surface.refreshBackgroundLayerThumbnailSource();
+                surface.rebuildLayerHierarchyRows();
             }
+
+            onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()
         }
 
         Rectangle {
@@ -1549,6 +1648,8 @@ Rectangle {
                         toolMode: surface.toolMode
                         documentViewModel: surface.documentViewModel
                         viewId: surface.viewId
+
+                        onRasterContentChanged: surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)
                     }
                 }
 

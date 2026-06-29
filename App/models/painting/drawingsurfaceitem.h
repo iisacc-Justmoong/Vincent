@@ -46,6 +46,10 @@ public:
                                                           const QVariantList &objects,
                                                           const QVariantList &rasterLayers);
     Q_INVOKABLE QString cacheRasterSnapshotSource();
+    Q_INVOKABLE QString cacheRasterThumbnailSource(qreal maximumWidth = 32, qreal maximumHeight = 32);
+    Q_INVOKABLE QString cacheDrawableObjectThumbnailSource(const QVariantMap &object,
+                                                           qreal maximumWidth = 32,
+                                                           qreal maximumHeight = 32) const;
     Q_INVOKABLE bool restoreRasterSnapshot(const QString &fileUrl);
     Q_INVOKABLE QVariantMap psdCompatibilityManifest(const QVariantList &objects) const;
     Q_INVOKABLE void undo();
@@ -74,6 +78,7 @@ signals:
     void backgroundChanged();
     void canUndoChanged();
     void canRedoChanged();
+    void rasterContentChanged();
 
 protected:
     bool event(QEvent *event) override;

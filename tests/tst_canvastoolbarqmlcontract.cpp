@@ -581,7 +581,16 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     const QString surfaceSource = QString::fromUtf8(surfaceQml.readAll());
 
     QVERIFY(surfaceSource.contains(QStringLiteral("property var layerHierarchyRows: []")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property string backgroundLayerThumbnailSource: \"\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjectThumbnailSources: ({})")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property var rasterLayerThumbnailSources: ({})")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function rebuildLayerHierarchyRows()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function layerIconSourceForDrawableObject(drawableObject)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("iconSource: layerIconSourceForDrawableObject(drawableObject)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("iconSource: surface.backgroundLayerThumbnailSource")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("iconGlyph: \"\"")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("function layerIconGlyphForDrawableObject(drawableObject)")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("iconGlyph: \"R\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function addEmptyLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property int nextEmptyLayerNumber: 1")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: drawableObjectVisualModel")));
@@ -594,6 +603,10 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(surfaceSource.contains(QStringLiteral("property var rasterLayerItems: ({})")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function registerRasterLayerItem(objectId, surfaceItem)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function unregisterRasterLayerItem(objectId, surfaceItem)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cacheRasterThumbnailSource(surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cacheDrawableObjectThumbnailSource(drawableObject, surface.layerHierarchyThumbnailSize, surface.layerHierarchyThumbnailSize)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function activeRasterSurface()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function nextEmptyLayerName()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectForLayerKey(layerKey)")));

@@ -8,6 +8,7 @@
 #include <QQuickItem>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtTest>
@@ -40,6 +41,7 @@ private slots:
     void commitsShapeToRasterCanvas();
     void commitsSpeechBubbleTailsAsIntegratedSolidShapes();
     void fillsContiguousRasterRegion();
+    void cachesLayerBitmapThumbnails();
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
     void savesCompositeDrawableObjectsAsLayeredPsdWithMetadata();
     void opensLayeredPsdThroughPsdSdkReader();
@@ -751,13 +753,23 @@ void tst_DrawingSurfaceItem::addsBlankLayerRowsWithoutTransformHitTesting()
     QCOMPARE(layerObject.value(QStringLiteral("width")).toReal(), canvasItem->width());
     QCOMPARE(layerObject.value(QStringLiteral("height")).toReal(), canvasItem->height());
 
-    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
-    QCOMPARE(rows.size(), 2);
+    QVariantList rows;
+    QTRY_VERIFY([&]() {
+        rows = rootItem->property("layerHierarchyRows").toList();
+        return rows.size() == 2
+            && !rows.at(0).toMap().value(QStringLiteral("iconSource")).toString().isEmpty();
+    }());
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("object-1"));
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("label")).toString(), QStringLiteral("Layer 1"));
-    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("iconGlyph")).toString(), QStringLiteral("L"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("iconGlyph")).toString(), QString());
+    const QString layerThumbnailSource = rows.at(0).toMap().value(QStringLiteral("iconSource")).toString();
+    const QString layerThumbnailPath = QUrl(layerThumbnailSource).toLocalFile();
+    QVERIFY(QFileInfo::exists(layerThumbnailPath));
+    QCOMPARE(QImage(layerThumbnailPath).size(), QSize(32, 32));
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("selected")).toBool(), true);
     QCOMPARE(rows.at(1).toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("iconGlyph")).toString(), QString());
+    QVERIFY(!rows.at(1).toMap().value(QStringLiteral("iconSource")).toString().isEmpty());
 
     QQmlExpression transformableSelection(engine.rootContext(),
                                           object.data(),
@@ -1371,6 +1383,58 @@ void tst_DrawingSurfaceItem::fillsContiguousRasterRegion()
     QCOMPARE(saved.pixelColor(12, 12).rgba(), fillColor.rgba());
     QCOMPARE(saved.pixelColor(84, 12).alpha(), 0);
     QVERIFY(saved.pixelColor(48, 32).alpha() > 0);
+}
+
+void tst_DrawingSurfaceItem::cachesLayerBitmapThumbnails()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(96);
+    item.setHeight(64);
+    item.setDocumentViewModel(&viewModel);
+
+    QSignalSpy contentChanged(&item, &DrawingSurfaceItem::rasterContentChanged);
+    QVERIFY(item.commitShape(12, 10, 36, 28, QStringLiteral("rectangle"), QColor(QStringLiteral("#1976d2"))));
+    QVERIFY(contentChanged.count() > 0);
+
+    const QString rasterThumbnailSource = item.cacheRasterThumbnailSource(32, 32);
+    QVERIFY(!rasterThumbnailSource.isEmpty());
+    const QString rasterThumbnailPath = QUrl(rasterThumbnailSource).toLocalFile();
+    QVERIFY(QFileInfo::exists(rasterThumbnailPath));
+    const QImage rasterThumbnail(rasterThumbnailPath);
+    QVERIFY(!rasterThumbnail.isNull());
+    QCOMPARE(rasterThumbnail.size(), QSize(32, 32));
+
+    QVariantMap shapeObject;
+    shapeObject.insert(QStringLiteral("id"), 1);
+    shapeObject.insert(QStringLiteral("type"), QStringLiteral("shape"));
+    shapeObject.insert(QStringLiteral("x"), 8);
+    shapeObject.insert(QStringLiteral("y"), 6);
+    shapeObject.insert(QStringLiteral("width"), 40);
+    shapeObject.insert(QStringLiteral("height"), 30);
+    shapeObject.insert(QStringLiteral("shapeKind"), QStringLiteral("ellipse"));
+    shapeObject.insert(QStringLiteral("color"), QStringLiteral("#1976d2"));
+
+    const QString objectThumbnailSource = item.cacheDrawableObjectThumbnailSource(shapeObject, 32, 32);
+    QVERIFY(!objectThumbnailSource.isEmpty());
+    const QString objectThumbnailPath = QUrl(objectThumbnailSource).toLocalFile();
+    QVERIFY(QFileInfo::exists(objectThumbnailPath));
+    const QImage objectThumbnail(objectThumbnailPath);
+    QVERIFY(!objectThumbnail.isNull());
+    QCOMPARE(objectThumbnail.size(), QSize(32, 32));
+
+    bool hasObjectColorPixel = false;
+    for (int y = 0; y < objectThumbnail.height() && !hasObjectColorPixel; ++y) {
+        for (int x = 0; x < objectThumbnail.width(); ++x) {
+            const QColor pixel = objectThumbnail.pixelColor(x, y);
+            if (pixel.alpha() > 0 && pixel.blue() > 120 && pixel.red() < 80 && pixel.green() > 70) {
+                hasObjectColorPixel = true;
+                break;
+            }
+        }
+    }
+    QVERIFY(hasObjectColorPixel);
 }
 
 void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaster()
