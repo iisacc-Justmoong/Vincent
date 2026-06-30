@@ -116,6 +116,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("property color backgroundColor: LV.Theme.panelBackground03")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarVerticalPadding: LV.Theme.gap4")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property real toolbarHorizontalPadding: toolbarVerticalPadding / 2")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property real colorPickerExtraRightPadding: Math.max(0, toolbarVerticalPadding - toolbarHorizontalPadding)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: leftToolbarActions")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: toolbarBackground")));
     QVERIFY(toolbarSource.contains(QStringLiteral("anchors.fill: toolbarBackground")));
@@ -125,6 +126,7 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSize: toolbar.toolbarControlIconSize")));
     QVERIFY(toolbarSource.contains(QStringLiteral("width: toolbar.toolbarColorSwatchSize")));
     QVERIFY(toolbarSource.contains(QStringLiteral("width: toolbar.toolbarColorSwatchRingSize")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Layout.rightMargin: toolbar.colorPickerExtraRightPadding")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("implicitWidth: 36")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("implicitHeight: 36")));
