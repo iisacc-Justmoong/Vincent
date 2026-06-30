@@ -17,6 +17,7 @@ private slots:
     void toolbarIsOffsetBelowApplicationWindowTopChrome();
     void painterPageUsesLvHierarchyLayerPanel();
     void pressureCurveControlsUseThreePointGraphAtBottom();
+    void brushSettingsExposePressureOpacityToggle();
 };
 
 void tst_CanvasToolBarQmlContract::brushReselectionOpensBrushSettingsMenu()
@@ -791,6 +792,46 @@ void tst_CanvasToolBarQmlContract::pressureCurveControlsUseThreePointGraphAtBott
     QVERIFY(!sliderComponent.contains(QStringLiteral("pressureCurveMinimum")));
     QVERIFY(!sliderComponent.contains(QStringLiteral("pressureCurveCenter")));
     QVERIFY(!sliderComponent.contains(QStringLiteral("pressureCurveMaximum")));
+}
+
+void tst_CanvasToolBarQmlContract::brushSettingsExposePressureOpacityToggle()
+{
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+    QFile toolbarQml(toolbarQmlPath);
+    QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
+
+    QVERIFY(toolbarSource.contains(QStringLiteral("property bool brushPressureControlsOpacity: true")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("signal brushPressureControlsOpacityChangeRequested(bool enabled)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("component BrushPropertyToggle: Item")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("objectName: \"brushPressureControlsOpacityToggle\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("label: qsTr(\"Pressure Opacity\")")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("checked: toolbar.brushPressureControlsOpacity")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("toolbar.brushPressureControlsOpacityChangeRequested(checked)")));
+
+    const qsizetype opacityIndex = toolbarSource.indexOf(QStringLiteral("propertyName: \"brushOpacity\""));
+    const qsizetype pressureOpacityIndex = toolbarSource.indexOf(QStringLiteral("label: qsTr(\"Pressure Opacity\")"));
+    const qsizetype hardnessIndex = toolbarSource.indexOf(QStringLiteral("propertyName: \"brushHardness\""));
+    QVERIFY(opacityIndex >= 0);
+    QVERIFY(pressureOpacityIndex > opacityIndex);
+    QVERIFY(hardnessIndex > pressureOpacityIndex);
+
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QFile painterPageQml(painterPageQmlPath);
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString pageSource = QString::fromUtf8(painterPageQml.readAll());
+    QVERIFY(pageSource.contains(QStringLiteral("brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true")));
+    QVERIFY(pageSource.contains(QStringLiteral("onBrushPressureControlsOpacityChangeRequested: enabled => painterPage.setBrushProperty(\"brushPressureControlsOpacity\", enabled)")));
+
+    const QString surfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!surfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+    QFile surfaceQml(surfaceQmlPath);
+    QVERIFY(surfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString surfaceSource = QString::fromUtf8(surfaceQml.readAll());
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool brushPressureControlsOpacity: true")));
+    QCOMPARE(surfaceSource.count(QStringLiteral("pressureToOpacityEnabled: surface.brushPressureControlsOpacity")), 2);
 }
 
 QTEST_APPLESS_MAIN(tst_CanvasToolBarQmlContract)

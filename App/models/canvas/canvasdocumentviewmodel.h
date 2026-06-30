@@ -20,6 +20,7 @@ class CanvasDocumentViewModel : public QObject
     Q_PROPERTY(qreal pressureCurveMinimum READ pressureCurveMinimum WRITE setPressureCurveMinimum NOTIFY pressureCurveMinimumChanged)
     Q_PROPERTY(qreal pressureCurveCenter READ pressureCurveCenter WRITE setPressureCurveCenter NOTIFY pressureCurveCenterChanged)
     Q_PROPERTY(qreal pressureCurveMaximum READ pressureCurveMaximum WRITE setPressureCurveMaximum NOTIFY pressureCurveMaximumChanged)
+    Q_PROPERTY(bool brushPressureControlsOpacity READ brushPressureControlsOpacity WRITE setBrushPressureControlsOpacity NOTIFY brushPressureControlsOpacityChanged)
     Q_PROPERTY(qreal stabilizerStrength READ stabilizerStrength WRITE setStabilizerStrength NOTIFY stabilizerStrengthChanged)
     Q_PROPERTY(QString toolMode READ toolMode WRITE setToolMode NOTIFY toolModeChanged)
     Q_PROPERTY(QString shapeKind READ shapeKind WRITE setShapeKind NOTIFY shapeKindChanged)
@@ -45,6 +46,7 @@ public:
     [[nodiscard]] qreal pressureCurveMinimum() const;
     [[nodiscard]] qreal pressureCurveCenter() const;
     [[nodiscard]] qreal pressureCurveMaximum() const;
+    [[nodiscard]] bool brushPressureControlsOpacity() const;
     [[nodiscard]] qreal stabilizerStrength() const;
     [[nodiscard]] QString toolMode() const;
     [[nodiscard]] QString shapeKind() const;
@@ -61,6 +63,7 @@ public:
     void setPressureCurveMinimum(qreal pressureCurveMinimum);
     void setPressureCurveCenter(qreal pressureCurveCenter);
     void setPressureCurveMaximum(qreal pressureCurveMaximum);
+    void setBrushPressureControlsOpacity(bool enabled);
     void setStabilizerStrength(qreal stabilizerStrength);
     void setToolMode(const QString &toolMode);
     void setShapeKind(const QString &shapeKind);
@@ -79,6 +82,7 @@ signals:
     void pressureCurveMinimumChanged();
     void pressureCurveCenterChanged();
     void pressureCurveMaximumChanged();
+    void brushPressureControlsOpacityChanged();
     void stabilizerStrengthChanged();
     void toolModeChanged();
     void shapeKindChanged();
@@ -98,6 +102,7 @@ private:
     qreal m_pressureCurveMinimum = 0.0;
     qreal m_pressureCurveCenter = 0.5;
     qreal m_pressureCurveMaximum = 1.0;
+    bool m_brushPressureControlsOpacity = true;
     qreal m_stabilizerStrength = 0.0;
     QString m_toolMode = QStringLiteral("brush");
     QString m_shapeKind = QStringLiteral("rectangle");

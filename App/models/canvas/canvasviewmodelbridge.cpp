@@ -37,6 +37,14 @@ void readMinimumRealProperty(const QObject *source,
     }
 }
 
+void readBoolProperty(const QObject *source, const char *propertyName, bool &target)
+{
+    const QVariant value = source->property(propertyName);
+    if (value.isValid()) {
+        target = value.toBool();
+    }
+}
+
 } // namespace
 
 void CanvasViewModelBridge::setDocumentViewModel(QObject *documentViewModel)
@@ -70,6 +78,7 @@ void CanvasViewModelBridge::syncToolState(CanvasBrushConfig &brushConfig, QStrin
     readBoundedRealProperty(m_documentViewModel, "pressureCurveMinimum", brushConfig.pressureCurveMinimum, 0.0, 1.0);
     readBoundedRealProperty(m_documentViewModel, "pressureCurveCenter", brushConfig.pressureCurveCenter, 0.0, 1.0);
     readBoundedRealProperty(m_documentViewModel, "pressureCurveMaximum", brushConfig.pressureCurveMaximum, 0.0, 1.0);
+    readBoolProperty(m_documentViewModel, "brushPressureControlsOpacity", brushConfig.pressureToOpacityEnabled);
     readBoundedRealProperty(m_documentViewModel, "stabilizerStrength", brushConfig.stabilizerStrength, 0.0, 1.0);
     brushConfig.flowEnabled = true;
     brushConfig.opacityEnabled = true;

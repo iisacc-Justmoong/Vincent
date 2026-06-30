@@ -34,6 +34,7 @@ void tst_CanvasDocumentViewModel::exposesDefaultDocumentState()
     QCOMPARE(viewModel.pressureCurveMinimum(), 0.0);
     QCOMPARE(viewModel.pressureCurveCenter(), 0.5);
     QCOMPARE(viewModel.pressureCurveMaximum(), 1.0);
+    QCOMPARE(viewModel.brushPressureControlsOpacity(), true);
     QCOMPARE(viewModel.stabilizerStrength(), 0.0);
     QCOMPARE(viewModel.toolMode(), QStringLiteral("brush"));
     QCOMPARE(viewModel.shapeKind(), QStringLiteral("rectangle"));
@@ -70,6 +71,7 @@ void tst_CanvasDocumentViewModel::updatesEngineBrushSettingsAndClampsValues()
     QSignalSpy flowSpy(&viewModel, &CanvasDocumentViewModel::brushFlowChanged);
     QSignalSpy hardnessSpy(&viewModel, &CanvasDocumentViewModel::brushHardnessChanged);
     QSignalSpy pressureCenterSpy(&viewModel, &CanvasDocumentViewModel::pressureCurveCenterChanged);
+    QSignalSpy pressureOpacitySpy(&viewModel, &CanvasDocumentViewModel::brushPressureControlsOpacityChanged);
 
     viewModel.setBrushFlow(0.35);
     QCOMPARE(viewModel.brushFlow(), 0.35);
@@ -105,6 +107,15 @@ void tst_CanvasDocumentViewModel::updatesEngineBrushSettingsAndClampsValues()
     QCOMPARE(viewModel.pressureCurveCenter(), 0.4);
     QCOMPARE(viewModel.pressureCurveMaximum(), 0.4);
     QCOMPARE(pressureCenterSpy.count(), 2);
+
+    viewModel.setBrushPressureControlsOpacity(false);
+    QCOMPARE(viewModel.brushPressureControlsOpacity(), false);
+    QCOMPARE(pressureOpacitySpy.count(), 1);
+    viewModel.setBrushPressureControlsOpacity(false);
+    QCOMPARE(pressureOpacitySpy.count(), 1);
+    viewModel.setBrushPressureControlsOpacity(true);
+    QCOMPARE(viewModel.brushPressureControlsOpacity(), true);
+    QCOMPARE(pressureOpacitySpy.count(), 2);
 
     viewModel.setStabilizerStrength(1.5);
     QCOMPARE(viewModel.stabilizerStrength(), 1.0);

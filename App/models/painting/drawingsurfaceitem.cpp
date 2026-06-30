@@ -23,10 +23,12 @@
 #include <QPalette>
 #include <QPoint>
 #include <QPointF>
+#include <QPointingDevice>
 #include <QQuickItemGrabResult>
 #include <QRectF>
 #include <QSize>
 #include <QStandardPaths>
+#include <QTabletEvent>
 #include <QTemporaryFile>
 #include <QTextDocument>
 #include <QTextOption>
@@ -120,6 +122,29 @@ bool isTabletEvent(QEvent::Type type)
     return type == QEvent::TabletPress
         || type == QEvent::TabletMove
         || type == QEvent::TabletRelease;
+}
+
+QTabletEvent makeSyntheticTabletStrokeEvent(QEvent::Type eventType,
+                                            qreal pointX,
+                                            qreal pointY,
+                                            qreal rawPressure,
+                                            Qt::MouseButton button,
+                                            Qt::MouseButtons buttons)
+{
+    const QPointF position(pointX, pointY);
+    return QTabletEvent(eventType,
+                        QPointingDevice::primaryPointingDevice(),
+                        position,
+                        position,
+                        rawPressure,
+                        0.0F,
+                        0.0F,
+                        0.0F,
+                        0.0,
+                        0.0F,
+                        Qt::NoModifier,
+                        button,
+                        buttons);
 }
 
 QImage transparentCanvasImage(const QSize &size)
@@ -1087,10 +1112,18 @@ void DrawingSurfaceItem::resizeCanvasSurface(qreal canvasWidth, qreal canvasHeig
 
 void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    Q_UNUSED(rawPressure)
-    Q_UNUSED(pressureSensitive)
-
     if (!canMutateDocument()) {
+        return;
+    }
+
+    if (pressureSensitive) {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletPress,
+                                                            pointX,
+                                                            pointY,
+                                                            rawPressure,
+                                                            Qt::LeftButton,
+                                                            Qt::LeftButton);
+        CanvasAdapter::event(&event);
         return;
     }
 
@@ -1104,11 +1137,19 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
 
 bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    Q_UNUSED(rawPressure)
-    Q_UNUSED(pressureSensitive)
-
     if (!canMutateDocument()) {
         return false;
+    }
+
+    if (pressureSensitive) {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletMove,
+                                                            pointX,
+                                                            pointY,
+                                                            rawPressure,
+                                                            Qt::NoButton,
+                                                            Qt::LeftButton);
+        CanvasAdapter::event(&event);
+        return true;
     }
 
     QMouseEvent event = makeMouseEvent(QEvent::MouseMove,
@@ -1122,10 +1163,18 @@ bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal raw
 
 void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
 {
-    Q_UNUSED(rawPressure)
-    Q_UNUSED(pressureSensitive)
-
     if (!canMutateDocument()) {
+        return;
+    }
+
+    if (pressureSensitive) {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletRelease,
+                                                            pointX,
+                                                            pointY,
+                                                            rawPressure,
+                                                            Qt::LeftButton,
+                                                            Qt::NoButton);
+        CanvasAdapter::event(&event);
         return;
     }
 

@@ -330,6 +330,7 @@ Item {
                 pressureCurveMinimum: painterPage.vm ? painterPage.vm.pressureCurveMinimum : 0
                 pressureCurveCenter: painterPage.vm ? painterPage.vm.pressureCurveCenter : 0.5
                 pressureCurveMaximum: painterPage.vm ? painterPage.vm.pressureCurveMaximum : 1
+                brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
                 shapeKind: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
@@ -423,6 +424,7 @@ Item {
             pressureCurveMinimum: painterPage.vm ? painterPage.vm.pressureCurveMinimum : 0
             pressureCurveCenter: painterPage.vm ? painterPage.vm.pressureCurveCenter : 0.5
             pressureCurveMaximum: painterPage.vm ? painterPage.vm.pressureCurveMaximum : 1
+            brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true
             stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
             currentColor: painterPage.vm ? painterPage.vm.brushColor : "#1a1a1a"
             currentTool: painterPage.vm ? painterPage.vm.toolMode : "brush"
@@ -433,6 +435,7 @@ Item {
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)
             onBrushPropertyChangeRequested: (propertyName, value) => painterPage.setBrushProperty(propertyName, value)
+            onBrushPressureControlsOpacityChangeRequested: enabled => painterPage.setBrushProperty("brushPressureControlsOpacity", enabled)
             onColorPicked: swatchColor => painterPage.setBrushColor(swatchColor)
             onToolSelected: tool => painterPage.setToolMode(tool)
             onShapeSelected: shapeKind => painterPage.setShapeKind(shapeKind)

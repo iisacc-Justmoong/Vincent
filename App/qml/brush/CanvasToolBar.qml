@@ -23,6 +23,7 @@ Item {
     property real pressureCurveMinimum: 0
     property real pressureCurveCenter: 0.5
     property real pressureCurveMaximum: 1
+    property bool brushPressureControlsOpacity: true
     property real stabilizerStrength: 0
     property color currentColor: "#1a1a1a"
     property color backgroundColor: LV.Theme.panelBackground03
@@ -104,6 +105,7 @@ Item {
     signal saveRequested(string fileUrl)
     signal brushSizeChangeRequested(real size)
     signal brushPropertyChangeRequested(string propertyName, real value)
+    signal brushPressureControlsOpacityChangeRequested(bool enabled)
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
     signal shapeSelected(string shapeKind)
@@ -472,6 +474,39 @@ Item {
                     border.width: 1
                     border.color: propertySlider.pressed ? Qt.rgba(255, 255, 255, 0.28) : Qt.rgba(0, 0, 0, 0.38)
                 }
+            }
+        }
+    }
+
+    component BrushPropertyToggle: Item {
+        id: brushPropertyToggle
+
+        property string label: ""
+        property bool checked: true
+
+        Layout.fillWidth: true
+        implicitWidth: 300
+        implicitHeight: 24
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: toolbar.spacingSmall
+
+            Controls.Label {
+                text: brushPropertyToggle.label
+                color: "#f2f4f7"
+                font.pixelSize: 12
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            LV.ToggleSwitch {
+                objectName: "brushPressureControlsOpacityToggle"
+                checked: brushPropertyToggle.checked
+                Layout.preferredWidth: 42
+                Layout.preferredHeight: 22
+                onCheckedChanged: toolbar.brushPressureControlsOpacityChangeRequested(checked)
             }
         }
     }
@@ -930,6 +965,11 @@ Item {
                 value: toolbar.brushOpacity
                 displayScale: 100
                 suffix: qsTr("%")
+            }
+
+            BrushPropertyToggle {
+                label: qsTr("Pressure Opacity")
+                checked: toolbar.brushPressureControlsOpacity
             }
 
             BrushPropertySlider {

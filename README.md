@@ -21,7 +21,7 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 2. Extract it and run the `Vincent` binary inside the extracted folder.
 
 ## Features at a Glance
-- iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
+- iiPaintEngine-backed brush and eraser strokes with native pointer/tablet event handling and pressure-controlled brush opacity
 - Layered raster document model with a base raster canvas plus selectable transparent raster layers; blank documents start with `Background` plus a selected transparent `Layer 1`, each backed by its own iiPaintEngine surface and undo/redo state
 - Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, while flat image inputs remain transformable image objects
 - Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects

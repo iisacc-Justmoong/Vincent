@@ -68,7 +68,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Assigns paint-editor tool shortcuts on the canvas surface: `B` brush, `E` eraser, `H` hand-pan, `V` move, `Z` zoom, `U` shape, `G` fill, and `T` text. The same physical key positions also work under two-beolsik Korean input.
 - Opens an HSL triangle color wheel from a current-color swatch button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
-- Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
+- Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength, plus a pressure-opacity toggle that controls whether tablet pressure scales the brush opacity cap. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
 - Restricts open dialogs to supported Qt image inputs plus PSD files and lets the save dialog default to Photoshop PSD while still offering PNG, JPEG, BMP, WebP, and TIFF, with default extension handling per selected filter.
 
 ### `HslTriangleColorPicker.qml`
@@ -121,7 +121,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 - Exposes palette, brush color, brush size, iiPaintEngine brush settings, active tool, selected shape kind, and canvas dimensions to QML.
 - Sets the default brush hardness to the app's maximum anti-aliased edge setting for iiPaintEngine's coverage-based circular brush.
-- Clamps brush size, brush dynamics, pressure curve, stabilizer, and canvas dimensions to safe ranges.
+- Clamps brush size, brush dynamics, pressure curve, pressure-opacity enablement, stabilizer, and canvas dimensions to safe ranges.
 - Restricts tool mode to the flat-raster tool set: brush, eraser, pan, move, zoom, shape, fill, and text.
 
 ### `PsdCompatibilityDocument`

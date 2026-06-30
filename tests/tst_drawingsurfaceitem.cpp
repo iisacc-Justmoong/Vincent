@@ -39,6 +39,7 @@ private slots:
     void renamesLayerRowsAndDrawableObjectMetadata();
     void layersExposeHierarchyRowsAndReorderDrawableObjects();
     void drawsAndSavesStroke();
+    void pressureSensitiveManualStrokesPreserveInputPressure();
     void erasesCommittedStrokePixels();
     void commitsTextToRasterCanvas();
     void commitsShapeToRasterCanvas();
@@ -259,6 +260,7 @@ void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
     viewModel.setPressureCurveMinimum(0.2);
     viewModel.setPressureCurveMaximum(0.8);
     viewModel.setPressureCurveCenter(0.6);
+    viewModel.setBrushPressureControlsOpacity(false);
     viewModel.setStabilizerStrength(0.44);
 
     QVariantMap initialProperties;
@@ -274,6 +276,7 @@ void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
     initialProperties.insert(QStringLiteral("pressureCurveMinimum"), 0.2);
     initialProperties.insert(QStringLiteral("pressureCurveCenter"), 0.6);
     initialProperties.insert(QStringLiteral("pressureCurveMaximum"), 0.8);
+    initialProperties.insert(QStringLiteral("brushPressureControlsOpacity"), false);
     initialProperties.insert(QStringLiteral("stabilizerStrength"), 0.44);
 
     QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
@@ -310,6 +313,7 @@ void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
     QCOMPARE(canvasItem->pressureCurveMinimum(), 0.2);
     QCOMPARE(canvasItem->pressureCurveCenter(), 0.6);
     QCOMPARE(canvasItem->pressureCurveMaximum(), 0.8);
+    QCOMPARE(canvasItem->pressureToOpacityEnabled(), false);
     QCOMPARE(canvasItem->stabilizerStrength(), 0.44);
 
     QTemporaryDir dir;
@@ -1456,6 +1460,27 @@ void tst_DrawingSurfaceItem::drawsAndSavesStroke()
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
     QCOMPARE(saved.size(), QSize(128, 96));
+}
+
+void tst_DrawingSurfaceItem::pressureSensitiveManualStrokesPreserveInputPressure()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(96);
+    item.setHeight(64);
+    item.setMultithreadedEventsEnabled(false);
+    item.setDocumentViewModel(&viewModel);
+
+    QSignalSpy inputChanged(&item, &DrawingSurfaceItem::inputStateChanged);
+
+    item.beginStroke(24, 24, 0.25, true);
+    QCOMPARE(item.inputDevice(), QStringLiteral("tablet"));
+    QVERIFY(qAbs(item.inputPressure() - 0.25) < 0.0001);
+    QVERIFY(inputChanged.count() > 0);
+
+    item.endStroke(24, 24, 0.25, true);
+    QTRY_COMPARE(item.strokeCount(), 1);
 }
 
 void tst_DrawingSurfaceItem::erasesCommittedStrokePixels()

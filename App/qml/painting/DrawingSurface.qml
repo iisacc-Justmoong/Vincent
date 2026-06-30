@@ -22,6 +22,7 @@ Rectangle {
     property real pressureCurveMinimum: 0
     property real pressureCurveCenter: 0.5
     property real pressureCurveMaximum: 1
+    property bool brushPressureControlsOpacity: true
     property real stabilizerStrength: 0
     property var documentViewModel: null
     property string viewId: ""
@@ -1732,6 +1733,7 @@ Rectangle {
             pressureCurveMinimum: surface.pressureCurveMinimum
             pressureCurveCenter: surface.pressureCurveCenter
             pressureCurveMaximum: surface.pressureCurveMaximum
+            pressureToOpacityEnabled: surface.brushPressureControlsOpacity
             stabilizerStrength: surface.stabilizerStrength
             toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.toolMode : "move"
             documentViewModel: surface.documentViewModel
@@ -1899,6 +1901,7 @@ Rectangle {
                         pressureCurveMinimum: surface.pressureCurveMinimum
                         pressureCurveCenter: surface.pressureCurveCenter
                         pressureCurveMaximum: surface.pressureCurveMaximum
+                        pressureToOpacityEnabled: surface.brushPressureControlsOpacity
                         stabilizerStrength: surface.stabilizerStrength
                         toolMode: surface.toolMode
                         documentViewModel: surface.documentViewModel

@@ -124,6 +124,11 @@ qreal CanvasDocumentViewModel::pressureCurveMaximum() const
     return m_pressureCurveMaximum;
 }
 
+bool CanvasDocumentViewModel::brushPressureControlsOpacity() const
+{
+    return m_brushPressureControlsOpacity;
+}
+
 qreal CanvasDocumentViewModel::stabilizerStrength() const
 {
     return m_stabilizerStrength;
@@ -270,6 +275,16 @@ void CanvasDocumentViewModel::setPressureCurveMaximum(qreal pressureCurveMaximum
     if (maximumChanged) {
         emit pressureCurveMaximumChanged();
     }
+}
+
+void CanvasDocumentViewModel::setBrushPressureControlsOpacity(bool enabled)
+{
+    if (m_brushPressureControlsOpacity == enabled) {
+        return;
+    }
+
+    m_brushPressureControlsOpacity = enabled;
+    emit brushPressureControlsOpacityChanged();
 }
 
 void CanvasDocumentViewModel::setStabilizerStrength(qreal stabilizerStrength)
