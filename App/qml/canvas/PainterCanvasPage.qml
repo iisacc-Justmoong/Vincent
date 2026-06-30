@@ -114,6 +114,60 @@ Item {
         drawingSurface.openRaster(fileUrl);
     }
 
+    function openNewCanvasDialog() {
+        canvasToolBar.openNewCanvasDialog();
+    }
+
+    function openFileDialog() {
+        canvasToolBar.openFileDialog();
+    }
+
+    function openSaveDialog() {
+        canvasToolBar.openSaveDialog();
+    }
+
+    function undoActiveRasterSurface() {
+        const rasterSurface = drawingSurface.activeRasterSurface();
+        if (rasterSurface) {
+            rasterSurface.undo();
+        }
+    }
+
+    function redoActiveRasterSurface() {
+        const rasterSurface = drawingSurface.activeRasterSurface();
+        if (rasterSurface) {
+            rasterSurface.redo();
+        }
+    }
+
+    function addLayer() {
+        drawingSurface.addEmptyLayer();
+        Qt.callLater(painterPage.syncLayerHierarchySelection);
+    }
+
+    function deleteCurrentLayer() {
+        drawingSurface.deleteCurrentLayer();
+        Qt.callLater(painterPage.syncLayerHierarchySelection);
+    }
+
+    function canDeleteCurrentLayer() {
+        return drawingSurface.canDeleteCurrentLayer();
+    }
+
+    function selectShapeTool(shapeKind) {
+        painterPage.setShapeKind(shapeKind);
+        painterPage.setToolMode("shape");
+    }
+
+    function fitCanvasToWindow() {
+        drawingSurface.fitCanvasZoomToCurrentCanvas();
+    }
+
+    function resetCanvasView() {
+        drawingSurface.resetCanvasPan();
+        drawingSurface.fitCanvasZoomToCurrentCanvas();
+    }
+
     function syncLayerHierarchySelection() {
         if (!layerHierarchyPanel.visible) {
             return;
