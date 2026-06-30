@@ -101,7 +101,8 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
 
-    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarButtonPadding: 1")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property real toolbarButtonVerticalPadding: 1")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property real toolbarButtonHorizontalPadding: toolbarButtonVerticalPadding / 2")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 18")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarMenuButtonWidth: 30")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarIconSize: 16")));
@@ -113,13 +114,13 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url panHandIconSource: \"qrc:/Vincent/resources/icons/panHand.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url typeAliasIconSource: \"qrc:/Vincent/resources/icons/typeAlias.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("property color backgroundColor: LV.Theme.panelBackground03")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarHorizontalPadding")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarVerticalPadding: LV.Theme.gap4")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property real toolbarHorizontalPadding: toolbarVerticalPadding / 2")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: leftToolbarActions")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: toolbarBackground")));
     QVERIFY(toolbarSource.contains(QStringLiteral("anchors.fill: toolbarBackground")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("horizontalPadding: toolbar.toolbarButtonPadding")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("verticalPadding: toolbar.toolbarButtonPadding")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("horizontalPadding: toolbar.toolbarButtonHorizontalPadding")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("verticalPadding: toolbar.toolbarButtonVerticalPadding")));
     QVERIFY(toolbarSource.contains(QStringLiteral("implicitWidth: toolbar.toolbarControlButtonSize")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconSize: toolbar.toolbarControlIconSize")));
     QVERIFY(toolbarSource.contains(QStringLiteral("width: toolbar.toolbarColorSwatchSize")));
@@ -127,6 +128,8 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("implicitWidth: 36")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("implicitHeight: 36")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int toolbarButtonPadding")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int toolbarHorizontalPadding: spacingLarge")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("titlebarReservedHeight")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("titlebarDragRequested")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaLeftToolbarWidth")));
@@ -530,7 +533,9 @@ void tst_CanvasToolBarQmlContract::toolbarUsesFullWidthRectangularBackground()
     QVERIFY(toolbarSource.contains(QStringLiteral("implicitHeight: toolbarLayout.implicitHeight + toolbarVerticalPadding * 2")));
     QVERIFY(layoutBlock.contains(QStringLiteral("anchors.fill: toolbarBackground")));
     QVERIFY(layoutBlock.contains(QStringLiteral("anchors.leftMargin: toolbar.toolbarHorizontalPadding")));
+    QVERIFY(layoutBlock.contains(QStringLiteral("anchors.rightMargin: toolbar.toolbarHorizontalPadding")));
     QVERIFY(layoutBlock.contains(QStringLiteral("anchors.topMargin: toolbar.toolbarVerticalPadding")));
+    QVERIFY(layoutBlock.contains(QStringLiteral("anchors.bottomMargin: toolbar.toolbarVerticalPadding")));
     QVERIFY(!backgroundBlock.contains(QStringLiteral("gradient: Gradient")));
     QVERIFY(!backgroundBlock.contains(QStringLiteral("GradientStop")));
     QVERIFY(!backgroundBlock.contains(QStringLiteral("border.width: 1")));

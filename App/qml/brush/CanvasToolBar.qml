@@ -41,7 +41,8 @@ Item {
     readonly property int maximumCanvasDimension: 8192
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
-    readonly property int toolbarButtonPadding: 1
+    readonly property real toolbarButtonVerticalPadding: 1
+    readonly property real toolbarButtonHorizontalPadding: toolbarButtonVerticalPadding / 2
     readonly property int figmaToolbarButtonSize: 18
     readonly property int figmaToolbarMenuButtonWidth: 30
     readonly property int figmaToolbarIconSize: 16
@@ -49,8 +50,8 @@ Item {
     readonly property int toolbarControlIconSize: 16
     readonly property int toolbarColorSwatchSize: 20
     readonly property int toolbarColorSwatchRingSize: 24
-    readonly property int toolbarHorizontalPadding: spacingLarge
     readonly property int toolbarVerticalPadding: LV.Theme.gap4
+    readonly property real toolbarHorizontalPadding: toolbarVerticalPadding / 2
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
     readonly property url panHandIconSource: "qrc:/Vincent/resources/icons/panHand.svg"
     readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
@@ -271,8 +272,8 @@ Item {
     component FigmaToolbarButton: LV.IconButton {
         iconSize: toolbar.figmaToolbarIconSize
         tone: LV.AbstractButton.Borderless
-        horizontalPadding: toolbar.toolbarButtonPadding
-        verticalPadding: toolbar.toolbarButtonPadding
+        horizontalPadding: toolbar.toolbarButtonHorizontalPadding
+        verticalPadding: toolbar.toolbarButtonVerticalPadding
         cornerRadius: LV.Theme.radiusSm
         implicitWidth: toolbar.figmaToolbarButtonSize
         implicitHeight: toolbar.figmaToolbarButtonSize
@@ -313,8 +314,8 @@ Item {
             anchors.bottom: parent.bottom
             width: toolbar.figmaToolbarButtonSize
             tone: menuButton.tone
-            horizontalPadding: toolbar.toolbarButtonPadding
-            verticalPadding: toolbar.toolbarButtonPadding
+            horizontalPadding: toolbar.toolbarButtonHorizontalPadding
+            verticalPadding: toolbar.toolbarButtonVerticalPadding
             cornerRadius: LV.Theme.radiusSm
             Accessible.name: menuButton.accessibleName
             onClicked: menuButton.bodyClicked()
