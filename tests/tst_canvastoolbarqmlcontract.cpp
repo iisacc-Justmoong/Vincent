@@ -13,7 +13,7 @@ private slots:
     void drawingSurfaceProvidesPaintStyleTextToolEditor();
     void shapeToolProvidesSplitMenuAndDragInsertion();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
-    void toolbarUsesFullRoundSolidCylinderBackground();
+    void toolbarUsesFullWidthRectangularBackground();
     void toolbarIsOffsetBelowApplicationWindowTopChrome();
     void painterPageUsesLvHierarchyLayerPanel();
     void pressureCurveControlsUseThreePointGraphAtBottom();
@@ -101,14 +101,34 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
 
-    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarButtonPadding: 1")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 18")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarMenuButtonWidth: 30")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarIconSize: 16")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarControlButtonSize: 28")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarControlIconSize: 16")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarColorSwatchSize: 20")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarColorSwatchRingSize: 24")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url translateObjectIconSource: \"qrc:/Vincent/resources/icons/translateObject.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url panHandIconSource: \"qrc:/Vincent/resources/icons/panHand.svg\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("readonly property url typeAliasIconSource: \"qrc:/Vincent/resources/icons/typeAlias.svg\"")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("property color backgroundColor: LV.Theme.panelBackground03")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarHorizontalPadding")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("readonly property int toolbarVerticalPadding: LV.Theme.gap4")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: leftToolbarActions")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("id: floatingBackground")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("anchors.fill: floatingBackground")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: toolbarBackground")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("anchors.fill: toolbarBackground")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("horizontalPadding: toolbar.toolbarButtonPadding")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("verticalPadding: toolbar.toolbarButtonPadding")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("implicitWidth: toolbar.toolbarControlButtonSize")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("iconSize: toolbar.toolbarControlIconSize")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("width: toolbar.toolbarColorSwatchSize")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("width: toolbar.toolbarColorSwatchRingSize")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarButtonSize: 20")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("implicitWidth: 36")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("implicitHeight: 36")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("titlebarReservedHeight")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("titlebarDragRequested")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaLeftToolbarWidth")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaLeftToolbarHeight")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("readonly property int figmaToolbarOuterHorizontalPadding")));
@@ -482,7 +502,7 @@ void tst_CanvasToolBarQmlContract::brushSizeControlsFlowFromDecreaseToSliderToIn
     QVERIFY(sliderIndex < increaseIndex);
 }
 
-void tst_CanvasToolBarQmlContract::toolbarUsesFullRoundSolidCylinderBackground()
+void tst_CanvasToolBarQmlContract::toolbarUsesFullWidthRectangularBackground()
 {
     const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
     QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
@@ -491,18 +511,33 @@ void tst_CanvasToolBarQmlContract::toolbarUsesFullRoundSolidCylinderBackground()
     QVERIFY(toolbarQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString toolbarSource = QString::fromUtf8(toolbarQml.readAll());
 
-    const qsizetype backgroundIndex = toolbarSource.indexOf(QStringLiteral("id: floatingBackground"));
+    const qsizetype backgroundIndex = toolbarSource.indexOf(QStringLiteral("id: toolbarBackground"));
+    const qsizetype separatorIndex = toolbarSource.indexOf(QStringLiteral("id: toolbarBottomSeparator"));
     const qsizetype layoutIndex = toolbarSource.indexOf(QStringLiteral("id: toolbarLayout"));
     QVERIFY(backgroundIndex >= 0);
-    QVERIFY(layoutIndex > backgroundIndex);
+    QVERIFY(separatorIndex > backgroundIndex);
+    QVERIFY(layoutIndex > separatorIndex);
 
-    const QString backgroundBlock = toolbarSource.mid(backgroundIndex, layoutIndex - backgroundIndex);
-    QVERIFY(backgroundBlock.contains(QStringLiteral("radius: height / 2")));
-    QVERIFY(backgroundBlock.contains(QStringLiteral("color: LV.Theme.panelBackground03")));
+    const QString backgroundBlock = toolbarSource.mid(backgroundIndex, separatorIndex - backgroundIndex);
+    const QString layoutBlock = toolbarSource.mid(layoutIndex, toolbarSource.indexOf(QStringLiteral("LV.HStack {"), layoutIndex + 1) - layoutIndex);
+    QVERIFY(backgroundBlock.contains(QStringLiteral("anchors.fill: parent")));
+    QVERIFY(backgroundBlock.contains(QStringLiteral("radius: 0")));
+    QVERIFY(backgroundBlock.contains(QStringLiteral("color: toolbar.backgroundColor")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: toolbarBottomSeparator")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("anchors.bottom: parent.bottom")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("height: 1")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: toolbarEventBlocker")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("implicitHeight: toolbarLayout.implicitHeight + toolbarVerticalPadding * 2")));
+    QVERIFY(layoutBlock.contains(QStringLiteral("anchors.fill: toolbarBackground")));
+    QVERIFY(layoutBlock.contains(QStringLiteral("anchors.leftMargin: toolbar.toolbarHorizontalPadding")));
+    QVERIFY(layoutBlock.contains(QStringLiteral("anchors.topMargin: toolbar.toolbarVerticalPadding")));
     QVERIFY(!backgroundBlock.contains(QStringLiteral("gradient: Gradient")));
     QVERIFY(!backgroundBlock.contains(QStringLiteral("GradientStop")));
-    QVERIFY(!backgroundBlock.contains(QStringLiteral("anchors.top: parent.top")));
-    QVERIFY(!backgroundBlock.contains(QStringLiteral("radius: LV.Theme.radiusLg")));
+    QVERIFY(!backgroundBlock.contains(QStringLiteral("border.width: 1")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("id: floatingBackground")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("radius: height / 2")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("id: titlebarDragArea")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("titlebarWindowControlInset")));
 }
 
 void tst_CanvasToolBarQmlContract::toolbarIsOffsetBelowApplicationWindowTopChrome()
@@ -514,10 +549,28 @@ void tst_CanvasToolBarQmlContract::toolbarIsOffsetBelowApplicationWindowTopChrom
     QVERIFY(pageQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString pageSource = QString::fromUtf8(pageQml.readAll());
 
+    const qsizetype toolbarIndex = pageSource.indexOf(QStringLiteral("BrushUi.CanvasToolBar"));
+    const qsizetype chromeBackgroundIndex = pageSource.indexOf(QStringLiteral("id: toolbarChromeBackground"));
+    QVERIFY(toolbarIndex >= 0);
+    QVERIFY(chromeBackgroundIndex >= 0);
+    QVERIFY(chromeBackgroundIndex < toolbarIndex);
+    const QString toolbarBlock = pageSource.mid(toolbarIndex);
+
     QVERIFY(pageSource.contains(QStringLiteral("property int topChromeReservedHeight: 0")));
-    QVERIFY(pageSource.contains(QStringLiteral("readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall")));
-    QVERIFY(pageSource.contains(QStringLiteral("anchors.topMargin: painterPage.toolbarTopMargin")));
-    QVERIFY(!pageSource.contains(QStringLiteral("anchors.topMargin: painterPage.spacingSmall")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property color toolbarBackgroundColor: LV.Theme.panelBackground03")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int toolbarTopMargin: topChromeReservedHeight")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height")));
+    QVERIFY(pageSource.contains(QStringLiteral("height: painterPage.toolbarTopMargin + canvasToolBar.height")));
+    QVERIFY(pageSource.contains(QStringLiteral("color: painterPage.toolbarBackgroundColor")));
+    QVERIFY(toolbarBlock.contains(QStringLiteral("anchors.topMargin: painterPage.toolbarTopMargin")));
+    QVERIFY(toolbarBlock.contains(QStringLiteral("anchors.leftMargin: 0")));
+    QVERIFY(toolbarBlock.contains(QStringLiteral("anchors.rightMargin: 0")));
+    QVERIFY(toolbarBlock.contains(QStringLiteral("backgroundColor: painterPage.toolbarBackgroundColor")));
+    QVERIFY(!pageSource.contains(QStringLiteral("readonly property int toolbarTopMargin: 0")));
+    QVERIFY(!toolbarBlock.contains(QStringLiteral("titlebarReservedHeight: painterPage.topChromeReservedHeight")));
+    QVERIFY(!toolbarBlock.contains(QStringLiteral("onTitlebarDragRequested: painterPage.titlebarDragRequested()")));
+    QVERIFY(!toolbarBlock.contains(QStringLiteral("anchors.leftMargin: painterPage.spacingSmall")));
+    QVERIFY(!toolbarBlock.contains(QStringLiteral("anchors.rightMargin: painterPage.spacingSmall")));
 }
 
 void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
@@ -528,15 +581,27 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QFile pageQml(pageQmlPath);
     QVERIFY(pageQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString pageSource = QString::fromUtf8(pageQml.readAll());
+    const qsizetype panelIndex = pageSource.indexOf(QStringLiteral("id: layerHierarchyPanel"));
+    const qsizetype surfaceIndex = pageSource.indexOf(QStringLiteral("Painting.DrawingSurface"));
+    const qsizetype surfaceEndIndex = pageSource.indexOf(QStringLiteral("Connections {"), surfaceIndex);
+    QVERIFY(panelIndex >= 0);
+    QVERIFY(surfaceIndex > panelIndex);
+    QVERIFY(surfaceEndIndex > surfaceIndex);
+    const QString panelBlock = pageSource.mid(panelIndex, surfaceIndex - panelIndex);
+    const QString surfaceBlock = pageSource.mid(surfaceIndex, surfaceEndIndex - surfaceIndex);
 
     QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerPanelWidth")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height")));
     QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerRenameActivationWindowMs")));
     QVERIFY(pageSource.contains(QStringLiteral("readonly property int layerRenameRepeatActivationThreshold")));
     QVERIFY(pageSource.contains(QStringLiteral("property bool layerRenameActive: false")));
     QVERIFY(pageSource.contains(QStringLiteral("id: layerHierarchyPanel")));
     QVERIFY(pageSource.contains(QStringLiteral("objectName: \"layerHierarchyPanel\"")));
     QVERIFY(pageSource.contains(QStringLiteral("LV.Hierarchy")));
-    QVERIFY(pageSource.contains(QStringLiteral("anchors.left: parent.left")));
+    QVERIFY(panelBlock.contains(QStringLiteral("anchors.left: parent.left")));
+    QVERIFY(panelBlock.contains(QStringLiteral("anchors.topMargin: painterPage.layerPanelTopMargin")));
+    QVERIFY(panelBlock.contains(QStringLiteral("anchors.leftMargin: 0")));
+    QVERIFY(panelBlock.contains(QStringLiteral("anchors.bottomMargin: 0")));
     QVERIFY(pageSource.contains(QStringLiteral("model: drawingSurface.layerHierarchyRows")));
     QVERIFY(pageSource.contains(QStringLiteral("editable: true")));
     QVERIFY(pageSource.contains(QStringLiteral("footerVisible: true")));
@@ -565,7 +630,11 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(pageSource.contains(QStringLiteral("layerHierarchyPanel.activateListItemByKey(drawingSurface.currentLayerKey())")));
     QVERIFY(pageSource.contains(QStringLiteral("LV.ToolbarButton")));
     QVERIFY(!pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
-    QVERIFY(pageSource.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
+    QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
+    QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.leftMargin: 0")));
+    QVERIFY(!panelBlock.contains(QStringLiteral("anchors.leftMargin: painterPage.spacingSmall")));
+    QVERIFY(!panelBlock.contains(QStringLiteral("anchors.bottomMargin: painterPage.spacingSmall")));
+    QVERIFY(!surfaceBlock.contains(QStringLiteral("anchors.leftMargin: painterPage.spacingSmall")));
     QVERIFY(pageSource.contains(QStringLiteral("id: layerRenameEditorFrame")));
     QVERIFY(pageSource.contains(QStringLiteral("parent: layerHierarchyPanel")));
     QVERIFY(pageSource.contains(QStringLiteral("TextInput")));

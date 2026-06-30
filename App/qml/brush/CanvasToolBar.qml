@@ -25,6 +25,7 @@ Item {
     property real pressureCurveMaximum: 1
     property real stabilizerStrength: 0
     property color currentColor: "#1a1a1a"
+    property color backgroundColor: LV.Theme.panelBackground03
     property string currentTool: "brush"
     property string currentShape: "rectangle"
     property int canvasWidth: fallbackNewCanvasWidth
@@ -40,9 +41,16 @@ Item {
     readonly property int maximumCanvasDimension: 8192
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
-    readonly property int figmaToolbarButtonSize: 20
-    readonly property int figmaToolbarMenuButtonWidth: 34
+    readonly property int toolbarButtonPadding: 1
+    readonly property int figmaToolbarButtonSize: 18
+    readonly property int figmaToolbarMenuButtonWidth: 30
     readonly property int figmaToolbarIconSize: 16
+    readonly property int toolbarControlButtonSize: 28
+    readonly property int toolbarControlIconSize: 16
+    readonly property int toolbarColorSwatchSize: 20
+    readonly property int toolbarColorSwatchRingSize: 24
+    readonly property int toolbarHorizontalPadding: spacingLarge
+    readonly property int toolbarVerticalPadding: LV.Theme.gap4
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
     readonly property url panHandIconSource: "qrc:/Vincent/resources/icons/panHand.svg"
     readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
@@ -84,8 +92,8 @@ Item {
         }
     ]
 
-    implicitHeight: toolbarLayout.implicitHeight + spacingSmall * 4
-    implicitWidth: toolbarLayout.implicitWidth + spacingSmall * 4
+    implicitHeight: toolbarLayout.implicitHeight + toolbarVerticalPadding * 2
+    implicitWidth: toolbarLayout.implicitWidth + toolbarHorizontalPadding * 2
     height: implicitHeight
 
     signal newCanvasRequested(int canvasWidth, int canvasHeight)
@@ -263,8 +271,8 @@ Item {
     component FigmaToolbarButton: LV.IconButton {
         iconSize: toolbar.figmaToolbarIconSize
         tone: LV.AbstractButton.Borderless
-        horizontalPadding: 2
-        verticalPadding: 2
+        horizontalPadding: toolbar.toolbarButtonPadding
+        verticalPadding: toolbar.toolbarButtonPadding
         cornerRadius: LV.Theme.radiusSm
         implicitWidth: toolbar.figmaToolbarButtonSize
         implicitHeight: toolbar.figmaToolbarButtonSize
@@ -305,8 +313,8 @@ Item {
             anchors.bottom: parent.bottom
             width: toolbar.figmaToolbarButtonSize
             tone: menuButton.tone
-            horizontalPadding: 2
-            verticalPadding: 2
+            horizontalPadding: toolbar.toolbarButtonPadding
+            verticalPadding: toolbar.toolbarButtonPadding
             cornerRadius: LV.Theme.radiusSm
             Accessible.name: menuButton.accessibleName
             onClicked: menuButton.bodyClicked()
@@ -968,22 +976,25 @@ Item {
     }
 
     Rectangle {
-        id: floatingBackground
+        id: toolbarBackground
         anchors.fill: parent
-        anchors.leftMargin: toolbar.spacingSmall
-        anchors.rightMargin: toolbar.spacingSmall
-        anchors.topMargin: toolbar.spacingSmall
-        anchors.bottomMargin: toolbar.spacingSmall
-        radius: height / 2
+        radius: 0
         clip: true
-        color: LV.Theme.panelBackground03
-        border.width: 1
-        border.color: Qt.rgba(255, 255, 255, 0.16)
+        color: toolbar.backgroundColor
+    }
+
+    Rectangle {
+        id: toolbarBottomSeparator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 1
+        color: Qt.rgba(255, 255, 255, 0.12)
     }
 
     MouseArea {
         id: toolbarEventBlocker
-        anchors.fill: floatingBackground
+        anchors.fill: toolbarBackground
         z: 0
         acceptedButtons: Qt.AllButtons
         hoverEnabled: true
@@ -1004,11 +1015,11 @@ Item {
     LV.HStack {
         id: toolbarLayout
         z: 1
-        anchors.fill: floatingBackground
-        anchors.leftMargin: toolbar.spacingSmall
-        anchors.rightMargin: toolbar.spacingSmall
-        anchors.topMargin: toolbar.spacingSmall
-        anchors.bottomMargin: toolbar.spacingSmall
+        anchors.fill: toolbarBackground
+        anchors.leftMargin: toolbar.toolbarHorizontalPadding
+        anchors.rightMargin: toolbar.toolbarHorizontalPadding
+        anchors.topMargin: toolbar.toolbarVerticalPadding
+        anchors.bottomMargin: toolbar.toolbarVerticalPadding
         spacing: toolbar.spacingMedium
         alignmentName: "center"
 
@@ -1121,11 +1132,11 @@ Item {
 
             Rectangle {
                 id: brushPreview
-                implicitWidth: 36
-                implicitHeight: 36
+                implicitWidth: toolbar.toolbarControlButtonSize
+                implicitHeight: toolbar.toolbarControlButtonSize
                 Layout.preferredWidth: implicitWidth
                 Layout.preferredHeight: implicitHeight
-                radius: 18
+                radius: width / 2
                 color: Qt.rgba(255, 255, 255, 0.04)
                 border.width: 1
                 border.color: Qt.rgba(255, 255, 255, 0.15)
@@ -1133,7 +1144,7 @@ Item {
 
                 Rectangle {
                     readonly property real normalized: (toolbar.brushSize - 1) / 47
-                    width: 6 + normalized * 20
+                    width: 5 + normalized * 16
                     height: width
                     radius: width / 2
                     color: toolbar.currentColor
@@ -1144,8 +1155,14 @@ Item {
             }
 
             LV.IconButton {
-                iconSize: 20
+                iconSize: toolbar.toolbarControlIconSize
                 tone: LV.AbstractButton.Borderless
+                implicitWidth: toolbar.toolbarControlButtonSize
+                implicitHeight: toolbar.toolbarControlButtonSize
+                width: toolbar.toolbarControlButtonSize
+                height: toolbar.toolbarControlButtonSize
+                Layout.preferredWidth: toolbar.toolbarControlButtonSize
+                Layout.preferredHeight: toolbar.toolbarControlButtonSize
                 iconName: "imagezoomOut"
                 Accessible.name: qsTr("Decrease brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
@@ -1200,8 +1217,14 @@ Item {
             }
 
             LV.IconButton {
-                iconSize: 20
+                iconSize: toolbar.toolbarControlIconSize
                 tone: LV.AbstractButton.Borderless
+                implicitWidth: toolbar.toolbarControlButtonSize
+                implicitHeight: toolbar.toolbarControlButtonSize
+                width: toolbar.toolbarControlButtonSize
+                height: toolbar.toolbarControlButtonSize
+                Layout.preferredWidth: toolbar.toolbarControlButtonSize
+                Layout.preferredHeight: toolbar.toolbarControlButtonSize
                 iconName: "imagezoomIn"
                 Accessible.name: qsTr("Increase brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
@@ -1212,12 +1235,12 @@ Item {
 
         Rectangle {
             id: currentColorButton
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: toolbar.toolbarControlButtonSize
+            implicitHeight: toolbar.toolbarControlButtonSize
             Layout.preferredWidth: implicitWidth
             Layout.preferredHeight: implicitHeight
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            radius: 18
+            radius: width / 2
             color: colorButtonMouseArea.containsMouse || colorPickerMenu.opened ? LV.Theme.panelBackground10 : Qt.rgba(255, 255, 255, 0.04)
             border.width: colorPickerMenu.opened ? 2 : 1
             border.color: colorPickerMenu.opened ? toolbar.accentColor : Qt.rgba(255, 255, 255, 0.15)
@@ -1225,9 +1248,9 @@ Item {
             Rectangle {
                 id: colorPickerBall
                 anchors.centerIn: parent
-                width: 24
-                height: 24
-                radius: 12
+                width: toolbar.toolbarColorSwatchSize
+                height: toolbar.toolbarColorSwatchSize
+                radius: width / 2
                 color: toolbar.currentColor
                 border.width: 1
                 border.color: Qt.rgba(0, 0, 0, 0.32)
@@ -1235,9 +1258,9 @@ Item {
 
             Rectangle {
                 anchors.centerIn: parent
-                width: 28
-                height: 28
-                radius: 14
+                width: toolbar.toolbarColorSwatchRingSize
+                height: toolbar.toolbarColorSwatchRingSize
+                radius: width / 2
                 color: "transparent"
                 border.width: 1
                 border.color: Qt.rgba(255, 255, 255, 0.22)

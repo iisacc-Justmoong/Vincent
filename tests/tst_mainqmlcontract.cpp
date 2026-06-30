@@ -8,7 +8,7 @@ class tst_MainQmlContract : public QObject
 
 private slots:
     void applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome();
-    void applicationWindowEnablesLogicalTopDragHandle();
+    void applicationWindowKeepsEmptyLogicalTopDragHandle();
     void applicationWindowPassesTopDragHandleHeightToCanvasPage();
 };
 
@@ -29,7 +29,7 @@ void tst_MainQmlContract::applicationWindowKeepsNativeControlsWhileUsingSolidVis
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.WindowTitleHint")));
 }
 
-void tst_MainQmlContract::applicationWindowEnablesLogicalTopDragHandle()
+void tst_MainQmlContract::applicationWindowKeepsEmptyLogicalTopDragHandle()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -40,6 +40,7 @@ void tst_MainQmlContract::applicationWindowEnablesLogicalTopDragHandle()
 
     QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleHeight: 0")));
+    QVERIFY(!mainSource.contains(QStringLiteral("onTitlebarDragRequested: window.requestWindowMove()")));
     QVERIFY(!mainSource.contains(QStringLiteral("MouseArea")));
     QVERIFY(!mainSource.contains(QStringLiteral("DragHandler")));
 }

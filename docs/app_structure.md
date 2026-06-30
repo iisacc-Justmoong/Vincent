@@ -39,23 +39,24 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 - Creates the main LVRS application window.
 - Keeps native close, minimize, and maximize controls while using LVRS solid chrome to suppress the visual title-bar strip.
-- Enables LVRS's logical top drag handle so the window can move from the top area without adding a visible handle.
-- Passes the active top drag-handle height into `PainterCanvasPage` so floating toolbar placement clears ApplicationWindow controls.
+- Keeps LVRS's logical top drag handle enabled while solid chrome suppresses the visible titlebar strip.
+- Passes the active top drag-handle height into `PainterCanvasPage` so the titlebar-position area remains empty, shares the toolbar background color, and the toolbar starts below it.
 - Hosts `PainterCanvasPage` as the single content view.
 
 ### `PainterCanvasPage.qml`
 
 - Binds the view to LVRS `ViewModels` using the stable `PainterCanvasPage` view ID.
 - Reads brush and canvas state from `CanvasDocumentViewModel`.
-- Offsets the floating toolbar by the reserved top chrome height plus the normal page gap, keeping its absolute top position below the ApplicationWindow control/drag region.
-- Hosts a left-side `LV.Hierarchy` layer panel under the toolbar. The panel lists current QML session layers top-to-bottom plus a locked `Background` raster row, displays each row through LVRS `iconSource` bitmap thumbnails instead of letter glyphs, activates layer selection, opens inline layer-name editing from repeated row activation/double-click, delegates row drag moves back to `DrawingSurface`, and exposes plus/minus footer buttons for creating or removing object layers.
+- Places the toolbar below the reserved top chrome height, paints the reserved area and toolbar from the same toolbar background color, and keeps the visible titlebar suppressed.
+- Hosts a docked left-side `LV.Hierarchy` layer panel directly under the toolbar and flush with the window's left and bottom edges. The panel lists current QML session layers top-to-bottom plus a locked `Background` raster row, displays each row through LVRS `iconSource` bitmap thumbnails instead of letter glyphs, activates layer selection, opens inline layer-name editing from repeated row activation/double-click, delegates row drag moves back to `DrawingSurface`, and exposes plus/minus footer buttons for creating or removing object layers.
 - Routes toolbar actions into either view-model property updates or `DrawingSurface` commands.
 
 ### `CanvasToolBar.qml`
 
 - Provides the flat-raster command bar.
 - Exposes left toolbar file actions for new, open, and save, with clear still available through the keyboard shortcut.
-- Renders the command bar inside a full-height solid round cylinder background.
+- Renders the command bar inside a full-width square-corner toolbar background with a bottom separator instead of a floating cylinder.
+- Uses compact 18px tool buttons with 1px button padding and reduced auxiliary control sizes so the toolbar reads as a dense application command bar.
 - Renders the left command cluster inside the existing toolbar frame using LVRS `addFile`, `generalopen`, `generalsave`, app-local `panHand`, `translateObject`, `generalsearch`, `showCode`, `eraser`, selected shape-kind, `fillbucket`, and `typeAlias` icons.
 - Keeps existing behavior on the matching actionable icons: add opens the new-canvas size modal, open shows the image-open dialog, save shows the image-save dialog, `panHand` selects the pan tool, `translateObject` selects the move tool, `generalsearch` selects the zoom tool, pencil selects or reopens brush settings, eraser selects the eraser, the shape split button selects the shape tool from its body and opens the shape menu from its chevron, `fillbucket` selects the fill tool, and `typeAlias` selects the text tool.
 - Uses an LVRS-styled modal with width and height inputs before emitting the new-canvas request.

@@ -13,11 +13,12 @@ Item {
     readonly property int spacingLarge: LV.Theme.gap16
     readonly property string viewId: "PainterCanvasPage"
     readonly property real maximumAntialiasingBrushHardness: 1
-    readonly property int toolbarTopMargin: topChromeReservedHeight + spacingSmall
+    readonly property color toolbarBackgroundColor: LV.Theme.panelBackground03
+    readonly property int toolbarTopMargin: topChromeReservedHeight
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
     readonly property int layerPanelWidth: Math.min(260, Math.max(220, Math.round(width * 0.22)))
-    readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height + spacingSmall
+    readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height
     readonly property int layerRenameActivationWindowMs: 500
     readonly property int layerRenameRepeatActivationThreshold: 3
 
@@ -209,8 +210,8 @@ Item {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 anchors.topMargin: painterPage.layerPanelTopMargin
-                anchors.leftMargin: painterPage.spacingSmall
-                anchors.bottomMargin: painterPage.spacingSmall
+                anchors.leftMargin: 0
+                anchors.bottomMargin: 0
                 width: painterPage.layerPanelWidth
                 z: 4
                 minimumPanelWidth: painterPage.layerPanelWidth
@@ -267,7 +268,7 @@ Item {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.left: layerHierarchyPanel.right
-                anchors.leftMargin: painterPage.spacingSmall
+                anchors.leftMargin: 0
                 workspaceColor: LV.Theme.window
                 documentViewModel: painterPage.vm
                 viewId: painterPage.viewId
@@ -345,15 +346,26 @@ Item {
             }
         }
 
+        Rectangle {
+            id: toolbarChromeBackground
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: painterPage.toolbarTopMargin + canvasToolBar.height
+            color: painterPage.toolbarBackgroundColor
+            z: 9
+        }
+
         BrushUi.CanvasToolBar {
             id: canvasToolBar
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: painterPage.toolbarTopMargin
-            anchors.leftMargin: painterPage.spacingSmall
-            anchors.rightMargin: painterPage.spacingSmall
+            anchors.leftMargin: 0
+            anchors.rightMargin: 0
             z: 10
+            backgroundColor: painterPage.toolbarBackgroundColor
             brushSize: painterPage.vm ? painterPage.vm.brushSize : 2
             brushFlow: painterPage.vm ? painterPage.vm.brushFlow : 1
             brushOpacity: painterPage.vm ? painterPage.vm.brushOpacity : 1
