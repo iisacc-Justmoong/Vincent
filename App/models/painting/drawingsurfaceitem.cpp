@@ -129,6 +129,21 @@ QImage transparentCanvasImage(const QSize &size)
     return image;
 }
 
+QImage opaqueCanvasBackgroundImage(const QImage &rasterImage)
+{
+    if (rasterImage.isNull()) {
+        return {};
+    }
+
+    QImage image(rasterImage.size(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+
+    QPainter painter(&image);
+    painter.drawImage(QPointF(0.0, 0.0), rasterImage);
+    painter.end();
+    return image;
+}
+
 QDir writableCacheDirectory(const QString &subdirectoryName)
 {
     const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
@@ -585,18 +600,23 @@ QImage rasterizedRasterLayer(const QImage &layerImage, const QRect &bounds)
 QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
                                                   const QVariantList &objects,
                                                   const PsdCompatibilityDocument &document,
-                                                  const QHash<int, QImage> &rasterLayersByObjectId = {})
+                                                  const QHash<int, QImage> &rasterLayersByObjectId,
+                                                  bool includeBackgroundLayer)
 {
     const QList<PsdLayerRecord> records = document.layers();
-    if (records.isEmpty()) {
+    if (records.isEmpty() && objects.isEmpty()) {
         return {};
     }
 
     QList<PsdImageWriter::Layer> layers;
     layers.reserve(records.size());
-    layers.append(PsdImageWriter::Layer{records.constFirst().name(), records.constFirst().bounds(), rasterImage});
 
-    int recordIndex = 1;
+    int recordIndex = 0;
+    if (includeBackgroundLayer && !records.isEmpty()) {
+        layers.append(PsdImageWriter::Layer{records.constFirst().name(), records.constFirst().bounds(), rasterImage});
+        recordIndex = 1;
+    }
+
     for (const QVariant &objectValue : objects) {
         if (objectValue.toMap().isEmpty()) {
             continue;
@@ -621,17 +641,25 @@ QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
 bool writeLayeredPsdFile(const QString &filePath,
                          const QImage &rasterImage,
                          const QVariantList &objects,
-                         const QHash<int, QImage> &rasterLayersByObjectId = {})
+                         const QHash<int, QImage> &rasterLayersByObjectId,
+                         bool includeBackgroundLayer)
 {
-    const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(rasterImage.size(), objects);
+    const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(rasterImage.size(),
+                                                                                          objects,
+                                                                                          includeBackgroundLayer);
     if (!document.isPsdCanvasSizeCompatible()) {
         return false;
     }
 
-    const QImage mergedImage = compositeImageWithObjects(rasterImage, objects, rasterLayersByObjectId);
+    const QImage baseImage = includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
+    const QImage mergedImage = compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
     return PsdImageWriter::writeLayeredImage(filePath,
                                             mergedImage,
-                                            psdLayersFromSession(rasterImage, objects, document, rasterLayersByObjectId),
+                                            psdLayersFromSession(baseImage,
+                                                                 objects,
+                                                                 document,
+                                                                 rasterLayersByObjectId,
+                                                                 includeBackgroundLayer),
                                             document.toManifest());
 }
 
@@ -848,7 +876,7 @@ bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
     if (hasPsdSuffix(fileUrl)) {
         syncCanvasSize();
-        return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()), {});
+        return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()), {}, {}, true);
     }
 
     return CanvasAdapter::saveToFile(fileUrl);
@@ -861,12 +889,9 @@ bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVa
 
 bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fileUrl,
                                                               const QVariantList &objects,
-                                                              const QVariantList &rasterLayers)
+                                                              const QVariantList &rasterLayers,
+                                                              bool includeBackgroundLayer)
 {
-    if (objects.isEmpty()) {
-        return saveToFile(fileUrl);
-    }
-
     syncCanvasSize();
     const QImage rasterImage = currentRasterCanvasImage(canvasSize());
     if (rasterImage.isNull()) {
@@ -907,10 +932,15 @@ bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fil
     }
 
     if (hasPsdSuffix(fileUrl)) {
-        return writeLayeredPsdFile(localFilePath(fileUrl), rasterImage, objects, rasterLayersByObjectId);
+        return writeLayeredPsdFile(localFilePath(fileUrl),
+                                   rasterImage,
+                                   objects,
+                                   rasterLayersByObjectId,
+                                   includeBackgroundLayer);
     }
 
-    const QImage image = compositeImageWithObjects(rasterImage, objects, rasterLayersByObjectId);
+    const QImage baseImage = includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
+    const QImage image = compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
     return image.save(localFilePath(fileUrl));
 }
 
@@ -1015,9 +1045,10 @@ bool DrawingSurfaceItem::restoreRasterSnapshot(const QString &fileUrl)
     return restored;
 }
 
-QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &objects) const
+QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &objects,
+                                                         bool includeBackgroundLayer) const
 {
-    return PsdCompatibilityDocument::fromVincentSession(canvasSize(), objects).toManifest();
+    return PsdCompatibilityDocument::fromVincentSession(canvasSize(), objects, includeBackgroundLayer).toManifest();
 }
 
 void DrawingSurfaceItem::undo()

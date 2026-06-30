@@ -112,8 +112,10 @@ Rectangle {
     readonly property int layerHierarchyThumbnailSize: 32
     readonly property int layerHierarchyThumbnailRefreshDelayMs: 1000
     readonly property int brushLivePreviewFrameIntervalMs: 16
+    readonly property string transparencyGridTileSource: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJElEQVR42mP49OnTf3z4ypUreDHDqAHDwgBCCghZMGrAsDAAAIlzqC6skcNAAAAAAElFTkSuQmCC"
     property bool layerHierarchyRowsRebuildScheduled: false
     property bool backgroundLayerThumbnailRefreshPending: false
+    property bool backgroundLayerPresent: true
     property var pendingRasterLayerThumbnailRefreshes: ({})
     property string backgroundLayerThumbnailSource: ""
     property var drawableObjectThumbnailSources: ({})
@@ -166,6 +168,7 @@ Rectangle {
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
+        surface.backgroundLayerPresent = true;
         clearDrawableObjects();
         if (arguments.length >= 2) {
             resizeCanvasItemToDimensions(canvasWidth, canvasHeight);
@@ -179,6 +182,7 @@ Rectangle {
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
+        surface.backgroundLayerPresent = true;
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
@@ -198,6 +202,7 @@ Rectangle {
             return false;
         }
 
+        surface.backgroundLayerPresent = true;
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
@@ -263,6 +268,7 @@ Rectangle {
             return false;
         }
 
+        surface.backgroundLayerPresent = false;
         clearDrawableObjects();
         resizeCanvasItemToDimensions(psdDocument.canvasWidth, psdDocument.canvasHeight);
         canvasSurface.newCanvas();
@@ -270,6 +276,7 @@ Rectangle {
         var firstObjectId = -1;
         var startIndex = 0;
         if (shouldRestorePsdBackgroundLayer(psdDocument) && importedLayers[0].source) {
+            surface.backgroundLayerPresent = true;
             canvasSurface.restoreRasterSnapshot(importedLayers[0].source);
             startIndex = 1;
         }
@@ -288,13 +295,13 @@ Rectangle {
     function saveToFile(fileUrl) {
         commitActiveText();
         commitActiveShape();
-        return canvasSurface.saveToFileWithObjectsAndRasterLayers(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors());
+        return canvasSurface.saveToFileWithObjectsAndRasterLayers(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors(), surface.backgroundLayerPresent);
     }
 
     function psdCompatibilityManifest() {
         commitActiveText();
         commitActiveShape();
-        return canvasSurface.psdCompatibilityManifest(surface.drawableObjects);
+        return canvasSurface.psdCompatibilityManifest(surface.drawableObjects, surface.backgroundLayerPresent);
     }
 
     function longestTextLine(textValue) {
@@ -749,7 +756,11 @@ Rectangle {
                 return item;
             }
         }
-        return canvasSurface;
+        return surface.backgroundLayerPresent ? canvasSurface : null;
+    }
+
+    function hasActiveRasterSurface() {
+        return activeRasterSurface() !== null;
     }
 
     function rasterLayerDescriptors() {
@@ -902,7 +913,10 @@ Rectangle {
     }
 
     function currentLayerKey() {
-        return surface.selectedDrawableObjectId >= 0 ? layerKeyForDrawableObjectId(surface.selectedDrawableObjectId) : "raster-canvas";
+        if (surface.selectedDrawableObjectId >= 0) {
+            return layerKeyForDrawableObjectId(surface.selectedDrawableObjectId);
+        }
+        return surface.backgroundLayerPresent ? "raster-canvas" : "";
     }
 
     function rebuildLayerHierarchyRows() {
@@ -927,23 +941,25 @@ Rectangle {
                 showChevron: false
             });
         }
-        rows.push({
-            key: "raster-canvas",
-            itemId: 0,
-            objectId: -1,
-            layerKind: "raster",
-            depth: 0,
-            parentKey: "",
-            parentItemKey: "",
-            label: qsTr("Background"),
-            iconSource: surface.backgroundLayerThumbnailSource,
-            iconGlyph: "",
-            selected: surface.selectedDrawableObjectId < 0,
-            enabled: true,
-            activatable: true,
-            draggable: false,
-            showChevron: false
-        });
+        if (surface.backgroundLayerPresent) {
+            rows.push({
+                key: "raster-canvas",
+                itemId: 0,
+                objectId: -1,
+                layerKind: "raster",
+                depth: 0,
+                parentKey: "",
+                parentItemKey: "",
+                label: qsTr("Background"),
+                iconSource: surface.backgroundLayerThumbnailSource,
+                iconGlyph: "",
+                selected: surface.selectedDrawableObjectId < 0,
+                enabled: true,
+                activatable: true,
+                draggable: false,
+                showChevron: false
+            });
+        }
         surface.layerHierarchyRows = rows;
     }
 
@@ -997,6 +1013,9 @@ Rectangle {
     function activateLayerByKey(layerKey) {
         const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
         if (normalizedKey === "raster-canvas") {
+            if (!surface.backgroundLayerPresent) {
+                return false;
+            }
             surface.selectedDrawableObjectId = -1;
             resetDrawableObjectTransform();
             return true;
@@ -1013,11 +1032,40 @@ Rectangle {
         return false;
     }
 
+    function deleteBackgroundLayer() {
+        if (!surface.backgroundLayerPresent) {
+            return false;
+        }
+
+        surface.backgroundLayerPresent = false;
+        surface.backgroundLayerThumbnailSource = "";
+        surface.backgroundLayerThumbnailRefreshPending = false;
+        surface.selectedDrawableObjectId = -1;
+        resetDrawableObjectTransform();
+        canvasSurface.newCanvas();
+        rebuildLayerHierarchyRows();
+        return true;
+    }
+
     function deleteLayerByKey(layerKey) {
-        if (!activateLayerByKey(layerKey) || surface.selectedDrawableObjectId < 0) {
+        const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        if (normalizedKey === "raster-canvas") {
+            return deleteBackgroundLayer();
+        }
+
+        if (!activateLayerByKey(normalizedKey) || surface.selectedDrawableObjectId < 0) {
             return false;
         }
         return deleteSelectedDrawableObject();
+    }
+
+    function canDeleteCurrentLayer() {
+        return surface.selectedDrawableObjectId >= 0 || (surface.selectedDrawableObjectId < 0 && surface.backgroundLayerPresent);
+    }
+
+    function deleteCurrentLayer() {
+        const key = currentLayerKey();
+        return key.length > 0 && deleteLayerByKey(key);
     }
 
     function canRenameLayerByKey(layerKey) {
@@ -1305,7 +1353,11 @@ Rectangle {
 
         commitActiveText();
         cancelActiveShape();
-        activeRasterSurface().fillAt(pointX, pointY, surface.brushColor);
+        const rasterSurface = activeRasterSurface();
+        if (!rasterSurface) {
+            return;
+        }
+        rasterSurface.fillAt(pointX, pointY, surface.brushColor);
     }
 
     function resetCanvasPan() {
@@ -1636,9 +1688,19 @@ Rectangle {
             height: canvasSurface.height
             transformOrigin: Item.Center
             scale: surface.canvasZoomScale
-            color: surface.canvasColor
+            color: surface.backgroundLayerPresent ? surface.canvasColor : "transparent"
             border.color: "#b8bcc4"
             border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
+
+            Image {
+                objectName: "transparencyGridBackground"
+                anchors.fill: parent
+                visible: !surface.backgroundLayerPresent
+                source: surface.transparencyGridTileSource
+                fillMode: Image.Tile
+                smooth: false
+                cache: true
+            }
         }
 
         DrawingSurfaceItem {
@@ -1662,7 +1724,7 @@ Rectangle {
             pressureCurveCenter: surface.pressureCurveCenter
             pressureCurveMaximum: surface.pressureCurveMaximum
             stabilizerStrength: surface.stabilizerStrength
-            toolMode: surface.toolMode
+            toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.toolMode : "move"
             documentViewModel: surface.documentViewModel
             viewId: surface.viewId
 
@@ -2105,20 +2167,30 @@ Rectangle {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Undo
         enabled: !surface.textEditingActive
-        onActivated: surface.activeRasterSurface().undo()
+        onActivated: {
+            const rasterSurface = surface.activeRasterSurface();
+            if (rasterSurface) {
+                rasterSurface.undo();
+            }
+        }
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequence: StandardKey.Redo
         enabled: !surface.textEditingActive
-        onActivated: surface.activeRasterSurface().redo()
+        onActivated: {
+            const rasterSurface = surface.activeRasterSurface();
+            if (rasterSurface) {
+                rasterSurface.redo();
+            }
+        }
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
         sequences: ["Delete", "Backspace"]
-        enabled: !surface.textEditingActive && !surface.shapeDraggingActive && !surface.drawableObjectTransformActive && surface.hasSelectedDrawableObject()
-        onActivated: surface.deleteSelectedDrawableObject()
+        enabled: !surface.textEditingActive && !surface.shapeDraggingActive && !surface.drawableObjectTransformActive && surface.canDeleteCurrentLayer()
+        onActivated: surface.deleteCurrentLayer()
     }
 }

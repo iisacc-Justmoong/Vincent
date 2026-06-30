@@ -228,7 +228,7 @@ Item {
                 footerButton2: ({
                         type: "icon",
                         iconName: "remove",
-                        enabled: drawingSurface.selectedDrawableObjectId >= 0
+                        enabled: drawingSurface.canDeleteCurrentLayer()
                     })
                 footerButton3: ({
                         type: "icon",
@@ -250,15 +250,9 @@ Item {
                         drawingSurface.addEmptyLayer();
                         Qt.callLater(painterPage.syncLayerHierarchySelection);
                     } else if (index === 1) {
-                        drawingSurface.deleteSelectedDrawableObject();
+                        drawingSurface.deleteCurrentLayer();
                         Qt.callLater(painterPage.syncLayerHierarchySelection);
                     }
-                }
-
-                LV.ToolbarButton {
-                    buttonId: "layers"
-                    iconName: "projectStructure"
-                    enabled: false
                 }
             }
 

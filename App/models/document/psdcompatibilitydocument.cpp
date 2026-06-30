@@ -291,11 +291,14 @@ QVariantMap PsdLayerRecord::toVariantMap() const
 }
 
 PsdCompatibilityDocument PsdCompatibilityDocument::fromVincentSession(const QSize &canvasSize,
-                                                                      const QVariantList &drawableObjects)
+                                                                      const QVariantList &drawableObjects,
+                                                                      bool includeBackgroundLayer)
 {
     PsdCompatibilityDocument document;
     document.m_canvasSize = QSize(qMax(1, canvasSize.width()), qMax(1, canvasSize.height()));
-    document.m_layers.append(PsdLayerRecord::rasterCanvas(document.m_canvasSize));
+    if (includeBackgroundLayer) {
+        document.m_layers.append(PsdLayerRecord::rasterCanvas(document.m_canvasSize));
+    }
 
     for (int index = 0; index < drawableObjects.size(); ++index) {
         const QVariantMap drawableObject = drawableObjects.at(index).toMap();

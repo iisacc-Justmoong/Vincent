@@ -316,8 +316,7 @@ void readLayerMaskSection(const psd::Document *document,
         return;
     }
 
-    QList<PsdImportedLayer> topToBottomLayers;
-    topToBottomLayers.reserve(static_cast<qsizetype>(layerMaskSection->layerCount));
+    imported->layers.reserve(static_cast<qsizetype>(layerMaskSection->layerCount));
     for (unsigned int index = 0; index < layerMaskSection->layerCount; ++index) {
         psd::Layer *layer = &layerMaskSection->layers[index];
         psd::ExtractLayer(document, file, allocator, layer);
@@ -333,13 +332,8 @@ void readLayerMaskSection(const psd::Document *document,
         importedLayer.hasVectorMask = layer->vectorMask != nullptr;
         importedLayer.image = imageFromLayerData(*document, *layer);
         if (!importedLayer.image.isNull()) {
-            topToBottomLayers.append(importedLayer);
+            imported->layers.append(importedLayer);
         }
-    }
-
-    imported->layers.reserve(topToBottomLayers.size());
-    for (auto layer = topToBottomLayers.crbegin(); layer != topToBottomLayers.crend(); ++layer) {
-        imported->layers.append(*layer);
     }
 }
 

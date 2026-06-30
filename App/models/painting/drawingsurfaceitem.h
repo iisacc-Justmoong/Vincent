@@ -46,7 +46,8 @@ public:
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
     Q_INVOKABLE bool saveToFileWithObjectsAndRasterLayers(const QString &fileUrl,
                                                           const QVariantList &objects,
-                                                          const QVariantList &rasterLayers);
+                                                          const QVariantList &rasterLayers,
+                                                          bool includeBackgroundLayer = true);
     Q_INVOKABLE QString cacheRasterSnapshotSource();
     Q_INVOKABLE QString cacheRasterThumbnailSource(qreal maximumWidth = 32, qreal maximumHeight = 32);
     Q_INVOKABLE QString cacheGrabbedThumbnailSource(QObject *grabResult);
@@ -54,7 +55,8 @@ public:
                                                            qreal maximumWidth = 32,
                                                            qreal maximumHeight = 32) const;
     Q_INVOKABLE bool restoreRasterSnapshot(const QString &fileUrl);
-    Q_INVOKABLE QVariantMap psdCompatibilityManifest(const QVariantList &objects) const;
+    Q_INVOKABLE QVariantMap psdCompatibilityManifest(const QVariantList &objects,
+                                                     bool includeBackgroundLayer = true) const;
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void resizeCanvasSurface(qreal canvasWidth, qreal canvasHeight);

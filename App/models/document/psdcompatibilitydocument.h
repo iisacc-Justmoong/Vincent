@@ -60,7 +60,8 @@ public:
     }
 
     [[nodiscard]] static PsdCompatibilityDocument fromVincentSession(const QSize &canvasSize,
-                                                                     const QVariantList &drawableObjects);
+                                                                     const QVariantList &drawableObjects,
+                                                                     bool includeBackgroundLayer = true);
 
     [[nodiscard]] QSize canvasSize() const;
     [[nodiscard]] QList<PsdLayerRecord> layers() const;

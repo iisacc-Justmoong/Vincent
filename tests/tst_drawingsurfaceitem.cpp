@@ -7,6 +7,7 @@
 #include <QQmlExpression>
 #include <QQuickItem>
 #include <QSignalSpy>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QVariantList>
@@ -30,6 +31,7 @@ private slots:
     void zoomsCanvasWithHorizontalDrag();
     void movesAndResizesDrawableObjects();
     void deletesSelectedDrawableObject();
+    void deletesBackgroundLayerLikeRegularLayer();
     void addsBlankLayerRowsWithoutTransformHitTesting();
     void savesRasterLayerItemsAsIndependentCanvasLayers();
     void deletingRasterLayerRemovesItsPaintFromQmlComposite();
@@ -44,6 +46,8 @@ private slots:
     void fillsContiguousRasterRegion();
     void cachesLayerBitmapThumbnails();
     void savesCompositeDrawableObjectsWithoutFlatteningRaster();
+    void savesBlankCanvasAsOpaquePsdBackground();
+    void savesPsdLayerRecordsInBottomToTopOrder();
     void savesCompositeDrawableObjectsAsLayeredPsdWithMetadata();
     void opensLayeredPsdThroughPsdSdkReader();
     void createsPsdDrawablePreviewForQmlImage();
@@ -159,6 +163,75 @@ qsizetype layerMaskLengthOffset(const QByteArray &psd)
 {
     const qsizetype resourcesOffset = imageResourcesLengthOffset(psd);
     return resourcesOffset + 4 + readUInt32(psd, static_cast<int>(resourcesOffset));
+}
+
+int paddedPascalStringSize(int textLength)
+{
+    return ((textLength + 1 + 3) / 4) * 4;
+}
+
+QStringList psdLayerRecordNames(const QByteArray &psd)
+{
+    QStringList names;
+    const qsizetype layerOffset = layerMaskLengthOffset(psd);
+    if (layerOffset + 10 >= psd.size()) {
+        return names;
+    }
+
+    const qsizetype layerInfoEnd = layerOffset + 8 + readUInt32(psd, static_cast<int>(layerOffset + 4));
+    qsizetype cursor = layerOffset + 8;
+    if (cursor + 2 > psd.size()) {
+        return names;
+    }
+
+    const int layerCount = qAbs(static_cast<qint16>(readUInt16(psd, static_cast<int>(cursor))));
+    cursor += 2;
+    names.reserve(layerCount);
+
+    for (int layerIndex = 0; layerIndex < layerCount; ++layerIndex) {
+        if (cursor + 18 > psd.size() || cursor >= layerInfoEnd) {
+            return {};
+        }
+
+        cursor += 16;
+        const int channelCount = readUInt16(psd, static_cast<int>(cursor));
+        cursor += 2 + channelCount * 6;
+        if (cursor + 16 > psd.size()) {
+            return {};
+        }
+
+        cursor += 12;
+        const quint32 extraDataLength = readUInt32(psd, static_cast<int>(cursor));
+        cursor += 4;
+        const qsizetype extraDataEnd = cursor + extraDataLength;
+        if (extraDataEnd > psd.size() || cursor + 8 > psd.size()) {
+            return {};
+        }
+
+        const quint32 layerMaskLength = readUInt32(psd, static_cast<int>(cursor));
+        cursor += 4 + layerMaskLength;
+        if (cursor + 4 > psd.size()) {
+            return {};
+        }
+
+        const quint32 blendingRangesLength = readUInt32(psd, static_cast<int>(cursor));
+        cursor += 4 + blendingRangesLength;
+        if (cursor >= psd.size()) {
+            return {};
+        }
+
+        const int nameLength = static_cast<uchar>(psd.at(cursor));
+        ++cursor;
+        if (cursor + nameLength > psd.size()) {
+            return {};
+        }
+
+        names.append(QString::fromLatin1(psd.mid(cursor, nameLength)));
+        cursor += paddedPascalStringSize(nameLength) - 1;
+        cursor = extraDataEnd;
+    }
+
+    return names;
 }
 
 } // namespace
@@ -703,6 +776,115 @@ void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
     QCOMPARE(objects.size(), 1);
 }
 
+void tst_DrawingSurfaceItem::deletesBackgroundLayerLikeRegularLayer()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 320);
+    initialProperties.insert(QStringLiteral("height"), 240);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
+    QVERIFY(canvasPaper);
+    QCOMPARE(canvasPaper->property("color").value<QColor>(), QColor(Qt::white));
+    QQuickItem *transparencyGridBackground =
+            findItemByObjectName(rootItem, QStringLiteral("transparencyGridBackground"));
+    QVERIFY(transparencyGridBackground);
+    QCOMPARE(transparencyGridBackground->property("visible").toBool(), false);
+    QCOMPARE(transparencyGridBackground->property("source").toUrl().scheme(), QStringLiteral("data"));
+
+    QVariantList rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 1);
+    QCOMPARE(rows.first().toMap().value(QStringLiteral("key")).toString(), QStringLiteral("raster-canvas"));
+    QCOMPARE(rows.first().toMap().value(QStringLiteral("selected")).toBool(), true);
+
+    QQmlExpression canDeleteBackground(engine.rootContext(),
+                                       object.data(),
+                                       QStringLiteral("canDeleteCurrentLayer();"));
+    const QVariant canDeleteResult = canDeleteBackground.evaluate();
+    QVERIFY2(!canDeleteBackground.hasError(), qPrintable(canDeleteBackground.error().toString()));
+    QCOMPARE(canDeleteResult.toBool(), true);
+
+    QQmlExpression deleteBackground(engine.rootContext(),
+                                    object.data(),
+                                    QStringLiteral("deleteCurrentLayer();"));
+    const QVariant deleteResult = deleteBackground.evaluate();
+    QVERIFY2(!deleteBackground.hasError(), qPrintable(deleteBackground.error().toString()));
+    QCOMPARE(deleteResult.toBool(), true);
+    QCOMPARE(rootItem->property("backgroundLayerPresent").toBool(), false);
+    QCOMPARE(canvasPaper->property("color").value<QColor>(), QColor(Qt::transparent));
+    QCOMPARE(transparencyGridBackground->property("visible").toBool(), true);
+
+    rows = rootItem->property("layerHierarchyRows").toList();
+    QCOMPARE(rows.size(), 0);
+
+    QQmlExpression currentLayerKey(engine.rootContext(),
+                                   object.data(),
+                                   QStringLiteral("currentLayerKey();"));
+    const QVariant currentLayerKeyResult = currentLayerKey.evaluate();
+    QVERIFY2(!currentLayerKey.hasError(), qPrintable(currentLayerKey.error().toString()));
+    QCOMPARE(currentLayerKeyResult.toString(), QString());
+
+    QQmlExpression canDeleteEmptySelection(engine.rootContext(),
+                                           object.data(),
+                                           QStringLiteral("canDeleteCurrentLayer();"));
+    const QVariant canDeleteEmptyResult = canDeleteEmptySelection.evaluate();
+    QVERIFY2(!canDeleteEmptySelection.hasError(), qPrintable(canDeleteEmptySelection.error().toString()));
+    QCOMPARE(canDeleteEmptyResult.toBool(), false);
+
+    QQmlExpression hasActiveRasterSurface(engine.rootContext(),
+                                          object.data(),
+                                          QStringLiteral("hasActiveRasterSurface();"));
+    const QVariant hasActiveRasterResult = hasActiveRasterSurface.evaluate();
+    QVERIFY2(!hasActiveRasterSurface.hasError(), qPrintable(hasActiveRasterSurface.error().toString()));
+    QCOMPARE(hasActiveRasterResult.toBool(), false);
+
+    QQmlExpression activeRasterSurface(engine.rootContext(),
+                                       object.data(),
+                                       QStringLiteral("activeRasterSurface();"));
+    const QVariant activeRasterResult = activeRasterSurface.evaluate();
+    QVERIFY2(!activeRasterSurface.hasError(), qPrintable(activeRasterSurface.error().toString()));
+    QVERIFY(activeRasterResult.isNull() || activeRasterResult.value<QObject *>() == nullptr);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("without-background.psd"));
+    QQmlExpression savePsd(engine.rootContext(),
+                           object.data(),
+                           QStringLiteral("saveToFile(\"%1\");").arg(QUrl::fromLocalFile(psdPath).toString()));
+    const QVariant saveResult = savePsd.evaluate();
+    QVERIFY2(!savePsd.hasError(), qPrintable(savePsd.error().toString()));
+    QCOMPARE(saveResult.toBool(), true);
+
+    QFile psdFile(psdPath);
+    QVERIFY(psdFile.open(QIODevice::ReadOnly));
+    QCOMPARE(psdLayerRecordNames(psdFile.readAll()), QStringList());
+
+    const PsdImportedDocument importedDocument = PsdImageReader::readDocument(psdPath);
+    QVERIFY(importedDocument.isValid());
+    QCOMPARE(importedDocument.layers.size(), 0);
+    QCOMPARE(importedDocument.vincentManifest.value(QStringLiteral("layers")).toList().size(), 0);
+}
+
 void tst_DrawingSurfaceItem::addsBlankLayerRowsWithoutTransformHitTesting()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
@@ -879,7 +1061,7 @@ void tst_DrawingSurfaceItem::savesRasterLayerItemsAsIndependentCanvasLayers()
     QVERIFY(baseItem.saveToFileWithObjectsAndRasterLayers(baseOnlyPath, {}, {}));
     const QImage baseOnly(baseOnlyPath);
     QVERIFY(!baseOnly.isNull());
-    QCOMPARE(baseOnly.pixelColor(18, 18).alpha(), 0);
+    QCOMPARE(baseOnly.pixelColor(18, 18).rgba(), QColor(Qt::white).rgba());
 }
 
 void tst_DrawingSurfaceItem::deletingRasterLayerRemovesItsPaintFromQmlComposite()
@@ -973,7 +1155,7 @@ void tst_DrawingSurfaceItem::deletingRasterLayerRemovesItsPaintFromQmlComposite(
 
     const QImage afterDelete(afterDeletePath);
     QVERIFY(!afterDelete.isNull());
-    QCOMPARE(afterDelete.pixelColor(24, 24).alpha(), 0);
+    QCOMPARE(afterDelete.pixelColor(24, 24).rgba(), QColor(Qt::white).rgba());
 }
 
 void tst_DrawingSurfaceItem::addsManyRasterLayersWithoutSnapshotChurn()
@@ -1543,6 +1725,82 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsWithoutFlatteningRaste
     QVERIFY(!rasterOnly.isNull());
     QVERIFY(rasterOnly.pixelColor(16, 18).alpha() == 0);
     QVERIFY(rasterOnly.pixelColor(76, 28).alpha() == 0);
+}
+
+void tst_DrawingSurfaceItem::savesBlankCanvasAsOpaquePsdBackground()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(8);
+    item.setHeight(6);
+    item.setDocumentViewModel(&viewModel);
+    item.newCanvas();
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("blank-canvas.psd"));
+    QVERIFY(item.saveToFile(psdPath));
+
+    const PsdImportedDocument importedDocument = PsdImageReader::readDocument(psdPath);
+    QVERIFY(importedDocument.isValid());
+    QCOMPARE(importedDocument.canvasSize, QSize(8, 6));
+    QVERIFY(!importedDocument.mergedImage.isNull());
+    QCOMPARE(importedDocument.layers.size(), 1);
+    QCOMPARE(importedDocument.layers.at(0).name, QStringLiteral("Background"));
+    QCOMPARE(importedDocument.layers.at(0).bounds, QRect(0, 0, 8, 6));
+
+    const QColor expectedCanvasBackground(Qt::white);
+    QCOMPARE(importedDocument.mergedImage.pixelColor(0, 0).rgba(), expectedCanvasBackground.rgba());
+    QCOMPARE(importedDocument.mergedImage.pixelColor(7, 5).rgba(), expectedCanvasBackground.rgba());
+    QCOMPARE(importedDocument.layers.at(0).image.pixelColor(0, 0).rgba(), expectedCanvasBackground.rgba());
+    QCOMPARE(importedDocument.layers.at(0).image.pixelColor(7, 5).rgba(), expectedCanvasBackground.rgba());
+}
+
+void tst_DrawingSurfaceItem::savesPsdLayerRecordsInBottomToTopOrder()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(16);
+    item.setHeight(12);
+    item.setDocumentViewModel(&viewModel);
+
+    QVariantList objects;
+    for (int layerIndex = 1; layerIndex <= 4; ++layerIndex) {
+        QVariantMap layerObject;
+        layerObject.insert(QStringLiteral("id"), layerIndex);
+        layerObject.insert(QStringLiteral("type"), QStringLiteral("layer"));
+        layerObject.insert(QStringLiteral("name"), QStringLiteral("Layer %1").arg(layerIndex));
+        layerObject.insert(QStringLiteral("x"), 0);
+        layerObject.insert(QStringLiteral("y"), 0);
+        layerObject.insert(QStringLiteral("width"), 16);
+        layerObject.insert(QStringLiteral("height"), 12);
+        objects.append(layerObject);
+    }
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString psdPath = dir.filePath(QStringLiteral("ordered-layers.psd"));
+    QVERIFY(item.saveToFileWithObjects(psdPath, objects));
+
+    QFile psdFile(psdPath);
+    QVERIFY(psdFile.open(QIODevice::ReadOnly));
+    QCOMPARE(psdLayerRecordNames(psdFile.readAll()),
+             QStringList({QStringLiteral("Background"),
+                          QStringLiteral("Layer 1"),
+                          QStringLiteral("Layer 2"),
+                          QStringLiteral("Layer 3"),
+                          QStringLiteral("Layer 4")}));
+
+    const PsdImportedDocument importedDocument = PsdImageReader::readDocument(psdPath);
+    QVERIFY(importedDocument.isValid());
+    QCOMPARE(importedDocument.layers.size(), 5);
+    QCOMPARE(importedDocument.layers.at(0).name, QStringLiteral("Background"));
+    QCOMPARE(importedDocument.layers.at(1).name, QStringLiteral("Layer 1"));
+    QCOMPARE(importedDocument.layers.at(2).name, QStringLiteral("Layer 2"));
+    QCOMPARE(importedDocument.layers.at(3).name, QStringLiteral("Layer 3"));
+    QCOMPARE(importedDocument.layers.at(4).name, QStringLiteral("Layer 4"));
 }
 
 void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsLayeredPsdWithMetadata()

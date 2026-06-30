@@ -296,7 +296,6 @@ bool PsdImageWriter::writeLayeredImage(const QString &filePath,
     if (!canWritePath(filePath)
         || mergedImage.isNull()
         || !isPsdCompatibleSize(mergedImage.size())
-        || bottomToTopLayers.isEmpty()
         || bottomToTopLayers.size() > maximumPsdSdkLayerCount) {
         return false;
     }
@@ -332,8 +331,8 @@ bool PsdImageWriter::writeLayeredImage(const QString &filePath,
 
     addVincentMetadata(document, &allocator, manifest, bottomToTopLayers.size());
 
-    for (auto layer = bottomToTopLayers.crbegin(); layer != bottomToTopLayers.crend(); ++layer) {
-        if (!addLayer(document, &allocator, *layer)) {
+    for (const Layer &layer : bottomToTopLayers) {
+        if (!addLayer(document, &allocator, layer)) {
             return false;
         }
     }

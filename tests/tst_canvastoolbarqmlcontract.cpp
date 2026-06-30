@@ -409,7 +409,9 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitActiveShape();")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function fillAt(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode !== \"fill\"")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("activeRasterSurface().fillAt(pointX, pointY, surface.brushColor);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("const rasterSurface = activeRasterSurface();")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (!rasterSurface)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("rasterSurface.fillAt(pointX, pointY, surface.brushColor);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.fillAt(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasZoomScale: 1")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property real defaultCanvasZoomScale: 1")));
@@ -455,7 +457,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"text\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function psdCompatibilityManifest()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdCompatibilityManifest(surface.drawableObjects)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdCompatibilityManifest(surface.drawableObjects, surface.backgroundLayerPresent)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function openLayeredPsd(fileUrl)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdImportDocument(fileUrl)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sourceUrl.toLowerCase().endsWith(\".psd\") && openLayeredPsd(sourceUrl)")));
@@ -467,7 +469,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function resizedDrawableObject(originalObject, pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function deleteSelectedDrawableObject()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"Delete\", \"Backspace\"]")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.deleteSelectedDrawableObject()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.deleteCurrentLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: drawableObjectSelectionFrame")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginDrawableObjectTransform(mouse.x, mouse.y);")));
 
@@ -636,9 +638,11 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.applyLayerHierarchyOrder(layerHierarchyPanel.model);")));
     QVERIFY(pageSource.contains(QStringLiteral("onFooterButtonTriggered: function (index)")));
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.addEmptyLayer();")));
-    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.deleteSelectedDrawableObject();")));
+    QVERIFY(pageSource.contains(QStringLiteral("enabled: drawingSurface.canDeleteCurrentLayer()")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.deleteCurrentLayer();")));
     QVERIFY(pageSource.contains(QStringLiteral("layerHierarchyPanel.activateListItemByKey(drawingSurface.currentLayerKey())")));
-    QVERIFY(pageSource.contains(QStringLiteral("LV.ToolbarButton")));
+    QVERIFY(!panelBlock.contains(QStringLiteral("LV.ToolbarButton")));
+    QVERIFY(!panelBlock.contains(QStringLiteral("buttonId: \"layers\"")));
     QVERIFY(!pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
     QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
     QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.leftMargin: 0")));
@@ -662,7 +666,9 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(surfaceSource.contains(QStringLiteral("property var layerHierarchyRows: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int layerHierarchyThumbnailRefreshDelayMs: 1000")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int brushLivePreviewFrameIntervalMs: 16")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property string transparencyGridTileSource: \"data:image/png;base64,")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property bool backgroundLayerThumbnailRefreshPending: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool backgroundLayerPresent: true")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var pendingRasterLayerThumbnailRefreshes: ({})")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property string backgroundLayerThumbnailSource: \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjectThumbnailSources: ({})")));
@@ -705,10 +711,19 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(!surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function activeRasterSurface()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function hasActiveRasterSurface()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.toolMode : \"move\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"transparencyGridBackground\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("visible: !surface.backgroundLayerPresent")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("fillMode: Image.Tile")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("smooth: false")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function nextEmptyLayerName()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectForLayerKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function activateLayerByKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function deleteLayerByKey(layerKey)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function deleteBackgroundLayer()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function canDeleteCurrentLayer()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function deleteCurrentLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canRenameLayerByKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function layerNameByKey(layerKey)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function renameLayerByKey(layerKey, layerName)")));

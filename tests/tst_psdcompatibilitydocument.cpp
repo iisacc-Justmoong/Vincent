@@ -9,6 +9,7 @@ class tst_PsdCompatibilityDocument : public QObject
 private slots:
     void createsRasterBaseLayerForEmptyCanvas();
     void mapsSessionObjectsToPsdLayerRecords();
+    void omitsBackgroundLayerWhenDisabled();
     void clampsLayerBoundsAndOpacityToPsdSafeValues();
 };
 
@@ -103,6 +104,29 @@ void tst_PsdCompatibilityDocument::mapsSessionObjectsToPsdLayerRecords()
     QCOMPARE(textPayload.value(QStringLiteral("text")).toString(), QStringLiteral("Title\nSecond line"));
     QCOMPARE(textPayload.value(QStringLiteral("fontPixelSize")).toReal(), 22.0);
     QCOMPARE(textPayload.value(QStringLiteral("color")).toString(), QStringLiteral("#123456"));
+}
+
+void tst_PsdCompatibilityDocument::omitsBackgroundLayerWhenDisabled()
+{
+    QVariantMap layer;
+    layer.insert(QStringLiteral("id"), 4);
+    layer.insert(QStringLiteral("type"), QStringLiteral("layer"));
+    layer.insert(QStringLiteral("name"), QStringLiteral("Ink"));
+    layer.insert(QStringLiteral("x"), 0);
+    layer.insert(QStringLiteral("y"), 0);
+    layer.insert(QStringLiteral("width"), 64);
+    layer.insert(QStringLiteral("height"), 48);
+
+    const PsdCompatibilityDocument document =
+            PsdCompatibilityDocument::fromVincentSession(QSize(64, 48), {layer}, false);
+
+    QCOMPARE(document.canvasSize(), QSize(64, 48));
+    QCOMPARE(document.layers().size(), 1);
+    QCOMPARE(document.layers().constFirst().name(), QStringLiteral("Ink"));
+
+    const QVariantList manifestLayers = document.toManifest().value(QStringLiteral("layers")).toList();
+    QCOMPARE(manifestLayers.size(), 1);
+    QCOMPARE(manifestLayers.constFirst().toMap().value(QStringLiteral("name")).toString(), QStringLiteral("Ink"));
 }
 
 void tst_PsdCompatibilityDocument::clampsLayerBoundsAndOpacityToPsdSafeValues()
