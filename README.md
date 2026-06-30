@@ -22,16 +22,16 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
-- Layered raster document model with a base raster canvas plus selectable transparent raster layers, each backed by its own iiPaintEngine surface and undo/redo state
+- Layered raster document model with a base raster canvas plus selectable transparent raster layers; blank documents start with `Background` plus a selected transparent `Layer 1`, each backed by its own iiPaintEngine surface and undo/redo state
 - Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, while flat image inputs remain transformable image objects
 - Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects
 - Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
 - Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster
 - Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus the current `Background` canvas layer when present, current raster layers, and current image/text/shape objects in bottom-to-top order so Photoshop presents `Background` at the bottom, with Vincent layer metadata embedded as XMP
-- A docked left-side LVRS hierarchy panel lists the background raster canvas and current image, shape, text, and raster layers; selecting a raster layer makes it the active paint target, double-clicking a layer name edits it inline, dragging rows changes layer order, and the plus/minus footer buttons create or remove layers, including the background layer; when `Background` is removed, the canvas shows a tiled PNG-style transparency grid
+- A docked left-side LVRS hierarchy panel lists the background raster canvas and current image, shape, text, and raster layers; new blank canvases select the initial transparent `Layer 1` so brush strokes land on an editable layer immediately, double-clicking a layer name edits it inline, dragging rows changes layer order, and the plus/minus footer buttons create or remove layers, including the background layer; when `Background` is removed, the canvas shows a tiled PNG-style transparency grid
 - Layer creation uses an incremental visual model so adding many raster layers does not recreate existing layer surfaces or write PNG snapshots for unchanged layers
-- Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with a dense full-width top toolbar placed below the empty titlebar drag area, toolbar-frame and button x-axis padding set to half the y-axis padding, a current-color swatch with full y-axis right-edge padding that opens the HSL color picker, and brush controls that also set text size and text color
+- Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with a dense full-width top toolbar placed below the empty titlebar drag area, toolbar-frame and button x-axis padding set to half the y-axis padding, a current-color swatch with 4x right-edge padding that opens the HSL color picker, and brush controls that also set text size and text color
 - Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging
 - Zoom mode scales the canvas by dragging horizontally: right to zoom in, left to zoom out
 - Drag-to-insert solid shapes for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds

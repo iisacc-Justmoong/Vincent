@@ -176,6 +176,7 @@ Rectangle {
             syncCanvasItemSizeToWorkspace();
         }
         canvasSurface.newCanvas();
+        addDefaultDrawingLayer();
     }
 
     function clearCanvas() {
@@ -186,6 +187,7 @@ Rectangle {
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
+        addDefaultDrawingLayer();
     }
 
     function openRaster(fileUrl) {
@@ -996,6 +998,13 @@ Rectangle {
         return layerId;
     }
 
+    function addDefaultDrawingLayer() {
+        if (surface.drawableObjects.length > 0) {
+            return -1;
+        }
+        return addEmptyLayer();
+    }
+
     function replaceDrawableObjectById(objectId, drawableObject) {
         const nextObjects = surface.drawableObjects.slice();
         for (let index = 0; index < nextObjects.length; ++index) {
@@ -1040,7 +1049,7 @@ Rectangle {
         surface.backgroundLayerPresent = false;
         surface.backgroundLayerThumbnailSource = "";
         surface.backgroundLayerThumbnailRefreshPending = false;
-        surface.selectedDrawableObjectId = -1;
+        surface.selectedDrawableObjectId = surface.drawableObjects.length > 0 ? surface.drawableObjects[surface.drawableObjects.length - 1].id : -1;
         resetDrawableObjectTransform();
         canvasSurface.newCanvas();
         rebuildLayerHierarchyRows();
@@ -1731,6 +1740,7 @@ Rectangle {
             Component.onCompleted: {
                 surface.canvasItemReady = true;
                 surface.syncCanvasItemSizeToWorkspace();
+                surface.addDefaultDrawingLayer();
                 surface.refreshBackgroundLayerThumbnailSource();
                 surface.rebuildLayerHierarchyRows();
             }

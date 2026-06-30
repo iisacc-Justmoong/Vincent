@@ -52,7 +52,7 @@ Item {
     readonly property int toolbarColorSwatchRingSize: 24
     readonly property int toolbarVerticalPadding: LV.Theme.gap4
     readonly property real toolbarHorizontalPadding: toolbarVerticalPadding / 2
-    readonly property real colorPickerExtraRightPadding: Math.max(0, toolbarVerticalPadding - toolbarHorizontalPadding)
+    readonly property real colorPickerRightPadding: toolbarHorizontalPadding * 4
     readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
     readonly property url panHandIconSource: "qrc:/Vincent/resources/icons/panHand.svg"
     readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
@@ -1242,7 +1242,7 @@ Item {
             Layout.preferredWidth: implicitWidth
             Layout.preferredHeight: implicitHeight
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            Layout.rightMargin: toolbar.colorPickerExtraRightPadding
+            Layout.rightMargin: toolbar.colorPickerRightPadding
             radius: width / 2
             color: colorButtonMouseArea.containsMouse || colorPickerMenu.opened ? LV.Theme.panelBackground10 : Qt.rgba(255, 255, 255, 0.04)
             border.width: colorPickerMenu.opened ? 2 : 1
