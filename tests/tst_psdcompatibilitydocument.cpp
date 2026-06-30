@@ -125,7 +125,7 @@ void tst_PsdCompatibilityDocument::clampsLayerBoundsAndOpacityToPsdSafeValues()
     QCOMPARE(psdLayer.bounds(), QRect(0, 8, 128, 13));
     QCOMPARE(psdLayer.opacity(), 128);
     QVERIFY(!psdLayer.isVisible());
-    QCOMPARE(psdLayer.blendModeKey(), QStringLiteral("norm"));
+    QCOMPARE(psdLayer.blendModeKey(), QStringLiteral("mul "));
 
     const PsdCompatibilityDocument psbSizedDocument =
             PsdCompatibilityDocument::fromVincentSession(QSize(PsdCompatibilityDocument::maximumPsdCanvasEdge() + 1, 64), {});

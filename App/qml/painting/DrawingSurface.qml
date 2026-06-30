@@ -189,6 +189,10 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         const sourceUrl = fileUrl ? fileUrl.toString() : "";
+        if (sourceUrl.toLowerCase().endsWith(".psd") && openLayeredPsd(sourceUrl)) {
+            return true;
+        }
+
         const imageObject = canvasSurface.imageObjectForFile(sourceUrl, surface.workspaceCanvasWidth, surface.workspaceCanvasHeight);
         if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
             return false;
@@ -208,6 +212,76 @@ Rectangle {
             originalWidth: imageObject.originalWidth,
             originalHeight: imageObject.originalHeight
         });
+        return true;
+    }
+
+    function shouldRestorePsdBackgroundLayer(psdDocument) {
+        const manifest = psdDocument && psdDocument.vincentManifest ? psdDocument.vincentManifest : null;
+        const manifestLayers = manifest && Array.isArray(manifest.layers) ? manifest.layers : [];
+        const importedLayers = psdDocument && Array.isArray(psdDocument.layers) ? psdDocument.layers : [];
+        if (manifestLayers.length === 0 || importedLayers.length === 0) {
+            return false;
+        }
+        return String(manifestLayers[0].name || "") === "Background" && String(importedLayers[0].name || "") === "Background";
+    }
+
+    function appendImportedPsdRasterLayer(layer) {
+        if (!layer || !layer.source) {
+            return -1;
+        }
+
+        const layerId = surface.nextDrawableObjectId++;
+        appendDrawableObject({
+            id: layerId,
+            type: "layer",
+            name: layer.name && layer.name.length ? layer.name : nextEmptyLayerName(),
+            x: 0,
+            y: 0,
+            width: Math.max(1, canvasSurface.width),
+            height: Math.max(1, canvasSurface.height),
+            opacity: Number(layer.opacityRatio === undefined ? 1 : layer.opacityRatio),
+            visible: layer.visible === undefined ? true : Boolean(layer.visible),
+            blendMode: layer.blendModeKey || "norm",
+            psdBounds: {
+                left: Number(layer.left || 0),
+                top: Number(layer.top || 0),
+                right: Number(layer.right || 0),
+                bottom: Number(layer.bottom || 0)
+            }
+        });
+        surface.rasterLayerSnapshotSources[String(layerId)] = layer.source;
+        if (layer.thumbnailSource && layer.thumbnailSource.length > 0) {
+            setRasterLayerThumbnailSource(layerId, layer.thumbnailSource);
+        }
+        return layerId;
+    }
+
+    function openLayeredPsd(fileUrl) {
+        const psdDocument = canvasSurface.psdImportDocument(fileUrl);
+        const importedLayers = psdDocument && Array.isArray(psdDocument.layers) ? psdDocument.layers : [];
+        if (!psdDocument || !psdDocument.valid || importedLayers.length === 0) {
+            return false;
+        }
+
+        clearDrawableObjects();
+        resizeCanvasItemToDimensions(psdDocument.canvasWidth, psdDocument.canvasHeight);
+        canvasSurface.newCanvas();
+
+        var firstObjectId = -1;
+        var startIndex = 0;
+        if (shouldRestorePsdBackgroundLayer(psdDocument) && importedLayers[0].source) {
+            canvasSurface.restoreRasterSnapshot(importedLayers[0].source);
+            startIndex = 1;
+        }
+
+        for (let index = startIndex; index < importedLayers.length; ++index) {
+            const importedObjectId = appendImportedPsdRasterLayer(importedLayers[index]);
+            if (firstObjectId < 0 && importedObjectId >= 0) {
+                firstObjectId = importedObjectId;
+            }
+        }
+        surface.selectedDrawableObjectId = firstObjectId;
+        rebuildLayerHierarchyRows();
         return true;
     }
 
@@ -706,7 +780,10 @@ Rectangle {
             objectShapeKind: drawableObject.shapeKind || "",
             objectColor: drawableObject.color || "",
             objectText: drawableObject.text || "",
-            objectFontPixelSize: Math.max(1, Number(drawableObject.fontPixelSize || 1))
+            objectFontPixelSize: Math.max(1, Number(drawableObject.fontPixelSize || 1)),
+            objectOpacity: Math.max(0, Math.min(1, Number(drawableObject.opacity === undefined ? 1 : drawableObject.opacity))),
+            objectVisible: drawableObject.visible === undefined ? true : Boolean(drawableObject.visible),
+            objectBlendMode: drawableObject.blendMode || "norm"
         };
     }
 
@@ -1699,6 +1776,9 @@ Rectangle {
                 required property string objectColor
                 required property string objectText
                 required property real objectFontPixelSize
+                required property real objectOpacity
+                required property bool objectVisible
+                required property string objectBlendMode
                 readonly property bool isRasterLayer: objectType === "layer"
                 readonly property int rasterLayerObjectId: objectId
 
@@ -1707,6 +1787,8 @@ Rectangle {
                 y: objectY
                 width: Math.max(1, objectWidth)
                 height: Math.max(1, objectHeight)
+                visible: objectVisible
+                opacity: objectOpacity
 
                 Loader {
                     id: rasterLayerLoader

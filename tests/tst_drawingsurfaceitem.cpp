@@ -16,6 +16,7 @@
 #include "canvasdocumentviewmodel.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "paletteutils.h"
+#include "psdimagereader.h"
 
 class tst_DrawingSurfaceItem : public QObject
 {
@@ -1598,6 +1599,24 @@ void tst_DrawingSurfaceItem::savesCompositeDrawableObjectsAsLayeredPsdWithMetada
     QCOMPARE(readUInt16(psd, static_cast<int>(layerOffset + 8)), 2);
     QVERIFY(psd.contains("Background"));
     QVERIFY(psd.contains("Rectangle"));
+
+    const PsdImportedDocument importedDocument = PsdImageReader::readDocument(psdPath);
+    QVERIFY(importedDocument.isValid());
+    QCOMPARE(importedDocument.canvasSize, QSize(20, 12));
+    QCOMPARE(importedDocument.bitsPerChannel, 8);
+    QVERIFY(!importedDocument.xmpMetadata.isEmpty());
+    QCOMPARE(importedDocument.vincentManifest.value(QStringLiteral("compatibilityVersion")).toInt(), 1);
+    QCOMPARE(importedDocument.vincentManifest.value(QStringLiteral("layers")).toList().size(), 2);
+    QCOMPARE(importedDocument.layers.size(), 2);
+    QCOMPARE(importedDocument.layers.at(0).name, QStringLiteral("Background"));
+    QCOMPARE(importedDocument.layers.at(0).bounds, QRect(0, 0, 20, 12));
+    QCOMPARE(importedDocument.layers.at(1).name, QStringLiteral("Rectangle"));
+    QCOMPARE(importedDocument.layers.at(1).bounds, QRect(2, 3, 10, 6));
+    QCOMPARE(importedDocument.layers.at(1).blendModeKey, QStringLiteral("norm"));
+    QCOMPARE(importedDocument.layers.at(1).opacity, 255);
+    QVERIFY(importedDocument.layers.at(1).visible);
+    QCOMPARE(importedDocument.layers.at(1).image.size(), QSize(20, 12));
+    QVERIFY(isBlueShapePixel(importedDocument.layers.at(1).image.pixelColor(4, 4)));
 }
 
 void tst_DrawingSurfaceItem::opensLayeredPsdThroughPsdSdkReader()

@@ -785,6 +785,65 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
     return object;
 }
 
+QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const
+{
+    const QString filePath = localFilePath(fileUrl);
+    if (!PsdImageReader::canReadPath(filePath)) {
+        return {};
+    }
+
+    const PsdImportedDocument imported = PsdImageReader::readDocument(filePath);
+    if (!imported.isValid()) {
+        return {};
+    }
+
+    QVariantList layers;
+    layers.reserve(imported.layers.size());
+    for (const PsdImportedLayer &layer : imported.layers) {
+        if (layer.image.isNull()) {
+            continue;
+        }
+
+        QVariantMap layerMap;
+        layerMap.insert(QStringLiteral("name"), layer.name);
+        layerMap.insert(QStringLiteral("left"), layer.bounds.left());
+        layerMap.insert(QStringLiteral("top"), layer.bounds.top());
+        layerMap.insert(QStringLiteral("right"), layer.bounds.right() + 1);
+        layerMap.insert(QStringLiteral("bottom"), layer.bounds.bottom() + 1);
+        layerMap.insert(QStringLiteral("width"), layer.bounds.width());
+        layerMap.insert(QStringLiteral("height"), layer.bounds.height());
+        layerMap.insert(QStringLiteral("blendModeKey"), layer.blendModeKey);
+        layerMap.insert(QStringLiteral("opacity"), layer.opacity);
+        layerMap.insert(QStringLiteral("opacityRatio"), qBound<qreal>(0.0, layer.opacity / 255.0, 1.0));
+        layerMap.insert(QStringLiteral("visible"), layer.visible);
+        layerMap.insert(QStringLiteral("hasUserMask"), layer.hasUserMask);
+        layerMap.insert(QStringLiteral("hasVectorMask"), layer.hasVectorMask);
+        layerMap.insert(QStringLiteral("source"), cachedPngSourceForImage(QStringLiteral("psd-import-layers"), layer.image));
+        layerMap.insert(QStringLiteral("thumbnailSource"),
+                        cachedPngSourceForImage(QStringLiteral("layer-thumbnails"),
+                                                thumbnailImage(layer.image,
+                                                               boundedThumbnailMaximumSize(32, 32))));
+        layers.append(layerMap);
+    }
+
+    QVariantMap document;
+    document.insert(QStringLiteral("valid"), !layers.isEmpty() || !imported.mergedImage.isNull());
+    document.insert(QStringLiteral("canvasWidth"), imported.canvasSize.width());
+    document.insert(QStringLiteral("canvasHeight"), imported.canvasSize.height());
+    document.insert(QStringLiteral("bitsPerChannel"), imported.bitsPerChannel);
+    document.insert(QStringLiteral("colorMode"), imported.colorMode);
+    document.insert(QStringLiteral("hasRealMergedImage"), imported.hasRealMergedImage);
+    document.insert(QStringLiteral("xmpMetadata"), imported.xmpMetadata);
+    document.insert(QStringLiteral("vincentManifest"), imported.vincentManifest);
+    document.insert(QStringLiteral("layers"), layers);
+    document.insert(QStringLiteral("compatibilityWarnings"), imported.compatibilityWarnings);
+    if (!imported.mergedImage.isNull()) {
+        document.insert(QStringLiteral("mergedSource"),
+                        cachedPngSourceForImage(QStringLiteral("psd-previews"), imported.mergedImage));
+    }
+    return document;
+}
+
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
     if (hasPsdSuffix(fileUrl)) {

@@ -1,6 +1,7 @@
 #include "psdcompatibilitydocument.h"
 
 #include <QFileInfo>
+#include <QStringList>
 #include <QUrl>
 #include <QtMath>
 #include <QtGlobal>
@@ -17,6 +18,50 @@ QString normalizedBlendModeKey(const QVariantMap &drawableObject)
     const QString blendMode = drawableObject.value(QStringLiteral("blendMode")).toString().trimmed().toLower();
     if (blendMode == QStringLiteral("norm") || blendMode == QStringLiteral("normal")) {
         return QStringLiteral("norm");
+    }
+    if (blendMode == QStringLiteral("mul") || blendMode == QStringLiteral("multiply")) {
+        return QStringLiteral("mul ");
+    }
+    if (blendMode == QStringLiteral("scrn") || blendMode == QStringLiteral("screen")) {
+        return QStringLiteral("scrn");
+    }
+    if (blendMode == QStringLiteral("over") || blendMode == QStringLiteral("overlay")) {
+        return QStringLiteral("over");
+    }
+    if (blendMode == QStringLiteral("dark") || blendMode == QStringLiteral("darken")) {
+        return QStringLiteral("dark");
+    }
+    if (blendMode == QStringLiteral("lite") || blendMode == QStringLiteral("lighten")) {
+        return QStringLiteral("lite");
+    }
+    if (blendMode == QStringLiteral("diff") || blendMode == QStringLiteral("difference")) {
+        return QStringLiteral("diff");
+    }
+
+    static const QStringList supportedPsdKeys{
+        QStringLiteral("diss"),
+        QStringLiteral("idiv"),
+        QStringLiteral("lbrn"),
+        QStringLiteral("dkCl"),
+        QStringLiteral("div "),
+        QStringLiteral("lddg"),
+        QStringLiteral("lgCl"),
+        QStringLiteral("sLit"),
+        QStringLiteral("hLit"),
+        QStringLiteral("vLit"),
+        QStringLiteral("lLit"),
+        QStringLiteral("pLit"),
+        QStringLiteral("hMix"),
+        QStringLiteral("smud"),
+        QStringLiteral("fsub"),
+        QStringLiteral("fdiv"),
+        QStringLiteral("hue "),
+        QStringLiteral("sat "),
+        QStringLiteral("colr"),
+        QStringLiteral("lum ")
+    };
+    if (supportedPsdKeys.contains(drawableObject.value(QStringLiteral("blendMode")).toString().trimmed())) {
+        return drawableObject.value(QStringLiteral("blendMode")).toString().trimmed();
     }
 
     return QStringLiteral("norm");

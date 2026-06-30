@@ -23,7 +23,7 @@ Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer and tablet event handling
 - Layered raster document model with a base raster canvas plus selectable transparent raster layers, each backed by its own iiPaintEngine surface and undo/redo state
-- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`, with oversized images fitted inside the current workspace as transformable image objects so the initial canvas stays smaller than the window
+- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, while flat image inputs remain transformable image objects
 - Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects
 - Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
@@ -50,7 +50,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 ## Known Limitations
-- PSD import currently reads the merged/flat image only; layered PSD import, blend modes, layer effects, masks, and persisted editable vector/text project records are not implemented yet. PSD export stores rasterized layers and XMP metadata for the current Vincent session stack
+- PSD import reads 8-bit RGB/RGBA raster layers, layer names, bounds, opacity, visibility, Photoshop blend-mode keys, and Vincent XMP manifests when present; Photoshop smart objects, adjustment layers, layer effects, and editable text/vector reconstruction still fall back to raster compatibility data
 - Opened image objects remain session overlays, while added paint layers own their own raster pixels for deletion and export
 - Palette is fixed to the built-in colors
 - Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal

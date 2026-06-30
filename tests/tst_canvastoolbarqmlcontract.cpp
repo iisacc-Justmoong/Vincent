@@ -456,6 +456,11 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function psdCompatibilityManifest()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdCompatibilityManifest(surface.drawableObjects)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function openLayeredPsd(fileUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdImportDocument(fileUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("sourceUrl.toLowerCase().endsWith(\".psd\") && openLayeredPsd(sourceUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.rasterLayerSnapshotSources[String(layerId)] = layer.source;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("blendMode: layer.blendModeKey || \"norm\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("source: drawableObjectDelegate.objectType === \"image\" ? drawableObjectDelegate.objectSource : \"\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateDrawableObjectTransform(pointX, pointY)")));

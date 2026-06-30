@@ -110,7 +110,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Exposes `saveToFileWithObjectsAndRasterLayers` so QML can save the current base raster canvas plus live raster layer surfaces and transformable image, text, and shape session objects without flattening those objects into the live raster state.
 - Writes `.psd` paths as 8-bit RGB Photoshop documents with a merged preview, one base raster canvas layer, one rasterized layer per current raster/image/text/shape object, and Vincent XMP metadata for the compatibility manifest.
 - Exposes `psdCompatibilityManifest` so QML can retrieve a Photoshop-style manifest for the current raster canvas and transformable session objects.
-- Routes `.psd` imports through `PsdImageReader`; QML image-object imports receive a cached PNG preview source while retaining the original PSD source metadata.
+- Routes `.psd` imports through `PsdImageReader`; importable layered PSD documents become Vincent raster layers via cached full-canvas PNG snapshots, while flat PSD image-object imports still receive a cached PNG preview source and retain the original PSD source metadata.
 - Synchronizes brush state, tool mode, and canvas dimensions with `CanvasDocumentViewModel` through `CanvasViewModelBridge`.
 - Applies QML-driven canvas surface size updates atomically so startup resizing cannot leave partial 1-pixel dimensions in the document model.
 - Exposes `backgroundSource` and `hasBackground` for the current flat raster document metadata.
@@ -125,16 +125,17 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 
 ### `PsdCompatibilityDocument`
 
-- Provides the internal PSD compatibility boundary without introducing a layered PSD parser/writer dependency yet.
-- Stores an RGB, 8-bit document manifest with Photoshop-style top/left/bottom/right layer bounds, normal blend mode keys, byte opacity, visibility, and per-layer payload.
+- Provides the internal PSD compatibility boundary over the app's raster/session stack.
+- Stores an RGB, 8-bit document manifest with Photoshop-style top/left/bottom/right layer bounds, Photoshop blend mode keys, byte opacity, visibility, and per-layer payload.
 - Creates a bottom `Background` layer and maps current raster, image, text, and shape session layers into ordered layer records above it.
 - Clamps layer bounds to the current canvas and flags canvases larger than PSD's 30,000 px edge limit as not PSD-compatible.
 
 ### `PsdImageReader`
 
 - Uses the BSD-2-Clause `psd_sdk` parser to read Photoshop PSD files directly inside Vincent.
-- Converts 8-bit RGB/RGBA merged image data into `QImage`; files without merged image data remain unsupported until layer compositing is implemented.
-- Supplies PSD image data to both direct raster opening and QML transformable image-object preview generation.
+- Converts 8-bit RGB/RGBA merged image data into `QImage`.
+- Parses image resources for XMP metadata and restores Vincent's base64 JSON layer manifest when present.
+- Parses the layer mask section, extracts importable 8-bit RGB/RGBA raster layers, and exposes bottom-to-top layer images plus bounds, opacity, visibility, blend-mode keys, and mask-presence flags to QML.
 
 ### `PsdImageWriter`
 
@@ -157,7 +158,7 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 5. `PainterCanvasPage` hosts `LV.Hierarchy` on the left and binds it to `DrawingSurface.layerHierarchyRows`; rows use cached layer bitmap thumbnails via `iconSource`, activation selects the matching session object, repeated activation/double-click opens an inline `TextInput` for renaming, footer add creates a transparent raster layer, row drag rewrites `drawableObjects` order, and footer delete removes the selected layer.
 6. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save for each `DrawingSurfaceItem`; Vincent keeps the base raster canvas plus added raster layers as separate surfaces, renders opened images/text/shapes as overlays, routes fill replacements to the selected raster surface, and composites the stack during save.
 7. When PSD work needs document structure, `PsdCompatibilityDocument` converts the same base raster canvas and session objects into a PSD-style layer manifest; `.psd` save passes rasterized base/layer/object images plus that manifest metadata to `PsdImageWriter`.
-8. When opening PSD, `PsdImageReader` reads the merged image data through `psd_sdk`; QML displays a cached PNG preview for transformable PSD image objects.
+8. When opening PSD, `PsdImageReader` reads XMP metadata, merged image data, and importable 8-bit RGB/RGBA raster layers through `psd_sdk`; QML restores layered PSDs as Vincent raster layers and falls back to a cached merged PNG preview for flat PSD image objects.
 
 ## Testing Surface
 
@@ -165,5 +166,5 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - `tests/tst_psdcompatibilitydocument.cpp` validates the PSD compatibility manifest, including canvas metadata, raster base layer creation, session object layer mapping, PSD bounds, opacity, visibility, and PSD canvas-size limits.
 - `tests/tst_canvastoolbarqmlcontract.cpp` validates QML toolbar and page contracts, including the new-canvas size modal, brush reselection settings, pan-tool selection, move-tool selection, zoom-tool selection, shape split-menu selection, fill-tool selection, text-tool selection, object-transform and keyboard-delete hooks, the left `LV.Hierarchy` layer panel with live raster layer surfaces, bitmap thumbnail row icons, inline rename editing and plus/minus footer buttons, and HSL triangle color-picker usage.
 - `tests/tst_mainqmlcontract.cpp` validates the LVRS application-window chrome contract, including native controls and the logical top drag handle.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, hierarchy raster-layer creation without transform hit testing, raster-layer deletion removing its pixels from composite output, many-layer creation without snapshot churn, hierarchy-layer renaming, hierarchy-layer row projection and reordering, hand-tool canvas panning, horizontal-drag canvas zooming, composite object saving including layered PSD output with metadata, PSD merged-preview reopening through `psd_sdk`, undo/redo, saving, image-object opening within workspace bounds, explicit-size new canvas creation, and workspace-inset canvas creation.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, transformable image/text/shape object movement/resizing/deletion, hierarchy raster-layer creation without transform hit testing, raster-layer deletion removing its pixels from composite output, many-layer creation without snapshot churn, hierarchy-layer renaming, hierarchy-layer row projection and reordering, hand-tool canvas panning, horizontal-drag canvas zooming, composite object saving including layered PSD output with metadata, PSD merged-preview and layer import through `psd_sdk`, undo/redo, saving, image-object opening within workspace bounds, explicit-size new canvas creation, and workspace-inset canvas creation.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.
