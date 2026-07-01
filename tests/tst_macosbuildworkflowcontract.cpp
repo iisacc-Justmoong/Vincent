@@ -60,6 +60,11 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     QVERIFY(source.contains(QStringLiteral("NOTARY_APP_PASSWORD")));
     QVERIFY(source.contains(QStringLiteral("Bash 3.2")));
     QVERIFY(source.contains(QStringLiteral("CMAKE_EXTRA_ARGS")));
+    QVERIFY(source.contains(QStringLiteral("Contents/Resources/Appicon.icns")));
+    QVERIFY(source.contains(QStringLiteral("stale installer package")));
+    QVERIFY(source.contains(QStringLiteral("pkgutil --payload-files dist/Vincent.pkg")));
+    QVERIFY(source.contains(QStringLiteral("./Vincent.app/Contents/Resources/Appicon.icns")));
+    QVERIFY(source.contains(QStringLiteral("./Vincent.app/Contents/Resources/icon.icns")));
 }
 
 void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
@@ -76,6 +81,12 @@ void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
     QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
+    const QString syncScriptPath = QFINDTESTDATA("../tools/sync_app_icon_assets.sh");
+    QVERIFY2(!syncScriptPath.isEmpty(), "tools/sync_app_icon_assets.sh test data was not found");
+    QFile syncScript(syncScriptPath);
+    QVERIFY(syncScript.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString syncScriptSource = QString::fromUtf8(syncScript.readAll());
+
     const QString gitignorePath = QFINDTESTDATA("../.gitignore");
     QVERIFY2(!gitignorePath.isEmpty(), ".gitignore test data was not found");
     QFile gitignore(gitignorePath);
@@ -86,11 +97,17 @@ void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
     QVERIFY2(!QFINDTESTDATA("../resources/Appicon.ico").isEmpty(), "Windows app icon is missing");
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_MACOS_APP_ICON \"${CMAKE_SOURCE_DIR}/resources/Appicon.icns\")")));
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_WINDOWS_APP_ICON \"${CMAKE_SOURCE_DIR}/resources/Appicon.ico\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_LEGACY_MACOS_APP_ICON_FILE \"icon.icns\")")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_ICON_FILE \"${VINCENT_MACOS_APP_ICON_FILE}\"")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("$<TARGET_BUNDLE_DIR:Vincent>/Contents/Resources/${VINCENT_LEGACY_MACOS_APP_ICON_FILE}")));
     QVERIFY(cmakeSource.contains(QStringLiteral("file(WRITE \"${_vincent_windows_resource_file}\" \"IDI_ICON1 ICON")));
     QVERIFY(cmakeSource.contains(QStringLiteral("target_sources(Vincent PRIVATE \"${_vincent_windows_resource_file}\")")));
     QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@VINCENT_MACOS_APP_ICON_FILE@</string>")));
+    QVERIFY(syncScriptSource.contains(QStringLiteral("resources/Appicon.icns")));
+    QVERIFY(syncScriptSource.contains(QStringLiteral("packaging/macos/Vincent.xcassets/AppIcon.appiconset")));
+    QVERIFY(syncScriptSource.contains(QStringLiteral("iconutil -c iconset")));
+    QVERIFY(syncScriptSource.contains(QStringLiteral("AppIcon-1024.png")));
     QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.icns")));
     QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.ico")));
 }
@@ -148,18 +165,21 @@ if [ -z "$build_dir" ]; then
     build_dir="./build"
 fi
 
-mkdir -p "$build_dir/Vincent.app/Contents/MacOS"
+mkdir -p "$build_dir/Vincent.app/Contents/MacOS" "$build_dir/Vincent.app/Contents/Resources"
 cat > "$build_dir/Vincent.app/Contents/MacOS/Vincent" <<'APP'
 #!/bin/sh
 exit 0
 APP
 chmod +x "$build_dir/Vincent.app/Contents/MacOS/Vincent"
+printf 'fake icon\n' > "$build_dir/Vincent.app/Contents/Resources/Appicon.icns"
 cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
         "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleIconFile</key>
+    <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
     <string>2.2.1</string>
 </dict>

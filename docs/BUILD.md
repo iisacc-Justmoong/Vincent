@@ -17,6 +17,16 @@ Use `./build.sh` or `./build.sh local` for local development validation. The def
 
 The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`.
 
+Every mode verifies that `CFBundleIconFile` resolves to `Contents/Resources/Appicon.icns`, that the legacy `Contents/Resources/icon.icns` file is not present, and that the bundled icon matches `resources/Appicon.icns`. Distribution modes also inspect the generated `.pkg` payload before notarization or release, so a stale installer package that still contains `icon.icns` fails the build instead of installing the old app icon.
+
+`resources/Appicon.icns` is the canonical macOS icon source. After replacing it, regenerate the App Store/Xcode asset catalog before building:
+
+```bash
+tools/sync_app_icon_assets.sh
+```
+
+The script rewrites `packaging/macos/Vincent.xcassets/AppIcon.appiconset`, including `AppIcon-1024.png`, from the canonical `.icns`. The CMake bundle target also removes stale `Contents/Resources/icon.icns` after each macOS build, so an incremental `build/` or CLion `cmake-build-debug/` bundle cannot keep advertising the removed legacy icon.
+
 Distribution modes must be requested explicitly:
 
 ```bash
@@ -82,6 +92,16 @@ productbuild \
   "dist/Vincent-2.2.1.pkg"
 ```
 This produces the installer payload required by App Store Connect. Keep the `.pkg` under 4 GB.
+
+If installing `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg` shows an older app icon, treat the package as stale. A local build only refreshes `dist/Vincent.app`; regenerate the installer with `VINCENT_BUILD_MODE=devid ./build.sh`, `VINCENT_BUILD_MODE=mas ./build.sh`, or `VINCENT_BUILD_MODE=all ./build.sh`. You can inspect the package payload directly:
+
+```bash
+pkgutil --payload-files dist/Vincent.pkg | grep 'Contents/Resources/.*icns'
+```
+
+The payload should list `./Vincent.app/Contents/Resources/Appicon.icns` and should not list `./Vincent.app/Contents/Resources/icon.icns`.
+
+If Dock or Launchpad still shows the old icon after the installed bundle is correct, remove stale `/Applications/Vincent.app` Dock entries and let LaunchServices re-register the rebuilt app. A pinned Dock item can continue pointing at an old or removed bundle path even after the workspace `dist/Vincent.app` has the new icon.
 
 ## 9. Upload to App Store Connect
 1. Open Transporter.

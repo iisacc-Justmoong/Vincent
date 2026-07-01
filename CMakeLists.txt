@@ -241,6 +241,7 @@ lvrs_configure_qml_app(Vincent NO_PLATFORM_RUNTIME_TARGETS)
 set(VINCENT_MACOS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.icns")
 set(VINCENT_WINDOWS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.ico")
 get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
+set(VINCENT_LEGACY_MACOS_APP_ICON_FILE "icon.icns")
 
 if(APPLE)
     if(NOT EXISTS "${VINCENT_MACOS_APP_ICON}")
@@ -280,6 +281,10 @@ endif()
 
 if(APPLE)
     set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${VINCENT_MACOS_APP_ICON_FILE}")
+    add_custom_command(TARGET Vincent POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E rm -f
+                    "$<TARGET_BUNDLE_DIR:Vincent>/Contents/Resources/${VINCENT_LEGACY_MACOS_APP_ICON_FILE}"
+            COMMENT "Removing legacy macOS app icon from Vincent bundle")
 endif()
 
 # 설치 규칙: /Applications/Vincent.app
