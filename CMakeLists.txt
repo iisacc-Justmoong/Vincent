@@ -238,14 +238,28 @@ set_target_properties(Vincent PROPERTIES
 )
 lvrs_configure_qml_app(Vincent NO_PLATFORM_RUNTIME_TARGETS)
 
-set(VINCENT_APP_ICON "${CMAKE_SOURCE_DIR}/resources/icon.icns")
-get_filename_component(_vincent_icon_abs "${VINCENT_APP_ICON}" ABSOLUTE)
-if(EXISTS "${_vincent_icon_abs}")
-    get_filename_component(_vincent_icon_name "${_vincent_icon_abs}" NAME)
-    target_sources(Vincent PRIVATE "${_vincent_icon_abs}")
-    set_source_files_properties("${_vincent_icon_abs}" PROPERTIES
+set(VINCENT_MACOS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.icns")
+set(VINCENT_WINDOWS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.ico")
+get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
+
+if(APPLE)
+    if(NOT EXISTS "${VINCENT_MACOS_APP_ICON}")
+        message(FATAL_ERROR "macOS app icon is missing: ${VINCENT_MACOS_APP_ICON}")
+    endif()
+
+    target_sources(Vincent PRIVATE "${VINCENT_MACOS_APP_ICON}")
+    set_source_files_properties("${VINCENT_MACOS_APP_ICON}" PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources")
-    set(_vincent_icon_bundle_name "${_vincent_icon_name}")
+elseif(WIN32)
+    if(NOT EXISTS "${VINCENT_WINDOWS_APP_ICON}")
+        message(FATAL_ERROR "Windows app icon is missing: ${VINCENT_WINDOWS_APP_ICON}")
+    endif()
+
+    file(TO_NATIVE_PATH "${VINCENT_WINDOWS_APP_ICON}" _vincent_windows_app_icon_native)
+    string(REPLACE "\\" "\\\\" _vincent_windows_app_icon_rc "${_vincent_windows_app_icon_native}")
+    set(_vincent_windows_resource_file "${CMAKE_CURRENT_BINARY_DIR}/VincentAppIcon.rc")
+    file(WRITE "${_vincent_windows_resource_file}" "IDI_ICON1 ICON \"${_vincent_windows_app_icon_rc}\"\n")
+    target_sources(Vincent PRIVATE "${_vincent_windows_resource_file}")
 endif()
 
 # 번들 식별자 및 Info.plist 연결
@@ -264,8 +278,8 @@ if(APPLE)
     set_target_properties(Vincent PROPERTIES OUTPUT_NAME "Vincent")
 endif()
 
-if(DEFINED _vincent_icon_bundle_name)
-    set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${_vincent_icon_bundle_name}")
+if(APPLE)
+    set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${VINCENT_MACOS_APP_ICON_FILE}")
 endif()
 
 # 설치 규칙: /Applications/Vincent.app

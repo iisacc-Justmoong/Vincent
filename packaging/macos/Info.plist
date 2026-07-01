@@ -12,7 +12,7 @@
   <string>Vincent</string>
 
   <key>CFBundleIconFile</key>
-  <string>icon.icns</string>
+  <string>@VINCENT_MACOS_APP_ICON_FILE@</string>
 
   <key>CFBundleExecutable</key>
   <string>Vincent</string>

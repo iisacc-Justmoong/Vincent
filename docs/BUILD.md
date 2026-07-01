@@ -54,6 +54,7 @@ Verify that all `.framework` bundles now sit inside `dist/"Vincent 2.2.1.app"/Co
 Update the generated `Info.plist` (inside `dist/"Vincent 2.2.1.app"/Contents/`) with:
 - `CFBundleIdentifier` matching your bundle ID.
 - `CFBundleVersion` and `CFBundleShortVersionString` set to a semantic version number you are shipping.
+- `CFBundleIconFile` should resolve to the bundled `resources/Appicon.icns` file. Windows builds embed `resources/Appicon.ico` through the generated resource script.
 - Any usage description strings your app requires (e.g., `NSMicrophoneUsageDescription`)—Vincent 2.2.1 currently relies only on file picker access.
 
 ## 6. Sandbox Entitlements

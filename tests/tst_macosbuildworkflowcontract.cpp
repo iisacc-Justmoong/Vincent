@@ -37,6 +37,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
 
 private slots:
     void buildGuideSeparatesLocalAndDistributionSigning();
+    void platformAppIconsAreBundledFromResources();
     void buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays();
 };
 
@@ -59,6 +60,39 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     QVERIFY(source.contains(QStringLiteral("NOTARY_APP_PASSWORD")));
     QVERIFY(source.contains(QStringLiteral("Bash 3.2")));
     QVERIFY(source.contains(QStringLiteral("CMAKE_EXTRA_ARGS")));
+}
+
+void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
+{
+    const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
+    QFile cmakeFile(cmakePath);
+    QVERIFY(cmakeFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString cmakeSource = QString::fromUtf8(cmakeFile.readAll());
+
+    const QString infoPlistPath = QFINDTESTDATA("../packaging/macos/Info.plist");
+    QVERIFY2(!infoPlistPath.isEmpty(), "packaging/macos/Info.plist test data was not found");
+    QFile infoPlist(infoPlistPath);
+    QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
+
+    const QString gitignorePath = QFINDTESTDATA("../.gitignore");
+    QVERIFY2(!gitignorePath.isEmpty(), ".gitignore test data was not found");
+    QFile gitignore(gitignorePath);
+    QVERIFY(gitignore.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString gitignoreSource = QString::fromUtf8(gitignore.readAll());
+
+    QVERIFY2(!QFINDTESTDATA("../resources/Appicon.icns").isEmpty(), "macOS app icon is missing");
+    QVERIFY2(!QFINDTESTDATA("../resources/Appicon.ico").isEmpty(), "Windows app icon is missing");
+    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_MACOS_APP_ICON \"${CMAKE_SOURCE_DIR}/resources/Appicon.icns\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_WINDOWS_APP_ICON \"${CMAKE_SOURCE_DIR}/resources/Appicon.ico\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources\"")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_ICON_FILE \"${VINCENT_MACOS_APP_ICON_FILE}\"")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("file(WRITE \"${_vincent_windows_resource_file}\" \"IDI_ICON1 ICON")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("target_sources(Vincent PRIVATE \"${_vincent_windows_resource_file}\")")));
+    QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@VINCENT_MACOS_APP_ICON_FILE@</string>")));
+    QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.icns")));
+    QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.ico")));
 }
 
 void tst_MacOSBuildWorkflowContract::buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays()
