@@ -782,10 +782,13 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasW
         return false;
     }
 
+    const bool hasMaximumCanvasSize = maximumCanvasWidth > 0 || maximumCanvasHeight > 0;
     const QSize maximumSize(
-            maximumCanvasWidth > 0 ? qRound(maximumCanvasWidth) : canvasSize().width(),
-            maximumCanvasHeight > 0 ? qRound(maximumCanvasHeight) : canvasSize().height());
-    const QSize rasterSize = fittedOpenedRasterSize(image.size(), maximumSize);
+            maximumCanvasWidth > 0 ? qRound(maximumCanvasWidth) : image.width(),
+            maximumCanvasHeight > 0 ? qRound(maximumCanvasHeight) : image.height());
+    const QSize rasterSize = hasMaximumCanvasSize
+            ? fittedOpenedRasterSize(image.size(), maximumSize)
+            : image.size();
     if (rasterSize.isEmpty()) {
         return false;
     }
@@ -817,10 +820,13 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
         return {};
     }
 
+    const bool hasMaximumObjectSize = maximumObjectWidth > 0 || maximumObjectHeight > 0;
     const QSize maximumSize(
-            maximumObjectWidth > 0 ? qRound(maximumObjectWidth) : canvasSize().width(),
-            maximumObjectHeight > 0 ? qRound(maximumObjectHeight) : canvasSize().height());
-    const QSize objectSize = fittedOpenedRasterSize(image.size(), maximumSize);
+            maximumObjectWidth > 0 ? qRound(maximumObjectWidth) : image.width(),
+            maximumObjectHeight > 0 ? qRound(maximumObjectHeight) : image.height());
+    const QSize objectSize = hasMaximumObjectSize
+            ? fittedOpenedRasterSize(image.size(), maximumSize)
+            : image.size();
     if (objectSize.isEmpty()) {
         return {};
     }

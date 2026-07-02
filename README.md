@@ -31,7 +31,7 @@ Windows maintainers can generate the package from a Windows Qt/LVRS/iiPaintEngin
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer/tablet event handling and pressure-controlled brush opacity
 - Layered raster document model with a base raster canvas plus selectable transparent raster layers; blank documents start with `Background` plus a selected transparent `Layer 1`, each backed by its own iiPaintEngine surface and undo/redo state
-- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, while flat image inputs remain transformable image objects
+- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, the first flat image input creates an image-sized raster canvas without workspace padding, and later flat image opens in that image document insert transformable image object layers on the existing canvas
 - Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects
 - Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata
 - LVRS-backed MVVM document state with a compact C++ canvas document view model
@@ -45,7 +45,7 @@ Windows maintainers can generate the package from a Windows Qt/LVRS/iiPaintEngin
 - Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging
 - Zoom mode scales the canvas by dragging horizontally: right to zoom in, left to zoom out
 - Drag-to-insert solid shapes for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds
-- Inserted image, shape, and text objects can be selected with the move tool, dragged, resized from corner transform handles, and deleted with Delete or Backspace before raster export
+- Inserted image, shape, and text objects are created as separate layer rows, can be selected with the move tool, dragged or resized past the canvas bounds from corner transform handles, and deleted with Delete or Backspace before raster export
 - Global menu shortcuts cover every actionable menu item: Command/Ctrl+N/O/S for new/open/save-as, Command/Ctrl+Z and platform redo for history, Command/Ctrl+Shift+N/Delete for layer creation/deletion, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, [/] for brush size, and Command/Ctrl+0/1/M plus platform fullscreen for window controls. Tool shortcuts also support matching two-beolsik Korean key positions on the canvas.
 - Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting
 - LVRS solid chrome keeps native window controls and the logical top drag handle available without restoring a visible titlebar; that reserved top area stays empty, shares the toolbar background color, and the toolbar starts below it

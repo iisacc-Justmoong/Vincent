@@ -31,6 +31,7 @@ Rectangle {
     property string toolMode: "brush"
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
+    property bool flatRasterDocumentOpened: false
     property bool textEditingActive: false
     property string shapeKind: "rectangle"
     property bool shapeDraggingActive: false
@@ -170,6 +171,7 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         surface.backgroundLayerPresent = true;
+        surface.flatRasterDocumentOpened = false;
         clearDrawableObjects();
         if (arguments.length >= 2) {
             resizeCanvasItemToDimensions(canvasWidth, canvasHeight);
@@ -185,6 +187,7 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         surface.backgroundLayerPresent = true;
+        surface.flatRasterDocumentOpened = false;
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
@@ -200,23 +203,40 @@ Rectangle {
             return true;
         }
 
-        const imageObject = canvasSurface.imageObjectForFile(sourceUrl, surface.workspaceCanvasWidth, surface.workspaceCanvasHeight);
-        if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
+        if (surface.flatRasterDocumentOpened) {
+            return appendRasterImageObject(sourceUrl);
+        }
+
+        if (!canvasSurface.openRaster(sourceUrl)) {
             return false;
         }
 
         surface.backgroundLayerPresent = true;
         clearDrawableObjects();
-        syncCanvasItemSizeToWorkspace();
-        canvasSurface.clearCanvas();
+        canvasSizeCreated = true;
+        resizeRasterLayerItems(canvasSurface.width, canvasSurface.height);
+        fitCanvasZoomToCurrentCanvas();
+        addDefaultDrawingLayer();
+        surface.flatRasterDocumentOpened = true;
+        return true;
+    }
+
+    function appendRasterImageObject(fileUrl) {
+        const imageObject = canvasSurface.imageObjectForFile(fileUrl);
+        if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
+            return false;
+        }
+
         appendDrawableObject({
             id: surface.nextDrawableObjectId++,
             type: "image",
-            x: Math.max(0, Math.round((canvasSurface.width - imageObject.width) / 2)),
-            y: Math.max(0, Math.round((canvasSurface.height - imageObject.height) / 2)),
+            x: Math.round((canvasSurface.width - imageObject.width) / 2),
+            y: Math.round((canvasSurface.height - imageObject.height) / 2),
             width: imageObject.width,
             height: imageObject.height,
             source: imageObject.source,
+            originalSource: imageObject.originalSource || imageObject.source,
+            sourceFormat: imageObject.sourceFormat || "",
             originalWidth: imageObject.originalWidth,
             originalHeight: imageObject.originalHeight
         });
@@ -271,6 +291,7 @@ Rectangle {
             return false;
         }
 
+        surface.flatRasterDocumentOpened = false;
         surface.backgroundLayerPresent = false;
         clearDrawableObjects();
         resizeCanvasItemToDimensions(psdDocument.canvasWidth, psdDocument.canvasHeight);
@@ -930,7 +951,8 @@ Rectangle {
                 key: layerKeyForDrawableObjectId(drawableObject.id),
                 itemId: drawableObject.id,
                 objectId: drawableObject.id,
-                layerKind: "object",
+                layerKind: "layer",
+                contentKind: drawableObject.type || "",
                 depth: 0,
                 parentKey: "",
                 parentItemKey: "",
@@ -1121,7 +1143,7 @@ Rectangle {
         const topToBottomObjects = [];
         for (let rowIndex = 0; rowIndex < rows.length; ++rowIndex) {
             const row = rows[rowIndex];
-            if (!row || row.layerKind !== "object") {
+            if (!row || (row.layerKind !== "layer" && row.layerKind !== "object")) {
                 continue;
             }
             const objectId = String(row.objectId);
@@ -1302,10 +1324,8 @@ Rectangle {
         const deltaX = pointX - surface.drawableObjectTransformStartX;
         const deltaY = pointY - surface.drawableObjectTransformStartY;
         const movedObject = cloneDrawableObject(originalObject);
-        const maxX = Math.max(0, canvasSurface.width - movedObject.width);
-        const maxY = Math.max(0, canvasSurface.height - movedObject.height);
-        movedObject.x = Math.max(0, Math.min(maxX, originalObject.x + deltaX));
-        movedObject.y = Math.max(0, Math.min(maxY, originalObject.y + deltaY));
+        movedObject.x = originalObject.x + deltaX;
+        movedObject.y = originalObject.y + deltaY;
         return movedObject;
     }
 
@@ -1318,16 +1338,16 @@ Rectangle {
         var bottom = originalObject.y + originalObject.height;
 
         if (surface.drawableObjectTransformMode.indexOf("w") >= 0) {
-            left = Math.max(0, Math.min(right - surface.drawableObjectMinimumDimension, originalObject.x + deltaX));
+            left = Math.min(right - surface.drawableObjectMinimumDimension, originalObject.x + deltaX);
         }
         if (surface.drawableObjectTransformMode.indexOf("e") >= 0) {
-            right = Math.min(canvasSurface.width, Math.max(left + surface.drawableObjectMinimumDimension, originalObject.x + originalObject.width + deltaX));
+            right = Math.max(left + surface.drawableObjectMinimumDimension, originalObject.x + originalObject.width + deltaX);
         }
         if (surface.drawableObjectTransformMode.indexOf("n") >= 0) {
-            top = Math.max(0, Math.min(bottom - surface.drawableObjectMinimumDimension, originalObject.y + deltaY));
+            top = Math.min(bottom - surface.drawableObjectMinimumDimension, originalObject.y + deltaY);
         }
         if (surface.drawableObjectTransformMode.indexOf("s") >= 0) {
-            bottom = Math.min(canvasSurface.height, Math.max(top + surface.drawableObjectMinimumDimension, originalObject.y + originalObject.height + deltaY));
+            bottom = Math.max(top + surface.drawableObjectMinimumDimension, originalObject.y + originalObject.height + deltaY);
         }
 
         const resizedObject = cloneDrawableObject(originalObject);
@@ -1776,6 +1796,7 @@ Rectangle {
 
             TextEdit {
                 id: textToolEditor
+                objectName: "textToolEditor"
                 anchors.fill: parent
                 anchors.margins: surface.textToolFramePadding
                 visible: surface.textEditingActive

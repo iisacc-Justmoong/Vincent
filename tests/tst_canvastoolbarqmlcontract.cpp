@@ -287,7 +287,11 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("function textToolResponsiveWidth()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginTextPlacement(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveText()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.imageObjectForFile(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool flatRasterDocumentOpened")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.openRaster(sourceUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function appendRasterImageObject(fileUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.imageObjectForFile(fileUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("addDefaultDrawingLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("appendDrawableObject({")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"image\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"text\"")));
@@ -295,6 +299,7 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("function rasterLayerDescriptors()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: textToolEditor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"textToolEditor\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
@@ -470,6 +475,11 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateDrawableObjectTransform(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resizedDrawableObject(originalObject, pointX, pointY)")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("canvasSurface.width - movedObject.width")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("right = Math.min(canvasSurface.width")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("bottom = Math.min(canvasSurface.height")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("left = Math.max(0, Math.min(right")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("top = Math.max(0, Math.min(bottom")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function deleteSelectedDrawableObject()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"Delete\", \"Backspace\"]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.deleteCurrentLayer()")));
@@ -724,6 +734,9 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectVisualModelEntry(drawableObject)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function reorderDrawableObjectVisualModel(orderedObjects)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function drawableObjectVisualModelCount()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("layerKind: \"layer\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("contentKind: drawableObject.type || \"\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("row.layerKind !== \"layer\" && row.layerKind !== \"object\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("parent: canvasSurface")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var rasterLayerItems: ({})")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function registerRasterLayerItem(objectId, surfaceItem)")));
