@@ -79,8 +79,8 @@ Rectangle {
     readonly property real ellipseBubbleTailRightAngle: 1.70
     readonly property int ellipseBubbleArcSegmentCount: 32
     readonly property int drawableObjectMinimumDimension: 8
-    readonly property int drawableObjectHandleSize: 8
-    readonly property int drawableObjectHandleHitSize: 16
+    readonly property int drawableObjectHandleSize: 10
+    readonly property int drawableObjectHandleHitSize: 32
     readonly property real defaultCanvasZoomScale: 1
     readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
@@ -105,6 +105,26 @@ Rectangle {
             mode: "resize-sw",
             xRatio: 0,
             yRatio: 1
+        },
+        {
+            mode: "resize-n",
+            xRatio: 0.5,
+            yRatio: 0
+        },
+        {
+            mode: "resize-e",
+            xRatio: 1,
+            yRatio: 0.5
+        },
+        {
+            mode: "resize-s",
+            xRatio: 0.5,
+            yRatio: 1
+        },
+        {
+            mode: "resize-w",
+            xRatio: 0,
+            yRatio: 0.5
         }
     ]
     property var drawableObjects: []
@@ -128,6 +148,7 @@ Rectangle {
     property bool persistRasterLayerSnapshots: true
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
+    property string drawableObjectHoverHandleMode: ""
     property real drawableObjectTransformStartX: 0
     property real drawableObjectTransformStartY: 0
     property var drawableObjectTransformOriginal: null
@@ -135,7 +156,10 @@ Rectangle {
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
 
-    onSelectedDrawableObjectIdChanged: rebuildLayerHierarchyRows()
+    onSelectedDrawableObjectIdChanged: {
+        surface.drawableObjectHoverHandleMode = "";
+        rebuildLayerHierarchyRows();
+    }
 
     function effectiveToolMode() {
         return surface.spacePanActive && !surface.textEditingActive ? "pan" : surface.toolMode;
@@ -1284,15 +1308,39 @@ Rectangle {
         }
 
         const halfHitSize = surface.drawableObjectHandleHitSize / 2;
+        const halfVisibleSize = surface.drawableObjectHandleSize / 2;
+        const insideObject = pointX > drawableObject.x && pointX < drawableObject.x + drawableObject.width && pointY > drawableObject.y && pointY < drawableObject.y + drawableObject.height;
         for (let index = 0; index < surface.drawableObjectHandles.length; ++index) {
             const handle = surface.drawableObjectHandles[index];
             const handleX = drawableObject.x + drawableObject.width * handle.xRatio;
             const handleY = drawableObject.y + drawableObject.height * handle.yRatio;
-            if (pointX >= handleX - halfHitSize && pointX <= handleX + halfHitSize && pointY >= handleY - halfHitSize && pointY <= handleY + halfHitSize) {
+            const insideHandleHitTarget = pointX >= handleX - halfHitSize && pointX <= handleX + halfHitSize && pointY >= handleY - halfHitSize && pointY <= handleY + halfHitSize;
+            const insideVisibleHandle = pointX >= handleX - halfVisibleSize && pointX <= handleX + halfVisibleSize && pointY >= handleY - halfVisibleSize && pointY <= handleY + halfVisibleSize;
+            if (insideHandleHitTarget && (!insideObject || insideVisibleHandle)) {
                 return handle.mode;
             }
         }
         return "";
+    }
+
+    function updateDrawableObjectHoverHandle(pointX, pointY) {
+        surface.drawableObjectHoverHandleMode = drawableObjectHandleAt(pointX, pointY);
+    }
+
+    function drawableObjectResizeCursor(handleMode) {
+        if (handleMode === "resize-nw" || handleMode === "resize-se") {
+            return Qt.SizeFDiagCursor;
+        }
+        if (handleMode === "resize-ne" || handleMode === "resize-sw") {
+            return Qt.SizeBDiagCursor;
+        }
+        if (handleMode === "resize-n" || handleMode === "resize-s") {
+            return Qt.SizeVerCursor;
+        }
+        if (handleMode === "resize-e" || handleMode === "resize-w") {
+            return Qt.SizeHorCursor;
+        }
+        return Qt.SizeAllCursor;
     }
 
     function resetDrawableObjectTransform() {
@@ -1358,17 +1406,18 @@ Rectangle {
         var top = originalObject.y;
         var right = originalObject.x + originalObject.width;
         var bottom = originalObject.y + originalObject.height;
+        const resizeDirections = surface.drawableObjectTransformMode.slice("resize-".length);
 
-        if (surface.drawableObjectTransformMode.indexOf("w") >= 0) {
+        if (resizeDirections.indexOf("w") >= 0) {
             left = Math.min(right - surface.drawableObjectMinimumDimension, originalObject.x + deltaX);
         }
-        if (surface.drawableObjectTransformMode.indexOf("e") >= 0) {
+        if (resizeDirections.indexOf("e") >= 0) {
             right = Math.max(left + surface.drawableObjectMinimumDimension, originalObject.x + originalObject.width + deltaX);
         }
-        if (surface.drawableObjectTransformMode.indexOf("n") >= 0) {
+        if (resizeDirections.indexOf("n") >= 0) {
             top = Math.min(bottom - surface.drawableObjectMinimumDimension, originalObject.y + deltaY);
         }
-        if (surface.drawableObjectTransformMode.indexOf("s") >= 0) {
+        if (resizeDirections.indexOf("s") >= 0) {
             bottom = Math.max(top + surface.drawableObjectMinimumDimension, originalObject.y + originalObject.height + deltaY);
         }
 
@@ -1533,6 +1582,10 @@ Rectangle {
             return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;
         }
         if (mode === "move") {
+            const resizeMode = surface.drawableObjectTransformActive && surface.drawableObjectTransformMode !== "move" ? surface.drawableObjectTransformMode : surface.drawableObjectHoverHandleMode;
+            if (resizeMode.length > 0) {
+                return surface.drawableObjectResizeCursor(resizeMode);
+            }
             return Qt.SizeAllCursor;
         }
         if (mode === "zoom") {
@@ -1783,11 +1836,13 @@ Rectangle {
 
         DrawingSurfaceItem {
             id: canvasSurface
+            objectName: "canvasSurface"
             x: Math.round((parent.width - width) / 2 + surface.canvasPanOffsetX)
             y: Math.round((parent.height - height) / 2 + surface.canvasPanOffsetY)
             z: 1
             width: 1
             height: 1
+            clip: true
             transformOrigin: Item.Center
             scale: surface.canvasZoomScale
             brushColor: surface.brushColor
@@ -2037,13 +2092,15 @@ Rectangle {
 
                 delegate: Rectangle {
                     required property var modelData
+                    readonly property bool activeHandle: surface.drawableObjectHoverHandleMode === modelData.mode || (surface.drawableObjectTransformActive && surface.drawableObjectTransformMode === modelData.mode)
 
                     width: surface.drawableObjectHandleSize
                     height: surface.drawableObjectHandleSize
                     x: drawableObjectSelectionFrame.width * modelData.xRatio - width / 2
                     y: drawableObjectSelectionFrame.height * modelData.yRatio - height / 2
+                    scale: activeHandle ? 1.2 : 1
                     color: surface.canvasColor
-                    border.width: 1
+                    border.width: activeHandle ? 2 : 1
                     border.color: surface.textToolAccentColor
                 }
             }
@@ -2123,6 +2180,10 @@ Rectangle {
 
         onPositionChanged: function (mouse) {
             const mode = surface.effectiveToolMode();
+            if (mode === "move" && !surface.drawableObjectTransformActive) {
+                surface.updateDrawableObjectHoverHandle(mouse.x, mouse.y);
+            }
+
             if (mode === "zoom" && surface.zoomDraggingActive) {
                 surface.updateZoomDrag(mouse.x);
                 mouse.accepted = true;
@@ -2154,6 +2215,7 @@ Rectangle {
             if (mode === "move") {
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y);
                 surface.commitDrawableObjectTransform();
+                surface.updateDrawableObjectHoverHandle(mouse.x, mouse.y);
                 mouse.accepted = true;
                 return;
             }
@@ -2166,7 +2228,12 @@ Rectangle {
             }
         }
 
+        onExited: {
+            surface.drawableObjectHoverHandleMode = "";
+        }
+
         onCanceled: {
+            surface.drawableObjectHoverHandleMode = "";
             surface.cancelActiveShape();
             surface.cancelActiveDrawableObjectTransform();
             surface.cancelPanDrag();

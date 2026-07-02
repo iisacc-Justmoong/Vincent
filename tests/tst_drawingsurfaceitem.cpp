@@ -763,10 +763,21 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QVERIFY(rootItem);
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
+    QCOMPARE(canvasItem->objectName(), QStringLiteral("canvasSurface"));
+    QVERIFY(canvasItem->clip());
     QTRY_VERIFY(canvasItem->width() > 100);
     QTRY_VERIFY(canvasItem->height() > 100);
     engine.rootContext()->setContextProperty(QStringLiteral("testCanvasWidth"), canvasItem->width());
     engine.rootContext()->setContextProperty(QStringLiteral("testCanvasHeight"), canvasItem->height());
+
+    QQmlExpression handleTargetContract(engine.rootContext(),
+                                        object.data(),
+                                        QStringLiteral("[drawableObjectHandleSize, drawableObjectHandleHitSize, drawableObjectHandles.length, "
+                                                       "drawableObjectResizeCursor(\"resize-n\") === Qt.SizeVerCursor, "
+                                                       "drawableObjectResizeCursor(\"resize-e\") === Qt.SizeHorCursor].join(\",\");"));
+    const QVariant handleTargetContractResult = handleTargetContract.evaluate();
+    QVERIFY2(!handleTargetContract.hasError(), qPrintable(handleTargetContract.error().toString()));
+    QCOMPARE(handleTargetContractResult.toString(), QStringLiteral("10,32,8,true,true"));
 
     QQmlExpression moveObject(engine.rootContext(),
                               object.data(),
@@ -830,6 +841,26 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QVERIFY(resizedOutsideObject.value(QStringLiteral("y")).toReal()
             + resizedOutsideObject.value(QStringLiteral("height")).toReal()
             > canvasItem->height());
+
+    QQmlExpression forgivingHandleHitTargets(engine.rootContext(),
+                                             object.data(),
+                                             QStringLiteral("var objectX = testCanvasWidth + 200;"
+                                                            "var objectY = testCanvasHeight + 200;"
+                                                            "appendDrawableObject({ id: 3, type: \"shape\", x: objectX, y: objectY, width: 40, height: 30, shapeKind: \"rectangle\", color: \"#ef6c00\" });"
+                                                            "var cornerMode = drawableObjectHandleAt(objectX + 55, objectY + 45);"
+                                                            "beginDrawableObjectTransform(objectX + 55, objectY + 45);"
+                                                            "updateDrawableObjectTransform(objectX + 75, objectY + 65);"
+                                                            "commitDrawableObjectTransform();"
+                                                            "var afterCorner = selectedDrawableObject();"
+                                                            "var edgeMode = drawableObjectHandleAt(objectX + 30, objectY - 15);"
+                                                            "beginDrawableObjectTransform(objectX + 30, objectY - 15);"
+                                                            "updateDrawableObjectTransform(objectX + 30, objectY - 25);"
+                                                            "commitDrawableObjectTransform();"
+                                                            "var afterEdge = selectedDrawableObject();"
+                                                            "[cornerMode, edgeMode, afterCorner.width, afterCorner.height, afterEdge.y === objectY - 10, afterEdge.height].join(\",\");"));
+    const QVariant forgivingHandleHitTargetsResult = forgivingHandleHitTargets.evaluate();
+    QVERIFY2(!forgivingHandleHitTargets.hasError(), qPrintable(forgivingHandleHitTargets.error().toString()));
+    QCOMPARE(forgivingHandleHitTargetsResult.toString(), QStringLiteral("resize-se,resize-n,60,50,true,60"));
 }
 
 void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
