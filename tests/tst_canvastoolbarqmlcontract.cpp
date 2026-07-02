@@ -287,13 +287,13 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("function textToolResponsiveWidth()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginTextPlacement(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function commitActiveText()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("property bool flatRasterDocumentOpened")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.openRaster(sourceUrl)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("function appendRasterImageObject(fileUrl)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.imageObjectForFile(fileUrl)")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("property bool flatRasterDocumentOpened")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("appendRasterImageObject")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("return appendRasterImageObject(sourceUrl);")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("canvasSurface.imageObjectForFile(fileUrl)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("addDefaultDrawingLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("appendDrawableObject({")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"image\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.saveToFileWithObjectsAndRasterLayers(")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function rasterLayerDescriptors()")));
@@ -303,7 +303,7 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"zoom\" || mode === \"fill\" || mode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"fill\" || mode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.canvasMouseAcceptedButtons()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasCursorShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"pan\")")));
@@ -410,7 +410,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(!surfaceSource.contains(QStringLiteral("strokeWidth")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("context.stroke();")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("traceEllipsePath(context, x, y, widthValue, bodyHeight);")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"zoom\" || mode === \"fill\" || mode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"fill\" || mode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"shape\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.CrossCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
@@ -433,6 +433,10 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function updateZoomDrag(pointX)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function cancelZoomDrag()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("scale: surface.canvasZoomScale")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("id: canvasZoomMouseArea")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"canvasZoomMouseArea\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.effectiveToolMode() === \"zoom\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: Qt.SizeHorCursor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginZoomDrag(mouse.x);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.updateZoomDrag(mouse.x);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.commitZoomDrag();")));

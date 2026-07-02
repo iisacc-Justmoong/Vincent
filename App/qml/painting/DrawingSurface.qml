@@ -31,7 +31,6 @@ Rectangle {
     property string toolMode: "brush"
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
-    property bool flatRasterDocumentOpened: false
     property bool spacePanActive: false
     property bool textEditingActive: false
     property string shapeKind: "rectangle"
@@ -217,7 +216,6 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         surface.backgroundLayerPresent = true;
-        surface.flatRasterDocumentOpened = false;
         clearDrawableObjects();
         if (arguments.length >= 2) {
             resizeCanvasItemToDimensions(canvasWidth, canvasHeight);
@@ -233,7 +231,6 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         surface.backgroundLayerPresent = true;
-        surface.flatRasterDocumentOpened = false;
         clearDrawableObjects();
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
@@ -249,10 +246,6 @@ Rectangle {
             return true;
         }
 
-        if (surface.flatRasterDocumentOpened) {
-            return appendRasterImageObject(sourceUrl);
-        }
-
         if (!canvasSurface.openRaster(sourceUrl)) {
             return false;
         }
@@ -263,29 +256,6 @@ Rectangle {
         resizeRasterLayerItems(canvasSurface.width, canvasSurface.height);
         fitCanvasZoomToCurrentCanvas();
         addDefaultDrawingLayer();
-        surface.flatRasterDocumentOpened = true;
-        return true;
-    }
-
-    function appendRasterImageObject(fileUrl) {
-        const imageObject = canvasSurface.imageObjectForFile(fileUrl);
-        if (!imageObject.source || imageObject.width <= 0 || imageObject.height <= 0) {
-            return false;
-        }
-
-        appendDrawableObject({
-            id: surface.nextDrawableObjectId++,
-            type: "image",
-            x: Math.round((canvasSurface.width - imageObject.width) / 2),
-            y: Math.round((canvasSurface.height - imageObject.height) / 2),
-            width: imageObject.width,
-            height: imageObject.height,
-            source: imageObject.source,
-            originalSource: imageObject.originalSource || imageObject.source,
-            sourceFormat: imageObject.sourceFormat || "",
-            originalWidth: imageObject.originalWidth,
-            originalHeight: imageObject.originalHeight
-        });
         return true;
     }
 
@@ -337,7 +307,6 @@ Rectangle {
             return false;
         }
 
-        surface.flatRasterDocumentOpened = false;
         surface.backgroundLayerPresent = false;
         clearDrawableObjects();
         resizeCanvasItemToDimensions(psdDocument.canvasWidth, psdDocument.canvasHeight);
@@ -1658,7 +1627,7 @@ Rectangle {
 
     function canvasMouseAcceptedButtons() {
         const mode = surface.effectiveToolMode();
-        if (mode === "shape" || mode === "move" || mode === "zoom" || mode === "fill" || mode === "text") {
+        if (mode === "shape" || mode === "move" || mode === "fill" || mode === "text") {
             return Qt.LeftButton;
         }
         return Qt.NoButton;
@@ -2229,6 +2198,37 @@ Rectangle {
 
             onCanceled: surface.cancelPanDrag()
         }
+
+        MouseArea {
+            id: canvasZoomMouseArea
+            objectName: "canvasZoomMouseArea"
+            anchors.fill: parent
+            z: 6
+            enabled: surface.effectiveToolMode() === "zoom"
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+            cursorShape: Qt.SizeHorCursor
+
+            onPressed: function (mouse) {
+                surface.beginZoomDrag(mouse.x);
+                mouse.accepted = true;
+            }
+
+            onPositionChanged: function (mouse) {
+                if (surface.zoomDraggingActive) {
+                    surface.updateZoomDrag(mouse.x);
+                    mouse.accepted = true;
+                }
+            }
+
+            onReleased: function (mouse) {
+                surface.updateZoomDrag(mouse.x);
+                surface.commitZoomDrag();
+                mouse.accepted = true;
+            }
+
+            onCanceled: surface.cancelZoomDrag()
+        }
     }
 
     MouseArea {
@@ -2241,12 +2241,6 @@ Rectangle {
 
         onPressed: function (mouse) {
             const mode = surface.effectiveToolMode();
-            if (mode === "zoom") {
-                surface.beginZoomDrag(mouse.x);
-                mouse.accepted = true;
-                return;
-            }
-
             if (mode === "move") {
                 surface.beginDrawableObjectTransform(mouse.x, mouse.y);
                 mouse.accepted = true;
@@ -2278,12 +2272,6 @@ Rectangle {
                 surface.updateDrawableObjectHoverHandle(mouse.x, mouse.y);
             }
 
-            if (mode === "zoom" && surface.zoomDraggingActive) {
-                surface.updateZoomDrag(mouse.x);
-                mouse.accepted = true;
-                return;
-            }
-
             if (mode === "move" && surface.drawableObjectTransformActive) {
                 const constrained = surface.drawableObjectTransformConstrainedFromMouse(mouse);
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y, constrained);
@@ -2300,13 +2288,6 @@ Rectangle {
 
         onReleased: function (mouse) {
             const mode = surface.effectiveToolMode();
-            if (mode === "zoom") {
-                surface.updateZoomDrag(mouse.x);
-                surface.commitZoomDrag();
-                mouse.accepted = true;
-                return;
-            }
-
             if (mode === "move") {
                 const constrained = surface.drawableObjectTransformConstrainedFromMouse(mouse);
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y, constrained);

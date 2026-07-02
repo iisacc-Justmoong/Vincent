@@ -57,7 +57,7 @@ private slots:
     void supportsUndoRedo();
     void opensRasterBackground();
     void opensLargeRasterAtOriginalImageSize();
-    void opensFirstRasterAsCanvasAndSecondRasterAsImageObject();
+    void opensRasterImagesAsCanvasAtSourceResolution();
 };
 
 namespace {
@@ -708,6 +708,14 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
     QVERIFY(canvasItem);
     QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
     QVERIFY(canvasPaper);
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    QQuickItem *canvasZoomMouseArea = findItemByObjectName(rootItem, QStringLiteral("canvasZoomMouseArea"));
+    QVERIFY(canvasZoomMouseArea);
+    QCOMPARE(canvasZoomMouseArea->parentItem(), canvasViewport);
+    QTRY_COMPARE(canvasZoomMouseArea->width(), canvasViewport->width());
+    QTRY_COMPARE(canvasZoomMouseArea->height(), canvasViewport->height());
+    QVERIFY(canvasZoomMouseArea->isEnabled());
     QTRY_COMPARE(rootItem->property("canvasZoomScale").toReal(), 1.0);
     QCOMPARE(canvasItem->scale(), 1.0);
     QCOMPARE(canvasPaper->scale(), 1.0);
@@ -733,6 +741,32 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
     QVERIFY(zoomedOutScale < zoomedInScale);
     QCOMPARE(canvasItem->scale(), zoomedOutScale);
     QCOMPARE(canvasPaper->scale(), zoomedOutScale);
+
+    QQmlExpression createSmallCanvas(engine.rootContext(),
+                                     object.data(),
+                                     QStringLiteral("newCanvas(200, 120);"));
+    createSmallCanvas.evaluate();
+    QVERIFY2(!createSmallCanvas.hasError(), qPrintable(createSmallCanvas.error().toString()));
+    QTRY_COMPARE(canvasItem->width(), 200.0);
+    QTRY_COMPARE(canvasItem->height(), 120.0);
+    QVERIFY(canvasItem->x() + canvasItem->width() < canvasViewport->width());
+    QCOMPARE(canvasZoomMouseArea->width(), canvasViewport->width());
+    QCOMPARE(canvasZoomMouseArea->height(), canvasViewport->height());
+
+    const qreal emptyWorkspaceStartX = canvasItem->x() + canvasItem->width() + 20.0;
+    QVERIFY(emptyWorkspaceStartX < canvasViewport->width());
+    engine.rootContext()->setContextProperty(QStringLiteral("testEmptyWorkspaceZoomStartX"), emptyWorkspaceStartX);
+    QQmlExpression emptyWorkspaceZoom(engine.rootContext(),
+                                      object.data(),
+                                      QStringLiteral("beginZoomDrag(testEmptyWorkspaceZoomStartX);"
+                                                     "updateZoomDrag(testEmptyWorkspaceZoomStartX + 120);"
+                                                     "commitZoomDrag();"));
+    emptyWorkspaceZoom.evaluate();
+    QVERIFY2(!emptyWorkspaceZoom.hasError(), qPrintable(emptyWorkspaceZoom.error().toString()));
+    const qreal emptyWorkspaceZoomedScale = rootItem->property("canvasZoomScale").toReal();
+    QVERIFY(emptyWorkspaceZoomedScale > zoomedOutScale);
+    QCOMPARE(canvasItem->scale(), emptyWorkspaceZoomedScale);
+    QCOMPARE(canvasPaper->scale(), emptyWorkspaceZoomedScale);
 }
 
 void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
@@ -2372,7 +2406,7 @@ void tst_DrawingSurfaceItem::opensLargeRasterAtOriginalImageSize()
     QCOMPARE(saved.size(), QSize(1200, 600));
 }
 
-void tst_DrawingSurfaceItem::opensFirstRasterAsCanvasAndSecondRasterAsImageObject()
+void tst_DrawingSurfaceItem::opensRasterImagesAsCanvasAtSourceResolution()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
 
@@ -2442,37 +2476,34 @@ void tst_DrawingSurfaceItem::opensFirstRasterAsCanvasAndSecondRasterAsImageObjec
     QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(),
              layerObject.value(QStringLiteral("id")).toInt());
 
-    QImage insertedImage(80, 60, QImage::Format_ARGB32);
-    insertedImage.fill(QColor(QStringLiteral("#ef5350")));
-    const QString insertedPath = dir.filePath(QStringLiteral("inserted-open.png"));
-    QVERIFY(insertedImage.save(insertedPath));
-    engine.rootContext()->setContextProperty(QStringLiteral("testInsertedImageUrl"),
-                                             QUrl::fromLocalFile(insertedPath).toString());
+    QImage replacementImage(80, 60, QImage::Format_ARGB32);
+    replacementImage.fill(QColor(QStringLiteral("#ef5350")));
+    const QString replacementPath = dir.filePath(QStringLiteral("replacement-open.png"));
+    QVERIFY(replacementImage.save(replacementPath));
+    engine.rootContext()->setContextProperty(QStringLiteral("testReplacementImageUrl"),
+                                             QUrl::fromLocalFile(replacementPath).toString());
 
-    QQmlExpression insertImage(engine.rootContext(),
-                               object.data(),
-                               QStringLiteral("openRaster(testInsertedImageUrl);"));
-    const QVariant insertResult = insertImage.evaluate();
-    QVERIFY2(!insertImage.hasError(), qPrintable(insertImage.error().toString()));
-    QCOMPARE(insertResult.toBool(), true);
+    QQmlExpression replaceImage(engine.rootContext(),
+                                object.data(),
+                                QStringLiteral("openRaster(testReplacementImageUrl);"));
+    const QVariant replaceResult = replaceImage.evaluate();
+    QVERIFY2(!replaceImage.hasError(), qPrintable(replaceImage.error().toString()));
+    QCOMPARE(replaceResult.toBool(), true);
 
-    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(image.width()));
-    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(image.height()));
-    QCOMPARE(canvasItem->backgroundSource(), QUrl::fromLocalFile(inputPath).toString());
-    QTRY_COMPARE(viewModel.canvasWidth(), image.width());
-    QTRY_COMPARE(viewModel.canvasHeight(), image.height());
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(replacementImage.width()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(replacementImage.height()));
+    QCOMPARE(canvasItem->backgroundSource(), QUrl::fromLocalFile(replacementPath).toString());
+    QTRY_COMPARE(viewModel.canvasWidth(), replacementImage.width());
+    QTRY_COMPARE(viewModel.canvasHeight(), replacementImage.height());
 
     objects = rootItem->property("drawableObjects").toList();
-    QCOMPARE(objects.size(), 2);
-    const QVariantMap insertedObject = objects.last().toMap();
-    QCOMPARE(insertedObject.value(QStringLiteral("type")).toString(), QStringLiteral("image"));
-    QCOMPARE(insertedObject.value(QStringLiteral("source")).toString(), QUrl::fromLocalFile(insertedPath).toString());
-    QCOMPARE(insertedObject.value(QStringLiteral("width")).toInt(), insertedImage.width());
-    QCOMPARE(insertedObject.value(QStringLiteral("height")).toInt(), insertedImage.height());
-    QCOMPARE(insertedObject.value(QStringLiteral("x")).toInt(), qRound((image.width() - insertedImage.width()) / 2.0));
-    QCOMPARE(insertedObject.value(QStringLiteral("y")).toInt(), qRound((image.height() - insertedImage.height()) / 2.0));
+    QCOMPARE(objects.size(), 1);
+    const QVariantMap replacementLayerObject = objects.first().toMap();
+    QCOMPARE(replacementLayerObject.value(QStringLiteral("type")).toString(), QStringLiteral("layer"));
+    QCOMPARE(replacementLayerObject.value(QStringLiteral("width")).toInt(), replacementImage.width());
+    QCOMPARE(replacementLayerObject.value(QStringLiteral("height")).toInt(), replacementImage.height());
     QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(),
-             insertedObject.value(QStringLiteral("id")).toInt());
+             replacementLayerObject.value(QStringLiteral("id")).toInt());
 
     const QString outputPath = dir.filePath(QStringLiteral("opened-canvas-output.png"));
     engine.rootContext()->setContextProperty(QStringLiteral("testSaveImageUrl"),
@@ -2486,11 +2517,8 @@ void tst_DrawingSurfaceItem::opensFirstRasterAsCanvasAndSecondRasterAsImageObjec
 
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
-    QCOMPARE(saved.size(), image.size());
-    QCOMPARE(saved.pixelColor(12, 12).rgba(), QColor(QStringLiteral("#26c6da")).rgba());
-    QCOMPARE(saved.pixelColor(insertedObject.value(QStringLiteral("x")).toInt() + 8,
-                              insertedObject.value(QStringLiteral("y")).toInt() + 8).rgba(),
-             QColor(QStringLiteral("#ef5350")).rgba());
+    QCOMPARE(saved.size(), replacementImage.size());
+    QCOMPARE(saved.pixelColor(12, 12).rgba(), QColor(QStringLiteral("#ef5350")).rgba());
 }
 
 QTEST_MAIN(tst_DrawingSurfaceItem)
