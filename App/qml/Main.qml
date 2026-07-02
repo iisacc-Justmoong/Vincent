@@ -148,99 +148,271 @@ LV.ApplicationWindow {
         return commandName + " - " + shortcutText;
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutQuit]
-        onActivated: Qt.quit()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutAddLayer]
+    Controls.Action {
+        id: newCanvasAction
+        text: qsTr("New Canvas...")
+        shortcut: window.shortcutNewCanvas
         enabled: window.canvasPage !== null
-        onActivated: window.requestAddLayer()
+        onTriggered: window.requestNewCanvas()
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutDeleteCurrentLayer]
+    Controls.Action {
+        id: openImageAction
+        text: qsTr("Open Image...")
+        shortcut: window.shortcutOpenImage
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestOpenImage()
+    }
+
+    Controls.Action {
+        id: saveImageAsAction
+        text: qsTr("Save Image As...")
+        shortcut: window.shortcutSaveImageAs
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestSaveImage()
+    }
+
+    Controls.Action {
+        id: clearCanvasAction
+        text: qsTr("Clear Canvas")
+        shortcut: window.shortcutClearCanvas
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestClearCanvas()
+    }
+
+    Controls.Action {
+        id: quitAction
+        text: qsTr("Quit Vincent")
+        shortcut: window.shortcutQuit
+        onTriggered: Qt.quit()
+    }
+
+    Controls.Action {
+        id: undoAction
+        text: qsTr("Undo")
+        shortcut: window.shortcutUndo
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestUndo()
+    }
+
+    Controls.Action {
+        id: redoAction
+        text: qsTr("Redo")
+        shortcut: window.shortcutRedo
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestRedo()
+    }
+
+    Controls.Action {
+        id: addLayerAction
+        text: qsTr("Add Layer")
+        shortcut: window.shortcutAddLayer
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestAddLayer()
+    }
+
+    Controls.Action {
+        id: deleteCurrentLayerAction
+        text: qsTr("Delete Current Layer")
+        shortcut: window.shortcutDeleteCurrentLayer
         enabled: window.canvasPage !== null && window.canvasPage.canDeleteCurrentLayer()
-        onActivated: window.requestDeleteCurrentLayer()
+        onTriggered: window.requestDeleteCurrentLayer()
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutRectangleShape]
+    Controls.Action {
+        id: brushToolAction
+        text: qsTr("Brush")
+        shortcut: window.shortcutBrushTool
+        checkable: true
+        checked: window.currentToolMode === "brush"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("rectangle")
+        onTriggered: window.requestToolMode("brush")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutEllipseShape]
+    Controls.Action {
+        id: eraserToolAction
+        text: qsTr("Eraser")
+        shortcut: window.shortcutEraserTool
+        checkable: true
+        checked: window.currentToolMode === "eraser"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("ellipse")
+        onTriggered: window.requestToolMode("eraser")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutTriangleShape]
+    Controls.Action {
+        id: handPanToolAction
+        text: qsTr("Hand Pan")
+        shortcut: window.shortcutHandPanTool
+        checkable: true
+        checked: window.currentToolMode === "pan"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("triangle")
+        onTriggered: window.requestToolMode("pan")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutDiamondShape]
+    Controls.Action {
+        id: moveToolAction
+        text: qsTr("Move")
+        shortcut: window.shortcutMoveTool
+        checkable: true
+        checked: window.currentToolMode === "move"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("diamond")
+        onTriggered: window.requestToolMode("move")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutStarShape]
+    Controls.Action {
+        id: zoomToolAction
+        text: qsTr("Zoom")
+        shortcut: window.shortcutZoomTool
+        checkable: true
+        checked: window.currentToolMode === "zoom"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("star")
+        onTriggered: window.requestToolMode("zoom")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutRectangleBubbleShape]
+    Controls.Action {
+        id: shapeToolAction
+        text: qsTr("Shape")
+        shortcut: window.shortcutShapeTool
+        checkable: true
+        checked: window.currentToolMode === "shape"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("rectanglebubble")
+        onTriggered: window.requestToolMode("shape")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutEllipseBubbleShape]
+    Controls.Action {
+        id: fillToolAction
+        text: qsTr("Fill")
+        shortcut: window.shortcutFillTool
+        checkable: true
+        checked: window.currentToolMode === "fill"
         enabled: window.canvasPage !== null
-        onActivated: window.requestShapeTool("ellipsebubble")
+        onTriggered: window.requestToolMode("fill")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutFitCanvasToWindow]
+    Controls.Action {
+        id: textToolAction
+        text: qsTr("Text")
+        shortcut: window.shortcutTextTool
+        checkable: true
+        checked: window.currentToolMode === "text"
         enabled: window.canvasPage !== null
-        onActivated: window.requestFitCanvasToWindow()
+        onTriggered: window.requestToolMode("text")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutResetCanvasView]
+    Controls.Action {
+        id: rectangleShapeAction
+        text: qsTr("Rectangle")
+        shortcut: window.shortcutRectangleShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectangle"
         enabled: window.canvasPage !== null
-        onActivated: window.requestResetCanvasView()
+        onTriggered: window.requestShapeTool("rectangle")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutMinimizeWindow]
-        onActivated: window.requestMinimizeWindow()
+    Controls.Action {
+        id: ellipseShapeAction
+        text: qsTr("Ellipse")
+        shortcut: window.shortcutEllipseShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipse"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("ellipse")
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [window.shortcutToggleFullScreen]
-        onActivated: window.requestToggleFullScreen()
+    Controls.Action {
+        id: triangleShapeAction
+        text: qsTr("Triangle")
+        shortcut: window.shortcutTriangleShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "triangle"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("triangle")
+    }
+
+    Controls.Action {
+        id: diamondShapeAction
+        text: qsTr("Diamond")
+        shortcut: window.shortcutDiamondShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "diamond"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("diamond")
+    }
+
+    Controls.Action {
+        id: starShapeAction
+        text: qsTr("Star")
+        shortcut: window.shortcutStarShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "star"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("star")
+    }
+
+    Controls.Action {
+        id: rectangleBubbleShapeAction
+        text: qsTr("Rectangle Bubble")
+        shortcut: window.shortcutRectangleBubbleShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectanglebubble"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("rectanglebubble")
+    }
+
+    Controls.Action {
+        id: ellipseBubbleShapeAction
+        text: qsTr("Ellipse Bubble")
+        shortcut: window.shortcutEllipseBubbleShape
+        checkable: true
+        checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipsebubble"
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestShapeTool("ellipsebubble")
+    }
+
+    Controls.Action {
+        id: decreaseBrushSizeAction
+        text: qsTr("Decrease Brush Size")
+        shortcut: window.shortcutDecreaseBrushSize
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestBrushSizeDelta(-1)
+    }
+
+    Controls.Action {
+        id: increaseBrushSizeAction
+        text: qsTr("Increase Brush Size")
+        shortcut: window.shortcutIncreaseBrushSize
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestBrushSizeDelta(1)
+    }
+
+    Controls.Action {
+        id: fitCanvasToWindowAction
+        text: qsTr("Fit Canvas to Window")
+        shortcut: window.shortcutFitCanvasToWindow
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestFitCanvasToWindow()
+    }
+
+    Controls.Action {
+        id: resetCanvasViewAction
+        text: qsTr("Reset Canvas View")
+        shortcut: window.shortcutResetCanvasView
+        enabled: window.canvasPage !== null
+        onTriggered: window.requestResetCanvasView()
+    }
+
+    Controls.Action {
+        id: minimizeWindowAction
+        text: qsTr("Minimize")
+        shortcut: window.shortcutMinimizeWindow
+        onTriggered: window.requestMinimizeWindow()
+    }
+
+    Controls.Action {
+        id: toggleFullScreenAction
+        text: window.visibility === QtQuickWindow.Window.FullScreen ? qsTr("Exit Full Screen") : qsTr("Enter Full Screen")
+        shortcut: window.shortcutToggleFullScreen
+        onTriggered: window.requestToggleFullScreen()
     }
 
     menuBar: Controls.MenuBar {
@@ -248,39 +420,25 @@ LV.ApplicationWindow {
             title: qsTr("File")
 
             Controls.MenuItem {
-                text: qsTr("New Canvas...")
-                shortcut: window.shortcutNewCanvas
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestNewCanvas()
+                action: newCanvasAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Open Image...")
-                shortcut: window.shortcutOpenImage
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestOpenImage()
+                action: openImageAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Save Image As...")
-                shortcut: window.shortcutSaveImageAs
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestSaveImage()
+                action: saveImageAsAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Clear Canvas")
-                shortcut: window.shortcutClearCanvas
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestClearCanvas()
+                action: clearCanvasAction
             }
 
             Controls.MenuSeparator {}
 
             Controls.MenuItem {
-                text: qsTr("Quit Vincent")
-                shortcut: window.shortcutQuit
-                onTriggered: Qt.quit()
+                action: quitAction
             }
         }
 
@@ -288,33 +446,21 @@ LV.ApplicationWindow {
             title: qsTr("Edit")
 
             Controls.MenuItem {
-                text: qsTr("Undo")
-                shortcut: window.shortcutUndo
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestUndo()
+                action: undoAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Redo")
-                shortcut: window.shortcutRedo
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestRedo()
+                action: redoAction
             }
 
             Controls.MenuSeparator {}
 
             Controls.MenuItem {
-                text: qsTr("Add Layer")
-                shortcut: window.shortcutAddLayer
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestAddLayer()
+                action: addLayerAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Delete Current Layer")
-                shortcut: window.shortcutDeleteCurrentLayer
-                enabled: window.canvasPage !== null && window.canvasPage.canDeleteCurrentLayer()
-                onTriggered: window.requestDeleteCurrentLayer()
+                action: deleteCurrentLayerAction
             }
 
             Controls.MenuSeparator {}
@@ -323,75 +469,35 @@ LV.ApplicationWindow {
                 title: qsTr("Tools")
 
                 Controls.MenuItem {
-                    text: qsTr("Brush")
-                    shortcut: window.shortcutBrushTool
-                    checkable: true
-                    checked: window.currentToolMode === "brush"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("brush")
+                    action: brushToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Eraser")
-                    shortcut: window.shortcutEraserTool
-                    checkable: true
-                    checked: window.currentToolMode === "eraser"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("eraser")
+                    action: eraserToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Hand Pan")
-                    shortcut: window.shortcutHandPanTool
-                    checkable: true
-                    checked: window.currentToolMode === "pan"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("pan")
+                    action: handPanToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Move")
-                    shortcut: window.shortcutMoveTool
-                    checkable: true
-                    checked: window.currentToolMode === "move"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("move")
+                    action: moveToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Zoom")
-                    shortcut: window.shortcutZoomTool
-                    checkable: true
-                    checked: window.currentToolMode === "zoom"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("zoom")
+                    action: zoomToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Shape")
-                    shortcut: window.shortcutShapeTool
-                    checkable: true
-                    checked: window.currentToolMode === "shape"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("shape")
+                    action: shapeToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Fill")
-                    shortcut: window.shortcutFillTool
-                    checkable: true
-                    checked: window.currentToolMode === "fill"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("fill")
+                    action: fillToolAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Text")
-                    shortcut: window.shortcutTextTool
-                    checkable: true
-                    checked: window.currentToolMode === "text"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestToolMode("text")
+                    action: textToolAction
                 }
             }
 
@@ -399,83 +505,42 @@ LV.ApplicationWindow {
                 title: qsTr("Shape Kind")
 
                 Controls.MenuItem {
-                    text: qsTr("Rectangle")
-                    shortcut: window.shortcutRectangleShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectangle"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("rectangle")
+                    action: rectangleShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Ellipse")
-                    shortcut: window.shortcutEllipseShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipse"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("ellipse")
+                    action: ellipseShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Triangle")
-                    shortcut: window.shortcutTriangleShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "triangle"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("triangle")
+                    action: triangleShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Diamond")
-                    shortcut: window.shortcutDiamondShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "diamond"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("diamond")
+                    action: diamondShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Star")
-                    shortcut: window.shortcutStarShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "star"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("star")
+                    action: starShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Rectangle Bubble")
-                    shortcut: window.shortcutRectangleBubbleShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectanglebubble"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("rectanglebubble")
+                    action: rectangleBubbleShapeAction
                 }
 
                 Controls.MenuItem {
-                    text: qsTr("Ellipse Bubble")
-                    shortcut: window.shortcutEllipseBubbleShape
-                    checkable: true
-                    checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipsebubble"
-                    enabled: window.canvasPage !== null
-                    onTriggered: window.requestShapeTool("ellipsebubble")
+                    action: ellipseBubbleShapeAction
                 }
             }
 
             Controls.MenuSeparator {}
 
             Controls.MenuItem {
-                text: qsTr("Decrease Brush Size")
-                shortcut: window.shortcutDecreaseBrushSize
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestBrushSizeDelta(-1)
+                action: decreaseBrushSizeAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Increase Brush Size")
-                shortcut: window.shortcutIncreaseBrushSize
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestBrushSizeDelta(1)
+                action: increaseBrushSizeAction
             }
         }
 
@@ -483,31 +548,21 @@ LV.ApplicationWindow {
             title: qsTr("Window")
 
             Controls.MenuItem {
-                text: qsTr("Fit Canvas to Window")
-                shortcut: window.shortcutFitCanvasToWindow
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestFitCanvasToWindow()
+                action: fitCanvasToWindowAction
             }
 
             Controls.MenuItem {
-                text: qsTr("Reset Canvas View")
-                shortcut: window.shortcutResetCanvasView
-                enabled: window.canvasPage !== null
-                onTriggered: window.requestResetCanvasView()
+                action: resetCanvasViewAction
             }
 
             Controls.MenuSeparator {}
 
             Controls.MenuItem {
-                text: qsTr("Minimize")
-                shortcut: window.shortcutMinimizeWindow
-                onTriggered: window.requestMinimizeWindow()
+                action: minimizeWindowAction
             }
 
             Controls.MenuItem {
-                text: window.visibility === QtQuickWindow.Window.FullScreen ? qsTr("Exit Full Screen") : qsTr("Enter Full Screen")
-                shortcut: window.shortcutToggleFullScreen
-                onTriggered: window.requestToggleFullScreen()
+                action: toggleFullScreenAction
             }
         }
 
@@ -704,7 +759,7 @@ LV.ApplicationWindow {
             Controls.MenuSeparator {}
 
             Controls.MenuItem {
-                text: qsTr("Vincent 2.2.1")
+                text: qsTr("Vincent 4.0")
                 enabled: false
             }
         }

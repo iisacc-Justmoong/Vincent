@@ -29,6 +29,15 @@ bool writeExecutable(const QString &path, const QByteArray &contents)
                                | QFileDevice::ReadOther
                                | QFileDevice::ExeOther);
 }
+
+QString legacyClionBuildTreeName()
+{
+    return QStringLiteral("cmake")
+            + QStringLiteral("-")
+            + QStringLiteral("build")
+            + QStringLiteral("-")
+            + QStringLiteral("debug");
+}
 }
 
 class tst_MacOSBuildWorkflowContract : public QObject
@@ -36,10 +45,65 @@ class tst_MacOSBuildWorkflowContract : public QObject
     Q_OBJECT
 
 private slots:
+    void cmakeFixesApplicationVersionAt40();
+    void cmakeRequiresRepositoryBuildDirectory();
+    void repositoryGuidelinesUseOnlyBuildDirectory();
     void buildGuideSeparatesLocalAndDistributionSigning();
     void platformAppIconsAreBundledFromResources();
     void buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays();
 };
+
+void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt40()
+{
+    const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
+
+    QFile cmakeFile(cmakePath);
+    QVERIFY(cmakeFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString cmakeSource = QString::fromUtf8(cmakeFile.readAll());
+
+    const QString infoPlistPath = QFINDTESTDATA("../packaging/macos/Info.plist");
+    QVERIFY2(!infoPlistPath.isEmpty(), "packaging/macos/Info.plist test data was not found");
+
+    QFile infoPlist(infoPlistPath);
+    QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
+
+    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"${PROJECT_VERSION}\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_BUNDLE_VERSION \"${VINCENT_BUNDLE_VERSION}\"")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_SHORT_VERSION_STRING \"${PROJECT_VERSION}\"")));
+    QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@PROJECT_VERSION@</string>")));
+    QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@VINCENT_BUNDLE_VERSION@</string>")));
+}
+
+void tst_MacOSBuildWorkflowContract::cmakeRequiresRepositoryBuildDirectory()
+{
+    const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
+
+    QFile cmakeFile(cmakePath);
+    QVERIFY(cmakeFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString cmakeSource = QString::fromUtf8(cmakeFile.readAll());
+
+    QVERIFY(cmakeSource.contains(QStringLiteral("repository-local build/ directory")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("cmake -S ${CMAKE_SOURCE_DIR} -B ${_vincent_required_build_dir}")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("NOT _vincent_actual_build_dir STREQUAL _vincent_required_build_dir")));
+}
+
+void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()
+{
+    const QString agentsPath = QFINDTESTDATA("../AGENTS.md");
+    QVERIFY2(!agentsPath.isEmpty(), "AGENTS.md test data was not found");
+
+    QFile agentsFile(agentsPath);
+    QVERIFY(agentsFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString agentsSource = QString::fromUtf8(agentsFile.readAll());
+
+    QVERIFY(agentsSource.contains(QStringLiteral("repository-local `build/` directory")));
+    QVERIFY(agentsSource.contains(QStringLiteral("alternate build trees are not supported")));
+    QVERIFY(!agentsSource.contains(legacyClionBuildTreeName()));
+}
 
 void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSigning()
 {
@@ -51,8 +115,14 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     const QString source = QString::fromUtf8(buildGuide.readAll());
 
     QVERIFY(source.contains(QStringLiteral("./build.sh local")));
+    QVERIFY(source.contains(QStringLiteral("repository-local `build/` CMake binary directory")));
+    QVERIFY(source.contains(QStringLiteral("alternate build trees are rejected")));
+    QVERIFY(!source.contains(legacyClionBuildTreeName()));
     QVERIFY(source.contains(QStringLiteral("ctest --test-dir build --output-on-failure")));
     QVERIFY(source.contains(QStringLiteral("Apple Development")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent.pkg")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-appstore.pkg")));
+    QVERIFY(source.contains(QStringLiteral("unsigned local installer packages")));
     QVERIFY(source.contains(QStringLiteral("VINCENT_BUILD_MODE=devid ./build.sh")));
     QVERIFY(source.contains(QStringLiteral("VINCENT_BUILD_MODE=mas ./build.sh")));
     QVERIFY(source.contains(QStringLiteral("Developer ID Application")));
@@ -65,6 +135,10 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     QVERIFY(source.contains(QStringLiteral("pkgutil --payload-files dist/Vincent.pkg")));
     QVERIFY(source.contains(QStringLiteral("./Vincent.app/Contents/Resources/Appicon.icns")));
     QVERIFY(source.contains(QStringLiteral("./Vincent.app/Contents/Resources/icon.icns")));
+    QVERIFY(source.contains(QStringLiteral("Transporter's Active list")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-appstore.pkg")));
+    QVERIFY(source.contains(QStringLiteral("App Store Connect record")));
+    QVERIFY(source.contains(QStringLiteral("cmp resources/Appicon.icns")));
 }
 
 void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
@@ -117,6 +191,15 @@ void tst_MacOSBuildWorkflowContract::buildScriptRunsLocalModeWithEmptyOptionalAr
 #ifndef Q_OS_MACOS
     QSKIP("build.sh depends on macOS packaging tools");
 #else
+    const QString gitignorePath = QFINDTESTDATA("../.gitignore");
+    QVERIFY2(!gitignorePath.isEmpty(), ".gitignore test data was not found");
+
+    QFile gitignoreFile(gitignorePath);
+    QVERIFY(gitignoreFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString gitignoreSource = QString::fromUtf8(gitignoreFile.readAll());
+    QVERIFY(!gitignoreSource.contains(QStringLiteral("\nbuild.sh\n")));
+    QVERIFY(!gitignoreSource.contains(QStringLiteral("\n/build.sh\n")));
+
     const QString sourceBuildScriptPath = QFINDTESTDATA("../build.sh");
     if (sourceBuildScriptPath.isEmpty()) {
         QSKIP("build.sh is a local workflow script and is not available in this checkout");
@@ -181,7 +264,7 @@ cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.2.1</string>
+    <string>4.0</string>
 </dict>
 </plist>
 PLIST
@@ -196,6 +279,51 @@ PLIST
                             QByteArray("#!/bin/sh\nexit 0\n")));
     QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("ninja")),
                             QByteArray("#!/bin/sh\nexit 0\n")));
+    const QByteArray fakeXcrun = R"SH(#!/bin/sh
+set -eu
+
+if [ "${1:-}" = "--find" ]; then
+    printf '/usr/bin/%s\n' "$2"
+    exit 0
+fi
+
+tool="${1:-}"
+shift || true
+case "$tool" in
+    productbuild)
+        out=""
+        for arg in "$@"; do
+            out="$arg"
+        done
+        mkdir -p "$(dirname "$out")"
+        printf 'fake package\n' > "$out"
+        ;;
+    *)
+        printf 'unsupported fake xcrun tool: %s\n' "$tool" >&2
+        exit 1
+        ;;
+esac
+)SH";
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("xcrun")), fakeXcrun));
+
+    const QByteArray fakePkgutil = R"SH(#!/bin/sh
+set -eu
+
+case "${1:-}" in
+    --check-signature)
+        printf 'Package "%s":\n   Status: no signature\n' "$(basename "${2:-}")"
+        ;;
+    --payload-files)
+        printf './Vincent.app/Contents/MacOS/Vincent\n'
+        printf './Vincent.app/Contents/Resources/Appicon.icns\n'
+        ;;
+    *)
+        printf 'unsupported fake pkgutil command: %s\n' "${1:-}" >&2
+        exit 1
+        ;;
+esac
+)SH";
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("pkgutil")), fakePkgutil));
 
     QProcess process;
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
@@ -214,6 +342,8 @@ PLIST
     QVERIFY2(process.exitCode() == 0, qPrintable(output));
     QVERIFY2(!output.contains(QStringLiteral("unbound variable")), qPrintable(output));
     QVERIFY2(output.contains(QStringLiteral("done")), qPrintable(output));
+    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
+    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
 #endif
 }
 

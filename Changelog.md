@@ -32,15 +32,21 @@
 
 ### 현재 작업트리 수정본
 
-- CMake macOS 빌드 후처리에 legacy `Contents/Resources/icon.icns` 제거 단계를 추가해, 증분 빌드나 기존 번들에 남은 오래된 아이콘 파일이 새 `Appicon.icns`와 공존하지 않도록 했다.
-- `tools/sync_app_icon_assets.sh`를 추가해 canonical `resources/Appicon.icns`에서 Xcode/App Store용 `packaging/macos/Vincent.xcassets/AppIcon.appiconset` PNG 파일들을 재생성할 수 있게 했다.
-- AppIcon asset catalog의 `16x16`부터 `1024`까지 PNG 산출물을 새 아이콘 기준으로 갱신했다.
-- 루트의 legacy `icon.icns`는 삭제되었고, 루트 `Appicon.icns`가 미추적 파일로 남아 있다. 추적 대상 canonical icon은 `resources/Appicon.icns`다.
-- `docs/BUILD.md`는 stale installer package 진단 절차를 추가했다. `pkgutil --payload-files dist/Vincent.pkg`로 `Appicon.icns`가 포함되고 `icon.icns`가 제외되는지 확인하는 흐름을 문서화했다.
-- `tst_macosbuildworkflowcontract`는 sync script 존재, asset catalog 동기화 계약, legacy icon 제거, fake bundle의 `CFBundleIconFile` 검증 준비를 포함하도록 보강됐다.
+- `Main.qml`의 메뉴 단축키 연결을 `Controls.MenuItem.shortcut`에서 `Controls.Action.shortcut`으로 옮겼다. 현재 Qt Quick Controls `MenuItem`에는 `shortcut` 속성이 없어 앱 시작 시 QML 로드가 실패했기 때문이다.
+- 메뉴 항목은 `action` 속성으로 named action에 연결되며, 테스트와 앱 구조 문서는 이 계약을 기준으로 갱신했다.
+- `build.sh` 기본 local 흐름이 `dist/Vincent.app` 생성에서 멈추지 않고 unsigned `dist/Vincent.pkg`와 `dist/Vincent-appstore.pkg`를 함께 재생성하도록 바꿨다.
+- `dist/Vincent.pkg`는 수정 전 산출물이어서 현재 정상 `dist/Vincent.app` 기준으로 unsigned 로컬 설치용 패키지를 재생성했다. 이 패키지는 Developer ID Installer 서명이 없으므로 Gatekeeper 배포 신뢰 대상은 아니다.
+- Transporter Active 목록에 이전 아이콘이 보이는 경우를 패키지 payload 문제와 분리했다. 현재 `dist/Vincent-appstore.pkg`는 `Appicon.icns`를 포함하고 legacy `icon.icns`는 포함하지 않으므로, 목록 썸네일은 App Store Connect 레코드/캐시 아이콘으로 별도 확인해야 한다.
+- CMake binary directory를 저장소 루트의 `build/`로 강제했다. 이제 다른 build tree로 configure하면 CMake가 즉시 실패하며, 저장소 지침과 패키징 문서도 `build/` 단일 경로만 안내한다.
+- CMake 프로젝트 버전, macOS `CFBundleShortVersionString`, `CFBundleVersion`, 앱 메뉴 표시, README와 패키징 문서를 모두 Vincent 4.0 기준으로 고정했다.
+- Windows PowerShell용 `build-windows.ps1`을 추가했다. 이 스크립트는 Windows용 Qt/LVRS/iiPaintEngine prefix를 검증하고, `build/`에서 configure/build/test를 수행한 뒤 `windeployqt`, dependency DLL 및 LVRS QML import 복사, `dist/Vincent-Windows` staging, `dist/Vincent-4.0-Windows.zip` 생성을 처리한다.
+- Windows configure에서 macOS 전용 `productbuild` 설정이 섞이지 않도록 CPack 설정을 플랫폼별로 분리하고, Windows install target은 `Vincent.exe` runtime을 패키지 루트에 설치하도록 정리했다.
 
 ### 검증 관점
 
 - 오늘 커밋들은 기능 변경에 대응하는 테스트와 문서 갱신을 함께 포함한다.
-- 현재 작업트리 수정본은 아직 커밋되지 않았으며, 앱 아이콘 stale bundle/package 문제를 막기 위한 패키징 후속 변경으로 분류된다.
-- 추가 검증 시 우선순위는 `cmake --build build --target tests_macosbuildworkflowcontract`, `ctest --test-dir build --output-on-failure -R tests_macosbuildworkflowcontract`, `./build.sh local`, 번들 `Contents/Resources` 아이콘 확인, `.pkg` payload 확인 순서가 적절하다.
+- 현재 작업트리 수정본은 아직 커밋되지 않았으며, 설치 앱 시작 실패를 막기 위한 QML 메뉴 단축키 후속 변경과 `build/` 단일 CMake build tree 계약으로 분류된다.
+- `tests_mainqmlcontract`, macOS 빌드 workflow 계약 테스트, 전체 `ctest`, `./build.sh local`, `/Applications/Vincent.app` 실행 스모크, 새 `dist/Vincent.pkg` payload 및 추출 앱 실행 스모크를 통과했다.
+- `dist/Vincent-appstore.pkg` payload의 `Appicon.icns`는 canonical `resources/Appicon.icns`와 일치하며, `CFBundleIconFile`도 `Appicon.icns`로 해석된다.
+- `dist/Vincent.pkg`는 unsigned 상태이므로 `spctl -a -vv -t install dist/Vincent.pkg`는 `no usable signature`로 거부된다. 신뢰 배포용 패키지는 Developer ID Installer 서명과 notarization이 필요하다.
+- Windows 스크립트는 macOS 호스트에서 직접 실행 검증할 수 없으므로, `tests_windowsbuildworkflowcontract`가 PowerShell 실행 계약, CMake Windows install/ZIP CPack 설정, 문서화된 Windows 실행 명령을 텍스트 계약으로 고정한다.

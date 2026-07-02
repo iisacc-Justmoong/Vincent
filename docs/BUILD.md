@@ -1,6 +1,6 @@
-# Vincent 2.2.1 Packaging Guide
+# Vincent 4.0 Packaging Guide
 
-This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant macOS package for Vincent 2.2.1, plus the Linux TGZ package. It assumes you have the Qt dependencies referenced in the repository README installed.
+This document captures the end-to-end steps needed to turn the `Vincent` build tree into an App Store–compliant macOS package for Vincent 4.0, a Windows runtime package, plus the Linux TGZ package. It assumes you have the Qt dependencies referenced in the repository README installed.
 
 ## 1. Prerequisites
 - Apple Developer Program membership with access to App Store Connect.
@@ -13,11 +13,13 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 - iiPaintEngine installed under `$HOME/.local/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
 
 ## 1a. Automated Local Build Script
-Use `./build.sh` or `./build.sh local` for local development validation. The default local mode configures `build/`, builds Vincent, runs `ctest --test-dir build --output-on-failure`, deploys Qt runtime files into `dist/Vincent.app`, and signs that app with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature if no development certificate is installed.
+Use `./build.sh` or `./build.sh local` for local development validation. The default local mode configures `build/`, builds Vincent, runs `ctest --test-dir build --output-on-failure`, deploys Qt runtime files into `dist/Vincent.app`, signs that app with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature if no development certificate is installed, then regenerates unsigned local installer packages at `dist/Vincent.pkg` and `dist/Vincent-appstore.pkg`.
 
-The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`.
+The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`. Because `build.sh` is the official packaging entry point, it is tracked source and must not be ignored by `.gitignore`. Vincent's marketing version and generated macOS `CFBundleVersion` are both fixed to `4.0` by CMake and the configured Info.plist.
 
-Every mode verifies that `CFBundleIconFile` resolves to `Contents/Resources/Appicon.icns`, that the legacy `Contents/Resources/icon.icns` file is not present, and that the bundled icon matches `resources/Appicon.icns`. Distribution modes also inspect the generated `.pkg` payload before notarization or release, so a stale installer package that still contains `icon.icns` fails the build instead of installing the old app icon.
+Vincent intentionally supports only the repository-local `build/` CMake binary directory. Configure, build, test, and package commands must use `-B build`, `cmake --build build`, and `ctest --test-dir build`; alternate build trees are rejected during CMake configure so CLion and shell workflows cannot silently produce stale bundles elsewhere.
+
+Every mode verifies that `CFBundleIconFile` resolves to `Contents/Resources/Appicon.icns`, that the legacy `Contents/Resources/icon.icns` file is not present, and that the bundled icon matches `resources/Appicon.icns`. All generated `.pkg` payloads are inspected before the build exits, so a stale installer package that still contains `icon.icns` fails the build instead of installing the old app icon.
 
 `resources/Appicon.icns` is the canonical macOS icon source. After replacing it, regenerate the App Store/Xcode asset catalog before building:
 
@@ -25,9 +27,9 @@ Every mode verifies that `CFBundleIconFile` resolves to `Contents/Resources/Appi
 tools/sync_app_icon_assets.sh
 ```
 
-The script rewrites `packaging/macos/Vincent.xcassets/AppIcon.appiconset`, including `AppIcon-1024.png`, from the canonical `.icns`. The CMake bundle target also removes stale `Contents/Resources/icon.icns` after each macOS build, so an incremental `build/` or CLion `cmake-build-debug/` bundle cannot keep advertising the removed legacy icon.
+The script rewrites `packaging/macos/Vincent.xcassets/AppIcon.appiconset`, including `AppIcon-1024.png`, from the canonical `.icns`. The CMake bundle target also removes stale `Contents/Resources/icon.icns` after each macOS build, so an incremental `build/` bundle cannot keep advertising the removed legacy icon.
 
-Distribution modes must be requested explicitly:
+Signed distribution modes must be requested explicitly:
 
 ```bash
 VINCENT_BUILD_MODE=devid ./build.sh
@@ -35,7 +37,32 @@ VINCENT_BUILD_MODE=mas ./build.sh
 VINCENT_BUILD_MODE=all ./build.sh
 ```
 
-`devid` requires `Developer ID Application` and `Developer ID Installer` certificates plus notarization credentials. `mas` requires `Apple Distribution` and `3rd Party Mac Developer Installer` certificates. `all` runs both distribution flows. For Developer ID notarization, prefer `NOTARY_KEYCHAIN_PROFILE`; if Apple ID mode is used, provide the app-specific password through `NOTARY_APP_PASSWORD` rather than storing it in the script.
+`devid` requires `Developer ID Application` and `Developer ID Installer` certificates plus notarization credentials. `mas` requires `Apple Distribution` and `3rd Party Mac Developer Installer` certificates. `all` runs both distribution flows. The local `dist/Vincent.pkg` and `dist/Vincent-appstore.pkg` outputs are unsigned smoke/install artifacts only; they are not notarized or App Store upload packages. For Developer ID notarization, prefer `NOTARY_KEYCHAIN_PROFILE`; if Apple ID mode is used, provide the app-specific password through `NOTARY_APP_PASSWORD` rather than storing it in the script.
+
+## 1b. Windows Build, Package, and Current-User Install Script
+Run the Windows build from Windows PowerShell 5.1 or newer. The script expects Windows-built Qt, LVRS, and iiPaintEngine prefixes; macOS `.local` binaries cannot be reused on Windows. Set the prefix variables once per shell session:
+
+```powershell
+$env:QT_PREFIX = "C:\Qt\6.8.3\msvc2022_64"
+$env:LVRS_PREFIX = "$HOME\.local\LVRS"
+$env:IIPAINTENGINE_PREFIX = "$HOME\.local\iiPaintEngine"
+```
+
+Then build, test, deploy Qt runtime files, copy dependency DLLs, and create the Windows ZIP package:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean
+```
+
+The script always configures with `cmake -S . -B build`, builds only the repository-local `build/` tree, runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed, and deploys Qt/QML runtime files with `windeployqt --qmldir App/qml`. It also copies LVRS/iiPaintEngine runtime DLLs and LVRS QML imports when those files are present in the dependency prefixes. The staged app is written to `dist/Vincent-Windows`, and the package is written to `dist/Vincent-4.0-Windows.zip`.
+
+For a current-user smoke install, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -InstallForCurrentUser
+```
+
+That copies the staged runtime to `%LOCALAPPDATA%\Programs\Vincent` by default and creates a shortcut in the current user's Start Menu. Use `-InstallDir <path>` to override the install directory. If the Qt kit is MSVC-based and `cl.exe` is not already in `PATH`, the script tries to load the Visual Studio C++ build environment through `vswhere.exe`; otherwise, launch it from a Developer PowerShell for VS.
 
 ## 2. Configure the Release Build
 ```bash
@@ -48,24 +75,24 @@ cmake --build build --target Vincent
 If you need a different bundle identifier, update `BUNDLE_ID` in `CMakeLists.txt` before configuring. Adjust the deployment target if you need to support newer or older macOS releases.
 
 ## 3. Stage the App Bundle
-The built app lives under `build/"Vincent 2.2.1.app"`. Copy it to a staging directory (for example, `dist/"Vincent 2.2.1.app"`) so you can safely run deployment tools without touching your build tree.
+The built app lives under `build/Vincent.app`. Copy it to a staging directory (for example, `dist/Vincent.app`) so you can safely run deployment tools without touching your build tree.
 
 ## 4. Embed Qt Frameworks
 Run `macdeployqt` in App Store mode to embed the required Qt frameworks and QML plugins:
 ```bash
-macdeployqt "dist/Vincent 2.2.1.app" \
+macdeployqt "dist/Vincent.app" \
   -appstore-compliant \
   -qmldir=App/qml \
   -always-overwrite
 ```
-Verify that all `.framework` bundles now sit inside `dist/"Vincent 2.2.1.app"/Contents/Frameworks` and that `qt.conf` exists in `Contents/Resources/`.
+Verify that all `.framework` bundles now sit inside `dist/Vincent.app/Contents/Frameworks` and that `qt.conf` exists in `Contents/Resources/`.
 
 ## 5. Prepare Metadata
-Update the generated `Info.plist` (inside `dist/"Vincent 2.2.1.app"/Contents/`) with:
+Update the generated `Info.plist` (inside `dist/Vincent.app/Contents/`) with:
 - `CFBundleIdentifier` matching your bundle ID.
 - `CFBundleVersion` and `CFBundleShortVersionString` set to a semantic version number you are shipping.
 - `CFBundleIconFile` should resolve to the bundled `resources/Appicon.icns` file. Windows builds embed `resources/Appicon.ico` through the generated resource script.
-- Any usage description strings your app requires (e.g., `NSMicrophoneUsageDescription`)—Vincent 2.2.1 currently relies only on file picker access.
+- Any usage description strings your app requires (e.g., `NSMicrophoneUsageDescription`)—Vincent 4.0 currently relies only on file picker access.
 
 ## 6. Sandbox Entitlements
 Customize `packaging/macos/Vincent.entitlements` if the app needs additional capabilities. The default template enables the App Sandbox and grants read/write access to user-selected files and picture libraries. Keep entitlements minimal to improve App Review approval chances.
@@ -75,25 +102,25 @@ Customize `packaging/macos/Vincent.entitlements` if the app needs additional cap
 codesign --force --options runtime \
   --entitlements packaging/macos/Vincent.entitlements \
   --sign "Apple Distribution: MUYEONG YUN (5U49ST9XZH)" \
-  "dist/Vincent 2.2.1.app"
+  "dist/Vincent.app"
 ```
 Then validate the signature:
 ```bash
-codesign --verify --deep --strict "dist/Vincent 2.2.1.app"
-spctl --assess --type execute "dist/Vincent 2.2.1.app"
+codesign --verify --deep --strict "dist/Vincent.app"
+spctl --assess --type execute "dist/Vincent.app"
 ```
 If `spctl` warns about missing the hardened runtime, make sure `--options runtime` was passed.
 
 ## 8. Create the Installer Package
 ```bash
 productbuild \
-  --component "dist/Vincent 2.2.1.app" /Applications \
+  --component "dist/Vincent.app" /Applications \
   --sign "Apple Installer: MUYEONG YUN (5U49ST9XZH)" \
-  "dist/Vincent-2.2.1.pkg"
+  "dist/Vincent-4.0.pkg"
 ```
 This produces the installer payload required by App Store Connect. Keep the `.pkg` under 4 GB.
 
-If installing `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg` shows an older app icon, treat the package as stale. A local build only refreshes `dist/Vincent.app`; regenerate the installer with `VINCENT_BUILD_MODE=devid ./build.sh`, `VINCENT_BUILD_MODE=mas ./build.sh`, or `VINCENT_BUILD_MODE=all ./build.sh`. You can inspect the package payload directly:
+If installing `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg` shows an older app icon, treat the package as stale. A default local build now refreshes `dist/Vincent.app` and regenerates both unsigned package outputs from that app. Use `VINCENT_BUILD_MODE=devid ./build.sh`, `VINCENT_BUILD_MODE=mas ./build.sh`, or `VINCENT_BUILD_MODE=all ./build.sh` only when signed distribution packages are needed. You can inspect the package payload directly:
 
 ```bash
 pkgutil --payload-files dist/Vincent.pkg | grep 'Contents/Resources/.*icns'
@@ -101,11 +128,20 @@ pkgutil --payload-files dist/Vincent.pkg | grep 'Contents/Resources/.*icns'
 
 The payload should list `./Vincent.app/Contents/Resources/Appicon.icns` and should not list `./Vincent.app/Contents/Resources/icon.icns`.
 
+If Transporter's Active list still shows the previous icon after this payload check passes, do not treat that queue thumbnail as proof that the `.pkg` still embeds the old icon. The Active list can identify the App Store Connect record by app name and Apple ID before delivery, so remove and re-add the item, confirm you dragged the freshly rebuilt `dist/Vincent-appstore.pkg`, and inspect the package payload again:
+
+```bash
+pkgutil --expand-full dist/Vincent-appstore.pkg /tmp/vincent-appstore-payload
+cmp resources/Appicon.icns /tmp/vincent-appstore-payload/com.iisacc.vincent.painter.pkg/Payload/Vincent.app/Contents/Resources/Appicon.icns
+```
+
+If the `cmp` command succeeds, the upload package contains the current app icon. Update or refresh the App Store Connect app record icon separately if Transporter continues to show the old store listing icon before delivery.
+
 If Dock or Launchpad still shows the old icon after the installed bundle is correct, remove stale `/Applications/Vincent.app` Dock entries and let LaunchServices re-register the rebuilt app. A pinned Dock item can continue pointing at an old or removed bundle path even after the workspace `dist/Vincent.app` has the new icon.
 
 ## 9. Upload to App Store Connect
 1. Open Transporter.
-2. Drag `dist/Vincent-2.2.1.pkg` into the queue.
+2. Drag `dist/Vincent-4.0.pkg` into the queue.
 3. Provide your App Store Connect credentials and upload.
 4. Resolve any validation issues that Transporter reports (missing icons, entitlement mismatches, etc.).
 
@@ -115,7 +151,7 @@ If Dock or Launchpad still shows the old icon after the installed bundle is corr
 - Submit for review.
 
 ## Troubleshooting Tips
-- Use `otool -L "dist/Vincent 2.2.1.app"/Contents/MacOS/"Vincent 2.2.1"` to ensure no absolute paths to your build tree remain.
+- Use `otool -L dist/Vincent.app/Contents/MacOS/Vincent` to ensure no absolute paths to your build tree remain.
 - Leverage `plutil -p` to inspect `Info.plist` after `macdeployqt` runs.
 - If Transporter rejects the upload due to missing `LC_VERSION_MIN_MACOSX`, make sure `CMAKE_OSX_DEPLOYMENT_TARGET` is set at configure time.
 - Should you require notarization for outside-the-store distribution, rerun codesigning with the same entitlements and submit via `xcrun notarytool`; App Store submissions do not need separate notarization.

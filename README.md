@@ -1,24 +1,32 @@
-# Vincent 2.2.1
+# Vincent 4.0
 
-Vincent 2.2.1 is a minimalist raster drawing app built with Qt 6.
+Vincent 4.0 is a minimalist raster drawing app built with Qt 6.
 
 ## System Requirements
 - macOS 12 or later (Apple Silicon or Intel)
+- Windows 10 or later when using the Windows package
 - Linux builds are available when provided by the release page
 
 ## Install (macOS)
-1. Download `Vincent-2.2.1.pkg` from the latest release.
-2. Double-click the installer and follow the prompts to install Vincent 2.2.1 in Applications.
-3. Open Vincent 2.2.1 from Launchpad or the Applications folder.
+1. Download `Vincent-4.0.pkg` from the latest release.
+2. Double-click the installer and follow the prompts to install Vincent 4.0 in Applications.
+3. Open Vincent 4.0 from Launchpad or the Applications folder.
 
 ## Install (macOS .app bundle)
-1. Download `Vincent 2.2.1.app` from the release assets.
+1. Download `Vincent 4.0.app` from the release assets.
 2. Drag it into the Applications folder.
-3. Open Vincent 2.2.1 and allow any prompts to access files you select.
+3. Open Vincent 4.0 and allow any prompts to access files you select.
 
 ## Install (Linux)
-1. Download the `Vincent-2.2.1-Linux.tar.gz` release archive.
+1. Download the `Vincent-4.0-Linux.tar.gz` release archive.
 2. Extract it and run the `Vincent` binary inside the extracted folder.
+
+## Install (Windows)
+1. Download `Vincent-4.0-Windows.zip` from the release assets.
+2. Extract it to a writable folder such as `%LOCALAPPDATA%\Programs\Vincent`.
+3. Run `Vincent.exe`.
+
+Windows maintainers can generate the package from a Windows Qt/LVRS/iiPaintEngine environment with `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean`. The script stages `dist/Vincent-Windows`, creates `dist/Vincent-4.0-Windows.zip`, and can install to the current user with `-InstallForCurrentUser`.
 
 ## Features at a Glance
 - iiPaintEngine-backed brush and eraser strokes with native pointer/tablet event handling and pressure-controlled brush opacity

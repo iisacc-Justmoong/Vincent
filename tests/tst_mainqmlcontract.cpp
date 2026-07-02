@@ -107,6 +107,7 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Fit Canvas to Window\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Reset Canvas View\")")));
     QVERIFY(mainSource.contains(QStringLiteral("title: qsTr(\"Keyboard Shortcuts\")")));
+    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent 4.0\")")));
 }
 
 void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
@@ -124,68 +125,58 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === \"osx\" ? \"Ctrl+Meta+F\" : \"F11\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function shortcutReference(commandName, shortcutText)")));
 
-    const QStringList shortcutContracts = {
-            QStringLiteral("shortcutNewCanvas"),
-            QStringLiteral("shortcutOpenImage"),
-            QStringLiteral("shortcutSaveImageAs"),
-            QStringLiteral("shortcutClearCanvas"),
-            QStringLiteral("shortcutQuit"),
-            QStringLiteral("shortcutUndo"),
-            QStringLiteral("shortcutRedo"),
-            QStringLiteral("shortcutAddLayer"),
-            QStringLiteral("shortcutDeleteCurrentLayer"),
-            QStringLiteral("shortcutBrushTool"),
-            QStringLiteral("shortcutEraserTool"),
-            QStringLiteral("shortcutHandPanTool"),
-            QStringLiteral("shortcutMoveTool"),
-            QStringLiteral("shortcutZoomTool"),
-            QStringLiteral("shortcutShapeTool"),
-            QStringLiteral("shortcutFillTool"),
-            QStringLiteral("shortcutTextTool"),
-            QStringLiteral("shortcutRectangleShape"),
-            QStringLiteral("shortcutEllipseShape"),
-            QStringLiteral("shortcutTriangleShape"),
-            QStringLiteral("shortcutDiamondShape"),
-            QStringLiteral("shortcutStarShape"),
-            QStringLiteral("shortcutRectangleBubbleShape"),
-            QStringLiteral("shortcutEllipseBubbleShape"),
-            QStringLiteral("shortcutDecreaseBrushSize"),
-            QStringLiteral("shortcutIncreaseBrushSize"),
-            QStringLiteral("shortcutFitCanvasToWindow"),
-            QStringLiteral("shortcutResetCanvasView"),
-            QStringLiteral("shortcutMinimizeWindow"),
-            QStringLiteral("shortcutToggleFullScreen"),
+    const QStringList actionShortcutContracts = {
+            QStringLiteral("shortcutNewCanvas|newCanvasAction"),
+            QStringLiteral("shortcutOpenImage|openImageAction"),
+            QStringLiteral("shortcutSaveImageAs|saveImageAsAction"),
+            QStringLiteral("shortcutClearCanvas|clearCanvasAction"),
+            QStringLiteral("shortcutQuit|quitAction"),
+            QStringLiteral("shortcutUndo|undoAction"),
+            QStringLiteral("shortcutRedo|redoAction"),
+            QStringLiteral("shortcutAddLayer|addLayerAction"),
+            QStringLiteral("shortcutDeleteCurrentLayer|deleteCurrentLayerAction"),
+            QStringLiteral("shortcutBrushTool|brushToolAction"),
+            QStringLiteral("shortcutEraserTool|eraserToolAction"),
+            QStringLiteral("shortcutHandPanTool|handPanToolAction"),
+            QStringLiteral("shortcutMoveTool|moveToolAction"),
+            QStringLiteral("shortcutZoomTool|zoomToolAction"),
+            QStringLiteral("shortcutShapeTool|shapeToolAction"),
+            QStringLiteral("shortcutFillTool|fillToolAction"),
+            QStringLiteral("shortcutTextTool|textToolAction"),
+            QStringLiteral("shortcutRectangleShape|rectangleShapeAction"),
+            QStringLiteral("shortcutEllipseShape|ellipseShapeAction"),
+            QStringLiteral("shortcutTriangleShape|triangleShapeAction"),
+            QStringLiteral("shortcutDiamondShape|diamondShapeAction"),
+            QStringLiteral("shortcutStarShape|starShapeAction"),
+            QStringLiteral("shortcutRectangleBubbleShape|rectangleBubbleShapeAction"),
+            QStringLiteral("shortcutEllipseBubbleShape|ellipseBubbleShapeAction"),
+            QStringLiteral("shortcutDecreaseBrushSize|decreaseBrushSizeAction"),
+            QStringLiteral("shortcutIncreaseBrushSize|increaseBrushSizeAction"),
+            QStringLiteral("shortcutFitCanvasToWindow|fitCanvasToWindowAction"),
+            QStringLiteral("shortcutResetCanvasView|resetCanvasViewAction"),
+            QStringLiteral("shortcutMinimizeWindow|minimizeWindowAction"),
+            QStringLiteral("shortcutToggleFullScreen|toggleFullScreenAction"),
     };
 
-    for (const QString &shortcutContract : shortcutContracts) {
+    QVERIFY(mainSource.contains(QStringLiteral("Controls.Action {")));
+    QVERIFY(!mainSource.contains(QStringLiteral("Shortcut {")));
+
+    for (const QString &actionShortcutContract : actionShortcutContracts) {
+        const QStringList parts = actionShortcutContract.split(QLatin1Char('|'));
+        QCOMPARE(parts.size(), 2);
+        const QString shortcutContract = parts.at(0);
+        const QString actionId = parts.at(1);
+
         QVERIFY2(mainSource.contains(QStringLiteral("readonly property string ") + shortcutContract),
                  qPrintable(shortcutContract + QStringLiteral(" property is missing")));
+        QVERIFY2(mainSource.contains(QStringLiteral("id: ") + actionId),
+                 qPrintable(actionId + QStringLiteral(" action is missing")));
         QVERIFY2(mainSource.contains(QStringLiteral("shortcut: window.") + shortcutContract),
-                 qPrintable(shortcutContract + QStringLiteral(" menu binding is missing")));
+                 qPrintable(shortcutContract + QStringLiteral(" action shortcut is missing")));
+        QVERIFY2(mainSource.contains(QStringLiteral("action: ") + actionId),
+                 qPrintable(actionId + QStringLiteral(" menu binding is missing")));
         QVERIFY2(mainSource.contains(QStringLiteral(", window.") + shortcutContract + QStringLiteral(")")),
                  qPrintable(shortcutContract + QStringLiteral(" help reference is missing")));
-    }
-
-    const QStringList applicationShortcutContracts = {
-            QStringLiteral("shortcutQuit"),
-            QStringLiteral("shortcutAddLayer"),
-            QStringLiteral("shortcutDeleteCurrentLayer"),
-            QStringLiteral("shortcutRectangleShape"),
-            QStringLiteral("shortcutEllipseShape"),
-            QStringLiteral("shortcutTriangleShape"),
-            QStringLiteral("shortcutDiamondShape"),
-            QStringLiteral("shortcutStarShape"),
-            QStringLiteral("shortcutRectangleBubbleShape"),
-            QStringLiteral("shortcutEllipseBubbleShape"),
-            QStringLiteral("shortcutFitCanvasToWindow"),
-            QStringLiteral("shortcutResetCanvasView"),
-            QStringLiteral("shortcutMinimizeWindow"),
-            QStringLiteral("shortcutToggleFullScreen"),
-    };
-
-    for (const QString &shortcutContract : applicationShortcutContracts) {
-        QVERIFY2(mainSource.contains(QStringLiteral("sequences: [window.") + shortcutContract + QStringLiteral("]")),
-                 qPrintable(shortcutContract + QStringLiteral(" Shortcut is missing")));
     }
 }
 

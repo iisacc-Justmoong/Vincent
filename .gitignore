@@ -95,5 +95,3 @@ resources/UIIcons/.DS_Store
 packaging.sh
 dist.sh
 bundling.sh
-build.sh
-/build.sh

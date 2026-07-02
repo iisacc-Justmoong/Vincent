@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.24)
-project(Vincent VERSION 2.2.1 LANGUAGES C CXX)
+
+set(_vincent_required_build_dir "${CMAKE_SOURCE_DIR}/build")
+set(_vincent_actual_build_dir "${CMAKE_BINARY_DIR}")
+cmake_path(ABSOLUTE_PATH _vincent_required_build_dir NORMALIZE)
+cmake_path(ABSOLUTE_PATH _vincent_actual_build_dir NORMALIZE)
+if(NOT _vincent_actual_build_dir STREQUAL _vincent_required_build_dir)
+    message(FATAL_ERROR
+            "Vincent only supports the repository-local build/ directory. "
+            "Reconfigure with: cmake -S ${CMAKE_SOURCE_DIR} -B ${_vincent_required_build_dir}")
+endif()
+unset(_vincent_actual_build_dir)
+unset(_vincent_required_build_dir)
+
+project(Vincent VERSION 4.0 LANGUAGES C CXX)
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
@@ -10,19 +23,11 @@ set(VINCENT_MIN_MACOS_VERSION "12.0")
 
 include(CTest)
 
-math(EXPR _vincent_default_bundle_version
-        "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
-set(_vincent_bundle_version_default "${_vincent_default_bundle_version}")
-if(DEFINED ENV{VINCENT_BUNDLE_VERSION} AND NOT "$ENV{VINCENT_BUNDLE_VERSION}" STREQUAL "")
-    set(_vincent_bundle_version_default "$ENV{VINCENT_BUNDLE_VERSION}")
-endif()
-set(VINCENT_BUNDLE_VERSION "${_vincent_bundle_version_default}" CACHE STRING "CFBundleVersion (numeric build number)")
-if(NOT VINCENT_BUNDLE_VERSION MATCHES "^[0-9]+$")
-    message(FATAL_ERROR "VINCENT_BUNDLE_VERSION must be numeric (example: 20100)")
+set(VINCENT_BUNDLE_VERSION "${PROJECT_VERSION}")
+if(NOT VINCENT_BUNDLE_VERSION MATCHES "^[0-9]+(\\.[0-9]+)?(\\.[0-9]+)?$")
+    message(FATAL_ERROR "VINCENT_BUNDLE_VERSION must be one to three dot-separated numeric components")
 endif()
 message(STATUS "Vincent versions: marketing=${PROJECT_VERSION}, bundle=${VINCENT_BUNDLE_VERSION}, qml=${VINCENT_QML_MODULE_VERSION}")
-unset(_vincent_bundle_version_default)
-unset(_vincent_default_bundle_version)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -287,11 +292,12 @@ if(APPLE)
             COMMENT "Removing legacy macOS app icon from Vincent bundle")
 endif()
 
-# 설치 규칙: /Applications/Vincent.app
-install(TARGETS Vincent BUNDLE DESTINATION "Applications" COMPONENT Runtime)
-
-# Linux install target (runtime binary)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+# 설치 규칙
+if(APPLE)
+    install(TARGETS Vincent BUNDLE DESTINATION "Applications" COMPONENT Runtime)
+elseif(WIN32)
+    install(TARGETS Vincent RUNTIME DESTINATION "." COMPONENT Runtime)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
 endif()
 
@@ -306,25 +312,40 @@ if(APPLE)
             COMPONENT Runtime)
 endif()
 
-# CPack 구성: productbuild로 단일 컴포넌트 .pkg 생성
-set(CPACK_GENERATOR "productbuild")
+# CPack 구성
 set(CPACK_PACKAGE_NAME "Vincent")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-build${VINCENT_BUNDLE_VERSION}")
+if(APPLE)
+    # productbuild로 단일 컴포넌트 .pkg 생성
+    set(CPACK_GENERATOR "productbuild")
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-build${VINCENT_BUNDLE_VERSION}")
 
-# 설치 경로: .app을 /Applications로 설치
-set(CPACK_PACKAGING_INSTALL_PREFIX "/")  # 루트 기준
-set(CPACK_PRODUCTBUILD_INSTALLER_DIRECTORY "/") # 내부적으로 사용
-set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources")
+    # 설치 경로: .app을 /Applications로 설치
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/")  # 루트 기준
+    set(CPACK_PRODUCTBUILD_INSTALLER_DIRECTORY "/") # 내부적으로 사용
+    set(CPACK_PRODUCTBUILD_RESOURCES "${CMAKE_SOURCE_DIR}/packaging/macos/resources")
 
-# 식별자
-set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.vincent.painter")
+    # 식별자
+    set(CPACK_PRODUCTBUILD_IDENTIFIER "com.iisacc.vincent.painter")
 
-# 서명 신원: 기본은 무서명으로 두고, 필요한 경우에만 명시한다.
-set(VINCENT_CPACK_SIGNING_IDENTITY "" CACHE STRING "Installer signing identity for CPack productbuild/pkgbuild")
-if(VINCENT_CPACK_SIGNING_IDENTITY)
-    set(CPACK_PKGBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
-    set(CPACK_PRODUCTBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
+    # 서명 신원: 기본은 무서명으로 두고, 필요한 경우에만 명시한다.
+    set(VINCENT_CPACK_SIGNING_IDENTITY "" CACHE STRING "Installer signing identity for CPack productbuild/pkgbuild")
+    if(VINCENT_CPACK_SIGNING_IDENTITY)
+        set(CPACK_PKGBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
+        set(CPACK_PRODUCTBUILD_IDENTITY_NAME "${VINCENT_CPACK_SIGNING_IDENTITY}")
+    endif()
+elseif(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Windows")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Linux")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+else()
+    set(CPACK_GENERATOR "TGZ")
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 endif()
 
 # 단일 컴포넌트로 .app을 패키지화
@@ -334,17 +355,13 @@ set(CPACK_COMPONENT_RUNTIME_DESCRIPTION "Vincent ${PROJECT_VERSION} Application"
 set(CPACK_COMPONENT_RUNTIME_REQUIRED TRUE)
 set(CPACK_COMPONENT_RUNTIME_DEPENDS "")
 
-set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
-set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
-set(CPACK_BUNDLE_NAME "Vincent")
-if(VINCENT_CPACK_SIGNING_IDENTITY)
-    set(CPACK_BUNDLE_APPLE_CERT_APP "${VINCENT_CPACK_SIGNING_IDENTITY}")
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(CPACK_GENERATOR "TGZ")
-    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Linux")
-    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+if(APPLE)
+    set(CPACK_COMPONENT_RUNTIME_PACKAGE_TYPE "component")
+    set(CPACK_COMPONENT_RUNTIME_INSTALL_PATH "/Applications")
+    set(CPACK_BUNDLE_NAME "Vincent")
+    if(VINCENT_CPACK_SIGNING_IDENTITY)
+        set(CPACK_BUNDLE_APPLE_CERT_APP "${VINCENT_CPACK_SIGNING_IDENTITY}")
+    endif()
 endif()
 
 include(CPack)

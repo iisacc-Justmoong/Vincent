@@ -1,6 +1,6 @@
-# Vincent 2.2.1 Application Structure
+# Vincent 4.0 Application Structure
 
-This document captures the flat-raster architecture of Vincent 2.2.1 after replacing the local painting implementation with iiPaintEngine.
+This document captures the flat-raster architecture of Vincent 4.0 after replacing the local painting implementation with iiPaintEngine.
 
 ## Top-Level Layout
 
@@ -40,9 +40,9 @@ This document captures the flat-raster architecture of Vincent 2.2.1 after repla
 - Creates the main LVRS application window.
 - Keeps native close, minimize, and maximize controls while using LVRS solid chrome to suppress the visual title-bar strip.
 - Keeps LVRS's logical top drag handle enabled while solid chrome suppresses the visible titlebar strip.
-- Uses CMake platform packaging metadata so `resources/Appicon.icns` becomes the canonical macOS bundle icon and `resources/Appicon.ico` becomes the Windows executable icon resource. The macOS App Store/Xcode asset catalog is regenerated from the same `.icns` through `tools/sync_app_icon_assets.sh`, and the CMake bundle build removes the legacy `Contents/Resources/icon.icns` file from incremental bundles.
+- Uses CMake platform packaging metadata so `resources/Appicon.icns` becomes the canonical macOS bundle icon and `resources/Appicon.ico` becomes the Windows executable icon resource. The macOS App Store/Xcode asset catalog is regenerated from the same `.icns` through `tools/sync_app_icon_assets.sh`, and the CMake bundle build removes the legacy `Contents/Resources/icon.icns` file from incremental bundles. Windows packaging is driven by `build-windows.ps1`, which keeps the build tree fixed at `build/`, runs `windeployqt`, copies LVRS/iiPaintEngine runtime DLLs plus LVRS QML imports, and stages `dist/Vincent-Windows`.
 - Provides a Qt Quick Controls menu bar on the LVRS application window. File routes to the existing new/open/save/clear flows, Edit routes to undo/redo, layer creation/deletion, tool and shape selection, and brush-size changes, Window routes to canvas fit/reset plus native window controls, and Help exposes the current keyboard shortcut reference.
-- Owns named shortcut contracts for every actionable menu item. File uses platform Command/Ctrl N/O/S, Command/Ctrl+Shift+K, and Command/Ctrl+Q; Edit uses platform undo/redo, Command/Ctrl+Shift+N, Command/Ctrl+Shift+Delete, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, and [/] for brush size; Window uses Command/Ctrl+0, Command/Ctrl+1, Command/Ctrl+M, and platform fullscreen. Menu-only commands are backed by `Shortcut` items so the displayed shortcut and invoked command stay aligned.
+- Owns named shortcut contracts for every actionable menu item. File uses platform Command/Ctrl N/O/S, Command/Ctrl+Shift+K, and Command/Ctrl+Q; Edit uses platform undo/redo, Command/Ctrl+Shift+N, Command/Ctrl+Shift+Delete, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, and [/] for brush size; Window uses Command/Ctrl+0, Command/Ctrl+1, Command/Ctrl+M, and platform fullscreen. Actionable menu entries are backed by `Controls.Action` objects so Qt owns shortcut registration and menu items bind through their supported `action` property.
 - Passes the active top drag-handle height into `PainterCanvasPage` so the titlebar-position area remains empty, shares the toolbar background color, and the toolbar starts below it.
 - Hosts `PainterCanvasPage` as the single content view.
 
