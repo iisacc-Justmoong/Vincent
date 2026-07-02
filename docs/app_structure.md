@@ -67,7 +67,7 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 - Uses app-local vector sources for the `panHand`, `translateObject`, and `typeAlias` slots while preserving the Figma/LVRS icon names where available. `panHand` covers the hand-pan tool missing from the LVRS icon set, `translateObject` avoids the bundled embedded-image SVG warning, and `typeAlias` matches the Figma `typeAlias / Theme=Light` metadata instead of LVRS's different default icon shape.
 - Keeps pan input on the fixed canvas viewport and applies pan movement with direct item `x`/`y` offsets instead of anchor center offsets, avoiding anchor relayout during every drag frame.
 - Restricts tools to brush, eraser, pan, move, zoom, shape, fill, and text.
-- Assigns paint-editor tool shortcuts on the canvas surface: `B` brush, `E` eraser, `H` hand-pan, `V` move, `Z` zoom, `U` shape, `G` fill, and `T` text. The same physical key positions also work under two-beolsik Korean input.
+- Assigns paint-editor tool shortcuts on the canvas surface: `B` brush, `E` eraser, `H` hand-pan, `V` move, `Z` zoom, `U` shape, `G` fill, and `T` text. Holding `Space` temporarily routes canvas input through pan without changing the selected tool, except while the text editor is actively receiving text. The same physical key positions also work under two-beolsik Korean input.
 - Opens an HSL triangle color wheel from a current-color swatch button instead of presenting enumerated palette swatches.
 - Orders brush size controls as decrease button, slider, and increase button so the controls follow the value direction.
 - Opens a brush settings menu when the already-selected brush tool is pressed again, with sliders for iiPaintEngine brush size, flow, opacity, hardness, spacing, and stabilizer strength, plus a pressure-opacity toggle that controls whether tablet pressure scales the brush opacity cap. The pressure minimum, center, and maximum parameters sit at the bottom of the menu as a three-point curve graph instead of separate sliders.
@@ -97,7 +97,7 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 - Creates new canvases from explicit width and height values passed by the toolbar modal, clamped to the supported raster dimension range, then fits the initial zoom down only when the requested canvas is larger than the workspace viewport.
 - Keeps an already-created canvas static; later window or view-model canvas dimension changes do not resize it.
 - Presents only the fixed canvas area on a white paper background while `Background` exists, switches that area to a tiled PNG-style transparency grid after `Background` is removed, and leaves any resized viewport overflow in the LVRS workspace color while stacking the base raster canvas, raster layer surfaces, and transformable object overlays in hierarchy order.
-- Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, and toolbar state binding.
+- Keeps QML responsible for viewport placement, wheel focus handling, keyboard shortcuts, temporary Space-pan input override, and toolbar state binding.
 - Exposes a PSD compatibility manifest helper that commits pending text/shape placement and asks `DrawingSurfaceItem` to map the raster canvas plus current session objects into Photoshop-style layer records.
 
 ## Core C++ Components

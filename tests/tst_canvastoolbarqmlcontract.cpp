@@ -303,16 +303,16 @@ void tst_CanvasToolBarQmlContract::drawingSurfaceProvidesPaintStyleTextToolEdito
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: surface.textEditingActive")));
     QVERIFY(surfaceSource.contains(QStringLiteral("color: surface.brushColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasMouseAcceptedButtons()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"zoom\" || mode === \"fill\" || mode === \"text\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("acceptedButtons: surface.canvasMouseAcceptedButtons()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasCursorShape()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"pan\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"pan\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"move\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"move\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.SizeAllCursor;")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"zoom\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"zoom\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.SizeHorCursor;")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"fill\" || surface.toolMode === \"eraser\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"fill\" || mode === \"eraser\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.canvasCursorShape()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("border.color: surface.textToolAccentColor")));
     QVERIFY(surfaceSource.contains(QStringLiteral("selectionColor: surface.textToolAccentColor")));
@@ -408,8 +408,8 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(!surfaceSource.contains(QStringLiteral("strokeWidth")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("context.stroke();")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("traceEllipsePath(context, x, y, widthValue, bodyHeight);")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\" || surface.toolMode === \"move\" || surface.toolMode === \"zoom\" || surface.toolMode === \"fill\" || surface.toolMode === \"text\"")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"shape\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("mode === \"shape\" || mode === \"move\" || mode === \"zoom\" || mode === \"fill\" || mode === \"text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (mode === \"shape\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("return Qt.CrossCursor;")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginShapeDrag(mouse.x, mouse.y, aspectLocked);")));
@@ -439,7 +439,7 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("function updatePanDrag(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resetCanvasPan()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: canvasPanMouseArea")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.toolMode === \"pan\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.effectiveToolMode() === \"pan\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("x: Math.round((parent.width - width) / 2 + surface.canvasPanOffsetX)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("y: Math.round((parent.height - height) / 2 + surface.canvasPanOffsetY)")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("anchors.horizontalCenterOffset: surface.canvasPanOffsetX")));
@@ -453,6 +453,13 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"eraser\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"H\", \"ㅗ\"]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"pan\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool spacePanActive: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function effectiveToolMode()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function beginSpacePanMode()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function endSpacePanMode()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("event.key === Qt.Key_Space")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginSpacePanMode()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.endSpacePanMode()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"V\", \"ㅍ\"]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"move\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"Z\", \"ㅋ\"]")));
@@ -485,6 +492,8 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.deleteCurrentLayer()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: drawableObjectSelectionFrame")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.beginDrawableObjectTransform(mouse.x, mouse.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.effectiveToolMode() === \"pan\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("const mode = surface.effectiveToolMode();")));
 
     const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
     QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
@@ -750,7 +759,7 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(!surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function activeRasterSurface()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function hasActiveRasterSurface()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.toolMode : \"move\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.effectiveToolMode() : \"move\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"transparencyGridBackground\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("visible: !surface.backgroundLayerPresent")));
     QVERIFY(surfaceSource.contains(QStringLiteral("fillMode: Image.Tile")));
@@ -770,10 +779,10 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(surfaceSource.contains(QStringLiteral("function hasTransformableSelectedDrawableObject()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("type: \"layer\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"rasterLayerSurface-\" + drawableObjectDelegate.rasterLayerObjectId")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.toolMode === \"brush\" || surface.toolMode === \"eraser\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.effectiveToolMode() === \"brush\" || surface.effectiveToolMode() === \"eraser\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("label: qsTr(\"Background\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("draggable: false")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode === \"move\" && surface.hasTransformableSelectedDrawableObject()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.effectiveToolMode() === \"move\" && surface.hasTransformableSelectedDrawableObject()")));
 }
 
 void tst_CanvasToolBarQmlContract::pressureCurveControlsUseThreePointGraphAtBottom()

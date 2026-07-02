@@ -32,6 +32,7 @@ Rectangle {
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
     property bool flatRasterDocumentOpened: false
+    property bool spacePanActive: false
     property bool textEditingActive: false
     property string shapeKind: "rectangle"
     property bool shapeDraggingActive: false
@@ -135,6 +136,27 @@ Rectangle {
     signal toolShortcutRequested(string tool)
 
     onSelectedDrawableObjectIdChanged: rebuildLayerHierarchyRows()
+
+    function effectiveToolMode() {
+        return surface.spacePanActive && !surface.textEditingActive ? "pan" : surface.toolMode;
+    }
+
+    function beginSpacePanMode() {
+        if (surface.textEditingActive) {
+            return false;
+        }
+        surface.spacePanActive = true;
+        return true;
+    }
+
+    function endSpacePanMode() {
+        if (!surface.spacePanActive) {
+            return false;
+        }
+        surface.spacePanActive = false;
+        surface.commitPanDrag();
+        return true;
+    }
 
     function syncCanvasItemSizeToWorkspace() {
         if (!canvasItemReady || surface.width <= 0 || surface.height <= 0) {
@@ -1397,7 +1419,7 @@ Rectangle {
     }
 
     function beginPanDrag(pointX, pointY) {
-        if (surface.toolMode !== "pan") {
+        if (surface.effectiveToolMode() !== "pan") {
             return;
         }
 
@@ -1492,29 +1514,31 @@ Rectangle {
     }
 
     function canvasMouseAcceptedButtons() {
-        if (surface.toolMode === "shape" || surface.toolMode === "move" || surface.toolMode === "zoom" || surface.toolMode === "fill" || surface.toolMode === "text") {
+        const mode = surface.effectiveToolMode();
+        if (mode === "shape" || mode === "move" || mode === "zoom" || mode === "fill" || mode === "text") {
             return Qt.LeftButton;
         }
         return Qt.NoButton;
     }
 
     function canvasCursorShape() {
-        if (surface.toolMode === "shape") {
+        const mode = surface.effectiveToolMode();
+        if (mode === "shape") {
             return Qt.CrossCursor;
         }
-        if (surface.toolMode === "text") {
+        if (mode === "text") {
             return Qt.IBeamCursor;
         }
-        if (surface.toolMode === "pan") {
+        if (mode === "pan") {
             return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;
         }
-        if (surface.toolMode === "move") {
+        if (mode === "move") {
             return Qt.SizeAllCursor;
         }
-        if (surface.toolMode === "zoom") {
+        if (mode === "zoom") {
             return Qt.SizeHorCursor;
         }
-        if (surface.toolMode === "fill" || surface.toolMode === "eraser") {
+        if (mode === "fill" || mode === "eraser") {
             return Qt.PointingHandCursor;
         }
         return Qt.CrossCursor;
@@ -1689,6 +1713,30 @@ Rectangle {
         }
     }
 
+    onTextEditingActiveChanged: {
+        if (textEditingActive) {
+            endSpacePanMode();
+        }
+    }
+
+    onActiveFocusChanged: {
+        if (!activeFocus) {
+            endSpacePanMode();
+        }
+    }
+
+    Keys.onPressed: function (event) {
+        if (event.key === Qt.Key_Space && !event.isAutoRepeat && surface.beginSpacePanMode()) {
+            event.accepted = true;
+        }
+    }
+
+    Keys.onReleased: function (event) {
+        if (event.key === Qt.Key_Space && !event.isAutoRepeat && surface.endSpacePanMode()) {
+            event.accepted = true;
+        }
+    }
+
     onWidthChanged: {
         if (!surface.canvasSizeCreated) {
             syncCanvasItemSizeToWorkspace();
@@ -1755,7 +1803,7 @@ Rectangle {
             pressureCurveMaximum: surface.pressureCurveMaximum
             pressureToOpacityEnabled: surface.brushPressureControlsOpacity
             stabilizerStrength: surface.stabilizerStrength
-            toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.toolMode : "move"
+            toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.effectiveToolMode() : "move"
             documentViewModel: surface.documentViewModel
             viewId: surface.viewId
 
@@ -1877,7 +1925,7 @@ Rectangle {
                 readonly property bool isRasterLayer: objectType === "layer"
                 readonly property int rasterLayerObjectId: objectId
 
-                z: isRasterLayer && surface.selectedDrawableObjectId === rasterLayerObjectId && (surface.toolMode === "brush" || surface.toolMode === "eraser") ? 4 : 2
+                z: isRasterLayer && surface.selectedDrawableObjectId === rasterLayerObjectId && (surface.effectiveToolMode() === "brush" || surface.effectiveToolMode() === "eraser") ? 4 : 2
                 x: objectX
                 y: objectY
                 width: Math.max(1, objectWidth)
@@ -1909,7 +1957,7 @@ Rectangle {
 
                     DrawingSurfaceItem {
                         anchors.fill: parent
-                        enabled: surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.toolMode === "brush" || surface.toolMode === "eraser")
+                        enabled: surface.selectedDrawableObjectId === drawableObjectDelegate.rasterLayerObjectId && (surface.effectiveToolMode() === "brush" || surface.effectiveToolMode() === "eraser")
                         objectName: "rasterLayerSurface-" + drawableObjectDelegate.rasterLayerObjectId
                         brushColor: surface.brushColor
                         brushSize: surface.brushSize
@@ -1924,7 +1972,7 @@ Rectangle {
                         pressureCurveMaximum: surface.pressureCurveMaximum
                         pressureToOpacityEnabled: surface.brushPressureControlsOpacity
                         stabilizerStrength: surface.stabilizerStrength
-                        toolMode: surface.toolMode
+                        toolMode: surface.effectiveToolMode()
                         documentViewModel: surface.documentViewModel
                         viewId: surface.viewId
 
@@ -1974,7 +2022,7 @@ Rectangle {
         Rectangle {
             id: drawableObjectSelectionFrame
             parent: canvasSurface
-            visible: surface.toolMode === "move" && surface.hasTransformableSelectedDrawableObject()
+            visible: surface.effectiveToolMode() === "move" && surface.hasTransformableSelectedDrawableObject()
             z: 5
             x: surface.selectedDrawableObjectProperty("x", 0)
             y: surface.selectedDrawableObjectProperty("y", 0)
@@ -2005,7 +2053,7 @@ Rectangle {
             id: canvasPanMouseArea
             anchors.fill: parent
             z: 6
-            enabled: surface.toolMode === "pan"
+            enabled: surface.effectiveToolMode() === "pan"
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton
             cursorShape: surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor
@@ -2041,51 +2089,53 @@ Rectangle {
         cursorShape: surface.canvasCursorShape()
 
         onPressed: function (mouse) {
-            if (surface.toolMode === "zoom") {
+            const mode = surface.effectiveToolMode();
+            if (mode === "zoom") {
                 surface.beginZoomDrag(mouse.x);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "move") {
+            if (mode === "move") {
                 surface.beginDrawableObjectTransform(mouse.x, mouse.y);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "shape") {
+            if (mode === "shape") {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.beginShapeDrag(mouse.x, mouse.y, aspectLocked);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "fill") {
+            if (mode === "fill") {
                 surface.fillAt(mouse.x, mouse.y);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "text") {
+            if (mode === "text") {
                 surface.beginTextPlacement(mouse.x, mouse.y);
                 mouse.accepted = true;
             }
         }
 
         onPositionChanged: function (mouse) {
-            if (surface.toolMode === "zoom" && surface.zoomDraggingActive) {
+            const mode = surface.effectiveToolMode();
+            if (mode === "zoom" && surface.zoomDraggingActive) {
                 surface.updateZoomDrag(mouse.x);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "move" && surface.drawableObjectTransformActive) {
+            if (mode === "move" && surface.drawableObjectTransformActive) {
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y);
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "shape" && surface.shapeDraggingActive) {
+            if (mode === "shape" && surface.shapeDraggingActive) {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
                 mouse.accepted = true;
@@ -2093,21 +2143,22 @@ Rectangle {
         }
 
         onReleased: function (mouse) {
-            if (surface.toolMode === "zoom") {
+            const mode = surface.effectiveToolMode();
+            if (mode === "zoom") {
                 surface.updateZoomDrag(mouse.x);
                 surface.commitZoomDrag();
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "move") {
+            if (mode === "move") {
                 surface.updateDrawableObjectTransform(mouse.x, mouse.y);
                 surface.commitDrawableObjectTransform();
                 mouse.accepted = true;
                 return;
             }
 
-            if (surface.toolMode === "shape") {
+            if (mode === "shape") {
                 const aspectLocked = surface.shapeAspectLockedFromMouse(mouse);
                 surface.updateShapeDrag(mouse.x, mouse.y, aspectLocked);
                 surface.commitActiveShape();

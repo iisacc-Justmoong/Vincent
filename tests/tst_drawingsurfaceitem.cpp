@@ -628,6 +628,51 @@ void tst_DrawingSurfaceItem::pansCanvasWithHandToolDrag()
     QTRY_COMPARE(canvasItem->y(), initialCanvasY);
     QTRY_COMPARE(canvasPaper->x(), initialPaperX);
     QTRY_COMPARE(canvasPaper->y(), initialPaperY);
+
+    QQmlExpression setBrushTool(engine.rootContext(),
+                                object.data(),
+                                QStringLiteral("toolMode = \"brush\";"));
+    setBrushTool.evaluate();
+    QVERIFY2(!setBrushTool.hasError(), qPrintable(setBrushTool.error().toString()));
+    QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
+
+    QQmlExpression temporaryPan(engine.rootContext(),
+                                object.data(),
+                                QStringLiteral("beginSpacePanMode();"
+                                               "beginPanDrag(40, 60);"
+                                               "updatePanDrag(75, 84);"
+                                               "commitPanDrag();"
+                                               "[effectiveToolMode(), toolMode, canvasPanOffsetX, canvasPanOffsetY].join(\",\");"));
+    const QVariant temporaryPanResult = temporaryPan.evaluate();
+    QVERIFY2(!temporaryPan.hasError(), qPrintable(temporaryPan.error().toString()));
+    QCOMPARE(temporaryPanResult.toString(), QStringLiteral("pan,brush,35,24"));
+    QTRY_COMPARE(canvasItem->x(), initialCanvasX + 35.0);
+    QTRY_COMPARE(canvasItem->y(), initialCanvasY + 24.0);
+    QTRY_COMPARE(canvasPaper->x(), initialPaperX + 35.0);
+    QTRY_COMPARE(canvasPaper->y(), initialPaperY + 24.0);
+
+    QQmlExpression releaseTemporaryPan(engine.rootContext(),
+                                       object.data(),
+                                       QStringLiteral("endSpacePanMode();"
+                                                      "[effectiveToolMode(), toolMode, canvasPanOffsetX, canvasPanOffsetY].join(\",\");"));
+    const QVariant releaseTemporaryPanResult = releaseTemporaryPan.evaluate();
+    QVERIFY2(!releaseTemporaryPan.hasError(), qPrintable(releaseTemporaryPan.error().toString()));
+    QCOMPARE(releaseTemporaryPanResult.toString(), QStringLiteral("brush,brush,35,24"));
+
+    QQmlExpression textEditingSpace(engine.rootContext(),
+                                    object.data(),
+                                    QStringLiteral("toolMode = \"text\";"
+                                                   "beginTextPlacement(20, 24);"
+                                                   "[beginSpacePanMode(), effectiveToolMode(), spacePanActive, textEditingActive].join(\",\");"));
+    const QVariant textEditingSpaceResult = textEditingSpace.evaluate();
+    QVERIFY2(!textEditingSpace.hasError(), qPrintable(textEditingSpace.error().toString()));
+    QCOMPARE(textEditingSpaceResult.toString(), QStringLiteral("false,text,false,true"));
+
+    QQmlExpression cancelTextEditing(engine.rootContext(),
+                                     object.data(),
+                                     QStringLiteral("cancelActiveText();"));
+    cancelTextEditing.evaluate();
+    QVERIFY2(!cancelTextEditing.hasError(), qPrintable(cancelTextEditing.error().toString()));
 }
 
 void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
