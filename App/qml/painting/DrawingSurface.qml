@@ -466,8 +466,16 @@ Rectangle {
         };
     }
 
-    function shapeAspectLockedFromMouse(mouse) {
+    function shiftModifierActiveFromMouse(mouse) {
         return (mouse.modifiers & Qt.ShiftModifier) !== 0;
+    }
+
+    function shapeAspectLockedFromMouse(mouse) {
+        return shiftModifierActiveFromMouse(mouse);
+    }
+
+    function drawableObjectTransformConstrainedFromMouse(mouse) {
+        return shiftModifierActiveFromMouse(mouse);
     }
 
     function shapeDragAxisDirection(delta, negativeLimit, positiveLimit) {
@@ -1390,16 +1398,40 @@ Rectangle {
         return true;
     }
 
-    function movedDrawableObject(originalObject, pointX, pointY) {
+    function constrainedDrawableObjectDelta(pointX, pointY) {
         const deltaX = pointX - surface.drawableObjectTransformStartX;
         const deltaY = pointY - surface.drawableObjectTransformStartY;
+        if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+            return {
+                x: deltaX,
+                y: 0
+            };
+        }
+        return {
+            x: 0,
+            y: deltaY
+        };
+    }
+
+    function drawableObjectDelta(pointX, pointY, constrained) {
+        if (constrained) {
+            return constrainedDrawableObjectDelta(pointX, pointY);
+        }
+        return {
+            x: pointX - surface.drawableObjectTransformStartX,
+            y: pointY - surface.drawableObjectTransformStartY
+        };
+    }
+
+    function movedDrawableObject(originalObject, pointX, pointY, constrained) {
+        const delta = drawableObjectDelta(pointX, pointY, constrained);
         const movedObject = cloneDrawableObject(originalObject);
-        movedObject.x = originalObject.x + deltaX;
-        movedObject.y = originalObject.y + deltaY;
+        movedObject.x = originalObject.x + delta.x;
+        movedObject.y = originalObject.y + delta.y;
         return movedObject;
     }
 
-    function resizedDrawableObject(originalObject, pointX, pointY) {
+    function resizedDrawableObjectBounds(originalObject, pointX, pointY) {
         const deltaX = pointX - surface.drawableObjectTransformStartX;
         const deltaY = pointY - surface.drawableObjectTransformStartY;
         var left = originalObject.x;
@@ -1421,20 +1453,82 @@ Rectangle {
             bottom = Math.max(top + surface.drawableObjectMinimumDimension, originalObject.y + originalObject.height + deltaY);
         }
 
+        return {
+            left: left,
+            top: top,
+            right: right,
+            bottom: bottom,
+            resizeDirections: resizeDirections
+        };
+    }
+
+    function aspectLockedDrawableObjectResizeBounds(originalObject, pointX, pointY) {
+        const freeBounds = resizedDrawableObjectBounds(originalObject, pointX, pointY);
+        const resizeDirections = freeBounds.resizeDirections;
+        const originalWidth = Math.max(surface.drawableObjectMinimumDimension, originalObject.width);
+        const originalHeight = Math.max(surface.drawableObjectMinimumDimension, originalObject.height);
+        const minimumScale = Math.max(surface.drawableObjectMinimumDimension / originalWidth, surface.drawableObjectMinimumDimension / originalHeight);
+        const freeWidth = Math.max(surface.drawableObjectMinimumDimension, freeBounds.right - freeBounds.left);
+        const freeHeight = Math.max(surface.drawableObjectMinimumDimension, freeBounds.bottom - freeBounds.top);
+        const widthScale = freeWidth / originalWidth;
+        const heightScale = freeHeight / originalHeight;
+        var scale = widthScale;
+
+        if (resizeDirections.indexOf("n") >= 0 || resizeDirections.indexOf("s") >= 0) {
+            if (resizeDirections.indexOf("e") < 0 && resizeDirections.indexOf("w") < 0) {
+                scale = heightScale;
+            } else if (Math.abs(heightScale - 1) > Math.abs(widthScale - 1)) {
+                scale = heightScale;
+            }
+        }
+        scale = Math.max(minimumScale, scale);
+
+        const lockedWidth = originalWidth * scale;
+        const lockedHeight = originalHeight * scale;
+        const originalRight = originalObject.x + originalObject.width;
+        const originalBottom = originalObject.y + originalObject.height;
+        const originalCenterX = originalObject.x + originalObject.width / 2;
+        const originalCenterY = originalObject.y + originalObject.height / 2;
+        var left = originalObject.x;
+        var top = originalObject.y;
+
+        if (resizeDirections.indexOf("w") >= 0) {
+            left = originalRight - lockedWidth;
+        } else if (resizeDirections.indexOf("e") < 0) {
+            left = originalCenterX - lockedWidth / 2;
+        }
+
+        if (resizeDirections.indexOf("n") >= 0) {
+            top = originalBottom - lockedHeight;
+        } else if (resizeDirections.indexOf("s") < 0) {
+            top = originalCenterY - lockedHeight / 2;
+        }
+
+        return {
+            left: left,
+            top: top,
+            right: left + lockedWidth,
+            bottom: top + lockedHeight
+        };
+    }
+
+    function resizedDrawableObject(originalObject, pointX, pointY, aspectLocked) {
+        const bounds = aspectLocked ? aspectLockedDrawableObjectResizeBounds(originalObject, pointX, pointY) : resizedDrawableObjectBounds(originalObject, pointX, pointY);
+
         const resizedObject = cloneDrawableObject(originalObject);
-        resizedObject.x = left;
-        resizedObject.y = top;
-        resizedObject.width = right - left;
-        resizedObject.height = bottom - top;
+        resizedObject.x = bounds.left;
+        resizedObject.y = bounds.top;
+        resizedObject.width = bounds.right - bounds.left;
+        resizedObject.height = bounds.bottom - bounds.top;
         return resizedObject;
     }
 
-    function updateDrawableObjectTransform(pointX, pointY) {
+    function updateDrawableObjectTransform(pointX, pointY, constrained) {
         if (!surface.drawableObjectTransformActive || !surface.drawableObjectTransformOriginal) {
             return;
         }
 
-        const nextObject = surface.drawableObjectTransformMode === "move" ? movedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY) : resizedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY);
+        const nextObject = surface.drawableObjectTransformMode === "move" ? movedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY, constrained) : resizedDrawableObject(surface.drawableObjectTransformOriginal, pointX, pointY, constrained);
         replaceDrawableObjectById(nextObject.id, nextObject);
     }
 
@@ -2191,7 +2285,8 @@ Rectangle {
             }
 
             if (mode === "move" && surface.drawableObjectTransformActive) {
-                surface.updateDrawableObjectTransform(mouse.x, mouse.y);
+                const constrained = surface.drawableObjectTransformConstrainedFromMouse(mouse);
+                surface.updateDrawableObjectTransform(mouse.x, mouse.y, constrained);
                 mouse.accepted = true;
                 return;
             }
@@ -2213,7 +2308,8 @@ Rectangle {
             }
 
             if (mode === "move") {
-                surface.updateDrawableObjectTransform(mouse.x, mouse.y);
+                const constrained = surface.drawableObjectTransformConstrainedFromMouse(mouse);
+                surface.updateDrawableObjectTransform(mouse.x, mouse.y, constrained);
                 surface.commitDrawableObjectTransform();
                 surface.updateDrawableObjectHoverHandle(mouse.x, mouse.y);
                 mouse.accepted = true;

@@ -30,6 +30,7 @@ private slots:
     void pansCanvasWithHandToolDrag();
     void zoomsCanvasWithHorizontalDrag();
     void movesAndResizesDrawableObjects();
+    void constrainsDrawableObjectTransformWithShiftModifier();
     void deletesSelectedDrawableObject();
     void deletesBackgroundLayerLikeRegularLayer();
     void addsBlankLayerRowsWithoutTransformHitTesting();
@@ -861,6 +862,85 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     const QVariant forgivingHandleHitTargetsResult = forgivingHandleHitTargets.evaluate();
     QVERIFY2(!forgivingHandleHitTargets.hasError(), qPrintable(forgivingHandleHitTargets.error().toString()));
     QCOMPARE(forgivingHandleHitTargetsResult.toString(), QStringLiteral("resize-se,resize-n,60,50,true,60"));
+}
+
+void tst_DrawingSurfaceItem::constrainsDrawableObjectTransformWithShiftModifier()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression constrainedMove(engine.rootContext(),
+                                   object.data(),
+                                   QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 40, height: 20, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                                                  "beginDrawableObjectTransform(20, 30);"
+                                                  "updateDrawableObjectTransform(80, 50, true);"
+                                                  "commitDrawableObjectTransform();"
+                                                  "beginDrawableObjectTransform(80, 30);"
+                                                  "updateDrawableObjectTransform(90, 120, true);"
+                                                  "commitDrawableObjectTransform();"));
+    constrainedMove.evaluate();
+    QVERIFY2(!constrainedMove.hasError(), qPrintable(constrainedMove.error().toString()));
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 2);
+    QVariantMap transformedObject = objects.last().toMap();
+    QCOMPARE(transformedObject.value(QStringLiteral("x")).toReal(), 70.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("y")).toReal(), 110.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("width")).toReal(), 40.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("height")).toReal(), 20.0);
+
+    QQmlExpression constrainedCornerResize(engine.rootContext(),
+                                           object.data(),
+                                           QStringLiteral("beginDrawableObjectTransform(110, 130);"
+                                                          "updateDrawableObjectTransform(170, 150, true);"
+                                                          "commitDrawableObjectTransform();"));
+    constrainedCornerResize.evaluate();
+    QVERIFY2(!constrainedCornerResize.hasError(), qPrintable(constrainedCornerResize.error().toString()));
+
+    objects = rootItem->property("drawableObjects").toList();
+    transformedObject = objects.last().toMap();
+    QCOMPARE(transformedObject.value(QStringLiteral("x")).toReal(), 70.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("y")).toReal(), 110.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("width")).toReal(), 100.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("height")).toReal(), 50.0);
+
+    QQmlExpression constrainedEdgeResize(engine.rootContext(),
+                                         object.data(),
+                                         QStringLiteral("beginDrawableObjectTransform(170, 135);"
+                                                        "updateDrawableObjectTransform(220, 135, true);"
+                                                        "commitDrawableObjectTransform();"));
+    constrainedEdgeResize.evaluate();
+    QVERIFY2(!constrainedEdgeResize.hasError(), qPrintable(constrainedEdgeResize.error().toString()));
+
+    objects = rootItem->property("drawableObjects").toList();
+    transformedObject = objects.last().toMap();
+    QCOMPARE(transformedObject.value(QStringLiteral("x")).toReal(), 70.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("y")).toReal(), 97.5);
+    QCOMPARE(transformedObject.value(QStringLiteral("width")).toReal(), 150.0);
+    QCOMPARE(transformedObject.value(QStringLiteral("height")).toReal(), 75.0);
 }
 
 void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
