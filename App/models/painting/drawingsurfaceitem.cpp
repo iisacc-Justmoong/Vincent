@@ -1130,6 +1130,7 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
                                                             Qt::LeftButton,
                                                             Qt::LeftButton);
         CanvasAdapter::event(&event);
+        emit inputStateChanged();
         return;
     }
 
@@ -1139,6 +1140,7 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
                                        Qt::LeftButton,
                                        Qt::LeftButton);
     CanvasAdapter::mousePressEvent(&event);
+    emit inputStateChanged();
 }
 
 bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
@@ -1155,6 +1157,7 @@ bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal raw
                                                             Qt::NoButton,
                                                             Qt::LeftButton);
         CanvasAdapter::event(&event);
+        emit inputStateChanged();
         return true;
     }
 
@@ -1164,6 +1167,7 @@ bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal raw
                                        Qt::NoButton,
                                        Qt::LeftButton);
     CanvasAdapter::mouseMoveEvent(&event);
+    emit inputStateChanged();
     return true;
 }
 
@@ -1181,6 +1185,8 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
                                                             Qt::LeftButton,
                                                             Qt::NoButton);
         CanvasAdapter::event(&event);
+        emit inputStateChanged();
+        emit rasterContentChanged();
         return;
     }
 
@@ -1190,6 +1196,8 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
                                        Qt::LeftButton,
                                        Qt::NoButton);
     CanvasAdapter::mouseReleaseEvent(&event);
+    emit inputStateChanged();
+    emit rasterContentChanged();
 }
 
 bool DrawingSurfaceItem::commitText(qreal pointX,

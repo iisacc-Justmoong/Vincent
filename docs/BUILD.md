@@ -43,10 +43,12 @@ VINCENT_BUILD_MODE=all ./build.sh
 Run the Windows build from Windows PowerShell 5.1 or newer. The script expects Windows-built Qt, LVRS, and iiPaintEngine prefixes; macOS `.local` binaries cannot be reused on Windows. Set the prefix variables once per shell session:
 
 ```powershell
-$env:QT_PREFIX = "C:\Qt\6.8.3\msvc2022_64"
+$env:QT_PREFIX = "C:\Qt\6.8.3\mingw_64"
 $env:LVRS_PREFIX = "$HOME\.local\LVRS"
 $env:IIPAINTENGINE_PREFIX = "$HOME\.local\iiPaintEngine"
 ```
+
+The supported MinGW setup uses Qt's bundled CMake, Ninja, and MinGW tools on `PATH`. The vendored `psd_sdk` build treats `Psdminiz.c` as C++ because that upstream C file includes headers with C++ `static_assert` declarations. The current iiPaintEngine Qt adapter exposes the brush opacity toggle as `brushOpacityEnabled`, so QML and bridge code should not use the older `pressureToOpacityEnabled` property name.
 
 Then build, test, deploy Qt runtime files, copy dependency DLLs, and create the Windows ZIP package:
 
@@ -54,7 +56,7 @@ Then build, test, deploy Qt runtime files, copy dependency DLLs, and create the 
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean
 ```
 
-The script always configures with `cmake -S . -B build`, builds only the repository-local `build/` tree, runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed, and deploys Qt/QML runtime files with `windeployqt --qmldir App/qml`. It also copies LVRS/iiPaintEngine runtime DLLs and LVRS QML imports when those files are present in the dependency prefixes. The staged app is written to `dist/Vincent-Windows`, and the package is written to `dist/Vincent-4.0-Windows.zip`.
+The script always configures with `cmake -S . -B build`, builds only the repository-local `build/` tree, runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed, and deploys Qt/QML runtime files with `windeployqt --qmldir App/qml`. Windows CTest entries prepend the Qt, LVRS, and iiPaintEngine DLL directories to `PATH` while still clearing Qt discovery variables. The script also copies LVRS/iiPaintEngine runtime DLLs and LVRS QML imports when those files are present in the dependency prefixes. The staged app is written to `dist/Vincent-Windows`, and the package is written to `dist/Vincent-4.0-Windows.zip`.
 
 For a current-user smoke install, run:
 

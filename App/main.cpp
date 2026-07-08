@@ -1,13 +1,15 @@
 #include <QDir>
+#include <QGuiApplication>
+#include <QMetaObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSet>
 #include <QStringList>
+#include <QUrl>
+#include <QVariant>
+#include <QQuickStyle>
 #include <QtQml>
 #include <qqml.h>
-
-#include <backend/state/viewmodelregistry.h>
-#include <backend/runtime/appentry.h>
 
 #include "models/canvas/canvasdocumentviewmodel.h"
 #include "models/painting/drawingsurfaceitem.h"
@@ -61,32 +63,41 @@ void configureEngineImports(QQmlApplicationEngine &engine)
 
 void registerViewModels(QQmlApplicationEngine &engine, PaletteUtils *paletteUtils)
 {
-    auto *registry = engine.singletonInstance<ViewModelRegistry *>(QStringLiteral("LVRS"),
-                                                                   QStringLiteral("ViewModels"));
+    QObject *registry = engine.singletonInstance<QObject *>(QStringLiteral("LVRS"),
+                                                            QStringLiteral("ViewModels"));
     if (!registry) {
         return;
     }
 
     auto *documentViewModel = new CanvasDocumentViewModel(paletteUtils, registry);
-    registry->set(QStringLiteral("CanvasDocument"), documentViewModel);
+    QMetaObject::invokeMethod(registry,
+                              "set",
+                              Q_ARG(QString, QStringLiteral("CanvasDocument")),
+                              Q_ARG(QObject *, documentViewModel));
 }
 
 } // namespace
 
 int main(int argc, char *argv[])
 {
-    lvrs::QmlAppLaunchSpec launchSpec;
-    launchSpec.bootstrap.applicationName = QStringLiteral("Vincent");
-    launchSpec.bootstrap.quickStyleName = QStringLiteral("Basic");
-    launchSpec.moduleUri = QStringLiteral("Vincent");
-    launchSpec.rootObject = QStringLiteral("Main");
-    launchSpec.configureEngine = [](QQmlApplicationEngine &engine) {
-        configureEngineImports(engine);
-        qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
-        auto *paletteUtils = new PaletteUtils(&engine);
-        engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
-        registerViewModels(engine, paletteUtils);
-    };
+    QGuiApplication app(argc, argv);
+    QGuiApplication::setApplicationName(QStringLiteral("Vincent"));
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
 
-    return lvrs::runBootstrappedQmlApp(argc, argv, launchSpec);
+    QQmlApplicationEngine engine;
+    configureEngineImports(engine);
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    auto *paletteUtils = new PaletteUtils(&engine);
+    engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
+    registerViewModels(engine, paletteUtils);
+
+    QObject::connect(&engine,
+                     &QQmlApplicationEngine::objectCreationFailed,
+                     &app,
+                     []() { QCoreApplication::exit(-1); },
+                     Qt::QueuedConnection);
+    engine.loadFromModule(QStringLiteral("Vincent"), QStringLiteral("Main"));
+
+    return app.exec();
 }

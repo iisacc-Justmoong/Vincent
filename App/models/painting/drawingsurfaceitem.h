@@ -84,6 +84,7 @@ signals:
     void canUndoChanged();
     void canRedoChanged();
     void rasterContentChanged();
+    void inputStateChanged();
 
 protected:
     bool event(QEvent *event) override;

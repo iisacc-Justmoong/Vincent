@@ -1919,7 +1919,7 @@ Rectangle {
             pressureCurveMinimum: surface.pressureCurveMinimum
             pressureCurveCenter: surface.pressureCurveCenter
             pressureCurveMaximum: surface.pressureCurveMaximum
-            pressureToOpacityEnabled: surface.brushPressureControlsOpacity
+            brushOpacityEnabled: surface.brushPressureControlsOpacity
             stabilizerStrength: surface.stabilizerStrength
             toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.effectiveToolMode() : "move"
             documentViewModel: surface.documentViewModel
@@ -2088,7 +2088,7 @@ Rectangle {
                         pressureCurveMinimum: surface.pressureCurveMinimum
                         pressureCurveCenter: surface.pressureCurveCenter
                         pressureCurveMaximum: surface.pressureCurveMaximum
-                        pressureToOpacityEnabled: surface.brushPressureControlsOpacity
+                        brushOpacityEnabled: surface.brushPressureControlsOpacity
                         stabilizerStrength: surface.stabilizerStrength
                         toolMode: surface.effectiveToolMode()
                         documentViewModel: surface.documentViewModel

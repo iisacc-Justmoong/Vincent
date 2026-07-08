@@ -22,6 +22,7 @@ class tst_WindowsBuildWorkflowContract : public QObject
 private slots:
     void windowsBuildScriptDefinesRunnablePackageContract();
     void cmakeHasWindowsInstallAndPackageRules();
+    void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void buildGuideDocumentsWindowsScript();
 };
 
@@ -58,7 +59,6 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("\"-B\", $BuildDir")));
     QVERIFY(source.contains(QStringLiteral("\"-DCMAKE_PREFIX_PATH=$prefixPath\"")));
     QVERIFY(source.contains(QStringLiteral("Invoke-Native $CTest @(\"--test-dir\", $BuildDir, \"--output-on-failure\"")));
-
     QVERIFY(source.contains(QStringLiteral("\"--qmldir\", (Join-Path $RepositoryRoot \"App\\qml\")")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"LVRS\"")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiPaintEngine\"")));
@@ -81,6 +81,30 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(source.contains(QStringLiteral("set(CPACK_PACKAGE_FILE_NAME \"Vincent-${CPACK_PACKAGE_VERSION}-Windows\")")));
     QVERIFY(source.contains(QStringLiteral("if(APPLE)\n    # productbuild")));
     QVERIFY(source.contains(QStringLiteral("set(CPACK_GENERATOR \"productbuild\")")));
+    QVERIFY(source.contains(QStringLiteral("set_source_files_properties(\"${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c\" PROPERTIES LANGUAGE CXX)")));
+
+    const QString testsCmakePath = QFINDTESTDATA("../tests/CMakeLists.txt");
+    QVERIFY2(!testsCmakePath.isEmpty(), "tests/CMakeLists.txt test data was not found");
+    const QString testsSource = readTextFile(testsCmakePath);
+    QVERIFY(testsSource.contains(QStringLiteral("ENVIRONMENT_MODIFICATION")));
+    QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>")));
+}
+
+void tst_WindowsBuildWorkflowContract::appEntryPointAvoidsNonExportedLvrsRuntimeSymbols()
+{
+    const QString mainPath = QFINDTESTDATA("../App/main.cpp");
+    QVERIFY2(!mainPath.isEmpty(), "App/main.cpp test data was not found");
+    const QString source = readTextFile(mainPath);
+    QVERIFY(!source.isEmpty());
+
+    QVERIFY(source.contains(QStringLiteral("QGuiApplication app(argc, argv);")));
+    QVERIFY(source.contains(QStringLiteral("engine.loadFromModule(QStringLiteral(\"Vincent\"), QStringLiteral(\"Main\"))")));
+    QVERIFY(source.contains(QStringLiteral("engine.singletonInstance<QObject *>(QStringLiteral(\"LVRS\"),")));
+    QVERIFY(source.contains(QStringLiteral("QMetaObject::invokeMethod(registry,")));
+    QVERIFY(!source.contains(QStringLiteral("runBootstrappedQmlApp")));
+    QVERIFY(!source.contains(QStringLiteral("ViewModelRegistry *")));
+    QVERIFY(!source.contains(QStringLiteral("#include <backend/runtime/appentry.h>")));
+    QVERIFY(!source.contains(QStringLiteral("#include <backend/state/viewmodelregistry.h>")));
 }
 
 void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()

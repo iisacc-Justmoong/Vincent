@@ -78,10 +78,9 @@ void CanvasViewModelBridge::syncToolState(CanvasBrushConfig &brushConfig, QStrin
     readBoundedRealProperty(m_documentViewModel, "pressureCurveMinimum", brushConfig.pressureCurveMinimum, 0.0, 1.0);
     readBoundedRealProperty(m_documentViewModel, "pressureCurveCenter", brushConfig.pressureCurveCenter, 0.0, 1.0);
     readBoundedRealProperty(m_documentViewModel, "pressureCurveMaximum", brushConfig.pressureCurveMaximum, 0.0, 1.0);
-    readBoolProperty(m_documentViewModel, "brushPressureControlsOpacity", brushConfig.pressureToOpacityEnabled);
+    readBoolProperty(m_documentViewModel, "brushPressureControlsOpacity", brushConfig.opacityEnabled);
     readBoundedRealProperty(m_documentViewModel, "stabilizerStrength", brushConfig.stabilizerStrength, 0.0, 1.0);
     brushConfig.flowEnabled = true;
-    brushConfig.opacityEnabled = true;
     brushConfig.hardnessEnabled = true;
     brushConfig.spacingEnabled = true;
 

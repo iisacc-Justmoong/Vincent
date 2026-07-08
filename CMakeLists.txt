@@ -140,6 +140,7 @@ list(REMOVE_ITEM _vincent_psd_sdk_sources
         "${psd_sdk_SOURCE_DIR}/src/Psd/PsdNativeFile_Linux.cpp"
         "${psd_sdk_SOURCE_DIR}/src/Psd/PsdStringUtil.cpp"
 )
+set_source_files_properties("${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c" PROPERTIES LANGUAGE CXX)
 add_library(vincent_psd_sdk STATIC ${_vincent_psd_sdk_sources})
 target_include_directories(vincent_psd_sdk PUBLIC "${psd_sdk_SOURCE_DIR}/src/Psd")
 target_compile_features(vincent_psd_sdk PUBLIC cxx_std_11)

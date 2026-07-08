@@ -886,7 +886,7 @@ void tst_CanvasToolBarQmlContract::brushSettingsExposePressureOpacityToggle()
     QVERIFY(surfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString surfaceSource = QString::fromUtf8(surfaceQml.readAll());
     QVERIFY(surfaceSource.contains(QStringLiteral("property bool brushPressureControlsOpacity: true")));
-    QCOMPARE(surfaceSource.count(QStringLiteral("pressureToOpacityEnabled: surface.brushPressureControlsOpacity")), 2);
+    QCOMPARE(surfaceSource.count(QStringLiteral("brushOpacityEnabled: surface.brushPressureControlsOpacity")), 2);
 }
 
 QTEST_APPLESS_MAIN(tst_CanvasToolBarQmlContract)

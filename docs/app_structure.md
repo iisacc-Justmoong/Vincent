@@ -12,7 +12,7 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 - `App/models/document/psdcompatibilitydocument.*` defines the internal Photoshop-style document/layer manifest used as the boundary for PSD import/export.
 - `App/models/document/psdimagereader.*` wraps `psd_sdk` so Vincent can read PSD merged image data without relying on Qt image plugins.
 - `App/models/document/psdimagewriter.*` wraps `psd_sdk` so Vincent can write layered PSD files with XMP metadata.
-- `App/models/painting/drawingsurfaceitem.*` adapts Vincent's QML surface contract to `CanvasAdapter` from iiPaintEngine.
+- `App/models/painting/drawingsurfaceitem.*` adapts Vincent's QML surface contract to `CanvasAdapter` from iiPaintEngine and re-emits the raster/input signals Vincent consumes across the DLL boundary.
 - `App/qml/` contains the LVRS UI for the main window, toolbar, and drawing surface.
 - `tests/` contains Qt Test targets for the document view model and iiPaintEngine drawing surface integration.
 
@@ -26,11 +26,11 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 
 ## Runtime Entry Point (`App/main.cpp`)
 
-- Configures LVRS application launch metadata.
+- Starts a standard `QGuiApplication`/`QQmlApplicationEngine` entry point so Windows links only against LVRS's exported QML module surface instead of non-exported LVRS C++ runtime helpers.
 - Adds LVRS QML import paths discovered from local installation locations.
 - Registers `DrawingSurfaceItem` as the QML canvas item.
 - Registers `PaletteUtils` as a QML context helper.
-- Registers a shared `CanvasDocumentViewModel` in the LVRS `ViewModels` registry under `CanvasDocument`.
+- Registers a shared `CanvasDocumentViewModel` in the LVRS `ViewModels` registry under `CanvasDocument` through the registry's `QObject` meta-object API.
 - Launches the `Vincent` QML module's `Main` component.
 
 ## QML Module Layout (`App/qml/`)
@@ -155,7 +155,7 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 
 ## Data Flow Summary
 
-1. `main.cpp` launches the LVRS-backed QML application and registers the shared view model plus helper services.
+1. `main.cpp` launches the Qt/LVRS-backed QML application and registers the shared view model plus helper services.
 2. `PainterCanvasPage` binds to `CanvasDocumentViewModel` and passes brush state into `DrawingSurface`.
 3. `CanvasToolBar` emits user actions for file flow, tool selection, shape selection, HSL color picker changes, brush size updates, and brush reselection settings.
 4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.

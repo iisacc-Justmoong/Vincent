@@ -147,3 +147,18 @@ set_tests_properties(
         PROPERTIES
         ENVIRONMENT "${_vincent_test_environment}"
 )
+
+if(WIN32)
+    set_tests_properties(
+            tests_canvasdocumentviewmodel
+            tests_psdcompatibilitydocument
+            tests_canvastoolbarqmlcontract
+            tests_mainqmlcontract
+            tests_macosbuildworkflowcontract
+            tests_windowsbuildworkflowcontract
+            tests_drawingsurfaceitem
+            PROPERTIES
+            ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
+    )
+endif()

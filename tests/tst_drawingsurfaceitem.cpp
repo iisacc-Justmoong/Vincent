@@ -315,7 +315,7 @@ void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
     QCOMPARE(canvasItem->pressureCurveMinimum(), 0.2);
     QCOMPARE(canvasItem->pressureCurveCenter(), 0.6);
     QCOMPARE(canvasItem->pressureCurveMaximum(), 0.8);
-    QCOMPARE(canvasItem->pressureToOpacityEnabled(), false);
+    QCOMPARE(canvasItem->brushOpacityEnabled(), false);
     QCOMPARE(canvasItem->stabilizerStrength(), 0.44);
 
     QTemporaryDir dir;
