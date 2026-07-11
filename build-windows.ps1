@@ -14,6 +14,8 @@ param(
     [switch]$Clean,
     [switch]$SkipTests,
     [switch]$SkipPackage,
+    [switch]$CreateMsi,
+    [string]$WixToolsDir = $env:WIX_TOOLS_DIR,
     [switch]$InstallForCurrentUser,
     [string]$InstallDir = ""
 )
@@ -27,6 +29,8 @@ $BuildDir = Join-Path $RepositoryRoot "build"
 $DistRoot = Join-Path $RepositoryRoot "dist"
 $StageDir = Join-Path $DistRoot "Vincent-Windows"
 $ZipPath = Join-Path $DistRoot "Vincent-$Version-Windows.zip"
+$MsiWorkDir = Join-Path $BuildDir "msi"
+$MsiPath = Join-Path $BuildDir "Vincent-$Version-Windows.msi"
 
 function Write-Step {
     param([string]$Message)
@@ -138,6 +142,230 @@ function Resolve-DependencyPrefix {
     throw "$Name was not found. Install the Windows build of $Name and set the matching environment variable or script parameter."
 }
 
+function Resolve-Objdump {
+    param([string]$ResolvedQtPrefix)
+
+    $candidates = @()
+    $command = Get-Command "objdump.exe" -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidates += $command.Source
+    }
+
+    if ($ResolvedQtPrefix -match "mingw") {
+        $qtRoot = Split-Path -Parent (Split-Path -Parent $ResolvedQtPrefix)
+        if ($qtRoot) {
+            $candidates += Get-ChildItem -Path (Join-Path $qtRoot "Tools") -Filter "objdump.exe" -Recurse -File -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName
+        }
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    return ""
+}
+
+function Test-BinaryMentionsSymbol {
+    param(
+        [string]$Objdump,
+        [string]$Binary,
+        [string]$Symbol
+    )
+
+    $output = & $Objdump -p $Binary 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to inspect binary imports: $Binary"
+    }
+
+    return @($output | Select-String -SimpleMatch $Symbol).Count -gt 0
+}
+
+function Assert-MinGwRuntimeCompatibility {
+    param(
+        [string]$Directory,
+        [string]$ResolvedQtPrefix
+    )
+
+    if ($ResolvedQtPrefix -notmatch "mingw") {
+        return
+    }
+
+    $objdump = Resolve-Objdump -ResolvedQtPrefix $ResolvedQtPrefix
+    if (-not $objdump) {
+        throw "objdump.exe was not found. MinGW Windows packages require objdump-based DLL compatibility checks."
+    }
+
+    $libstdcpp = Join-Path $Directory "libstdc++-6.dll"
+    if (-not (Test-Path $libstdcpp)) {
+        throw "MinGW runtime deployment is incomplete: libstdc++-6.dll is missing."
+    }
+
+    $symbol = "__cxa_thread_atexit"
+    $runtimeExportsSymbol = Test-BinaryMentionsSymbol -Objdump $objdump -Binary $libstdcpp -Symbol $symbol
+    $incompatibleDlls = @(
+        Get-ChildItem -Path $Directory -Filter "*.dll" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne "libstdc++-6.dll" } |
+            Where-Object { Test-BinaryMentionsSymbol -Objdump $objdump -Binary $_.FullName -Symbol $symbol }
+    )
+
+    if (($incompatibleDlls.Count -gt 0) -and (-not $runtimeExportsSymbol)) {
+        $names = ($incompatibleDlls | ForEach-Object { $_.Name }) -join ", "
+        throw "MinGW ABI mismatch: $names imports $symbol, but staged libstdc++-6.dll does not export it. Rebuild those dependencies with the same MinGW kit as Qt: $ResolvedQtPrefix"
+    }
+}
+
+function Resolve-WixTools {
+    param([string]$ConfiguredToolsDir)
+
+    $candidates = @()
+    if ($ConfiguredToolsDir) {
+        $candidates += $ConfiguredToolsDir
+    }
+    if ($env:WIX) {
+        $candidates += $env:WIX
+        $candidates += Join-Path $env:WIX "bin"
+    }
+    $candidates += Join-Path $RepositoryRoot "build\tools\wix314"
+
+    $heatCommand = Get-Command "heat.exe" -ErrorAction SilentlyContinue
+    if ($heatCommand) {
+        $candidates += Split-Path -Parent $heatCommand.Source
+    }
+
+    foreach ($candidate in $candidates) {
+        if (-not $candidate) {
+            continue
+        }
+        if ((Test-Path (Join-Path $candidate "heat.exe")) -and
+            (Test-Path (Join-Path $candidate "candle.exe")) -and
+            (Test-Path (Join-Path $candidate "light.exe"))) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    throw "WiX Toolset was not found. Set WIX_TOOLS_DIR to a directory containing heat.exe, candle.exe, and light.exe."
+}
+
+function Write-MsiProductFile {
+    param(
+        [string]$OutputPath,
+        [string]$ProductVersion
+    )
+
+    $productSource = @'
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Codepage="1251"
+           Name="Vincent"
+           Language="1033"
+           Version="%%PRODUCT_VERSION%%"
+           Manufacturer="IISACC"
+           UpgradeCode="5F580AD5-3A19-4E89-924A-8B7C7A3A9F9B">
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perUser"
+             Description="Vincent %%PRODUCT_VERSION%% Windows Installer" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of Vincent is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="VincentIcon" SourceFile="$(var.SourceDir)\resources\Appicon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="VincentIcon" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <Feature Id="MainFeature" Title="Vincent" Level="1">
+      <ComponentGroupRef Id="VincentRuntime" />
+      <ComponentRef Id="ApplicationShortcutComponent" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="LocalProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="Vincent" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Vincent" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcutComponent" Guid="D3D91B09-F3E7-4CA5-8E42-F5F25C8ACD2A" Win64="yes">
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Name="Vincent"
+                  Description="Launch Vincent"
+                  Target="[INSTALLFOLDER]Vincent.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\IISACC\Vincent"
+                       Name="installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
+'@
+
+    $productSource = $productSource.Replace("%%PRODUCT_VERSION%%", $ProductVersion)
+    Set-Content -Path $OutputPath -Value $productSource -Encoding UTF8
+}
+
+function Remove-NonAsciiHarvestedFiles {
+    param([string]$HarvestPath)
+
+    $content = Get-Content -Path $HarvestPath -Raw
+    $nonAsciiComponentIds = [regex]::Matches($content, '(?ms)<Component Id="([^"]+)"[^>]*>\s*<File [^>]*Source="[^"]*[^\x00-\x7F][^"]*"[^>]*/>\s*</Component>') |
+        ForEach-Object { $_.Groups[1].Value } |
+        Sort-Object -Unique
+
+    foreach ($id in $nonAsciiComponentIds) {
+        $componentPattern = '(?ms)^\s*<Component Id="' + [regex]::Escape($id) + '".*?</Component>\r?\n'
+        $refPattern = '(?m)^\s*<ComponentRef Id="' + [regex]::Escape($id) + '" />\r?\n'
+        $content = [regex]::Replace($content, $componentPattern, "")
+        $content = [regex]::Replace($content, $refPattern, "")
+    }
+
+    Set-Content -Path $HarvestPath -Value $content -Encoding UTF8
+}
+
+function New-MsiInstaller {
+    param(
+        [string]$SourceDirectory,
+        [string]$OutputPath,
+        [string]$WorkDirectory,
+        [string]$ToolsDirectory,
+        [string]$ProductVersion
+    )
+
+    $wixTools = Resolve-WixTools -ConfiguredToolsDir $ToolsDirectory
+    $heat = Join-Path $wixTools "heat.exe"
+    $candle = Join-Path $wixTools "candle.exe"
+    $light = Join-Path $wixTools "light.exe"
+    $productPath = Join-Path $WorkDirectory "VincentProduct.wxs"
+    $runtimePath = Join-Path $WorkDirectory "VincentRuntime.wxs"
+
+    New-Item -ItemType Directory -Force $WorkDirectory | Out-Null
+    Write-MsiProductFile -OutputPath $productPath -ProductVersion $ProductVersion
+    Invoke-Native $heat @("dir", $SourceDirectory, "-cg", "VincentRuntime", "-dr", "INSTALLFOLDER", "-srd", "-sreg", "-sfrag", "-gg", "-var", "var.StageDir", "-out", $runtimePath)
+    Remove-NonAsciiHarvestedFiles -HarvestPath $runtimePath
+
+    Remove-Item -Path (Join-Path $WorkDirectory "*.wixobj"), $OutputPath -Force -ErrorAction SilentlyContinue
+    Invoke-Native $candle @("-dStageDir=$SourceDirectory", "-dSourceDir=$RepositoryRoot", "-arch", "x64", "-out", "$WorkDirectory\", $productPath, $runtimePath)
+    Invoke-Native $light @("-ext", "WixUIExtension", "-cultures:en-us", "-sice:ICE38", "-sice:ICE64", "-sice:ICE91", "-out", $OutputPath, (Join-Path $WorkDirectory "VincentProduct.wixobj"), (Join-Path $WorkDirectory "VincentRuntime.wixobj"))
+}
+
 function Import-VisualStudioEnvironment {
     param([string]$ResolvedQtPrefix)
 
@@ -240,6 +468,29 @@ function Copy-DependencyQmlImports {
     }
 }
 
+function Remove-QmlResourcePreferDirectives {
+    param(
+        [string]$ModuleName,
+        [string]$Destination
+    )
+
+    $moduleRoot = Join-Path (Join-Path $Destination "qml") $ModuleName
+    if (-not (Test-Path $moduleRoot)) {
+        return
+    }
+
+    Get-ChildItem -Path $moduleRoot -Filter "qmldir" -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $originalLines = @(Get-Content -Path $_.FullName)
+        $filteredLines = @($originalLines | Where-Object {
+            $_ -notmatch '^\s*prefer\s+:/qt/qml/'
+        })
+
+        if ($filteredLines.Count -ne $originalLines.Count) {
+            Set-Content -Path $_.FullName -Value $filteredLines -Encoding UTF8
+        }
+    }
+}
+
 function Resolve-VincentExecutable {
     param(
         [string]$BuildDirectory,
@@ -260,7 +511,10 @@ function Resolve-VincentExecutable {
 }
 
 function Verify-WindowsStage {
-    param([string]$Directory)
+    param(
+        [string]$Directory,
+        [string]$ResolvedQtPrefix
+    )
 
     $vincentExe = Join-Path $Directory "Vincent.exe"
     if (-not (Test-Path $vincentExe)) {
@@ -275,6 +529,8 @@ function Verify-WindowsStage {
     if (-not (Test-Path $windowsPlatformPlugin)) {
         throw "Qt runtime deployment is incomplete: platforms\qwindows.dll is missing."
     }
+
+    Assert-MinGwRuntimeCompatibility -Directory $Directory -ResolvedQtPrefix $ResolvedQtPrefix
 }
 
 function Install-ForCurrentUser {
@@ -347,6 +603,7 @@ if ($Clean) {
     Remove-Item $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item $StageDir -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
+    Remove-Item $MsiPath -Force -ErrorAction SilentlyContinue
 }
 
 $prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix) -join ";"
@@ -389,13 +646,21 @@ Invoke-Native $WindeployQt @(
 Copy-DependencyRuntimeFiles -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiPaintEngine" -Prefix $IiPaintEnginePrefix -Destination $StageDir
 Copy-DependencyQmlImports -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
-Verify-WindowsStage $StageDir
+Remove-QmlResourcePreferDirectives -ModuleName "LVRS" -Destination $StageDir
+Verify-WindowsStage -Directory $StageDir -ResolvedQtPrefix $QtPrefix
 
 if (-not $SkipPackage) {
     Write-Step "Creating ZIP package"
     Remove-Item $ZipPath -Force -ErrorAction SilentlyContinue
     Compress-Archive -Path (Join-Path $StageDir "*") -DestinationPath $ZipPath -Force
     Write-Host "Package: $ZipPath"
+}
+
+if ($CreateMsi) {
+    Write-Step "Creating MSI installer"
+    $msiVersion = if ($Version -match '^\d+\.\d+$') { "$Version.0" } else { $Version }
+    New-MsiInstaller -SourceDirectory $StageDir -OutputPath $MsiPath -WorkDirectory $MsiWorkDir -ToolsDirectory $WixToolsDir -ProductVersion $msiVersion
+    Write-Host "MSI: $MsiPath"
 }
 
 if ($InstallForCurrentUser) {

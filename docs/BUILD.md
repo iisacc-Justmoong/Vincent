@@ -19,6 +19,8 @@ The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled
 
 Vincent intentionally supports only the repository-local `build/` CMake binary directory. Configure, build, test, and package commands must use `-B build`, `cmake --build build`, and `ctest --test-dir build`; alternate build trees are rejected during CMake configure so CLion and shell workflows cannot silently produce stale bundles elsewhere.
 
+On Windows, the CMake build copies `LVRS.dll`, `libiiPaintEngine.dll`, and the MinGW compiler runtime DLLs next to `build/Vincent.exe` after linking. This keeps direct CLion or shell launches from the `build/` tree aligned with the project's dependency prefixes without partially redeploying Qt itself; a missing `LVRS.dll` dialog from `build/Vincent.exe` means the build tree is stale and should be rebuilt with `cmake --build build`.
+
 Every mode verifies that `CFBundleIconFile` resolves to `Contents/Resources/Appicon.icns`, that the legacy `Contents/Resources/icon.icns` file is not present, and that the bundled icon matches `resources/Appicon.icns`. All generated `.pkg` payloads are inspected before the build exits, so a stale installer package that still contains `icon.icns` fails the build instead of installing the old app icon.
 
 `resources/Appicon.icns` is the canonical macOS icon source. After replacing it, regenerate the App Store/Xcode asset catalog before building:
@@ -56,7 +58,15 @@ Then build, test, deploy Qt runtime files, copy dependency DLLs, and create the 
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean
 ```
 
-The script always configures with `cmake -S . -B build`, builds only the repository-local `build/` tree, runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed, and deploys Qt/QML runtime files with `windeployqt --qmldir App/qml`. Windows CTest entries prepend the Qt, LVRS, and iiPaintEngine DLL directories to `PATH` while still clearing Qt discovery variables. The script also copies LVRS/iiPaintEngine runtime DLLs and LVRS QML imports when those files are present in the dependency prefixes. The staged app is written to `dist/Vincent-Windows`, and the package is written to `dist/Vincent-4.0-Windows.zip`.
+To also create the Windows Installer package, make WiX Toolset 3.x available through `WIX_TOOLS_DIR`, `WIX`, or `PATH`, then add `-CreateMsi`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean -CreateMsi
+```
+
+The script always configures with `cmake -S . -B build`, builds only the repository-local `build/` tree, runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed, and deploys Qt/QML runtime files with `windeployqt --qmldir App/qml`. Windows CTest entries prepend the Qt, LVRS, and iiPaintEngine DLL directories to `PATH` while still clearing Qt discovery variables. The script also copies LVRS/iiPaintEngine runtime DLLs and LVRS QML imports when those files are present in the dependency prefixes. After copying LVRS QML files, it removes `prefer :/qt/qml/...` directives from copied `qmldir` files so the packaged app loads the file-system module instead of a missing embedded LVRS resource path. For MinGW packages, the staged runtime is inspected with `objdump` before packaging; if a copied dependency such as `LVRS.dll` imports `__cxa_thread_atexit` while the staged `libstdc++-6.dll` does not export it, the script fails with a MinGW ABI error and the dependency must be rebuilt with the same MinGW kit as Qt. The staged app is written to `dist/Vincent-Windows`, the ZIP package is written to `dist/Vincent-4.0-Windows.zip`, and the MSI package is written to `build/Vincent-4.0-Windows.msi` when `-CreateMsi` is passed. The generated MSI installs for the current user under `%LOCALAPPDATA%\Programs\Vincent`, and uses `AllowSameVersionUpgrades` so rebuilding Vincent 4.0.0 and reinstalling it replaces a previously installed 4.0.0 payload instead of leaving stale DLLs in the install directory.
+
+On Windows startup, Qt and QML diagnostics are appended to `%TEMP%\Vincent-startup.log`. If the packaged executable exits before showing a window, inspect that file first; it records missing QML imports, plugin loading errors, and object-creation failures that may not be visible from a GUI-subsystem executable. If Windows reports that the procedure entry point `__cxa_thread_atexit` cannot be found in `LVRS.dll`, that failure happens before Vincent reaches startup logging and indicates a platform runtime mismatch, not a QML load failure. Rebuild LVRS with the same Qt MinGW kit used for Vincent, rerun `build-windows.ps1 -Clean`, and regenerate the installer from the refreshed `dist/Vincent-Windows` payload.
 
 For a current-user smoke install, run:
 

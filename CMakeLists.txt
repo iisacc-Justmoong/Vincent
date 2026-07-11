@@ -238,6 +238,36 @@ target_link_libraries(Vincent PRIVATE
 )
 vincent_configure_local_runtime_paths(Vincent)
 
+set(_vincent_windows_runtime_files)
+if(WIN32 AND MINGW)
+    foreach(_vincent_mingw_runtime_name IN ITEMS
+            libgcc_s_seh-1.dll
+            libstdc++-6.dll
+            libwinpthread-1.dll)
+        string(MAKE_C_IDENTIFIER "${_vincent_mingw_runtime_name}" _vincent_mingw_runtime_var)
+        find_file("${_vincent_mingw_runtime_var}"
+                NAMES "${_vincent_mingw_runtime_name}"
+                PATHS ENV PATH
+                NO_CACHE)
+        if(${_vincent_mingw_runtime_var})
+            list(APPEND _vincent_windows_runtime_files "${${_vincent_mingw_runtime_var}}")
+        endif()
+        unset(_vincent_mingw_runtime_var)
+    endforeach()
+endif()
+
+if(WIN32)
+    add_custom_command(TARGET Vincent POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                    $<TARGET_FILE:LVRS::LVRS>
+                    $<TARGET_FILE:iiPaintEngine::iiPaintEngine>
+                    ${_vincent_windows_runtime_files}
+                    $<TARGET_FILE_DIR:Vincent>
+            COMMAND_EXPAND_LISTS
+            COMMENT "Copying Windows runtime DLLs next to Vincent.exe")
+endif()
+unset(_vincent_windows_runtime_files)
+
 # LVRS QML 모듈 링크 및 import 경로/정적 플러그인 자동 처리
 set_target_properties(Vincent PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"

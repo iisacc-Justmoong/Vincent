@@ -22,12 +22,15 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 2. `App/CMakeLists.txt` attaches the C++ sources and headers to the `Vincent` target.
 3. `qt_add_qml_module` registers the `Vincent` QML module and exposes `Main.qml`, `PainterCanvasPage.qml`, `CanvasToolBar.qml`, `HslTriangleColorPicker.qml`, and `DrawingSurface.qml`.
 4. The executable links against Qt Core, QML, Quick, Quick Controls 2, SVG, and `iiPaintEngine::iiPaintEngine`, then LVRS configures runtime QML import handling.
-5. When `BUILD_TESTING=ON`, `tests/CMakeLists.txt` registers the active unit test targets.
+5. On Windows, a post-build step copies LVRS, iiPaintEngine, and MinGW compiler runtime DLLs next to `build/Vincent.exe` so direct build-tree launches can resolve project dependencies without relying on a packaged install.
+6. When `BUILD_TESTING=ON`, `tests/CMakeLists.txt` registers the active unit test targets.
 
 ## Runtime Entry Point (`App/main.cpp`)
 
 - Starts a standard `QGuiApplication`/`QQmlApplicationEngine` entry point so Windows links only against LVRS's exported QML module surface instead of non-exported LVRS C++ runtime helpers.
-- Adds LVRS QML import paths discovered from local installation locations.
+- Calls LVRS's exported `qml_register_types_LVRS()` registration function before loading QML so LVRS-provided types such as `WindowSafeAreaObserver` and the `ViewModels` singleton are available without the full LVRS app bootstrap.
+- Adds the packaged `qml/` directory first and uses local LVRS development import paths only when a bundled LVRS module is not present.
+- Normalizes the root `QWindow` after QML load so a packaged Windows launch cannot leave the application alive with a zero-sized top-level window.
 - Registers `DrawingSurfaceItem` as the QML canvas item.
 - Registers `PaletteUtils` as a QML context helper.
 - Registers a shared `CanvasDocumentViewModel` in the LVRS `ViewModels` registry under `CanvasDocument` through the registry's `QObject` meta-object API.
@@ -40,7 +43,7 @@ This document captures the flat-raster architecture of Vincent 4.0 after replaci
 - Creates the main LVRS application window.
 - Keeps native close, minimize, and maximize controls while using LVRS solid chrome to suppress the visual title-bar strip.
 - Keeps LVRS's logical top drag handle enabled while solid chrome suppresses the visible titlebar strip.
-- Uses CMake platform packaging metadata so `resources/Appicon.icns` becomes the canonical macOS bundle icon and `resources/Appicon.ico` becomes the Windows executable icon resource. The macOS App Store/Xcode asset catalog is regenerated from the same `.icns` through `tools/sync_app_icon_assets.sh`, and the CMake bundle build removes the legacy `Contents/Resources/icon.icns` file from incremental bundles. Windows packaging is driven by `build-windows.ps1`, which keeps the build tree fixed at `build/`, runs `windeployqt`, copies LVRS/iiPaintEngine runtime DLLs plus LVRS QML imports, and stages `dist/Vincent-Windows`.
+- Uses CMake platform packaging metadata so `resources/Appicon.icns` becomes the canonical macOS bundle icon and `resources/Appicon.ico` becomes the Windows executable icon resource. The macOS App Store/Xcode asset catalog is regenerated from the same `.icns` through `tools/sync_app_icon_assets.sh`, and the CMake bundle build removes the legacy `Contents/Resources/icon.icns` file from incremental bundles. Windows packaging is driven by `build-windows.ps1`, which keeps the build tree fixed at `build/`, runs `windeployqt`, copies LVRS/iiPaintEngine runtime DLLs plus LVRS QML imports, rejects MinGW ABI-incompatible staged DLLs before packaging, stages `dist/Vincent-Windows`, and can generate a current-user same-version-upgrade MSI at `build/Vincent-4.0-Windows.msi`.
 - Provides a Qt Quick Controls menu bar on the LVRS application window. File routes to the existing new/open/save/clear flows, Edit routes to undo/redo, layer creation/deletion, tool and shape selection, and brush-size changes, Window routes to canvas fit/reset plus native window controls, and Help exposes the current keyboard shortcut reference.
 - Owns named shortcut contracts for every actionable menu item. File uses platform Command/Ctrl N/O/S, Command/Ctrl+Shift+K, and Command/Ctrl+Q; Edit uses platform undo/redo, Command/Ctrl+Shift+N, Command/Ctrl+Shift+Delete, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, and [/] for brush size; Window uses Command/Ctrl+0, Command/Ctrl+1, Command/Ctrl+M, and platform fullscreen. Actionable menu entries are backed by `Controls.Action` objects so Qt owns shortcut registration and menu items bind through their supported `action` property.
 - Passes the active top drag-handle height into `PainterCanvasPage` so the titlebar-position area remains empty, shares the toolbar background color, and the toolbar starts below it.
