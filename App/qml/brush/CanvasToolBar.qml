@@ -86,12 +86,12 @@ Item {
         {
             shape: "rectanglebubble",
             label: qsTr("Rectangle bubble"),
-            iconName: "rectanglebubble"
+            iconName: "rectangle"
         },
         {
             shape: "ellipsebubble",
             label: qsTr("Ellipse bubble"),
-            iconName: "ellipsebubble"
+            iconName: "ellipse"
         }
     ]
 

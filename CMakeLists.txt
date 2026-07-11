@@ -119,6 +119,7 @@ find_package(iiPaintEngine CONFIG REQUIRED)
 FetchContent_Declare(psd_sdk
         GIT_REPOSITORY https://github.com/MolecularMatters/psd_sdk.git
         GIT_TAG f51449543273cbf12058ae92b230e0c4209f5066
+        UPDATE_DISCONNECTED TRUE
 )
 FetchContent_GetProperties(psd_sdk)
 if(NOT psd_sdk_POPULATED)
@@ -144,6 +145,7 @@ set_source_files_properties("${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c" PROPERTIE
 add_library(vincent_psd_sdk STATIC ${_vincent_psd_sdk_sources})
 target_include_directories(vincent_psd_sdk PUBLIC "${psd_sdk_SOURCE_DIR}/src/Psd")
 target_compile_features(vincent_psd_sdk PUBLIC cxx_std_11)
+lvrs_apply_platform_build_optimizations(vincent_psd_sdk)
 
 set(_vincent_local_dependency_runtime_paths)
 foreach(_vincent_runtime_prefix IN ITEMS
@@ -169,6 +171,7 @@ qt_standard_project_setup(REQUIRES ${QT_MIN_VERSION})
 # 실행 타깃
 qt_add_executable(Vincent
         MANUAL_FINALIZATION
+        WIN32
         MACOSX_BUNDLE
 )
 
@@ -238,8 +241,15 @@ target_link_libraries(Vincent PRIVATE
 )
 vincent_configure_local_runtime_paths(Vincent)
 
+if(WIN32 AND MINGW)
+    target_link_options(Vincent PRIVATE
+            "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:-Wl,--gc-sections>"
+    )
+endif()
+
 set(_vincent_windows_runtime_files)
 if(WIN32 AND MINGW)
+    get_filename_component(_vincent_mingw_runtime_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
     foreach(_vincent_mingw_runtime_name IN ITEMS
             libgcc_s_seh-1.dll
             libstdc++-6.dll
@@ -247,13 +257,17 @@ if(WIN32 AND MINGW)
         string(MAKE_C_IDENTIFIER "${_vincent_mingw_runtime_name}" _vincent_mingw_runtime_var)
         find_file("${_vincent_mingw_runtime_var}"
                 NAMES "${_vincent_mingw_runtime_name}"
-                PATHS ENV PATH
+                PATHS "${_vincent_mingw_runtime_dir}"
+                NO_DEFAULT_PATH
                 NO_CACHE)
-        if(${_vincent_mingw_runtime_var})
-            list(APPEND _vincent_windows_runtime_files "${${_vincent_mingw_runtime_var}}")
+        if(NOT ${_vincent_mingw_runtime_var})
+            message(FATAL_ERROR
+                    "MinGW runtime ${_vincent_mingw_runtime_name} was not found next to ${CMAKE_CXX_COMPILER}")
         endif()
+        list(APPEND _vincent_windows_runtime_files "${${_vincent_mingw_runtime_var}}")
         unset(_vincent_mingw_runtime_var)
     endforeach()
+    unset(_vincent_mingw_runtime_dir)
 endif()
 
 if(WIN32)
@@ -276,6 +290,18 @@ lvrs_configure_qml_app(Vincent NO_PLATFORM_RUNTIME_TARGETS)
 
 set(VINCENT_MACOS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.icns")
 set(VINCENT_WINDOWS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.ico")
+set(VINCENT_WINDOWS_MANIFEST_TEMPLATE "${CMAKE_SOURCE_DIR}/resources/windows/Vincent.manifest.in")
+set(VINCENT_WINDOWS_RESOURCE_TEMPLATE "${CMAKE_SOURCE_DIR}/resources/windows/Vincent.rc.in")
+string(REPLACE "." ";" _vincent_windows_version_components "${PROJECT_VERSION}")
+list(LENGTH _vincent_windows_version_components _vincent_windows_version_component_count)
+while(_vincent_windows_version_component_count LESS 4)
+    list(APPEND _vincent_windows_version_components "0")
+    list(LENGTH _vincent_windows_version_components _vincent_windows_version_component_count)
+endwhile()
+list(JOIN _vincent_windows_version_components "." VINCENT_WINDOWS_VERSION_DOTTED)
+list(JOIN _vincent_windows_version_components "," VINCENT_WINDOWS_VERSION_COMMA)
+unset(_vincent_windows_version_component_count)
+unset(_vincent_windows_version_components)
 get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
 set(VINCENT_LEGACY_MACOS_APP_ICON_FILE "icon.icns")
 
@@ -291,11 +317,28 @@ elseif(WIN32)
     if(NOT EXISTS "${VINCENT_WINDOWS_APP_ICON}")
         message(FATAL_ERROR "Windows app icon is missing: ${VINCENT_WINDOWS_APP_ICON}")
     endif()
+    if(NOT EXISTS "${VINCENT_WINDOWS_MANIFEST_TEMPLATE}")
+        message(FATAL_ERROR "Windows application manifest template is missing: ${VINCENT_WINDOWS_MANIFEST_TEMPLATE}")
+    endif()
+    if(NOT EXISTS "${VINCENT_WINDOWS_RESOURCE_TEMPLATE}")
+        message(FATAL_ERROR "Windows resource template is missing: ${VINCENT_WINDOWS_RESOURCE_TEMPLATE}")
+    endif()
 
+    set(_vincent_windows_manifest_file "${CMAKE_CURRENT_BINARY_DIR}/Vincent.manifest")
+    configure_file("${VINCENT_WINDOWS_MANIFEST_TEMPLATE}"
+            "${_vincent_windows_manifest_file}" @ONLY)
+    file(TO_NATIVE_PATH "${_vincent_windows_manifest_file}" _vincent_windows_manifest_native)
+    string(REPLACE "\\" "\\\\" VINCENT_WINDOWS_MANIFEST_RC
+            "${_vincent_windows_manifest_native}")
     file(TO_NATIVE_PATH "${VINCENT_WINDOWS_APP_ICON}" _vincent_windows_app_icon_native)
-    string(REPLACE "\\" "\\\\" _vincent_windows_app_icon_rc "${_vincent_windows_app_icon_native}")
-    set(_vincent_windows_resource_file "${CMAKE_CURRENT_BINARY_DIR}/VincentAppIcon.rc")
-    file(WRITE "${_vincent_windows_resource_file}" "IDI_ICON1 ICON \"${_vincent_windows_app_icon_rc}\"\n")
+    string(REPLACE "\\" "\\\\" VINCENT_WINDOWS_APP_ICON_RC
+            "${_vincent_windows_app_icon_native}")
+
+    set(_vincent_windows_resource_file "${CMAKE_CURRENT_BINARY_DIR}/Vincent.rc")
+    configure_file("${VINCENT_WINDOWS_RESOURCE_TEMPLATE}"
+            "${_vincent_windows_resource_file}" @ONLY)
+    set_property(SOURCE "${_vincent_windows_resource_file}" APPEND PROPERTY
+            OBJECT_DEPENDS "${_vincent_windows_manifest_file}")
     target_sources(Vincent PRIVATE "${_vincent_windows_resource_file}")
 endif()
 

@@ -87,6 +87,7 @@ bundling.sh
 /resources/*
 !/resources/Appicon.icns
 !/resources/Appicon.ico
+!/resources/windows/
 !/resources/UIIcons/
 !/resources/UIIcons/**
 resources/UIIcons/.DS_Store

@@ -175,7 +175,7 @@ void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_ICON_FILE \"${VINCENT_MACOS_APP_ICON_FILE}\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("$<TARGET_BUNDLE_DIR:Vincent>/Contents/Resources/${VINCENT_LEGACY_MACOS_APP_ICON_FILE}")));
-    QVERIFY(cmakeSource.contains(QStringLiteral("file(WRITE \"${_vincent_windows_resource_file}\" \"IDI_ICON1 ICON")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("configure_file(\"${VINCENT_WINDOWS_RESOURCE_TEMPLATE}\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("target_sources(Vincent PRIVATE \"${_vincent_windows_resource_file}\")")));
     QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@VINCENT_MACOS_APP_ICON_FILE@</string>")));
     QVERIFY(syncScriptSource.contains(QStringLiteral("resources/Appicon.icns")));

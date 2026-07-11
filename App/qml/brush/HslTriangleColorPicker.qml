@@ -133,13 +133,19 @@ Item {
     }
 
     function pointFromWeights() {
-        normalizeWeights();
-        const pureHue = triangleTopPoint();
-        const white = triangleWhitePoint();
-        const black = triangleBlackPoint();
+        const pureHue = clamp(pureHueWeight, 0, 1);
+        const white = clamp(whiteWeight, 0, 1);
+        const black = clamp(blackWeight, 0, 1);
+        const total = pureHue + white + black;
+        const normalizedPureHue = total > 0 ? pureHue / total : 0;
+        const normalizedWhite = total > 0 ? white / total : 0;
+        const normalizedBlack = total > 0 ? black / total : 1;
+        const pureHuePoint = triangleTopPoint();
+        const whitePoint = triangleWhitePoint();
+        const blackPoint = triangleBlackPoint();
         return {
-            "x": pureHue.x * pureHueWeight + white.x * whiteWeight + black.x * blackWeight,
-            "y": pureHue.y * pureHueWeight + white.y * whiteWeight + black.y * blackWeight
+            "x": pureHuePoint.x * normalizedPureHue + whitePoint.x * normalizedWhite + blackPoint.x * normalizedBlack,
+            "y": pureHuePoint.y * normalizedPureHue + whitePoint.y * normalizedWhite + blackPoint.y * normalizedBlack
         };
     }
 

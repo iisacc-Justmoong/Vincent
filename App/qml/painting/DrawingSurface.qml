@@ -2394,7 +2394,7 @@ Rectangle {
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequence: StandardKey.Undo
+        sequences: [StandardKey.Undo]
         enabled: !surface.textEditingActive
         onActivated: {
             const rasterSurface = surface.activeRasterSurface();
@@ -2406,7 +2406,7 @@ Rectangle {
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequence: StandardKey.Redo
+        sequences: [StandardKey.Redo]
         enabled: !surface.textEditingActive
         onActivated: {
             const rasterSurface = surface.activeRasterSurface();

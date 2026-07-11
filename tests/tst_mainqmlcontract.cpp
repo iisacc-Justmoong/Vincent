@@ -9,9 +9,12 @@ class tst_MainQmlContract : public QObject
 
 private slots:
     void applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome();
-    void applicationWindowKeepsEmptyLogicalTopDragHandle();
+    void applicationWindowUsesNativeWindowsTitleBarWithoutEmptyDragGap();
     void applicationWindowPassesTopDragHandleHeightToCanvasPage();
+    void applicationWindowCreatesAtFixedLaunchGeometry();
+    void applicationWindowUsesDeferredCanvasIncubation();
     void applicationWindowProvidesApplicationMenuBar();
+    void applicationMenuBarMatchesWindowThemeAndUsesCompactHeight();
     void applicationMenuAssignsShortcutContracts();
 };
 
@@ -26,13 +29,14 @@ void tst_MainQmlContract::applicationWindowKeepsNativeControlsWhileUsingSolidVis
 
     QVERIFY(mainSource.contains(QStringLiteral("LV.ApplicationWindow")));
     QVERIFY(mainSource.contains(QStringLiteral("solidChrome: true")));
+    QVERIFY(!mainSource.contains(QStringLiteral("autoAttachRuntimeEvents: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("flags:")));
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.CustomizeWindowHint")));
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.FramelessWindowHint")));
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.WindowTitleHint")));
 }
 
-void tst_MainQmlContract::applicationWindowKeepsEmptyLogicalTopDragHandle()
+void tst_MainQmlContract::applicationWindowUsesNativeWindowsTitleBarWithoutEmptyDragGap()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -41,7 +45,8 @@ void tst_MainQmlContract::applicationWindowKeepsEmptyLogicalTopDragHandle()
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
+    QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os !== \"windows\"")));
+    QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleHeight: 0")));
     QVERIFY(!mainSource.contains(QStringLiteral("onTitlebarDragRequested: window.requestWindowMove()")));
     QVERIFY(!mainSource.contains(QStringLiteral("MouseArea")));
@@ -58,6 +63,46 @@ void tst_MainQmlContract::applicationWindowPassesTopDragHandleHeightToCanvasPage
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
     QVERIFY(mainSource.contains(QStringLiteral("topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0")));
+}
+
+void tst_MainQmlContract::applicationWindowCreatesAtFixedLaunchGeometry()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+
+    QFile mainQml(mainQmlPath);
+    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property int initialWidth: 1400")));
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property int initialHeight: 880")));
+    QVERIFY(mainSource.contains(QStringLiteral("width: initialWidth")));
+    QVERIFY(mainSource.contains(QStringLiteral("height: initialHeight")));
+    QVERIFY(mainSource.contains(QStringLiteral("visible: false")));
+    QVERIFY(!mainSource.contains(QStringLiteral("visible: true")));
+}
+
+void tst_MainQmlContract::applicationWindowUsesDeferredCanvasIncubation()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+
+    QFile mainQml(mainQmlPath);
+    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property int minimumWindowWidth: 640")));
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property int minimumWindowHeight: 400")));
+    QVERIFY(mainSource.contains(QStringLiteral("minimumWidth: minimumWindowWidth")));
+    QVERIFY(mainSource.contains(QStringLiteral("minimumHeight: minimumWindowHeight")));
+    QVERIFY(mainSource.contains(QStringLiteral("Loader {")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: painterPageLoader")));
+    QVERIFY(mainSource.contains(QStringLiteral("active: false")));
+    QVERIFY(mainSource.contains(QStringLiteral("asynchronous: true")));
+    QVERIFY(mainSource.contains(QStringLiteral("sourceComponent: CanvasViews.PainterCanvasPage")));
+    QVERIFY(mainSource.contains(QStringLiteral("Qt.callLater(function ()")));
+    QVERIFY(mainSource.contains(QStringLiteral("painterPageLoader.active = true;")));
+    QVERIFY(mainSource.contains(QStringLiteral("LV.Label {")));
 }
 
 void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
@@ -108,6 +153,25 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Reset Canvas View\")")));
     QVERIFY(mainSource.contains(QStringLiteral("title: qsTr(\"Keyboard Shortcuts\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent 4.0\")")));
+}
+
+void tst_MainQmlContract::applicationMenuBarMatchesWindowThemeAndUsesCompactHeight()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+
+    QFile mainQml(mainQmlPath);
+    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+
+    QVERIFY(mainSource.contains(QStringLiteral("id: applicationMenuBar")));
+    QVERIFY(mainSource.contains(QStringLiteral("implicitHeight: LV.Theme.controlHeightSm")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.button: window.windowColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("delegate: Controls.MenuBarItem")));
+    QVERIFY(mainSource.contains(QStringLiteral("topPadding: LV.Theme.gap2")));
+    QVERIFY(mainSource.contains(QStringLiteral("bottomPadding: LV.Theme.gap2")));
+    QVERIFY(mainSource.contains(QStringLiteral("contentItem: LV.Label")));
+    QVERIFY(mainSource.contains(QStringLiteral("color: window.windowColor")));
 }
 
 void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()

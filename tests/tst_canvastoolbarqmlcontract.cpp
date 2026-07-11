@@ -89,6 +89,14 @@ void tst_CanvasToolBarQmlContract::colorSelectionUsesHslTrianglePicker()
     QVERIFY(pickerSource.contains(QStringLiteral("triangleCanvas")));
     QVERIFY(pickerSource.contains(QStringLiteral("context.fillRect(x, y, 1, 1)")));
     QVERIFY(pickerSource.contains(QStringLiteral("picker.colorFromWeights(picker.selectedHue")));
+    const qsizetype pointFromWeightsIndex = pickerSource.indexOf(QStringLiteral("function pointFromWeights()"));
+    const qsizetype selectionModeIndex = pickerSource.indexOf(QStringLiteral("function selectionModeAt(point)"));
+    QVERIFY(pointFromWeightsIndex >= 0);
+    QVERIFY(selectionModeIndex > pointFromWeightsIndex);
+    const QString pointFromWeightsSource = pickerSource.mid(pointFromWeightsIndex,
+                                                            selectionModeIndex - pointFromWeightsIndex);
+    QVERIFY(!pointFromWeightsSource.contains(QStringLiteral("normalizeWeights();")));
+    QVERIFY(pointFromWeightsSource.contains(QStringLiteral("const total = pureHue + white + black;")));
     QVERIFY(!pickerSource.contains(QStringLiteral("createImageData")));
     QVERIFY(!pickerSource.contains(QStringLiteral("putImageData")));
 }
@@ -367,9 +375,9 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"star\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"star\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"rectanglebubble\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"rectanglebubble\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("shape: \"ellipsebubble\"")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("iconName: \"ellipsebubble\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"rectanglebubble\"")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("iconName: \"ellipsebubble\"")));
     QVERIFY(toolbarSource.contains(QStringLiteral("shapeSelected(shapeKind);")));
     QVERIFY(toolbarSource.contains(QStringLiteral("toolSelected(\"shape\");")));
     QVERIFY(toolbarSource.contains(QStringLiteral("return entry && entry.iconName ? entry.iconName : \"rectangle\";")));
@@ -476,6 +484,8 @@ void tst_CanvasToolBarQmlContract::shapeToolProvidesSplitMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"fill\")")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"T\", \"ㅅ\"]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("onActivated: surface.toolShortcutRequested(\"text\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [StandardKey.Undo]")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [StandardKey.Redo]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property var drawableObjects: []")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function psdCompatibilityManifest()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.psdCompatibilityManifest(surface.drawableObjects, surface.backgroundLayerPresent)")));

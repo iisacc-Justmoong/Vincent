@@ -8,16 +8,17 @@ LV.ApplicationWindow {
     id: window
     readonly property int initialWidth: 1400
     readonly property int initialHeight: 880
+    readonly property int minimumWindowWidth: 640
+    readonly property int minimumWindowHeight: 400
     width: initialWidth
     height: initialHeight
-    minimumWidth: initialWidth
-    minimumHeight: initialHeight
-    visible: true
+    minimumWidth: minimumWindowWidth
+    minimumHeight: minimumWindowHeight
+    visible: false
     windowColor: LV.Theme.window
     solidChrome: true
-    windowDragHandleEnabled: true
+    windowDragHandleEnabled: Qt.platform.os !== "windows"
     navigationEnabled: false
-    autoAttachRuntimeEvents: true
 
     property var canvasPage: null
     readonly property string currentToolMode: canvasPage && canvasPage.vm ? canvasPage.vm.toolMode : ""
@@ -53,6 +54,10 @@ LV.ApplicationWindow {
     readonly property string shortcutResetCanvasView: menuCommandModifier + "+1"
     readonly property string shortcutMinimizeWindow: menuCommandModifier + "+M"
     readonly property string shortcutToggleFullScreen: Qt.platform.os === "osx" ? "Ctrl+Meta+F" : "F11"
+
+    Component.onCompleted: Qt.callLater(function () {
+        painterPageLoader.active = true;
+    })
 
     function requestNewCanvas() {
         if (window.canvasPage) {
@@ -416,6 +421,44 @@ LV.ApplicationWindow {
     }
 
     menuBar: Controls.MenuBar {
+        id: applicationMenuBar
+        objectName: "applicationMenuBar"
+        implicitHeight: LV.Theme.controlHeightSm
+        padding: LV.Theme.gapNone
+        spacing: LV.Theme.gapNone
+        palette.button: window.windowColor
+        palette.buttonText: LV.Theme.textPrimary
+        palette.mid: LV.Theme.surfaceAlt
+
+        delegate: Controls.MenuBarItem {
+            id: applicationMenuBarItem
+            implicitHeight: applicationMenuBar.implicitHeight
+            topPadding: LV.Theme.gap2
+            bottomPadding: LV.Theme.gap2
+            leftPadding: LV.Theme.gap8
+            rightPadding: LV.Theme.gap8
+
+            contentItem: LV.Label {
+                text: applicationMenuBarItem.text
+                style: body
+                color: applicationMenuBarItem.enabled ? LV.Theme.textPrimary : LV.Theme.textOctonary
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            background: Rectangle {
+                implicitHeight: applicationMenuBar.implicitHeight
+                color: applicationMenuBarItem.down || applicationMenuBarItem.highlighted
+                    ? LV.Theme.surfaceAlt
+                    : "transparent"
+            }
+        }
+
+        background: Rectangle {
+            implicitHeight: LV.Theme.controlHeightSm
+            color: window.windowColor
+        }
+
         Controls.Menu {
             title: qsTr("File")
 
@@ -765,10 +808,21 @@ LV.ApplicationWindow {
         }
     }
 
-    CanvasViews.PainterCanvasPage {
-        id: painterPage
+    Loader {
+        id: painterPageLoader
         anchors.fill: parent
-        topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
-        onPageReady: window.canvasPage = painterPage
+        active: false
+        asynchronous: true
+        sourceComponent: CanvasViews.PainterCanvasPage {
+            id: painterPage
+            topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
+            onPageReady: window.canvasPage = painterPage
+        }
+    }
+
+    LV.Label {
+        anchors.centerIn: parent
+        visible: painterPageLoader.status !== Loader.Ready
+        text: qsTr("Loading canvas…")
     }
 }

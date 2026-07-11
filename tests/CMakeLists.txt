@@ -88,6 +88,25 @@ vincent_configure_local_runtime_paths(tests_windowsbuildworkflowcontract)
 
 add_test(NAME tests_windowsbuildworkflowcontract COMMAND tests_windowsbuildworkflowcontract)
 
+if(WIN32)
+    add_executable(tests_windowsbinarycontract
+            tst_windowsbinarycontract.cpp
+    )
+
+    target_compile_definitions(tests_windowsbinarycontract PRIVATE
+            VINCENT_EXECUTABLE_PATH="$<TARGET_FILE:Vincent>"
+    )
+    target_link_libraries(tests_windowsbinarycontract PRIVATE
+            Qt6::Core
+            Qt6::Test
+            version
+    )
+    add_dependencies(tests_windowsbinarycontract Vincent)
+    vincent_configure_local_runtime_paths(tests_windowsbinarycontract)
+
+    add_test(NAME tests_windowsbinarycontract COMMAND tests_windowsbinarycontract)
+endif()
+
 add_executable(tests_drawingsurfaceitem
         tst_drawingsurfaceitem.cpp
         ../App/models/brush/paletteutils.cpp
@@ -149,6 +168,12 @@ set_tests_properties(
 )
 
 if(WIN32)
+    set_tests_properties(tests_windowsbinarycontract PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+endif()
+
+if(WIN32)
     set_tests_properties(
             tests_canvasdocumentviewmodel
             tests_psdcompatibilitydocument
@@ -156,6 +181,7 @@ if(WIN32)
             tests_mainqmlcontract
             tests_macosbuildworkflowcontract
             tests_windowsbuildworkflowcontract
+            tests_windowsbinarycontract
             tests_drawingsurfaceitem
             PROPERTIES
             ENVIRONMENT_MODIFICATION

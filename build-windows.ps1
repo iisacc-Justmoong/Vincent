@@ -24,6 +24,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $Version = "4.0"
+$windowsVersionParts = @($Version -split '\.')
+while ($windowsVersionParts.Count -lt 4) {
+    $windowsVersionParts += "0"
+}
+$WindowsFileVersion = $windowsVersionParts[0..3] -join "."
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDir = Join-Path $RepositoryRoot "build"
 $DistRoot = Join-Path $RepositoryRoot "dist"
@@ -168,6 +173,29 @@ function Resolve-Objdump {
     return ""
 }
 
+function Resolve-Strip {
+    param([string]$ResolvedQtPrefix)
+
+    $candidates = @()
+    $command = Get-Command "strip.exe" -ErrorAction SilentlyContinue
+    if ($command) {
+        $candidates += $command.Source
+    }
+
+    $objdump = Resolve-Objdump -ResolvedQtPrefix $ResolvedQtPrefix
+    if ($objdump) {
+        $candidates += Join-Path (Split-Path -Parent $objdump) "strip.exe"
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    return ""
+}
+
 function Test-BinaryMentionsSymbol {
     param(
         [string]$Objdump,
@@ -181,6 +209,63 @@ function Test-BinaryMentionsSymbol {
     }
 
     return @($output | Select-String -SimpleMatch $Symbol).Count -gt 0
+}
+
+function Get-PeImportedDllNames {
+    param(
+        [string]$Objdump,
+        [string]$Binary
+    )
+
+    $output = & $Objdump -p $Binary 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to inspect PE imports: $Binary"
+    }
+
+    return @(
+        foreach ($line in $output) {
+            if ($line -match 'DLL Name:\s*(?<Name>\S+)\s*$') {
+                $Matches.Name
+            }
+        }
+    ) | Sort-Object -Unique
+}
+
+function Get-PeHeader {
+    param([string]$Binary)
+
+    [byte[]]$bytes = [System.IO.File]::ReadAllBytes($Binary)
+    if (($bytes.Length -lt 0x40) -or ($bytes[0] -ne 0x4d) -or ($bytes[1] -ne 0x5a)) {
+        throw "Not a valid PE image: $Binary"
+    }
+
+    $peOffset = [System.BitConverter]::ToInt32($bytes, 0x3c)
+    if (($peOffset -lt 0) -or ($peOffset + 96 -gt $bytes.Length)) {
+        throw "Invalid PE header offset: $Binary"
+    }
+    if ([System.BitConverter]::ToUInt32($bytes, $peOffset) -ne 0x00004550) {
+        throw "PE signature is missing: $Binary"
+    }
+
+    $coffHeaderOffset = $peOffset + 4
+    $optionalHeaderOffset = $coffHeaderOffset + 20
+    return [pscustomobject]@{
+        Machine = [System.BitConverter]::ToUInt16($bytes, $coffHeaderOffset)
+        PointerToSymbolTable = [System.BitConverter]::ToUInt32($bytes, $coffHeaderOffset + 8)
+        OptionalHeaderMagic = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset)
+        MajorOperatingSystemVersion = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 40)
+        MinorOperatingSystemVersion = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 42)
+        MajorSubsystemVersion = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 48)
+        MinorSubsystemVersion = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 50)
+        Subsystem = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 68)
+        DllCharacteristics = [System.BitConverter]::ToUInt16($bytes, $optionalHeaderOffset + 70)
+    }
+}
+
+function Get-PeSubsystem {
+    param([string]$Binary)
+
+    return (Get-PeHeader -Binary $Binary).Subsystem
 }
 
 function Assert-MinGwRuntimeCompatibility {
@@ -214,6 +299,58 @@ function Assert-MinGwRuntimeCompatibility {
     if (($incompatibleDlls.Count -gt 0) -and (-not $runtimeExportsSymbol)) {
         $names = ($incompatibleDlls | ForEach-Object { $_.Name }) -join ", "
         throw "MinGW ABI mismatch: $names imports $symbol, but staged libstdc++-6.dll does not export it. Rebuild those dependencies with the same MinGW kit as Qt: $ResolvedQtPrefix"
+    }
+}
+
+function Assert-StagedPeImportClosure {
+    param(
+        [string]$Directory,
+        [string]$ResolvedQtPrefix
+    )
+
+    if ($ResolvedQtPrefix -notmatch "mingw") {
+        return
+    }
+
+    $objdump = Resolve-Objdump -ResolvedQtPrefix $ResolvedQtPrefix
+    if (-not $objdump) {
+        throw "objdump.exe was not found. MinGW Windows packages require PE import-closure checks."
+    }
+
+    $availableDllNames = @{}
+    Get-ChildItem -LiteralPath $Directory -Filter "*.dll" -File -Recurse -ErrorAction SilentlyContinue |
+        ForEach-Object { $availableDllNames[$_.Name.ToUpperInvariant()] = $true }
+
+    $systemDirectories = @(
+        [Environment]::GetFolderPath([Environment+SpecialFolder]::System),
+        $env:SystemRoot
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+    foreach ($systemDirectory in $systemDirectories) {
+        Get-ChildItem -LiteralPath $systemDirectory -Filter "*.dll" -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $availableDllNames[$_.Name.ToUpperInvariant()] = $true }
+    }
+
+    $stageRoot = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    $unresolvedImports = @(
+        Get-ChildItem -LiteralPath $Directory -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in @(".exe", ".dll") } |
+            ForEach-Object {
+                $relativeBinary = $_.FullName.Substring($stageRoot.Length)
+                foreach ($importName in Get-PeImportedDllNames -Objdump $objdump -Binary $_.FullName) {
+                    $normalizedImport = $importName.ToUpperInvariant()
+                    if (($normalizedImport -notlike "API-MS-WIN-*") -and
+                        ($normalizedImport -notlike "EXT-MS-*") -and
+                        (-not $availableDllNames.ContainsKey($normalizedImport))) {
+                        "$relativeBinary -> $importName"
+                    }
+                }
+            }
+    )
+
+    if ($unresolvedImports.Count -gt 0) {
+        throw "Staged PE import closure is incomplete: $($unresolvedImports -join '; ')"
     }
 }
 
@@ -438,55 +575,89 @@ function Copy-DependencyRuntimeFiles {
     }
 }
 
-function Copy-DependencyQmlImports {
-    param(
-        [string]$Name,
-        [string]$Prefix,
-        [string]$Destination
-    )
-
-    $candidateDirs = @(
-        (Join-Path $Prefix "lib\qt6\qml"),
-        (Join-Path $Prefix "qml"),
-        (Join-Path $Prefix "platforms\windows\lib\qt6\qml")
-    )
-
-    $targetRoot = Join-Path $Destination "qml"
-    $copied = $false
-    foreach ($dir in $candidateDirs) {
-        if (-not (Test-Path $dir)) {
-            continue
-        }
-
-        New-Item -ItemType Directory -Force $targetRoot | Out-Null
-        Copy-Item (Join-Path $dir "*") -Destination $targetRoot -Recurse -Force
-        $copied = $true
-    }
-
-    if (-not $copied) {
-        Write-Warning "No QML imports were copied for $Name from $Prefix. This is acceptable only when the dependency does not ship QML modules."
-    }
-}
-
-function Remove-QmlResourcePreferDirectives {
+function Remove-EmbeddedDependencyQmlImport {
     param(
         [string]$ModuleName,
         [string]$Destination
     )
 
-    $moduleRoot = Join-Path (Join-Path $Destination "qml") $ModuleName
+    if ($ModuleName -notmatch '^[A-Za-z0-9_.-]+$') {
+        throw "Invalid QML module name: $ModuleName"
+    }
+
+    $destinationRoot = [System.IO.Path]::GetFullPath($Destination)
+    $qmlRoot = [System.IO.Path]::GetFullPath((Join-Path $destinationRoot "qml"))
+    $moduleRoot = [System.IO.Path]::GetFullPath((Join-Path $qmlRoot $ModuleName))
+    $qmlPrefix = $qmlRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $moduleRoot.StartsWith($qmlPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove a QML module outside the staged qml directory: $moduleRoot"
+    }
+
     if (-not (Test-Path $moduleRoot)) {
         return
     }
 
-    Get-ChildItem -Path $moduleRoot -Filter "qmldir" -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
-        $originalLines = @(Get-Content -Path $_.FullName)
-        $filteredLines = @($originalLines | Where-Object {
-            $_ -notmatch '^\s*prefer\s+:/qt/qml/'
-        })
+    Remove-Item -LiteralPath $moduleRoot -Recurse -Force
+}
 
-        if ($filteredLines.Count -ne $originalLines.Count) {
-            Set-Content -Path $_.FullName -Value $filteredLines -Encoding UTF8
+function Get-ReleaseOnlyQtArtifactRelativePaths {
+    return @(
+        "qmltooling",
+        "imageformats\qpdf.dll",
+        "Qt6Pdf.dll",
+        "qml\QtQuick\Pdf",
+        "platforminputcontexts\qtvirtualkeyboardplugin.dll",
+        "Qt6VirtualKeyboard.dll",
+        "qml\QtQuick\VirtualKeyboard",
+        "sqldrivers\qsqlpsql.dll",
+        "sqldrivers\qsqlmimer.dll"
+    )
+}
+
+function Remove-ReleaseOnlyQtArtifacts {
+    param(
+        [string]$Directory,
+        [string]$BuildType
+    )
+
+    if ($BuildType -eq "Debug") {
+        return
+    }
+
+    $stageRoot = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($relativePath in Get-ReleaseOnlyQtArtifactRelativePaths) {
+        $artifactPath = [System.IO.Path]::GetFullPath((Join-Path $Directory $relativePath))
+        if (-not $artifactPath.StartsWith($stageRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to remove a Qt artifact outside the staged directory: $artifactPath"
+        }
+        if (Test-Path $artifactPath) {
+            Remove-Item -LiteralPath $artifactPath -Recurse -Force
+        }
+    }
+}
+
+function Strip-WindowsRuntimeBinaries {
+    param(
+        [string]$Directory,
+        [string]$ResolvedQtPrefix,
+        [string]$Configuration
+    )
+
+    if (($ResolvedQtPrefix -notmatch "mingw") -or ($Configuration -notin @("Release", "MinSizeRel"))) {
+        return
+    }
+
+    $strip = Resolve-Strip -ResolvedQtPrefix $ResolvedQtPrefix
+    if (-not $strip) {
+        throw "strip.exe was not found. MinGW release packages require symbol stripping."
+    }
+
+    foreach ($runtimeName in @("Vincent.exe", "LVRS.dll", "libiiPaintEngine.dll")) {
+        $runtimePath = Join-Path $Directory $runtimeName
+        if (Test-Path $runtimePath) {
+            Invoke-Native $strip @("--strip-all", $runtimePath)
         }
     }
 }
@@ -513,12 +684,45 @@ function Resolve-VincentExecutable {
 function Verify-WindowsStage {
     param(
         [string]$Directory,
-        [string]$ResolvedQtPrefix
+        [string]$ResolvedQtPrefix,
+        [string]$ExpectedFileVersion,
+        [string]$BuildType
     )
 
     $vincentExe = Join-Path $Directory "Vincent.exe"
     if (-not (Test-Path $vincentExe)) {
         throw "Staged Vincent.exe is missing."
+    }
+
+    $peHeader = Get-PeHeader -Binary $vincentExe
+    if ($peHeader.Machine -ne 0x8664) {
+        throw "Staged Vincent.exe is not an AMD64 native binary (machine=0x$('{0:x4}' -f $peHeader.Machine))."
+    }
+    if ($peHeader.OptionalHeaderMagic -ne 0x020b) {
+        throw "Staged Vincent.exe is not PE32+ (magic=0x$('{0:x4}' -f $peHeader.OptionalHeaderMagic))."
+    }
+    if ((Get-PeSubsystem -Binary $vincentExe) -ne 2) {
+        throw "Staged Vincent.exe must use the Windows GUI subsystem."
+    }
+    $requiredDllCharacteristics = 0x0160
+    if (($peHeader.DllCharacteristics -band $requiredDllCharacteristics) -ne $requiredDllCharacteristics) {
+        throw "Staged Vincent.exe is missing required ASLR/DEP PE security flags."
+    }
+    if (($ResolvedQtPrefix -match "mingw") -and
+        ($BuildType -in @("Release", "MinSizeRel")) -and
+        ($peHeader.PointerToSymbolTable -ne 0)) {
+        throw "Staged MinGW Vincent.exe still contains a COFF symbol table."
+    }
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($vincentExe)
+    if ($versionInfo.FileVersion -ne $ExpectedFileVersion) {
+        throw "Staged Vincent.exe file version '$($versionInfo.FileVersion)' does not match '$ExpectedFileVersion'."
+    }
+    if ($versionInfo.ProductVersion -ne $ExpectedFileVersion) {
+        throw "Staged Vincent.exe product version '$($versionInfo.ProductVersion)' does not match '$ExpectedFileVersion'."
+    }
+    if ($versionInfo.ProductName -ne "Vincent") {
+        throw "Staged Vincent.exe product name is not Vincent."
     }
 
     if (-not (Get-ChildItem -Path $Directory -Filter "Qt6Core*.dll" -File -ErrorAction SilentlyContinue)) {
@@ -530,7 +734,88 @@ function Verify-WindowsStage {
         throw "Qt runtime deployment is incomplete: platforms\qwindows.dll is missing."
     }
 
+    $debugQtRuntimes = @(
+        Get-ChildItem -Path $Directory -Filter "Qt6*.dll" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.VersionInfo.IsDebug }
+    )
+    if (($BuildType -ne "Debug") -and ($debugQtRuntimes.Count -gt 0)) {
+        throw "Release staging contains debug Qt runtime DLLs: $($debugQtRuntimes.Name -join ', ')."
+    }
+
+    if ($BuildType -ne "Debug") {
+        foreach ($developmentOnlyPath in Get-ReleaseOnlyQtArtifactRelativePaths) {
+            if (Test-Path (Join-Path $Directory $developmentOnlyPath)) {
+                throw "Release staging contains an excluded development or unused plugin: $developmentOnlyPath"
+            }
+        }
+    }
+
     Assert-MinGwRuntimeCompatibility -Directory $Directory -ResolvedQtPrefix $ResolvedQtPrefix
+    Assert-StagedPeImportClosure -Directory $Directory -ResolvedQtPrefix $ResolvedQtPrefix
+}
+
+function Resolve-SafeCurrentUserInstallDirectory {
+    param(
+        [string]$TargetDirectory,
+        [string]$SourceDirectory
+    )
+
+    $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if (-not $localAppData) {
+        throw "The current user's Local Application Data directory could not be resolved."
+    }
+    if (-not $TargetDirectory) {
+        $TargetDirectory = Join-Path $localAppData "Programs\Vincent"
+    }
+
+    $localAppDataRoot = [System.IO.Path]::GetFullPath($localAppData).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar
+    )
+    $localAppDataPrefix = $localAppDataRoot + [System.IO.Path]::DirectorySeparatorChar
+    $resolvedTarget = [System.IO.Path]::GetFullPath($TargetDirectory).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar
+    )
+    if (-not $resolvedTarget.StartsWith($localAppDataPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "The current-user install directory must be below $localAppDataRoot."
+    }
+
+    if ($SourceDirectory) {
+        $resolvedSource = [System.IO.Path]::GetFullPath($SourceDirectory).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar
+        )
+        $targetPrefix = $resolvedTarget + [System.IO.Path]::DirectorySeparatorChar
+        $sourcePrefix = $resolvedSource + [System.IO.Path]::DirectorySeparatorChar
+        if ($resolvedTarget.Equals($resolvedSource, [System.StringComparison]::OrdinalIgnoreCase) -or
+            $resolvedTarget.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase) -or
+            $resolvedSource.StartsWith($targetPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "The current-user install directory must not overlap the staged source directory."
+        }
+    }
+
+    if (Test-Path -LiteralPath $resolvedTarget) {
+        $targetItem = Get-Item -LiteralPath $resolvedTarget -Force
+        if (-not $targetItem.PSIsContainer) {
+            throw "The current-user install target is not a directory: $resolvedTarget"
+        }
+        if (($targetItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "The current-user install directory must not be a reparse point: $resolvedTarget"
+        }
+
+        $existingEntries = @(Get-ChildItem -LiteralPath $resolvedTarget -Force -ErrorAction Stop)
+        if ($existingEntries.Count -gt 0) {
+            $ownershipMarker = Join-Path $resolvedTarget ".vincent-install-root"
+            $installedExecutable = Join-Path $resolvedTarget "Vincent.exe"
+            $isExistingVincentInstall = (Test-Path -LiteralPath $ownershipMarker)
+            if ((-not $isExistingVincentInstall) -and (Test-Path -LiteralPath $installedExecutable)) {
+                $isExistingVincentInstall = (Get-Item -LiteralPath $installedExecutable).VersionInfo.ProductName -eq "Vincent"
+            }
+            if (-not $isExistingVincentInstall) {
+                throw "Refusing to replace a non-empty directory that is not an existing Vincent installation: $resolvedTarget"
+            }
+        }
+    }
+
+    return $resolvedTarget
 }
 
 function Install-ForCurrentUser {
@@ -539,16 +824,19 @@ function Install-ForCurrentUser {
         [string]$TargetDirectory
     )
 
-    if (-not $TargetDirectory) {
-        $TargetDirectory = Join-Path $env:LOCALAPPDATA "Programs\Vincent"
-    }
+    $TargetDirectory = Resolve-SafeCurrentUserInstallDirectory `
+        -TargetDirectory $TargetDirectory `
+        -SourceDirectory $SourceDirectory
 
     Write-Step "Installing Vincent for the current user"
-    if (Test-Path $TargetDirectory) {
-        Remove-Item $TargetDirectory -Recurse -Force
+    if (Test-Path -LiteralPath $TargetDirectory) {
+        Remove-Item -LiteralPath $TargetDirectory -Recurse -Force
     }
     New-Item -ItemType Directory -Force $TargetDirectory | Out-Null
     Copy-Item (Join-Path $SourceDirectory "*") -Destination $TargetDirectory -Recurse -Force
+    Set-Content -LiteralPath (Join-Path $TargetDirectory ".vincent-install-root") `
+        -Value "Vincent current-user installation" `
+        -Encoding ASCII
 
     $programsMenu = [Environment]::GetFolderPath("Programs")
     $shortcutPath = Join-Path $programsMenu "Vincent.lnk"
@@ -607,6 +895,7 @@ if ($Clean) {
 }
 
 $prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix) -join ";"
+$buildTesting = if ($SkipTests) { "OFF" } else { "ON" }
 
 Write-Step "Configuring Vincent"
 Invoke-Native $CMake @(
@@ -614,12 +903,16 @@ Invoke-Native $CMake @(
     "-B", $BuildDir,
     "-G", $Generator,
     "-DCMAKE_BUILD_TYPE=$BuildType",
-    "-DBUILD_TESTING=ON",
+    "-DBUILD_TESTING=$buildTesting",
     "-DCMAKE_PREFIX_PATH=$prefixPath"
 )
 
 Write-Step "Building Vincent"
-Invoke-Native $CMake @("--build", $BuildDir, "--config", $BuildType)
+$buildArguments = @("--build", $BuildDir, "--config", $BuildType, "--parallel")
+if ($SkipTests) {
+    $buildArguments += @("--target", "Vincent")
+}
+Invoke-Native $CMake $buildArguments
 
 if (-not $SkipTests) {
     Write-Step "Running tests"
@@ -632,22 +925,31 @@ Remove-Item $StageDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $StageDir | Out-Null
 
 $VincentExecutable = Resolve-VincentExecutable -BuildDirectory $BuildDir -Configuration $BuildType
-Copy-Item $VincentExecutable -Destination (Join-Path $StageDir "Vincent.exe") -Force
+$StagedVincentExecutable = Join-Path $StageDir "Vincent.exe"
+Copy-Item $VincentExecutable -Destination $StagedVincentExecutable -Force
+if ((Get-FileHash -Algorithm SHA256 $VincentExecutable).Hash -ne (Get-FileHash -Algorithm SHA256 $StagedVincentExecutable).Hash) {
+    throw "Staged Vincent.exe does not match the executable produced by the current build."
+}
 
 $deployMode = if ($BuildType -eq "Debug") { "--debug" } else { "--release" }
 Invoke-Native $WindeployQt @(
     $deployMode,
     "--force",
     "--compiler-runtime",
+    "--translations", "en,ko",
+    "--skip-plugin-types", "qmltooling",
+    "--exclude-plugins", "qpdf,qtvirtualkeyboardplugin",
+    "--verbose", "0",
     "--qmldir", (Join-Path $RepositoryRoot "App\qml"),
-    (Join-Path $StageDir "Vincent.exe")
+    $StagedVincentExecutable
 )
 
 Copy-DependencyRuntimeFiles -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiPaintEngine" -Prefix $IiPaintEnginePrefix -Destination $StageDir
-Copy-DependencyQmlImports -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
-Remove-QmlResourcePreferDirectives -ModuleName "LVRS" -Destination $StageDir
-Verify-WindowsStage -Directory $StageDir -ResolvedQtPrefix $QtPrefix
+Remove-EmbeddedDependencyQmlImport -ModuleName "LVRS" -Destination $StageDir
+Remove-ReleaseOnlyQtArtifacts -Directory $StageDir -BuildType $BuildType
+Strip-WindowsRuntimeBinaries -Directory $StageDir -ResolvedQtPrefix $QtPrefix -Configuration $BuildType
+Verify-WindowsStage -Directory $StageDir -ResolvedQtPrefix $QtPrefix -ExpectedFileVersion $WindowsFileVersion -BuildType $BuildType
 
 if (-not $SkipPackage) {
     Write-Step "Creating ZIP package"
