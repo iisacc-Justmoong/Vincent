@@ -237,34 +237,6 @@ Item {
         return ".psd";
     }
 
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: StandardKey.New
-        enabled: !toolbar.dialogActive
-        onActivated: toolbar.openNewCanvasDialog()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: StandardKey.Open
-        enabled: !toolbar.dialogActive
-        onActivated: toolbar.openFileDialog()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequence: StandardKey.Save
-        enabled: !toolbar.dialogActive
-        onActivated: toolbar.openSaveDialog()
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [Qt.platform.os === "osx" ? "Meta+Shift+K" : "Ctrl+Shift+K"]
-        enabled: !toolbar.dialogActive
-        onActivated: toolbar.clearCanvasRequested()
-    }
-
     component ToolbarDivider: Rectangle {
         width: 1
         Layout.preferredHeight: 32

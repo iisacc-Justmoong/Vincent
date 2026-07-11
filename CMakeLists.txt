@@ -12,6 +12,11 @@ endif()
 unset(_vincent_actual_build_dir)
 unset(_vincent_required_build_dir)
 
+set(VINCENT_MIN_MACOS_VERSION "12.0")
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${VINCENT_MIN_MACOS_VERSION}" CACHE STRING "Minimum macOS version" FORCE)
+endif()
+
 project(Vincent VERSION 4.0 LANGUAGES C CXX)
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
@@ -19,7 +24,6 @@ set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
 # QML import minor는 API revision 없이는 0으로 유지하는 편이 안전하다.
 set(VINCENT_QML_MODULE_MINOR "0")
 set(VINCENT_QML_MODULE_VERSION "${VINCENT_QML_MODULE_MAJOR}.${VINCENT_QML_MODULE_MINOR}")
-set(VINCENT_MIN_MACOS_VERSION "12.0")
 
 include(CTest)
 
@@ -32,11 +36,6 @@ message(STATUS "Vincent versions: marketing=${PROJECT_VERSION}, bundle=${VINCENT
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-
-# macOS 최소 타겟 고정
-if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "${VINCENT_MIN_MACOS_VERSION}" CACHE STRING "Minimum macOS version" FORCE)
-endif()
 
 # Qt 경로 힌트(선택)
 if(DEFINED Qt6_DIR AND EXISTS "${Qt6_DIR}")
@@ -148,16 +147,29 @@ target_compile_features(vincent_psd_sdk PUBLIC cxx_std_11)
 lvrs_apply_platform_build_optimizations(vincent_psd_sdk)
 
 set(_vincent_local_dependency_runtime_paths)
-foreach(_vincent_runtime_prefix IN ITEMS
-        "$ENV{HOME}/.local/LVRS/platforms/macos"
-        "$ENV{HOME}/.local/LVRS"
-        "$ENV{HOME}/.local/iiPaintEngine/platforms/macos"
-        "$ENV{HOME}/.local/iiPaintEngine")
-    if(EXISTS "${_vincent_runtime_prefix}/lib")
-        list(APPEND _vincent_local_dependency_runtime_paths "${_vincent_runtime_prefix}/lib")
+set(_vincent_local_dependency_runtime_candidates)
+if(APPLE)
+    list(APPEND _vincent_local_dependency_runtime_candidates
+            "$ENV{HOME}/.local/LVRS/platforms/macos/lib"
+            "$ENV{HOME}/.local/iiPaintEngine/platforms/macos/lib")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND _vincent_local_dependency_runtime_candidates
+            "$ENV{HOME}/.local/LVRS/platforms/linux/lib"
+            "$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib")
+endif()
+if(UNIX)
+    list(APPEND _vincent_local_dependency_runtime_candidates
+            "$ENV{HOME}/.local/LVRS/lib"
+            "$ENV{HOME}/.local/iiPaintEngine/lib")
+endif()
+foreach(_vincent_runtime_path IN LISTS _vincent_local_dependency_runtime_candidates)
+    if(IS_DIRECTORY "${_vincent_runtime_path}")
+        list(APPEND _vincent_local_dependency_runtime_paths "${_vincent_runtime_path}")
     endif()
 endforeach()
 list(REMOVE_DUPLICATES _vincent_local_dependency_runtime_paths)
+unset(_vincent_local_dependency_runtime_candidates)
+unset(_vincent_runtime_path)
 
 function(vincent_configure_local_runtime_paths target_name)
     if(_vincent_local_dependency_runtime_paths)
@@ -185,7 +197,6 @@ endif()
 qt_add_qml_module(Vincent
         URI Vincent
         VERSION ${VINCENT_QML_MODULE_VERSION}
-        NO_IMPORT_SCAN
         QML_FILES
         App/qml/Main.qml
         App/qml/canvas/PainterCanvasPage.qml
@@ -292,18 +303,23 @@ set(VINCENT_MACOS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.icns")
 set(VINCENT_WINDOWS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.ico")
 set(VINCENT_WINDOWS_MANIFEST_TEMPLATE "${CMAKE_SOURCE_DIR}/resources/windows/Vincent.manifest.in")
 set(VINCENT_WINDOWS_RESOURCE_TEMPLATE "${CMAKE_SOURCE_DIR}/resources/windows/Vincent.rc.in")
-string(REPLACE "." ";" _vincent_windows_version_components "${PROJECT_VERSION}")
-list(LENGTH _vincent_windows_version_components _vincent_windows_version_component_count)
-while(_vincent_windows_version_component_count LESS 4)
-    list(APPEND _vincent_windows_version_components "0")
+if(WIN32)
+    string(REPLACE "." ";" _vincent_windows_version_components "${PROJECT_VERSION}")
     list(LENGTH _vincent_windows_version_components _vincent_windows_version_component_count)
-endwhile()
-list(JOIN _vincent_windows_version_components "." VINCENT_WINDOWS_VERSION_DOTTED)
-list(JOIN _vincent_windows_version_components "," VINCENT_WINDOWS_VERSION_COMMA)
-unset(_vincent_windows_version_component_count)
-unset(_vincent_windows_version_components)
-get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
-set(VINCENT_LEGACY_MACOS_APP_ICON_FILE "icon.icns")
+    while(_vincent_windows_version_component_count LESS 4)
+        list(APPEND _vincent_windows_version_components "0")
+        list(LENGTH _vincent_windows_version_components _vincent_windows_version_component_count)
+    endwhile()
+    list(JOIN _vincent_windows_version_components "." VINCENT_WINDOWS_VERSION_DOTTED)
+    list(JOIN _vincent_windows_version_components "," VINCENT_WINDOWS_VERSION_COMMA)
+    unset(_vincent_windows_version_component_count)
+    unset(_vincent_windows_version_components)
+endif()
+
+if(APPLE)
+    get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
+    set(VINCENT_LEGACY_MACOS_APP_ICON_FILE "icon.icns")
+endif()
 
 if(APPLE)
     if(NOT EXISTS "${VINCENT_MACOS_APP_ICON}")
@@ -343,22 +359,18 @@ elseif(WIN32)
 endif()
 
 # 번들 식별자 및 Info.plist 연결
-set(MAC_INFO_PLIST_TEMPLATE "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist")
-set(MAC_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/VincentInfo.plist")
-configure_file("${MAC_INFO_PLIST_TEMPLATE}" "${MAC_INFO_PLIST}" @ONLY)
-set_target_properties(Vincent PROPERTIES
-        MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "${BUNDLE_ID}"
-        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${BUNDLE_ID}"
-        MACOSX_BUNDLE_BUNDLE_VERSION "${VINCENT_BUNDLE_VERSION}"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-)
-
 if(APPLE)
-    set_target_properties(Vincent PROPERTIES OUTPUT_NAME "Vincent")
-endif()
-
-if(APPLE)
+    set(MAC_INFO_PLIST_TEMPLATE "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist")
+    set(MAC_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/VincentInfo.plist")
+    configure_file("${MAC_INFO_PLIST_TEMPLATE}" "${MAC_INFO_PLIST}" @ONLY)
+    set_target_properties(Vincent PROPERTIES
+            OUTPUT_NAME "Vincent"
+            MACOSX_BUNDLE_INFO_PLIST "${MAC_INFO_PLIST}"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "${BUNDLE_ID}"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${BUNDLE_ID}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${VINCENT_BUNDLE_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    )
     set_target_properties(Vincent PROPERTIES MACOSX_BUNDLE_ICON_FILE "${VINCENT_MACOS_APP_ICON_FILE}")
     add_custom_command(TARGET Vincent POST_BUILD
             COMMAND "${CMAKE_COMMAND}" -E rm -f
@@ -372,7 +384,16 @@ if(APPLE)
 elseif(WIN32)
     install(TARGETS Vincent RUNTIME DESTINATION "." COMPONENT Runtime)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_property(TARGET Vincent PROPERTY
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
     install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
+    install(FILES "${CMAKE_SOURCE_DIR}/packaging/linux/com.iisacc.vincent.painter.desktop"
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications"
+            COMPONENT Runtime)
+    install(FILES "${CMAKE_SOURCE_DIR}/packaging/macos/Vincent.xcassets/AppIcon.appiconset/icon_256x256.png"
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps"
+            RENAME "com.iisacc.vincent.painter.png"
+            COMPONENT Runtime)
 endif()
 
 if(BUILD_TESTING)
@@ -384,6 +405,12 @@ if(APPLE)
     install(CODE
             "include(\"${QT_DEPLOY_SUPPORT}\")\nqt6_deploy_runtime_dependencies(\n    EXECUTABLE \"Applications/Vincent.app\"\n    DEPLOY_TOOL_OPTIONS \"-qmldir=${CMAKE_SOURCE_DIR}/App/qml\"\n)\n"
             COMPONENT Runtime)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    qt_generate_deploy_qml_app_script(
+            TARGET Vincent
+            OUTPUT_SCRIPT _vincent_linux_deploy_script
+    )
+    install(SCRIPT "${_vincent_linux_deploy_script}" COMPONENT Runtime)
 endif()
 
 # CPack 구성
@@ -415,7 +442,7 @@ elseif(WIN32)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR "TGZ")
     set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Linux")
-    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/")
 else()
     set(CPACK_GENERATOR "TGZ")
     set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")

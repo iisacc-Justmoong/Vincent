@@ -1,11 +1,13 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QLineF>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlExpression>
 #include <QQuickItem>
+#include <QQuickWindow>
 #include <QSignalSpy>
 #include <QStringList>
 #include <QTemporaryDir>
@@ -29,6 +31,8 @@ private slots:
     void constrainsShapeDragWithShiftModifier();
     void pansCanvasWithHandToolDrag();
     void zoomsCanvasWithHorizontalDrag();
+    void usesToolAppropriateCanvasCursors();
+    void tracksBrushCursorDuringNativePointerInput();
     void movesAndResizesDrawableObjects();
     void constrainsDrawableObjectTransformWithShiftModifier();
     void deletesSelectedDrawableObject();
@@ -141,6 +145,33 @@ qreal fittedCanvasZoomScale(qreal viewportWidth, qreal viewportHeight, qreal can
 bool isBlueShapePixel(const QColor &pixel)
 {
     return pixel.alpha() > 0 && pixel.blue() > 120 && pixel.red() < 80 && pixel.green() > 70;
+}
+
+template<typename Predicate>
+int countLogicalAnnulusPixels(const QImage &image,
+                              const QSizeF &logicalSize,
+                              const QPointF &logicalCenter,
+                              qreal innerRadius,
+                              qreal outerRadius,
+                              Predicate predicate)
+{
+    if (image.isNull() || logicalSize.isEmpty()) {
+        return 0;
+    }
+
+    int matchingPixels = 0;
+    for (int pixelY = 0; pixelY < image.height(); ++pixelY) {
+        const qreal logicalY = (pixelY + 0.5) * logicalSize.height() / image.height();
+        for (int pixelX = 0; pixelX < image.width(); ++pixelX) {
+            const qreal logicalX = (pixelX + 0.5) * logicalSize.width() / image.width();
+            const qreal distance = QLineF(logicalCenter, QPointF(logicalX, logicalY)).length();
+            if (distance >= innerRadius && distance <= outerRadius
+                && predicate(image.pixelColor(pixelX, pixelY))) {
+                ++matchingPixels;
+            }
+        }
+    }
+    return matchingPixels;
 }
 
 quint16 readUInt16(const QByteArray &bytes, int offset)
@@ -767,6 +798,293 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
     QVERIFY(emptyWorkspaceZoomedScale > zoomedOutScale);
     QCOMPARE(canvasItem->scale(), emptyWorkspaceZoomedScale);
     QCOMPARE(canvasPaper->scale(), emptyWorkspaceZoomedScale);
+}
+
+void tst_DrawingSurfaceItem::usesToolAppropriateCanvasCursors()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQmlExpression cursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("var matches = [];"
+                       "function matchesCursor(mode, cursor) { toolMode = mode; return canvasCursorShape(20, 20) === cursor; }"
+                       "matches.push(matchesCursor(\"brush\", Qt.BlankCursor));"
+                       "matches.push(matchesCursor(\"eraser\", Qt.BlankCursor));"
+                       "matches.push(matchesCursor(\"zoom\", Qt.CrossCursor));"
+                       "matches.push(matchesCursor(\"shape\", Qt.CrossCursor));"
+                       "matches.push(matchesCursor(\"fill\", Qt.PointingHandCursor));"
+                       "matches.push(matchesCursor(\"text\", Qt.IBeamCursor));"
+                       "toolMode = \"pan\"; panDraggingActive = false; matches.push(canvasCursorShape(20, 20) === Qt.OpenHandCursor);"
+                       "panDraggingActive = true; matches.push(canvasCursorShape(20, 20) === Qt.ClosedHandCursor);"
+                       "panDraggingActive = false;"
+                       "appendDrawableObject({ id: 2, type: \"shape\", x: 100, y: 80, width: 100, height: 80, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "toolMode = \"move\";"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.ArrowCursor);"
+                       "matches.push(canvasCursorShape(150, 120) === Qt.SizeAllCursor);"
+                       "matches.push(canvasCursorShape(200, 120) === Qt.SizeHorCursor);"
+                       "drawableObjectHoverHandleMode = \"resize-e\";"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.ArrowCursor);"
+                       "beginDrawableObjectTransform(150, 120);"
+                       "drawableObjectHoverHandleMode = \"resize-e\";"
+                       "matches.push(canvasCursorShape(160, 130) === Qt.SizeAllCursor);"
+                       "cancelActiveDrawableObjectTransform();"
+                       "matches.push(drawableObjectHoverHandleMode === \"\");"
+                       "toolMode = \"brush\"; beginSpacePanMode();"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.OpenHandCursor);"
+                       "endSpacePanMode();"
+                       "matches.join(\",\");"));
+    const QVariant cursorContractResult = cursorContract.evaluate();
+    QVERIFY2(!cursorContract.hasError(), qPrintable(cursorContract.error().toString()));
+    QCOMPARE(cursorContractResult.toString(),
+             QStringLiteral("true,true,true,true,true,true,true,true,true,true,true,true,true,true,true"));
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QTRY_VERIFY(canvasItem->width() > 100);
+    QTRY_VERIFY(canvasItem->height() > 100);
+
+    QQuickItem *brushCursorGlassPane = findItemByObjectName(rootItem, QStringLiteral("brushCursorGlassPane"));
+    QVERIFY(brushCursorGlassPane);
+    QQuickItem *brushCursorOutline = findItemByObjectName(rootItem, QStringLiteral("brushCursorOutline"));
+    QVERIFY(brushCursorOutline);
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    QCOMPARE(brushCursorOutline->parentItem(), canvasViewport);
+    QObject *brushCursorHoverHandler = rootItem->findChild<QObject *>(QStringLiteral("brushCursorHoverHandler"));
+    QVERIFY(brushCursorHoverHandler);
+    QObject *brushCursorPointHandler = rootItem->findChild<QObject *>(QStringLiteral("brushCursorPointHandler"));
+    QVERIFY(brushCursorPointHandler);
+    QQuickItem *brushCursorRingShape = findItemByObjectName(rootItem, QStringLiteral("brushCursorRingShape"));
+    QVERIFY(brushCursorRingShape);
+    QObject *brushCursorOuterRing = rootItem->findChild<QObject *>(QStringLiteral("brushCursorOuterRing"));
+    QVERIFY(brushCursorOuterRing);
+    QObject *brushCursorInnerRing = rootItem->findChild<QObject *>(QStringLiteral("brushCursorInnerRing"));
+    QVERIFY(brushCursorInnerRing);
+
+    QQmlExpression brushCursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("toolMode = \"brush\"; brushSize = 12; canvasZoomScale = 2.5;"
+                       "[brushCursorToolActive,"
+                       " brushCursorScreenDiameter,"
+                       " !brushCursorUsesSystemFallback,"
+                       " canvasCursorShape(20, 20) === Qt.BlankCursor].join(\",\");"));
+    const QVariant brushCursorContractResult = brushCursorContract.evaluate();
+    QVERIFY2(!brushCursorContract.hasError(), qPrintable(brushCursorContract.error().toString()));
+    QCOMPARE(brushCursorContractResult.toString(), QStringLiteral("true,30,true,true"));
+    QCOMPARE(brushCursorHoverHandler->property("blocking").toBool(), false);
+    QTRY_COMPARE(brushCursorHoverHandler->property("cursorShape").toInt(), static_cast<int>(Qt::BlankCursor));
+    QTRY_COMPARE(brushCursorPointHandler->property("enabled").toBool(), true);
+    QCOMPARE(brushCursorPointHandler->property("acceptedButtons").toInt(), static_cast<int>(Qt::NoButton));
+    QCOMPARE(brushCursorPointHandler->property("cursorShape").toInt(), static_cast<int>(Qt::BlankCursor));
+    QTRY_VERIFY(qAbs(brushCursorGlassPane->width() - canvasItem->width()) < 0.01);
+    QTRY_VERIFY(qAbs(brushCursorGlassPane->height() - canvasItem->height()) < 0.01);
+    QCOMPARE(brushCursorOutline->property("cursorDiameter").toReal(), 30.0);
+    QCOMPARE(brushCursorOutline->width(), 30.0);
+    QCOMPARE(brushCursorOutline->height(), 30.0);
+    QVERIFY(brushCursorOutline->z() > canvasItem->z());
+    QCOMPARE(brushCursorRingShape->width(), 33.0);
+    QCOMPARE(brushCursorRingShape->height(), 33.0);
+    QCOMPARE(brushCursorOuterRing->property("strokeWidth").toReal(), 3.0);
+    QCOMPARE(brushCursorInnerRing->property("strokeWidth").toReal(), 1.0);
+    const QRectF brushCursorScreenRect = brushCursorOutline->mapRectToItem(rootItem,
+                                                                           brushCursorOutline->boundingRect());
+    QVERIFY(qAbs(brushCursorScreenRect.width() - 30.0) < 0.01);
+    QVERIFY(qAbs(brushCursorScreenRect.height() - 30.0) < 0.01);
+
+    QQmlExpression smallBrushCursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("brushSize = 2; canvasZoomScale = 1;"
+                       "[brushCursorScreenDiameter,"
+                       " brushCursorEffectiveOuterStrokeWidth,"
+                       " brushCursorEffectiveInnerStrokeWidth].join(\",\");"));
+    const QVariant smallBrushCursorContractResult = smallBrushCursorContract.evaluate();
+    QVERIFY2(!smallBrushCursorContract.hasError(), qPrintable(smallBrushCursorContract.error().toString()));
+    QCOMPARE(smallBrushCursorContractResult.toString(), QStringLiteral("2,1,0.3333333333333333"));
+    QTRY_COMPARE(brushCursorOutline->width(), 2.0);
+    QTRY_COMPARE(brushCursorRingShape->width(), 3.0);
+    QTRY_COMPARE(brushCursorOuterRing->property("strokeWidth").toReal(), 1.0);
+    QTRY_VERIFY(qAbs(brushCursorInnerRing->property("strokeWidth").toReal() - 1.0 / 3.0) < 0.0001);
+
+    QQmlExpression subpixelBrushCursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("brushSize = 1; canvasZoomScale = 0.5;"
+                       "[brushCursorScreenDiameter,"
+                       " brushCursorUsesSystemFallback,"
+                       " canvasCursorShape(20, 20) === Qt.CrossCursor].join(\",\");"));
+    const QVariant subpixelBrushCursorContractResult = subpixelBrushCursorContract.evaluate();
+    QVERIFY2(!subpixelBrushCursorContract.hasError(), qPrintable(subpixelBrushCursorContract.error().toString()));
+    QCOMPARE(subpixelBrushCursorContractResult.toString(), QStringLiteral("0.5,true,true"));
+    QTRY_COMPARE(brushCursorPointHandler->property("cursorShape").toInt(), static_cast<int>(Qt::CrossCursor));
+
+    QQmlExpression eraserCursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("toolMode = \"eraser\"; brushSize = 2; canvasZoomScale = 1;"
+                       "[brushCursorToolActive, canvasCursorShape(20, 20) === Qt.BlankCursor].join(\",\");"));
+    const QVariant eraserCursorContractResult = eraserCursorContract.evaluate();
+    QVERIFY2(!eraserCursorContract.hasError(), qPrintable(eraserCursorContract.error().toString()));
+    QCOMPARE(eraserCursorContractResult.toString(), QStringLiteral("true,true"));
+
+    QQmlExpression nonBrushCursorContract(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("toolMode = \"zoom\";"
+                       "[!brushCursorToolActive,"
+                       " canvasCursorShape(20, 20) === Qt.CrossCursor].join(\",\");"));
+    const QVariant nonBrushCursorContractResult = nonBrushCursorContract.evaluate();
+    QVERIFY2(!nonBrushCursorContract.hasError(), qPrintable(nonBrushCursorContract.error().toString()));
+    QCOMPARE(nonBrushCursorContractResult.toString(), QStringLiteral("true,true"));
+    QTRY_COMPARE(brushCursorPointHandler->property("enabled").toBool(), false);
+    QTRY_COMPARE(brushCursorHoverHandler->property("cursorShape").toInt(), static_cast<int>(Qt::CrossCursor));
+}
+
+void tst_DrawingSurfaceItem::tracksBrushCursorDuringNativePointerInput()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("brushSize"), 24);
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQuickWindow window;
+    window.setGeometry(100, 100, 500, 360);
+    rootItem->setParentItem(window.contentItem());
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QQuickItem *brushCursorOutline = findItemByObjectName(rootItem, QStringLiteral("brushCursorOutline"));
+    QVERIFY(brushCursorOutline);
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    QCOMPARE(brushCursorOutline->parentItem(), canvasViewport);
+    QObject *brushCursorHoverHandler = rootItem->findChild<QObject *>(QStringLiteral("brushCursorHoverHandler"));
+    QVERIFY(brushCursorHoverHandler);
+    QObject *brushCursorPointHandler = rootItem->findChild<QObject *>(QStringLiteral("brushCursorPointHandler"));
+    QVERIFY(brushCursorPointHandler);
+    QCOMPARE(brushCursorPointHandler->property("acceptedButtons").toInt(), static_cast<int>(Qt::NoButton));
+    QVERIFY(brushCursorOutline->z() > canvasItem->z());
+    QTRY_VERIFY(canvasItem->width() > 100);
+    QTRY_VERIFY(canvasItem->height() > 100);
+
+    QVERIFY(rootItem->setProperty("canvasZoomScale", 1.5));
+    QTRY_COMPARE(canvasItem->scale(), 1.5);
+
+    const QPointF hoverScenePoint = canvasItem->mapToScene(QPointF(canvasItem->width() / 2,
+                                                                   canvasItem->height() / 2));
+    const QPoint hoverWindowPoint(qRound(hoverScenePoint.x()), qRound(hoverScenePoint.y()));
+    QTest::mouseMove(&window, hoverWindowPoint);
+    QTRY_VERIFY(brushCursorHoverHandler->property("hovered").toBool());
+    QTRY_VERIFY(brushCursorOutline->isVisible());
+    QTRY_COMPARE(window.cursor().shape(), Qt::BlankCursor);
+
+    QRectF outlineSceneRect = brushCursorOutline->mapRectToScene(brushCursorOutline->boundingRect());
+    QVERIFY(qAbs(outlineSceneRect.width() - 36.0) < 0.1);
+    QVERIFY(qAbs(outlineSceneRect.height() - 36.0) < 0.1);
+    QVERIFY(QLineF(outlineSceneRect.center(), hoverScenePoint).length() < 1.0);
+
+    QTest::qWait(50);
+    const QImage hoverFrame = window.grabWindow();
+    QVERIFY(!hoverFrame.isNull());
+    const int darkRingPixels = countLogicalAnnulusPixels(
+        hoverFrame,
+        window.size(),
+        outlineSceneRect.center(),
+        16.0,
+        20.0,
+        [](const QColor &pixel) {
+            return pixel.alpha() > 200 && pixel.red() < 80 && pixel.green() < 80 && pixel.blue() < 80;
+        });
+    QVERIFY2(darkRingPixels >= 12, "The vector brush outline did not render above the blank raster surface");
+
+    QVERIFY(rootItem->setProperty("canvasZoomScale", 1.0));
+    QTRY_COMPARE(canvasItem->scale(), 1.0);
+    const QPointF edgeScenePoint = canvasItem->mapToScene(QPointF(4, canvasItem->height() / 2));
+    const QPoint edgeWindowPoint(qRound(edgeScenePoint.x()), qRound(edgeScenePoint.y()));
+    QTest::mouseMove(&window, edgeWindowPoint);
+    QTRY_VERIFY(QLineF(brushCursorOutline->mapRectToScene(brushCursorOutline->boundingRect()).center(),
+                       QPointF(edgeWindowPoint))
+                    .length()
+                < 1.0);
+    QVERIFY(brushCursorOutline->mapRectToScene(brushCursorOutline->boundingRect()).left()
+            < canvasItem->mapRectToScene(canvasItem->boundingRect()).left());
+    QVERIFY(rootItem->setProperty("canvasZoomScale", 1.5));
+    QTRY_COMPARE(canvasItem->scale(), 1.5);
+    QTest::mouseMove(&window, hoverWindowPoint);
+
+    QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, hoverWindowPoint);
+    QTRY_VERIFY(brushCursorPointHandler->property("active").toBool());
+    const QPoint dragWindowPoint = hoverWindowPoint + QPoint(18, 12);
+    QTest::mouseMove(&window, dragWindowPoint, 10);
+    QTRY_VERIFY(brushCursorPointHandler->property("active").toBool());
+    QTRY_VERIFY(QLineF(brushCursorOutline->mapRectToScene(brushCursorOutline->boundingRect()).center(),
+                       QPointF(dragWindowPoint))
+                    .length()
+                < 1.0);
+    QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, dragWindowPoint);
+    QTRY_VERIFY(!brushCursorPointHandler->property("active").toBool());
+    QTRY_VERIFY(QLineF(brushCursorOutline->mapRectToScene(brushCursorOutline->boundingRect()).center(),
+                       QPointF(dragWindowPoint))
+                    .length()
+                < 1.0);
+
+    QVERIFY(rootItem->setProperty("toolMode", QStringLiteral("eraser")));
+    QTest::mouseMove(&window, dragWindowPoint + QPoint(1, 0));
+    QTRY_VERIFY(brushCursorOutline->isVisible());
+    QTRY_COMPARE(window.cursor().shape(), Qt::BlankCursor);
+
+    QVERIFY(rootItem->setProperty("toolMode", QStringLiteral("pan")));
+    QTest::mouseMove(&window, dragWindowPoint + QPoint(2, 0));
+    QTRY_VERIFY(!brushCursorOutline->isVisible());
+    QTRY_COMPARE(window.cursor().shape(), Qt::OpenHandCursor);
 }
 
 void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()

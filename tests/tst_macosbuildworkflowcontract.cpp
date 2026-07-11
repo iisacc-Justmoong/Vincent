@@ -50,6 +50,7 @@ private slots:
     void repositoryGuidelinesUseOnlyBuildDirectory();
     void buildGuideSeparatesLocalAndDistributionSigning();
     void platformAppIconsAreBundledFromResources();
+    void buildScriptUsesIncrementalBuildsAndStripsDistributionBundles();
     void buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays();
 };
 
@@ -70,6 +71,11 @@ void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt40()
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
     QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
+    const qsizetype deploymentTargetIndex = cmakeSource.indexOf(QStringLiteral("set(CMAKE_OSX_DEPLOYMENT_TARGET"));
+    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0 LANGUAGES C CXX)"));
+    QVERIFY(deploymentTargetIndex >= 0);
+    QVERIFY(projectIndex > deploymentTargetIndex);
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"${PROJECT_VERSION}\")")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_BUNDLE_VERSION \"${VINCENT_BUNDLE_VERSION}\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_SHORT_VERSION_STRING \"${PROJECT_VERSION}\"")));
@@ -184,6 +190,32 @@ void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
     QVERIFY(syncScriptSource.contains(QStringLiteral("AppIcon-1024.png")));
     QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.icns")));
     QVERIFY(gitignoreSource.contains(QStringLiteral("!/resources/Appicon.ico")));
+}
+
+void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDistributionBundles()
+{
+    const QString buildScriptPath = QFINDTESTDATA("../build.sh");
+    QVERIFY2(!buildScriptPath.isEmpty(), "build.sh test data was not found");
+    QFile buildScript(buildScriptPath);
+    QVERIFY(buildScript.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString source = QString::fromUtf8(buildScript.readAll());
+
+    QVERIFY(source.contains(QStringLiteral("Usage: ./build.sh [--clean] [local|devid|mas|all]")));
+    QVERIFY(source.contains(QStringLiteral("CLEAN_BUILD_DIR=\"${CLEAN_BUILD_DIR:-0}\"")));
+    QVERIFY(source.contains(QStringLiteral("--clean)")));
+    QCOMPARE(source.count(QStringLiteral("CLEAN_BUILD_DIR=\"1\"")), 1);
+    QVERIFY(source.contains(QStringLiteral("MACDEPLOYQT_NO_STRIP=\"${MACDEPLOYQT_NO_STRIP:-}\"")));
+    QVERIFY(source.contains(QStringLiteral("if [[ -z \"$MACDEPLOYQT_NO_STRIP\" ]]; then")));
+    QVERIFY(source.contains(QStringLiteral("MACDEPLOYQT_NO_STRIP=\"1\"")));
+    QVERIFY(source.contains(QStringLiteral("MACDEPLOYQT_NO_STRIP=\"0\"")));
+    QVERIFY(source.contains(QStringLiteral("if [[ \"$MACDEPLOYQT_NO_STRIP\" == \"1\" ]]; then cmd+=(\"-no-strip\"); fi")));
+    QVERIFY(source.contains(QStringLiteral("need_cmd /usr/bin/otool")));
+    QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links()")));
+    QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -L \"$binary\"")));
+    QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -l \"$binary\"")));
+    QVERIFY(source.contains(QStringLiteral("LC_RPATH")));
+    QVERIFY(source.contains(QStringLiteral("deployed app contains non-portable absolute Mach-O paths")));
+    QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links \"$out_app\"")));
 }
 
 void tst_MacOSBuildWorkflowContract::buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays()

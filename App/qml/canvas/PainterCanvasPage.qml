@@ -21,6 +21,8 @@ Item {
     readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height
     readonly property int layerRenameActivationWindowMs: 500
     readonly property int layerRenameRepeatActivationThreshold: 3
+    readonly property bool dialogActive: canvasToolBar.dialogActive
+    readonly property bool textEditingActive: drawingSurface.textEditingActive || painterPage.layerRenameActive
 
     property int topChromeReservedHeight: 0
     property var vm: null
@@ -333,6 +335,7 @@ Item {
                 brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
+                toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive
                 shapeKind: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
                 textToolAccentColor: LV.Theme.primary
                 textToolFramePadding: painterPage.spacingSmall

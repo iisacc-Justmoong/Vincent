@@ -9,13 +9,14 @@ class tst_MainQmlContract : public QObject
 
 private slots:
     void applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome();
-    void applicationWindowUsesNativeWindowsTitleBarWithoutEmptyDragGap();
-    void applicationWindowPassesTopDragHandleHeightToCanvasPage();
+    void applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragRegion();
+    void applicationWindowPassesOnlyTheActiveMacOsDragHeightToCanvasPage();
     void applicationWindowCreatesAtFixedLaunchGeometry();
     void applicationWindowUsesDeferredCanvasIncubation();
     void applicationWindowProvidesApplicationMenuBar();
-    void applicationMenuBarMatchesWindowThemeAndUsesCompactHeight();
+    void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
+    void applicationActionsAreTheOnlyOwnersOfPortableShortcuts();
 };
 
 void tst_MainQmlContract::applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome()
@@ -36,7 +37,7 @@ void tst_MainQmlContract::applicationWindowKeepsNativeControlsWhileUsingSolidVis
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.WindowTitleHint")));
 }
 
-void tst_MainQmlContract::applicationWindowUsesNativeWindowsTitleBarWithoutEmptyDragGap()
+void tst_MainQmlContract::applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragRegion()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -45,7 +46,9 @@ void tst_MainQmlContract::applicationWindowUsesNativeWindowsTitleBarWithoutEmpty
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os !== \"windows\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os === \"osx\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("&& visibility !== QtQuickWindow.Window.FullScreen")));
+    QVERIFY(!mainSource.contains(QStringLiteral("Qt.platform.os !== \"windows\"")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleHeight: 0")));
     QVERIFY(!mainSource.contains(QStringLiteral("onTitlebarDragRequested: window.requestWindowMove()")));
@@ -53,7 +56,7 @@ void tst_MainQmlContract::applicationWindowUsesNativeWindowsTitleBarWithoutEmpty
     QVERIFY(!mainSource.contains(QStringLiteral("DragHandler")));
 }
 
-void tst_MainQmlContract::applicationWindowPassesTopDragHandleHeightToCanvasPage()
+void tst_MainQmlContract::applicationWindowPassesOnlyTheActiveMacOsDragHeightToCanvasPage()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -155,7 +158,7 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent 4.0\")")));
 }
 
-void tst_MainQmlContract::applicationMenuBarMatchesWindowThemeAndUsesCompactHeight()
+void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -172,6 +175,13 @@ void tst_MainQmlContract::applicationMenuBarMatchesWindowThemeAndUsesCompactHeig
     QVERIFY(mainSource.contains(QStringLiteral("bottomPadding: LV.Theme.gap2")));
     QVERIFY(mainSource.contains(QStringLiteral("contentItem: LV.Label")));
     QVERIFY(mainSource.contains(QStringLiteral("color: window.windowColor")));
+
+    const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
+    QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
+    QFile appEntry(appEntryPath);
+    QVERIFY(appEntry.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString appEntrySource = QString::fromUtf8(appEntry.readAll());
+    QVERIFY(!appEntrySource.contains(QStringLiteral("AA_DontUseNativeMenuBar")));
 }
 
 void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
@@ -185,7 +195,7 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
 
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string menuCommandModifier: Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutSaveImageAs: menuCommandModifier + \"+S\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutRedo: Qt.platform.os === \"osx\" ? \"Meta+Shift+Z\" : \"Ctrl+Y\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutRedo: Qt.platform.os === \"osx\" ? \"Meta+Shift+Z\" : (Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\")")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === \"osx\" ? \"Ctrl+Meta+F\" : \"F11\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function shortcutReference(commandName, shortcutText)")));
 
@@ -242,6 +252,69 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
         QVERIFY2(mainSource.contains(QStringLiteral(", window.") + shortcutContract + QStringLiteral(")")),
                  qPrintable(shortcutContract + QStringLiteral(" help reference is missing")));
     }
+}
+
+void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString pageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    const QString surfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!pageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+    QVERIFY2(!surfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+
+    auto readSource = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString mainSource = readSource(mainQmlPath);
+    const QString pageSource = readSource(pageQmlPath);
+    const QString toolbarSource = readSource(toolbarQmlPath);
+    const QString surfaceSource = readSource(surfaceQmlPath);
+    QVERIFY(!mainSource.isEmpty());
+    QVERIFY(!pageSource.isEmpty());
+    QVERIFY(!toolbarSource.isEmpty());
+    QVERIFY(!surfaceSource.isEmpty());
+
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property bool dialogActive: canvasToolBar.dialogActive")));
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property bool textEditingActive: drawingSurface.textEditingActive || painterPage.layerRenameActive")));
+    QVERIFY(pageSource.contains(QStringLiteral("toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive")));
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasCommandsEnabled")));
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasEditingCommandsEnabled")));
+    QVERIFY(mainSource.contains(QStringLiteral("enabled: window.canvasCommandsEnabled")));
+    QVERIFY(mainSource.contains(QStringLiteral("enabled: window.canvasEditingCommandsEnabled")));
+
+    QVERIFY(!toolbarSource.contains(QStringLiteral("sequence: StandardKey.New")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("sequence: StandardKey.Open")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("sequence: StandardKey.Save")));
+    QVERIFY(!toolbarSource.contains(QStringLiteral("Meta+Shift+K")));
+
+    const QStringList latinToolSequences = {
+            QStringLiteral("sequences: [\"B\", \"ㅠ\"]"),
+            QStringLiteral("sequences: [\"E\", \"ㄷ\"]"),
+            QStringLiteral("sequences: [\"H\", \"ㅗ\"]"),
+            QStringLiteral("sequences: [\"V\", \"ㅍ\"]"),
+            QStringLiteral("sequences: [\"Z\", \"ㅋ\"]"),
+            QStringLiteral("sequences: [\"U\", \"ㅕ\"]"),
+            QStringLiteral("sequences: [\"G\", \"ㅎ\"]"),
+            QStringLiteral("sequences: [\"T\", \"ㅅ\"]"),
+    };
+    for (const QString &sequence : latinToolSequences) {
+        QVERIFY2(!surfaceSource.contains(sequence), qPrintable(sequence));
+    }
+    QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"ㅠ\"]")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"ㄷ\"]")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.toolShortcutsEnabled && !surface.textEditingActive")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [\"[\"]")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [\"]\"]")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [StandardKey.Undo]")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [StandardKey.Redo]")));
 }
 
 QTEST_APPLESS_MAIN(tst_MainQmlContract)

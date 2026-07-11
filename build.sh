@@ -15,7 +15,7 @@ run() { printf '+ %q ' "$@" >&2; printf '\n' >&2; "$@"; }
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: ./build.sh [local|devid|mas|all]
+Usage: ./build.sh [--clean] [local|devid|mas|all]
 
 Modes:
   local   Build, test, deploy Qt runtime, sign dist/Vincent.app for local use,
@@ -27,6 +27,7 @@ Modes:
 
 Environment:
   VINCENT_BUILD_MODE may be used instead of the positional mode.
+  CLEAN_BUILD_DIR=1 or --clean discards build/ before configuring.
   RUN_TESTS=0 skips ctest.
 USAGE
 }
@@ -207,19 +208,23 @@ to_lower() {
 # =============================================================================
 
 BUILD_MODE="${VINCENT_BUILD_MODE:-local}"
-if [[ $# -gt 0 ]]; then
+CLEAN_BUILD_DIR="${CLEAN_BUILD_DIR:-0}"
+while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
       usage
       exit 0
       ;;
-    *)
-      BUILD_MODE="$1"
-      shift
+    --clean)
+      CLEAN_BUILD_DIR="1"
       ;;
+    local|devid|mas|all|package)
+      BUILD_MODE="$1"
+      ;;
+    *) die "unexpected argument: $1" ;;
   esac
-fi
-[[ $# -eq 0 ]] || die "unexpected arguments: $*"
+  shift
+done
 BUILD_MODE="$(normalize_build_mode "$BUILD_MODE")"
 RUN_TESTS="${RUN_TESTS:-1}"
 
@@ -233,7 +238,6 @@ CMAKE_SOURCE_DIR="."
 BUILD_DIR="./build"
 DIST_DIR="./dist"
 BUILD_TYPE="Release"          # 보통 Release 고정
-CLEAN_BUILD_DIR="1"           # 1이면 configure 전에 BUILD_DIR를 완전히 재생성하여 캐시 꼬임을 방지한다.
 CMAKE_PRESET=""               # 사용 시 preset의 binaryDir가 BUILD_DIR와 일치하도록 맞추는 것이 정석이다.
 CMAKE_GENERATOR="Ninja"       # Qt Quick + CMake + Ninja 전제
 declare -a CMAKE_EXTRA_ARGS
@@ -245,13 +249,21 @@ CMAKE_BUILD_PARALLEL=""       # 예: "12"
 MACDEPLOYQT="macdeployqt"
 QML_DIR="./App/qml"               # Qt Quick 프로젝트의 QML 루트(필수에 가깝다)
 MACDEPLOYQT_VERBOSE="2"       # 0-3
-MACDEPLOYQT_NO_STRIP="1"      # 1이면 -no-strip
+MACDEPLOYQT_NO_STRIP="${MACDEPLOYQT_NO_STRIP:-}"
 MACDEPLOYQT_ALWAYS_OVERWRITE="1" # 1이면 -always-overwrite
 MACDEPLOYQT_LIBPATH=""        # 서드파티 dylib 탐색 경로가 필요하면 지정
 # macdeployqt 추가 옵션이 필요하면 아래 배열에 추가한다.
 MACDEPLOYQT_EXTRA_ARGS=(
   # "-codesign="
 )
+
+if [[ -z "$MACDEPLOYQT_NO_STRIP" ]]; then
+  if [[ "$BUILD_MODE" == "local" ]]; then
+    MACDEPLOYQT_NO_STRIP="1"
+  else
+    MACDEPLOYQT_NO_STRIP="0"
+  fi
+fi
 
 # pkg 설치 경로(요구사항: /Applications)
 INSTALL_DIR="/Applications"
@@ -316,6 +328,7 @@ need_cmd cmp
 need_cmd /usr/bin/plutil
 need_cmd /usr/libexec/PlistBuddy
 need_cmd /usr/bin/file
+need_cmd /usr/bin/otool
 if [[ "$RUN_TESTS" == "1" ]]; then
   need_cmd ctest
 fi
@@ -529,6 +542,43 @@ macdeployqt_run() {
   run "${cmd[@]}"
 }
 
+assert_portable_macho_links() {
+  local app="$1"
+  local violations="${WORKDIR}/macho_path_violations_$(basename "$app")_$$.txt"
+  : > "$violations"
+
+  while IFS= read -r -d '' binary; do
+    if ! /usr/bin/file -b "$binary" 2>/dev/null | grep -q 'Mach-O'; then
+      continue
+    fi
+
+    /usr/bin/otool -L "$binary" \
+      | sed -n '2,$p' \
+      | sed -E 's/^[[:space:]]*([^[:space:]]+).*/\1/' \
+      | while IFS= read -r dependency; do
+          case "$dependency" in
+            ""|@*|/System/Library/*|/usr/lib/*) ;;
+            /*) printf '%s: dependency %s\n' "$binary" "$dependency" >> "$violations" ;;
+          esac
+        done
+
+    /usr/bin/otool -l "$binary" \
+      | awk '$1 == "cmd" && $2 == "LC_RPATH" { want_path = 1; next }
+             want_path && $1 == "path" { print $2; want_path = 0 }' \
+      | while IFS= read -r runtime_path; do
+          case "$runtime_path" in
+            ""|@*) ;;
+            /*) printf '%s: LC_RPATH %s\n' "$binary" "$runtime_path" >> "$violations" ;;
+          esac
+        done
+  done < <(find "${app}/Contents" -type f -print0)
+
+  if [[ -s "$violations" ]]; then
+    sed -n '1,80p' "$violations" >&2
+    die "deployed app contains non-portable absolute Mach-O paths: $app"
+  fi
+}
+
 prepare_app() {
   local mode="$1"
   local stage_dir="$2"
@@ -540,6 +590,7 @@ prepare_app() {
 
   say "macdeployqt begins: mode=$mode"
   macdeployqt_run "$out_app" "$mode"
+  assert_portable_macho_links "$out_app"
 
   if [[ "$mode" == "mas" && -n "$MAS_PROVISIONPROFILE" ]]; then
     say "embedding provisioning profile for MAS"

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Shapes as Shapes
 import Vincent 2.0
 
 Rectangle {
@@ -33,6 +34,7 @@ Rectangle {
     property bool canvasSizeCreated: false
     property bool spacePanActive: false
     property bool textEditingActive: false
+    property bool toolShortcutsEnabled: true
     property string shapeKind: "rectangle"
     property bool shapeDraggingActive: false
     property bool shapeAspectLocked: false
@@ -84,6 +86,16 @@ Rectangle {
     readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
     readonly property real zoomDragPixelsPerDoubling: 180
+    readonly property bool brushCursorToolActive: {
+        const mode = surface.effectiveToolMode();
+        return (mode === "brush" || mode === "eraser") && surface.hasActiveRasterSurface();
+    }
+    readonly property real brushCursorScreenDiameter: surface.brushSize * surface.canvasZoomScale
+    readonly property int brushCursorOuterStrokeWidth: 3
+    readonly property int brushCursorInnerStrokeWidth: 1
+    readonly property real brushCursorEffectiveOuterStrokeWidth: Math.min(surface.brushCursorOuterStrokeWidth, surface.brushCursorScreenDiameter / 2)
+    readonly property real brushCursorEffectiveInnerStrokeWidth: Math.min(surface.brushCursorInnerStrokeWidth, surface.brushCursorScreenDiameter / 6)
+    readonly property bool brushCursorUsesSystemFallback: surface.brushCursorToolActive && surface.brushCursorScreenDiameter < 1
     readonly property var drawableObjectHandles: [
         {
             mode: "resize-nw",
@@ -168,6 +180,7 @@ Rectangle {
         if (surface.textEditingActive) {
             return false;
         }
+        surface.drawableObjectHoverHandleMode = "";
         surface.spacePanActive = true;
         return true;
     }
@@ -1324,6 +1337,7 @@ Rectangle {
         surface.drawableObjectTransformActive = false;
         surface.drawableObjectTransformMode = "";
         surface.drawableObjectTransformOriginal = null;
+        surface.drawableObjectHoverHandleMode = "";
     }
 
     function cancelActiveDrawableObjectTransform() {
@@ -1633,9 +1647,15 @@ Rectangle {
         return Qt.NoButton;
     }
 
-    function canvasCursorShape() {
+    function canvasCursorShape(pointX, pointY) {
         const mode = surface.effectiveToolMode();
-        if (mode === "shape") {
+        if (mode === "brush" || mode === "eraser") {
+            if (!surface.hasActiveRasterSurface()) {
+                return Qt.ArrowCursor;
+            }
+            return surface.brushCursorUsesSystemFallback ? Qt.CrossCursor : Qt.BlankCursor;
+        }
+        if (mode === "zoom" || mode === "shape") {
             return Qt.CrossCursor;
         }
         if (mode === "text") {
@@ -1645,19 +1665,29 @@ Rectangle {
             return surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor;
         }
         if (mode === "move") {
-            const resizeMode = surface.drawableObjectTransformActive && surface.drawableObjectTransformMode !== "move" ? surface.drawableObjectTransformMode : surface.drawableObjectHoverHandleMode;
-            if (resizeMode.length > 0) {
-                return surface.drawableObjectResizeCursor(resizeMode);
+            if (surface.drawableObjectTransformActive) {
+                if (surface.drawableObjectTransformMode === "move") {
+                    return Qt.SizeAllCursor;
+                }
+                if (surface.drawableObjectTransformMode.length > 0) {
+                    return surface.drawableObjectResizeCursor(surface.drawableObjectTransformMode);
+                }
             }
-            return Qt.SizeAllCursor;
+
+            if (pointX === undefined || pointY === undefined) {
+                return Qt.ArrowCursor;
+            }
+
+            const handleMode = surface.drawableObjectHandleAt(pointX, pointY);
+            if (handleMode.length > 0) {
+                return surface.drawableObjectResizeCursor(handleMode);
+            }
+            return surface.drawableObjectIndexAt(pointX, pointY) >= 0 ? Qt.SizeAllCursor : Qt.ArrowCursor;
         }
-        if (mode === "zoom") {
-            return Qt.SizeHorCursor;
-        }
-        if (mode === "fill" || mode === "eraser") {
+        if (mode === "fill") {
             return Qt.PointingHandCursor;
         }
-        return Qt.CrossCursor;
+        return Qt.ArrowCursor;
     }
 
     function cancelActiveShape() {
@@ -1812,6 +1842,7 @@ Rectangle {
     }
 
     onToolModeChanged: {
+        surface.drawableObjectHoverHandleMode = "";
         if (toolMode !== "text") {
             commitActiveText();
         }
@@ -2169,6 +2200,88 @@ Rectangle {
             }
         }
 
+        Item {
+            id: brushCursorGlassPane
+            objectName: "brushCursorGlassPane"
+            parent: canvasSurface
+            anchors.fill: parent
+            z: 7
+
+            HoverHandler {
+                id: brushCursorHoverHandler
+                objectName: "brushCursorHoverHandler"
+                blocking: false
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad | PointerDevice.Stylus | PointerDevice.Airbrush
+                cursorShape: surface.canvasCursorShape(point.position.x, point.position.y)
+            }
+
+            PointHandler {
+                id: brushCursorPointHandler
+                objectName: "brushCursorPointHandler"
+                enabled: surface.brushCursorToolActive
+                acceptedButtons: Qt.NoButton
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad | PointerDevice.Stylus | PointerDevice.Airbrush
+                cursorShape: surface.brushCursorUsesSystemFallback ? Qt.CrossCursor : Qt.BlankCursor
+            }
+
+            Item {
+                id: brushCursorOutline
+                objectName: "brushCursorOutline"
+                parent: canvasViewport
+                z: 8
+                readonly property real cursorDiameter: surface.brushCursorScreenDiameter
+                readonly property point cursorPosition: brushCursorPointHandler.active ? brushCursorPointHandler.point.position : brushCursorHoverHandler.point.position
+                readonly property point cursorPositionInViewport: brushCursorGlassPane.mapToItem(canvasViewport, cursorPosition)
+
+                x: cursorPositionInViewport.x - width / 2
+                y: cursorPositionInViewport.y - height / 2
+                width: cursorDiameter
+                height: cursorDiameter
+                visible: surface.brushCursorToolActive && (brushCursorPointHandler.active || brushCursorHoverHandler.hovered)
+
+                Shapes.Shape {
+                    id: brushCursorRingShape
+                    objectName: "brushCursorRingShape"
+                    anchors.centerIn: parent
+                    width: brushCursorOutline.width + surface.brushCursorEffectiveOuterStrokeWidth
+                    height: width
+                    antialiasing: true
+
+                    Shapes.ShapePath {
+                        objectName: "brushCursorOuterRing"
+                        fillColor: "transparent"
+                        strokeColor: Qt.rgba(0, 0, 0, 0.82)
+                        strokeWidth: surface.brushCursorEffectiveOuterStrokeWidth
+
+                        PathAngleArc {
+                            centerX: brushCursorRingShape.width / 2
+                            centerY: brushCursorRingShape.height / 2
+                            radiusX: brushCursorOutline.cursorDiameter / 2
+                            radiusY: radiusX
+                            startAngle: -90
+                            sweepAngle: 360
+                        }
+                    }
+
+                    Shapes.ShapePath {
+                        objectName: "brushCursorInnerRing"
+                        fillColor: "transparent"
+                        strokeColor: Qt.rgba(1, 1, 1, 0.96)
+                        strokeWidth: surface.brushCursorEffectiveInnerStrokeWidth
+
+                        PathAngleArc {
+                            centerX: brushCursorRingShape.width / 2
+                            centerY: brushCursorRingShape.height / 2
+                            radiusX: brushCursorOutline.cursorDiameter / 2
+                            radiusY: radiusX
+                            startAngle: -90
+                            sweepAngle: 360
+                        }
+                    }
+                }
+            }
+        }
+
         MouseArea {
             id: canvasPanMouseArea
             anchors.fill: parent
@@ -2176,7 +2289,7 @@ Rectangle {
             enabled: surface.effectiveToolMode() === "pan"
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton
-            cursorShape: surface.panDraggingActive ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            cursorShape: surface.canvasCursorShape(mouseX, mouseY)
 
             onPressed: function (mouse) {
                 surface.beginPanDrag(mouse.x, mouse.y);
@@ -2207,7 +2320,7 @@ Rectangle {
             enabled: surface.effectiveToolMode() === "zoom"
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.SizeHorCursor
+            cursorShape: surface.canvasCursorShape(mouseX, mouseY)
 
             onPressed: function (mouse) {
                 surface.beginZoomDrag(mouse.x);
@@ -2232,12 +2345,13 @@ Rectangle {
     }
 
     MouseArea {
+        id: canvasPointerMouseArea
         parent: canvasSurface
         anchors.fill: parent
         z: 3
         hoverEnabled: true
         acceptedButtons: surface.canvasMouseAcceptedButtons()
-        cursorShape: surface.canvasCursorShape()
+        cursorShape: surface.canvasCursorShape(mouseX, mouseY)
 
         onPressed: function (mouse) {
             const mode = surface.effectiveToolMode();
@@ -2324,96 +2438,58 @@ Rectangle {
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["B", "ㅠ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅠ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("brush")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["E", "ㄷ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㄷ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("eraser")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["H", "ㅗ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅗ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("pan")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["V", "ㅍ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅍ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("move")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["Z", "ㅋ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅋ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("zoom")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["U", "ㅕ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅕ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("shape")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["G", "ㅎ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅎ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("fill")
     }
 
     Shortcut {
         context: Qt.ApplicationShortcut
-        sequences: ["T", "ㅅ"]
-        enabled: !surface.textEditingActive
+        sequences: ["ㅅ"]
+        enabled: surface.toolShortcutsEnabled && !surface.textEditingActive
         onActivated: surface.toolShortcutRequested("text")
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: ["["]
-        enabled: !surface.textEditingActive
-        onActivated: surface.brushDeltaRequested(-1)
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: ["]"]
-        enabled: !surface.textEditingActive
-        onActivated: surface.brushDeltaRequested(1)
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [StandardKey.Undo]
-        enabled: !surface.textEditingActive
-        onActivated: {
-            const rasterSurface = surface.activeRasterSurface();
-            if (rasterSurface) {
-                rasterSurface.undo();
-            }
-        }
-    }
-
-    Shortcut {
-        context: Qt.ApplicationShortcut
-        sequences: [StandardKey.Redo]
-        enabled: !surface.textEditingActive
-        onActivated: {
-            const rasterSurface = surface.activeRasterSurface();
-            if (rasterSurface) {
-                rasterSurface.redo();
-            }
-        }
     }
 
     Shortcut {

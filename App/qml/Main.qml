@@ -17,10 +17,13 @@ LV.ApplicationWindow {
     visible: false
     windowColor: LV.Theme.window
     solidChrome: true
-    windowDragHandleEnabled: Qt.platform.os !== "windows"
+    windowDragHandleEnabled: Qt.platform.os === "osx"
+        && visibility !== QtQuickWindow.Window.FullScreen
     navigationEnabled: false
 
     property var canvasPage: null
+    readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
+    readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
     readonly property string currentToolMode: canvasPage && canvasPage.vm ? canvasPage.vm.toolMode : ""
     readonly property string currentShapeKind: canvasPage && canvasPage.vm ? canvasPage.vm.shapeKind : ""
     readonly property string menuCommandModifier: Qt.platform.os === "osx" ? "Meta" : "Ctrl"
@@ -30,7 +33,7 @@ LV.ApplicationWindow {
     readonly property string shortcutClearCanvas: menuCommandModifier + "+Shift+K"
     readonly property string shortcutQuit: menuCommandModifier + "+Q"
     readonly property string shortcutUndo: menuCommandModifier + "+Z"
-    readonly property string shortcutRedo: Qt.platform.os === "osx" ? "Meta+Shift+Z" : "Ctrl+Y"
+    readonly property string shortcutRedo: Qt.platform.os === "osx" ? "Meta+Shift+Z" : (Qt.platform.os === "windows" ? "Ctrl+Y" : "Ctrl+Shift+Z")
     readonly property string shortcutAddLayer: menuCommandModifier + "+Shift+N"
     readonly property string shortcutDeleteCurrentLayer: menuCommandModifier + "+Shift+Delete"
     readonly property string shortcutBrushTool: "B"
@@ -157,7 +160,7 @@ LV.ApplicationWindow {
         id: newCanvasAction
         text: qsTr("New Canvas...")
         shortcut: window.shortcutNewCanvas
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestNewCanvas()
     }
 
@@ -165,7 +168,7 @@ LV.ApplicationWindow {
         id: openImageAction
         text: qsTr("Open Image...")
         shortcut: window.shortcutOpenImage
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestOpenImage()
     }
 
@@ -173,7 +176,7 @@ LV.ApplicationWindow {
         id: saveImageAsAction
         text: qsTr("Save Image As...")
         shortcut: window.shortcutSaveImageAs
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestSaveImage()
     }
 
@@ -181,7 +184,7 @@ LV.ApplicationWindow {
         id: clearCanvasAction
         text: qsTr("Clear Canvas")
         shortcut: window.shortcutClearCanvas
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestClearCanvas()
     }
 
@@ -196,7 +199,7 @@ LV.ApplicationWindow {
         id: undoAction
         text: qsTr("Undo")
         shortcut: window.shortcutUndo
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestUndo()
     }
 
@@ -204,7 +207,7 @@ LV.ApplicationWindow {
         id: redoAction
         text: qsTr("Redo")
         shortcut: window.shortcutRedo
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestRedo()
     }
 
@@ -212,7 +215,7 @@ LV.ApplicationWindow {
         id: addLayerAction
         text: qsTr("Add Layer")
         shortcut: window.shortcutAddLayer
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestAddLayer()
     }
 
@@ -220,7 +223,7 @@ LV.ApplicationWindow {
         id: deleteCurrentLayerAction
         text: qsTr("Delete Current Layer")
         shortcut: window.shortcutDeleteCurrentLayer
-        enabled: window.canvasPage !== null && window.canvasPage.canDeleteCurrentLayer()
+        enabled: window.canvasEditingCommandsEnabled && window.canvasPage.canDeleteCurrentLayer()
         onTriggered: window.requestDeleteCurrentLayer()
     }
 
@@ -230,7 +233,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutBrushTool
         checkable: true
         checked: window.currentToolMode === "brush"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("brush")
     }
 
@@ -240,7 +243,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutEraserTool
         checkable: true
         checked: window.currentToolMode === "eraser"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("eraser")
     }
 
@@ -250,7 +253,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutHandPanTool
         checkable: true
         checked: window.currentToolMode === "pan"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("pan")
     }
 
@@ -260,7 +263,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutMoveTool
         checkable: true
         checked: window.currentToolMode === "move"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("move")
     }
 
@@ -270,7 +273,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutZoomTool
         checkable: true
         checked: window.currentToolMode === "zoom"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("zoom")
     }
 
@@ -280,7 +283,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutShapeTool
         checkable: true
         checked: window.currentToolMode === "shape"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("shape")
     }
 
@@ -290,7 +293,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutFillTool
         checkable: true
         checked: window.currentToolMode === "fill"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("fill")
     }
 
@@ -300,7 +303,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutTextTool
         checkable: true
         checked: window.currentToolMode === "text"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestToolMode("text")
     }
 
@@ -310,7 +313,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutRectangleShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectangle"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("rectangle")
     }
 
@@ -320,7 +323,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutEllipseShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipse"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("ellipse")
     }
 
@@ -330,7 +333,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutTriangleShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "triangle"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("triangle")
     }
 
@@ -340,7 +343,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutDiamondShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "diamond"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("diamond")
     }
 
@@ -350,7 +353,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutStarShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "star"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("star")
     }
 
@@ -360,7 +363,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutRectangleBubbleShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "rectanglebubble"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("rectanglebubble")
     }
 
@@ -370,7 +373,7 @@ LV.ApplicationWindow {
         shortcut: window.shortcutEllipseBubbleShape
         checkable: true
         checked: window.currentToolMode === "shape" && window.currentShapeKind === "ellipsebubble"
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestShapeTool("ellipsebubble")
     }
 
@@ -378,7 +381,7 @@ LV.ApplicationWindow {
         id: decreaseBrushSizeAction
         text: qsTr("Decrease Brush Size")
         shortcut: window.shortcutDecreaseBrushSize
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestBrushSizeDelta(-1)
     }
 
@@ -386,7 +389,7 @@ LV.ApplicationWindow {
         id: increaseBrushSizeAction
         text: qsTr("Increase Brush Size")
         shortcut: window.shortcutIncreaseBrushSize
-        enabled: window.canvasPage !== null
+        enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestBrushSizeDelta(1)
     }
 
@@ -394,7 +397,7 @@ LV.ApplicationWindow {
         id: fitCanvasToWindowAction
         text: qsTr("Fit Canvas to Window")
         shortcut: window.shortcutFitCanvasToWindow
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestFitCanvasToWindow()
     }
 
@@ -402,7 +405,7 @@ LV.ApplicationWindow {
         id: resetCanvasViewAction
         text: qsTr("Reset Canvas View")
         shortcut: window.shortcutResetCanvasView
-        enabled: window.canvasPage !== null
+        enabled: window.canvasCommandsEnabled
         onTriggered: window.requestResetCanvasView()
     }
 

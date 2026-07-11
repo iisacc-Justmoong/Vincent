@@ -93,6 +93,10 @@ bundling.sh
 resources/UIIcons/.DS_Store
 /dist
 /packaging
+!/packaging/
+/packaging/*
+!/packaging/linux/
+!/packaging/linux/com.iisacc.vincent.painter.desktop
 packaging.sh
 dist.sh
 bundling.sh

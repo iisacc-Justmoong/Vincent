@@ -13,6 +13,7 @@
 #include <QVariant>
 #include <QWindow>
 #include <QQuickStyle>
+#include <QScreen>
 #include <QtQml>
 #include <qqml.h>
 
@@ -147,6 +148,23 @@ void registerViewModels(QQmlApplicationEngine &engine, PaletteUtils *paletteUtil
                               Q_ARG(QObject *, documentViewModel));
 }
 
+QSize finalLaunchWindowSize(const QWindow &window)
+{
+    QScreen *screen = window.screen();
+    if (!screen) {
+        screen = QGuiApplication::primaryScreen();
+    }
+    if (!screen) {
+        return window.size();
+    }
+
+    const QSize availableSize = screen->availableGeometry().size();
+    if (!availableSize.isValid()) {
+        return window.size();
+    }
+    return window.size().boundedTo(availableSize);
+}
+
 void showLaunchWindow(QQmlApplicationEngine &engine)
 {
     const QObjectList rootObjects = engine.rootObjects();
@@ -159,6 +177,10 @@ void showLaunchWindow(QQmlApplicationEngine &engine)
         return;
     }
 
+    const QSize finalSize = finalLaunchWindowSize(*window);
+    if (window->size() != finalSize) {
+        window->resize(finalSize);
+    }
     window->showNormal();
 }
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Vincent
+Comment=Raster drawing application
+Exec=Vincent %F
+Icon=com.iisacc.vincent.painter
+Terminal=false
+Categories=Graphics;2DGraphics;RasterGraphics;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/webp;image/tiff;image/vnd.adobe.photoshop;
+StartupWMClass=Vincent
+StartupNotify=true

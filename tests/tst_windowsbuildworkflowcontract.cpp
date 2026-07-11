@@ -106,6 +106,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("\"--exclude-plugins\", \"qpdf,qtvirtualkeyboardplugin\"")));
     QVERIFY(source.contains(QStringLiteral("\"--verbose\", \"0\"")));
     QVERIFY(source.contains(QStringLiteral("Verify-WindowsStage -Directory $StageDir -ResolvedQtPrefix $QtPrefix -ExpectedFileVersion $WindowsFileVersion -BuildType $BuildType")));
+    QVERIFY(source.contains(QStringLiteral("qml\\QtQuick\\Shapes\\qmlshapesplugin.dll")));
+    QVERIFY(source.contains(QStringLiteral("the Qt Quick Shapes QML plugin is missing")));
     QVERIFY(source.contains(QStringLiteral("libstdc++-6.dll")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("Rebuild those dependencies with the same MinGW kit as Qt")));
@@ -248,11 +250,20 @@ void tst_WindowsBuildWorkflowContract::appEntryPointShowsFinalGeometryOnlyOnce()
     QVERIFY(!source.isEmpty());
 
     QVERIFY(source.contains(QStringLiteral("void showLaunchWindow(QQmlApplicationEngine &engine)")));
+    QVERIFY(source.contains(QStringLiteral("QSize finalLaunchWindowSize(const QWindow &window)")));
+    QVERIFY(source.contains(QStringLiteral("screen->availableGeometry().size()")));
+    QVERIFY(source.contains(QStringLiteral("window.size().boundedTo(availableSize)")));
+    QVERIFY(source.contains(QStringLiteral("if (window->size() != finalSize)")));
+    QVERIFY(source.contains(QStringLiteral("window->resize(finalSize);")));
     QVERIFY(source.contains(QStringLiteral("window->showNormal();")));
     QVERIFY(!source.contains(QStringLiteral("ensureLaunchWindowVisible")));
-    QVERIFY(!source.contains(QStringLiteral("window->resize(")));
-    QVERIFY(!source.contains(QStringLiteral("boundedTo(")));
+    QCOMPARE(source.count(QStringLiteral("window->resize(")), 1);
     QVERIFY(!source.contains(QStringLiteral("QTimer::singleShot(")));
+
+    const qsizetype resizeIndex = source.indexOf(QStringLiteral("window->resize(finalSize);"));
+    const qsizetype showNormalIndex = source.indexOf(QStringLiteral("window->showNormal();"));
+    QVERIFY(resizeIndex >= 0);
+    QVERIFY(showNormalIndex > resizeIndex);
 
     const qsizetype loadIndex = source.indexOf(QStringLiteral("engine.loadFromModule(QStringLiteral(\"Vincent\"), QStringLiteral(\"Main\"));"));
     const qsizetype showIndex = source.indexOf(QStringLiteral("showLaunchWindow(engine);"));

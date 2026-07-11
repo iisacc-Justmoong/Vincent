@@ -734,6 +734,11 @@ function Verify-WindowsStage {
         throw "Qt runtime deployment is incomplete: platforms\qwindows.dll is missing."
     }
 
+    $quickShapesPlugin = Join-Path $Directory "qml\QtQuick\Shapes\qmlshapesplugin.dll"
+    if (-not (Test-Path $quickShapesPlugin)) {
+        throw "Qt runtime deployment is incomplete: the Qt Quick Shapes QML plugin is missing."
+    }
+
     $debugQtRuntimes = @(
         Get-ChildItem -Path $Directory -Filter "Qt6*.dll" -File -ErrorAction SilentlyContinue |
             Where-Object { $_.VersionInfo.IsDebug }
