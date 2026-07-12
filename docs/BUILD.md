@@ -19,7 +19,7 @@ The default macOS workflow is incremental and preserves `build/`, including the 
 
 After `macdeployqt`, the script inspects every Mach-O file with `otool -L` and every `LC_RPATH` with `otool -l`. Packaging fails if a deployed binary still references an absolute non-system dependency or RPATH, preventing a build-tree, `$HOME/.local`, Homebrew, or maintainer-specific path from escaping into the signed bundle.
 
-The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`. Because `build.sh` is the official packaging entry point, it is tracked source and must not be ignored by `.gitignore`. Vincent's marketing version and generated macOS `CFBundleVersion` are both fixed to `4.0` by CMake and the configured Info.plist.
+The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`. Because `build.sh` is the official packaging entry point, it is tracked source and must not be ignored by `.gitignore`. Vincent's release version and generated macOS `CFBundleVersion` are both fixed to `4.0.1` by CMake and the configured Info.plist; the in-app `Vincent 4.0` label remains the product-family marketing name.
 
 Vincent intentionally supports only the repository-local `build/` CMake binary directory. Configure, build, test, and package commands must use `-B build`, `cmake --build build`, and `ctest --test-dir build`; alternate build trees are rejected during CMake configure so CLion and shell workflows cannot silently produce stale bundles elsewhere.
 
@@ -56,33 +56,258 @@ $env:LVRS_PREFIX = "$HOME\.local\LVRS"
 $env:IIPAINTENGINE_PREFIX = "$HOME\.local\iiPaintEngine"
 ```
 
-The supported MinGW setup uses Qt's bundled CMake, Ninja, and MinGW tools on `PATH`. The vendored `psd_sdk` build treats `Psdminiz.c` as C++ because that upstream C file includes headers with C++ `static_assert` declarations. The current iiPaintEngine Qt adapter exposes the brush opacity toggle as `brushOpacityEnabled`, so QML and bridge code should not use the older `pressureToOpacityEnabled` property name.
+The supported MinGW setup uses Qt's bundled CMake, Ninja, and MinGW tools on `PATH`. The vendored `psd_sdk` build treats `Psdminiz.c` as C++ because that upstream C file includes headers with C++ `static_assert` declarations; the narrow `-Wno-pragmas` exception applies only to that upstream target because the file is also included by other SDK translation units. Windows MinGW builds retain Release optimization, function/data sections, linker garbage collection, and release symbol stripping but disable IPO for Vincent and the PSD SDK: MinGW 13 does not propagate its LTO plugin consistently through Ninja's archive and generated-QML steps, which otherwise produces plugin diagnostics, serial LTRANS fallback, and unreliable links. Other toolchains continue to use the LVRS IPO policy. The current iiPaintEngine Qt adapter exposes the brush opacity toggle as `brushOpacityEnabled`, so QML and bridge code should not use the older `pressureToOpacityEnabled` property name.
 
-Then build, test, deploy Qt runtime files, copy dependency DLLs, and create the Windows ZIP package:
+For a local build, test, and staged runtime without a distributable package, use:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -SkipPackage
 ```
 
-To also create the Windows Installer package, make WiX Toolset 3.x available through `WIX_TOOLS_DIR`, `WIX`, or `PATH`, then add `-CreateMsi`:
+Public Windows packages are fail-closed and require Windows SDK SignTool plus a Code Signing certificate whose private key is available through the Windows certificate store, hardware token, or configured KSP. Select the certificate by its exact 40-hex store thumbprint; the thumbprint identifies the certificate while file and timestamp digests remain SHA-256. The default store is `CurrentUser\My`; add `-SigningCertificateStoreLocation LocalMachine` only when the protected key is installed in `LocalMachine\My`. Windows PowerShell 5.1 can expose the Code Signing EKU object identifier as a string while other certificate providers expose an object with a `Value` property; the signing preflight normalizes both representations before enforcing EKU `1.3.6.1.5.5.7.3.3`. The policy contract runs under both Windows PowerShell 5.1 and PowerShell 7 when `pwsh.exe` is installed. For consumer distribution, release operations must use a certificate chaining to a consumer-trusted code-signing root or a trusted signing service. After any interrupted-publication recovery, but before clearing partial artifacts or producing new package output, the signing preflight rejects self-signed identities, builds an online-revocation Code Signing chain, and requires its terminal certificate to be in Windows' `LocalMachine\AuthRoot` public-root store. This blocks a private root manually trusted only on the development PC. A clean stock Windows installation remains the final consumer-trust check because root-program state and SmartScreen reputation can differ by image and update level.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -CreateMsi
+$env:VINCENT_SIGNING_CERTIFICATE_THUMBPRINT = "0123456789ABCDEF0123456789ABCDEF01234567"
+$env:SIGNTOOL_PATH = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
+$env:VINCENT_TIMESTAMP_URL = "http://timestamp.digicert.com"
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Sign
 ```
 
-The script always configures with `cmake -S . -B build`, preserves that repository-local tree for incremental work, builds with CMake's parallel mode, and runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed. Use `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean` only after changing toolchains or when recovering a stale build tree. Passing `-SkipTests` configures `BUILD_TESTING=OFF` and builds only the `Vincent` target. Runtime deployment uses `windeployqt --qmldir App/qml --translations en,ko`, requires the Qt Quick Shapes QML plugin used by the vector brush cursor, omits the release-only QML debugger plugin group plus the unused PDF, Qt Virtual Keyboard, PostgreSQL, and Mimer SQL plugins, then copies the LVRS and iiPaintEngine runtime DLLs. LVRS QML is compiled into the LVRS binary, so the stage deliberately removes any loose `qml/LVRS` directory emitted by deployment instead of copying thousands of duplicate source files or rewriting `qmldir` `prefer` directives.
+The release path accepts only Release or MinSizeRel, does not allow `-SkipTests`, requires the Code Signing EKU `1.3.6.1.5.5.7.3.3`, an accessible private key, a current certificate validity period, `DigitalSignature` permission when the Key Usage extension is present, and a reachable RFC 3161 timestamp service. It never falls back to unsigned output. To also create a signed Windows Installer package, make WiX Toolset 3.x available through `WIX_TOOLS_DIR`, `WIX`, or `PATH`, then add `-CreateMsi`. PFX password arguments are deliberately unsupported because command-line secrets are observable by other local processes. `SIGNTOOL_PATH` is the explicit override; automatic discovery considers protected Windows Kits locations rather than an arbitrary executable injected through `PATH`.
 
-Before packaging, the script verifies that the staged executable is a native AMD64 PE32+ Windows GUI binary, has the required ASLR/DEP flags, and exposes the expected file version, product version, and product name. MinGW Release and MinSizeRel stages strip the complete COFF symbol tables from `Vincent.exe`, `LVRS.dll`, and `libiiPaintEngine.dll` only; Qt's deployed binaries are left untouched. The stage is also inspected with `objdump`; if a dependency such as `LVRS.dll` imports `__cxa_thread_atexit` while the staged `libstdc++-6.dll` does not export it, the script fails with a MinGW ABI error and the dependency must be rebuilt with the same MinGW kit as Qt. The same pass checks the PE import closure of every staged executable and DLL against the staged payload and Windows system DLL set, so unresolved third-party imports fail before ZIP or MSI creation. The staged app is written to `dist/Vincent-Windows`, the ZIP package is written to `dist/Vincent-4.0-Windows.zip`, and the MSI package is written to `build/Vincent-4.0-Windows.msi` when `-CreateMsi` is passed. The generated MSI installs for the current user under `%LOCALAPPDATA%\Programs\Vincent`, and uses `AllowSameVersionUpgrades` so rebuilding Vincent 4.0.0 and reinstalling it replaces a previously installed 4.0.0 payload instead of leaving stale DLLs in the install directory.
+### Public Windows signing identity onboarding
 
-Normal Windows startup does not open or flush a diagnostic file. `Main.qml` establishes a hidden 1400x880 launch geometry as the preferred size. Before the first show, the common Qt entry point bounds that hidden size once to the selected screen's available geometry, then shows the completed window. It does not resize the window after it becomes visible. The same pre-show rule prevents Cocoa and Linux compositors from visibly correcting an oversized first frame. The asynchronous canvas `Loader` therefore cannot renegotiate the top-level size; users can still resize or maximize the window after launch. For an opt-in startup timing trace, set `$env:VINCENT_STARTUP_TRACE = "1"` before launching `Vincent.exe`; startup milestones are then appended to `%TEMP%\Vincent-startup.log`. A fatal root-QML object creation failure is written to that file and flushed even when tracing is disabled, but ordinary Qt/QML warnings are not redirected there. If Windows reports that the procedure entry point `__cxa_thread_atexit` cannot be found in `LVRS.dll`, that failure happens before Vincent reaches application logging and indicates a platform runtime mismatch, not a QML load failure. Rebuild LVRS with the same Qt MinGW kit used for Vincent, rerun `build-windows.ps1 -Clean`, and regenerate the installer from the refreshed `dist/Vincent-Windows` payload.
+The identity proof and protected-key activation must be completed by the legal person or authorized organization representative. Do not invent a Publisher name, send a private key or token PIN to a maintainer, or export the key into a PFX merely to automate this build.
 
-For a current-user smoke install, run:
+1. Choose the Publisher identity before ordering. An individual OV certificate displays the verified legal personal name. An organization OV certificate displays a verified registered legal or trade name; `Vincent` cannot be used as the Publisher merely because it is the product name. EV is appropriate only when a customer, procurement policy, or another signing program explicitly requires it; it no longer provides an automatic Microsoft Defender SmartScreen bypass over OV.
+2. Order an OV Code Signing certificate from a public CA that supports the applicant's country and legal form. For the current Windows-store SignTool flow, a CA-issued USB hardware token is the simplest option. A CA cloud HSM or another compliant token/KSP is also acceptable when its Windows provider exposes the certificate and protected private key through `CurrentUser\My` or `LocalMachine\My`.
+3. Complete the CA's identity validation personally. An individual should expect government-photo-ID/video verification, legal-name and residential-address evidence, independent phone or email verification, the subscriber agreement, and a confirmation callback. An organization should expect legal existence and address records, the applicant's photo-ID/video check, proof of authority, an independently verifiable business phone/email, the subscriber agreement, and an approval callback. The CA may request additional current registry or operational documents.
+4. Receive and initialize the hardware token, or activate the cloud HSM account, using the CA's instructions. Install only the CA/token vendor's signed middleware and Windows cryptographic provider. Keep multi-factor authentication enabled. Never disclose the PIN, recovery secret, private key, or cloud-signing credential.
+5. Connect and unlock the token, then confirm that Windows can see a currently valid Code Signing certificate and accessible private key:
+
+   ```powershell
+   Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
+     Where-Object { $_.HasPrivateKey } |
+     Format-List Subject,Issuer,Thumbprint,NotBefore,NotAfter,HasPrivateKey
+   ```
+
+   If the provider installs it machine-wide, repeat the command against `Cert:\LocalMachine\My` and pass `-SigningCertificateStoreLocation LocalMachine` to the build.
+6. Copy the actual 40-hex thumbprint without inventing or shortening it. Set only non-secret selectors and the CA's RFC 3161 URL, then close and reopen PowerShell so the persistent user environment is reloaded:
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable(
+     "VINCENT_SIGNING_CERTIFICATE_THUMBPRINT",
+     "<actual-40-hex-thumbprint>",
+     "User"
+   )
+   [Environment]::SetEnvironmentVariable(
+     "VINCENT_TIMESTAMP_URL",
+     "<CA-RFC3161-timestamp-URL>",
+     "User"
+   )
+   [Environment]::SetEnvironmentVariable(
+     "VINCENT_CORRESPONDING_SOURCE_URL",
+     "https://<publisher-controlled-location>/Vincent-4.0.1-Corresponding-Source.zip",
+     "User"
+   )
+   [Environment]::SetEnvironmentVariable(
+     "VINCENT_CORRESPONDING_SOURCE_SHA256",
+     "<actual-64-hex-source-archive-sha256>",
+     "User"
+   )
+   ```
+
+7. With the token connected and unlocked, create the replacement ZIP and MSI in one transaction:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Sign -CreateMsi
+   ```
+
+The release operator may provide a maintainer only the certificate thumbprint, exact `Subject`/Publisher text, store location, and public timestamp URL. Those values are not private-key material. The final release must publish the exact expected Publisher identity and SHA-256 sidecars, then install and launch the signed MSI on a clean, fully updated stock Windows machine before publication. Also confirm that every bundled project and third-party component has an explicit redistributable license and required notices; a public signature does not cure missing distribution rights.
+
+### Windows distribution licenses and corresponding source
+
+Every ZIP/MSI package stages `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `SOURCE_OFFER.txt`, and a `legal/` tree. The tree contains the LVRS AGPL text, psd_sdk BSD-2-Clause and embedded-miniz Unlicense texts, Pretendard 1.3.9 OFL text, the deployed Qt module license collections and SPDX documents, and the exact GCC/MinGW-w64/winpthreads notices matched by hash to the three staged MinGW runtime DLLs. The packaging gate copies each source file byte-for-byte, verifies its SHA-256 after staging, and requires the same tree in the ZIP and MSI because WiX harvests the final stage.
+
+Qt packaging requires the matching Qt `Sources` component and SBOM files from the selected kit. For Qt 6.8.3 they are resolved below `C:\Qt\6.8.3\Src` and `C:\Qt\6.8.3\mingw_64\sbom`. A MinGW package also resolves the exact `C:\Qt\Tools\mingw*` directory by comparing the staged runtime DLL hashes before copying its notices; an unrelated toolchain's license directory is rejected.
+
+Public distribution is currently fail-closed until the iiPaintEngine copyright holder makes a legal licensing decision. Do not infer a license merely because its repository is public. The copyright holder must add a root `LICENSE`, identify the SPDX license in its README, install that file as `share/licenses/iiPaintEngine/LICENSE`, add an installation-layout test, and publish the resulting source commit/tag. The selected license must be compatible with the way iiPaintEngine and the AGPL-3.0 Vincent application are combined; obtain qualified legal advice if ownership or compatibility is uncertain. Until then, `-AllowUnsignedPackage` remains a local test path and its `SOURCE_OFFER.txt` explicitly says that it is not for distribution.
+
+Before the first public build, create `Vincent-4.0.1-Corresponding-Source.zip` from clean, tagged Vincent, LVRS, and newly licensed iiPaintEngine sources plus the exact Qt corresponding source required for the conveyed libraries. Publish it at a location controlled by the publisher, calculate `Get-FileHash -Algorithm SHA256`, and set `VINCENT_CORRESPONDING_SOURCE_URL` and `VINCENT_CORRESPONDING_SOURCE_SHA256` to those exact values. An upstream Qt download link alone is not treated as the release's corresponding-source evidence. The signing script accepts only an absolute HTTPS URL and a 64-hex SHA-256 and writes both into the installed `SOURCE_OFFER.txt`.
+
+An explicitly unsigned package for local smoke testing requires `-AllowUnsignedPackage` and receives the `-unsigned` filename suffix so it cannot be confused with a public release:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -InstallForCurrentUser
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -AllowUnsignedPackage
+```
+
+The script always configures with `cmake -S . -B build`, preserves that repository-local tree for incremental work, builds with CMake's parallel mode, and runs `ctest --test-dir build --output-on-failure` unless `-SkipTests` is passed. General CTest validates source, authoring, and build-workflow contracts; it deliberately does not discover or inspect an MSI already present in `build/`, because such a file may belong to an earlier packaging run. When `-CreateMsi` is requested, the packaging workflow instead passes the exact newly linked `.partial.msi` path to the MSI database contract and refuses to hash or publish it unless that explicit database gate passes. Use `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -Clean -SkipPackage` for a clean-only local rebuild after changing toolchains or when recovering a stale build tree; add the appropriate signed or explicitly unsigned packaging flags when the same clean run should publish packages. Passing `-SkipTests` configures `BUILD_TESTING=OFF` and builds only the `Vincent` target. Runtime deployment uses `windeployqt --qmldir App/qml --translations en,ko`, requires the Qt Quick Shapes QML plugin used by the vector brush cursor, and omits the release-only QML debugger plugin group plus unused generic/Insight Tracker, SQL, Quick3D utility, PDF, Qt Virtual Keyboard, software OpenGL, and runtime D3D/DXC compiler payloads before copying the LVRS and iiPaintEngine runtime DLLs. Vincent uses Qt's Direct3D backend with precompiled shaders and does not load those shader compilers at runtime. LVRS QML is compiled into the LVRS binary, so the stage deliberately removes any loose `qml/LVRS` directory emitted by deployment instead of copying thousands of duplicate source files or rewriting `qmldir` `prefer` directives.
+
+Before packaging, the script verifies that the staged executable is a native AMD64 PE32+ Windows GUI binary, has the required ASLR/DEP flags, and exposes the expected file version, product version, and product name. MinGW Release and MinSizeRel stages strip the complete COFF symbol tables from `Vincent.exe`, `LVRS.dll`, and `libiiPaintEngine.dll` only; Qt's deployed binaries are left untouched. The stage is also inspected with `objdump`; if a dependency such as `LVRS.dll` imports `__cxa_thread_atexit` while the staged `libstdc++-6.dll` does not export it, the script fails with a MinGW ABI error and the dependency must be rebuilt with the same MinGW kit as Qt. The same pass checks the PE import closure of every staged executable and DLL against the staged payload and Windows system DLL set, so unresolved third-party imports fail before ZIP or MSI creation.
+
+After deployment, removal, strip, PE validation, and ABI/import validation have completed, signed mode signs `Vincent.exe`, `LVRS.dll`, and `libiiPaintEngine.dll` with the exact selected certificate even if those files arrived with another valid signature. It preserves valid timestamped vendor signatures on other PE files and Authenticode-signs the remaining unsigned staged `.exe` and `.dll` files with `signtool sign /fd SHA256 /tr <url> /td SHA256`. It then requires `signtool verify /pa /all /tw` to succeed for every staged PE and rechecks the selected certificate thumbprint on Vincent-owned files before compression.
+
+Only the selected package's temporary `.partial` files are cleared before a run. ZIP and MSI bytes are generated under `.partial` names, verified, and hashed with their final recorded filename while the previous canonical artifact remains untouched. Publication first writes a same-volume `prepared` transaction journal atomically, including whether each canonical artifact/checksum pair was validly present or completely absent. It then moves every last-known-good pair to `.previous`, promotes the complete verified set, verifies every promoted pair again, and atomically changes the journal to `committed` before deleting backups and the journal last. A retry reconciles that journal before signing-tool discovery, cleanup, or `-Clean`: `prepared` restores every old pair and removes newly introduced first-publication files, while `committed` is accepted only when every final pair remains valid. When ZIP and MSI are requested together, neither canonical file changes until both partial packages have passed their respective signing and validation gates. One journal per version and signed/unsigned flavor serializes ZIP-only, MSI-only, and combined publication because those modes share canonical files; an existing journal is matched only against the fixed ZIP/MSI allowlist, while a journal-free run examines only the package types requested by that invocation. Recovery examines final and backup files by SHA-256 and selects only an internally consistent artifact/checksum pair, including after a process interruption leaves a one-sided backup. Signed and unsigned outputs therefore do not delete or mix with one another. The ZIP is built from the final signed stage, while WiX builds the MSI from that stage and the MSI container itself is signed and verified before publication. The linked partial MSI must also pass the database contract test before hashing or promotion, so its UI, features, license, and transactional upgrade order are release gates rather than post-build observations. Heat, Candle, and Light run with warnings treated as errors and no ICE suppression; Smoke additionally runs ICE105 alone with warnings promoted to errors so the dual-context contract cannot be skipped by a tool default. Every ZIP and MSI receives an adjacent `.sha256` record; publish that record through the authenticated release channel because a checksum alone proves equality, not publisher identity. Authenticode covers the staged PE files and the signed MSI container, not the ZIP container or its loose QML/resources, so the authenticated sidecar hash binds the complete ZIP. The staged app is written to `dist/Vincent-Windows`, the signed ZIP to `dist/Vincent-4.0.1-Windows.zip`, and the signed MSI to `build/Vincent-4.0.1-Windows.msi`. Explicit unsigned smoke artifacts use `Vincent-4.0.1-Windows-unsigned.*` instead. Release notes must state the expected Publisher subject or certificate thumbprint so users can distinguish Vincent's signer from an unrelated valid signer. The Windows Installer 5 MSI authors the official `ALLUSERS=2` and `MSIINSTALLPERUSER=1` defaults, so it defaults to the current user under Local Application Data and upgrades the existing per-user 4.0.0 in the same installation context; its advanced options also offer an all-users installation under native 64-bit Program Files, which requires elevation. A required context-aware `installation-context marker` records the selected scope and resolved install location. Marker discovery runs before `FindRelatedProducts`, locks later upgrades to the registered scope, and preserves a custom all-users directory. A markerless per-user upgrade detected through `WIX_UPGRADE_DETECTED` is locked to current-user scope as a legacy fallback. Unattended upgrades must not override `ALLUSERS` or `MSIINSTALLPERUSER`: Windows Installer enumerates related products in the active installation context, so an explicitly forced opposite context cannot use the interactive markerless fallback. Ambiguous simultaneous per-user and per-machine registrations block new installation and cross-context upgrade, while maintenance and removal remain available for recovery. The MSI uses a deterministic ProductCode for the same version and architecture; a different version or architecture receives a different ProductCode, preventing same-version rebuilds from creating duplicate product registrations. The separate `-InstallForCurrentUser` unpackaged smoke path remains under Local Application Data. Public corrections must increment the first three ProductVersion fields, so 4.0.1 upgrades 4.0.0 while another 4.0.1 package retains the installed product identity rather than becoming a side-by-side product. Every later upgrade must use the same installation context selected for the installed product. `RemoveExistingProducts` runs after `InstallInitialize`, keeping removal of the old product inside the Windows Installer transaction so a failed replacement can roll it back.
+
+A machine-wide Vincent packaging mutex rejects a concurrent script invocation before either process can mutate a build tree or publication journal, including when the same repository is reached through a junction, symbolic link, mapped drive, or UNC alias.
+
+### Windows Installer UI contract
+
+The WiX MSI exposes the Vincent application files as a required core feature and installs one context-aware Start Menu shortcut with the executable. It defaults to the current user and therefore requires no elevation; choose **Advanced** on the first installation to select current-user or all-users scope and, for all-users scope, choose the installation directory. Current-user scope is rooted below Local Application Data, while all-users scope uses the machine's native `%ProgramFiles%\Vincent`, a shared Start Menu, and requires elevation. The shortcut is authored as an advertised entry owned by `Vincent.exe`, then materialized as a normal shell shortcut with `DISABLEADVTSHORTCUTS=1`; this keeps one executable-backed component valid under ICE38, ICE43, ICE57, and ICE105 in both contexts. On an upgrade, the stored installation-context marker overrides any opposite scope choice and reuses the recorded install location before related-product detection. The required core runtime cannot be deselected into an unusable package. Packaging converts the repository root `LICENSE` into the MSI's RTF license control with Unicode-safe escaping, so the wizard presents the actual GNU AGPL terms and never WiX's placeholder text; a Windows RichEdit round-trip test protects the converter.
+
+Windows Installer identifies an installed product through its registered product identity. Reopening the same MSI after a successful installation therefore enters maintenance mode by design; it must not be described or tested as another first-time **Install** flow. The maintenance wizard exposes the standard **Change**, **Repair**, and **Remove** paths: **Change** displays the installed required feature state, **Repair** restores missing or damaged installed files and the shortcut, and **Remove** uninstalls the product. First-install scope and destination choices are intentionally not offered again in maintenance. To exercise that contract again or change between current-user and all-users scope, remove the registered product first. A higher three-field ProductVersion performs the major upgrade only in the same installation context; republishing different bytes with the same ProductVersion is prohibited.
+
+Do not publish the generic Windows CPack output. It does not run `windeployqt`, staged PE closure checks, or Authenticode signing and is deliberately named `Vincent-4.0.1-Windows-unsigned-cpack-incomplete.zip`.
+
+Audit the immutable release archive rather than the mutable staging directory. Compare the sidecar hash, extract the canonical ZIP into a fresh temporary directory, and inspect the embedded executable:
+
+```powershell
+$zip = (Resolve-Path .\dist\Vincent-4.0.1-Windows.zip).Path
+$expectedHash = ((Get-Content "$zip.sha256" -Raw).Trim() -split '\s+')[0]
+$actualHash = (Get-FileHash -Algorithm SHA256 $zip).Hash
+if ($actualHash -ne $expectedHash) { throw "Release ZIP checksum mismatch" }
+$auditDir = Join-Path $env:TEMP ("Vincent-4.0.1-release-audit-" + [Guid]::NewGuid().ToString("N"))
+Expand-Archive -LiteralPath $zip -DestinationPath $auditDir -Force
+Get-AuthenticodeSignature "$auditDir\Vincent.exe" | Format-List Status,SignerCertificate,TimeStamperCertificate
+& $env:SIGNTOOL_PATH verify /pa /all /tw /v "$auditDir\Vincent.exe"
+```
+
+A consumer-trusted Authenticode chain prevents the publisher identity from being shown as unknown, but Microsoft Defender SmartScreen also evaluates publisher reputation and per-file reputation, so a new release hash may still warn. A signature reported as valid only because the build machine trusts a private root is not evidence that consumer Windows installations trust it; validate the release on a clean stock Windows machine or equivalent isolated runner. Self-signed certificates remain untrusted on ordinary consumer machines and do not solve public publisher identity.
+
+Normal Windows startup does not open or flush a diagnostic file. `Main.qml` establishes a hidden 1400x880 launch geometry as the preferred size. Before the first show, the common Qt entry point bounds that hidden size once to the selected screen's available geometry, then shows the completed window. It does not resize the window after it becomes visible. The same pre-show rule prevents Cocoa and Linux compositors from visibly correcting an oversized first frame. The asynchronous canvas `Loader` therefore cannot renegotiate the top-level size; users can still resize or maximize the window after launch. For an opt-in startup timing trace, set `$env:VINCENT_STARTUP_TRACE = "1"` before launching `Vincent.exe`; startup milestones are then appended to `%TEMP%\Vincent-startup.log`. A fatal root-QML object creation failure is written to that file and flushed even when tracing is disabled, but ordinary Qt/QML warnings are not redirected there. If Windows reports that the procedure entry point `__cxa_thread_atexit` cannot be found in `LVRS.dll`, that failure happens before Vincent reaches application logging and indicates a platform runtime mismatch, not a QML load failure. Rebuild LVRS with the same Qt MinGW kit used for Vincent, rerun `build-windows.ps1 -Clean -SkipPackage`, and regenerate the installer from the refreshed `dist/Vincent-Windows` payload.
+
+For a current-user smoke install without creating a package, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -SkipPackage -InstallForCurrentUser
 ```
 
 That copies the staged runtime to `%LOCALAPPDATA%\Programs\Vincent` by default and creates a shortcut in the current user's Start Menu. `-InstallDir <path>` may override the location only below the current user's Local Application Data directory. An existing non-empty target must contain Vincent's ownership marker or a versioned `Vincent.exe`; drive roots, user data roots, reparse points, unrelated directories, and the staged source are rejected before recursive deletion. If the Qt kit is MSVC-based and `cl.exe` is not already in `PATH`, the script tries to load the Visual Studio C++ build environment through `vswhere.exe`; otherwise, launch it from a Developer PowerShell for VS.
+
+## 1c. Microsoft Store MSIX
+
+Microsoft Store MSIX is Vincent's certificate-free public Windows distribution route. Microsoft re-signs an MSIX after certification, so the publisher does not buy, renew, export, or protect a public OV/EV certificate and customers do not receive a SmartScreen unknown-publisher warning for the Store installation. This applies to an actual MSIX submission only. Microsoft does not re-sign an MSI or EXE submitted through the separate Win32 installer path. See Microsoft's current [Windows code-signing options](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options) and [manual desktop MSIX packaging guide](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-manual-conversion).
+
+`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and writes SHA-256 sidecars. The manifest is x64, uses package version `4.0.1.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
+
+### Local self-signed MSIX verification
+
+Self-signing is valid only for development or centrally managed private devices. It does not make a download publicly trusted. Development output is therefore isolated under `build/development-only`, carries a development-only identity, and must never be attached to a public release.
+
+The development certificate Subject must exactly equal `CN=Vincent Development Local Only`, have the Code Signing EKU and an accessible private key in `CurrentUser\My`, and be selected by its exact 40-hex thumbprint. To install a self-signed MSIX, Windows App Installer additionally requires its public certificate in the local computer's `TrustedPeople` store. Import only the public `.cer`, not a PFX; this one-time trust operation requires an elevated PowerShell and should be removed when the development identity is retired. Do not place a leaf signing certificate in a Trusted Root store.
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_DEVELOPMENT_SIGNING_CERTIFICATE_THUMBPRINT",
+  "<actual-40-hex-development-thumbprint>",
+  "User"
+)
+
+$thumbprint = [Environment]::GetEnvironmentVariable(
+  "VINCENT_DEVELOPMENT_SIGNING_CERTIFICATE_THUMBPRINT",
+  "User"
+)
+$certificate = Get-Item "Cert:\CurrentUser\My\$thumbprint"
+New-Item -ItemType Directory -Path .\build\development-only -Force | Out-Null
+Export-Certificate `
+  -Cert $certificate `
+  -FilePath .\build\development-only\Vincent-Development-Local-Only.cer `
+  -Force
+```
+
+Then, from an elevated PowerShell, trust that public certificate for package testing:
+
+```powershell
+Import-Certificate `
+  -FilePath .\build\development-only\Vincent-Development-Local-Only.cer `
+  -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+```
+
+Build, sign, timestamp, install, activate, observe a visible Vincent window, and remove the package with one command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows-store.ps1 -Mode Development -InstallDevelopment
+```
+
+The command fails unless SignTool verifies the package and the installed tree contains the executable and legal notices. It launches through `shell:AppsFolder\<PackageFamilyName>!Vincent`, waits for a visible native window, stops only the process it launched, removes the development package, and confirms that registration is gone. `-SkipBuild` is allowed only for a repeated development check against an already tested runtime stage. The output is `build/development-only/Vincent-4.0.1-Windows-Sideload-Development-x64.msix`; its adjacent certificate is public-key material only, but neither file is a public release artifact.
+
+### Free Store account and Product identity
+
+The legal account holder must complete the identity-sensitive steps. Start at [storedeveloper.microsoft.com](https://storedeveloper.microsoft.com/) so the current free onboarding flow is used, then sign in or create the Microsoft account that will own the product. An individual account requires the account holder's government-issued photo ID and selfie verification and publishes under that verified individual identity. A company account requires authority over the organization and the business evidence Microsoft requests. Account type, legal contracts, identity proof, and the final Publish action cannot be delegated to a build script; an individual account cannot simply be converted into a company account later.
+
+After verification:
+
+1. Open Partner Center, choose **Apps and games**, **New product**, then **MSIX or PWA app**.
+2. Search for and reserve the exact public display name. Use `Vincent` only if Partner Center confirms it is available. A reservation can expire if it is not used for a submission.
+3. Open **Product management > Product identity**.
+4. Copy these three values exactly, preserving case, spaces, commas, and punctuation:
+   - `Package/Identity/Name`
+   - `Package/Identity/Publisher`
+   - `Package/Properties/PublisherDisplayName`
+5. Store only those non-secret values in the current user's environment:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_STORE_IDENTITY_NAME",
+  "<exact-Package-Identity-Name>",
+  "User"
+)
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_STORE_PUBLISHER",
+  "<exact-Package-Identity-Publisher>",
+  "User"
+)
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_STORE_PUBLISHER_DISPLAY_NAME",
+  "<exact-PublisherDisplayName>",
+  "User"
+)
+```
+
+An invented Name or Publisher produces a different package family and Partner Center rejects it. The local development Publisher is intentionally unrelated to the future Store Publisher and must not be substituted.
+
+### Legal release gate
+
+Store signing does not replace the publisher's license obligations. Before a public package can exist, the iiPaintEngine copyright holder must select and commit an explicit license in the iiPaintEngine repository. Do not infer or add a license without that authorization. Vincent's Store stage must then contain non-empty `legal/iiPaintEngine/LICENSE.txt`, all other staged third-party notices, and a corresponding-source offer for the exact release.
+
+Create a complete source archive for the shipped Vincent, LVRS, iiPaintEngine, patched/build-required dependency sources, build scripts, and license material; publish it at an HTTPS location controlled by the publisher; and record the SHA-256 of those exact bytes. Configure the evidence as follows:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_CORRESPONDING_SOURCE_URL",
+  "https://<publisher-controlled-host>/<exact-source-archive>",
+  "User"
+)
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_CORRESPONDING_SOURCE_SHA256",
+  "<exact-64-hex-SHA-256>",
+  "User"
+)
+```
+
+The Store mode fails closed before MakeAppx when the iiPaintEngine license, HTTPS URL, hash, legal notices, exact Product identity, current Release build, or tests are missing. It never turns a development package into a public package and never falls back to a placeholder.
+
+### Create and submit the Store upload
+
+After the Product identity and legal evidence are complete, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows-store.ps1 -Mode Store
+```
+
+This always rebuilds in Release mode and runs the complete test suite. It creates:
+
+- `build/Vincent-4.0.1-Windows-Store-x64.msix`, intentionally unsigned for Store ingestion;
+- `build/Vincent-4.0.1-Windows-Store-x64.msixupload`, a ZIP container holding exactly that x64 MSIX and no fake symbol archive;
+- a `.sha256` sidecar for each file.
+
+MinGW does not produce a Microsoft PDB, so `.appxsym` is deliberately omitted. Do not sign the Store upload with the private development certificate. Upload the `.msixupload` on the submission's **Packages** page; Partner Center performs the authoritative manifest, malware, policy, and technical certification and then replaces the package signature with Microsoft's Store signature.
+
+Because Vincent is a native Qt Win32 desktop application, the restricted `runFullTrust` capability must be explained under submission options. Use the following only after confirming it remains factually true for the submitted build:
+
+> Vincent is a native Qt 6 Win32 desktop image-editing application. Its primary executable runs at medium integrity and uses standard Win32 desktop APIs to open and save files explicitly selected by the user. It does not install drivers or services, request elevation, modify HKLM, or perform machine-wide configuration. The runFullTrust capability is required because the package contains a traditional full-trust Win32 desktop executable.
+
+The account holder must also complete the listing description and category, price and markets, at least one desktop screenshot, support contact, privacy/data-handling declarations based on the application's actual behavior, the IARC age-rating questionnaire, any additional open-source license notice, and the final submission consent. Do not publish a guessed privacy statement. Windows App Certification Kit is an optional local preflight and requires elevation; its result does not replace Partner Center certification.
 
 ## 2. Configure the Release Build
 ```bash
@@ -136,7 +361,7 @@ If `spctl` warns about missing the hardened runtime, make sure `--options runtim
 productbuild \
   --component "dist/Vincent.app" /Applications \
   --sign "Apple Installer: MUYEONG YUN (5U49ST9XZH)" \
-  "dist/Vincent-4.0.pkg"
+  "dist/Vincent-4.0.1.pkg"
 ```
 This produces the installer payload required by App Store Connect. Keep the `.pkg` under 4 GB.
 
@@ -161,7 +386,7 @@ If Dock or Launchpad still shows the old icon after the installed bundle is corr
 
 ## 9. Upload to App Store Connect
 1. Open Transporter.
-2. Drag `dist/Vincent-4.0.pkg` into the queue.
+2. Drag `dist/Vincent-4.0.1.pkg` into the queue.
 3. Provide your App Store Connect credentials and upload.
 4. Resolve any validation issues that Transporter reports (missing icons, entitlement mismatches, etc.).
 

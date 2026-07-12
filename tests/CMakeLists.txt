@@ -181,6 +181,72 @@ set_tests_properties(
 )
 
 if(WIN32)
+    find_program(_vincent_powershell_executable NAMES powershell.exe REQUIRED)
+    add_test(
+            NAME tests_windowsauthenticodepolicy
+            COMMAND "${_vincent_powershell_executable}"
+                    -NoProfile
+                    -ExecutionPolicy Bypass
+                    -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_windowsauthenticodepolicy.ps1"
+                    -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows.ps1"
+    )
+    set_tests_properties(tests_windowsauthenticodepolicy PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+
+    find_program(_vincent_pwsh_executable NAMES pwsh.exe)
+    if(_vincent_pwsh_executable)
+        add_test(
+                NAME tests_windowsauthenticodepolicy_pwsh
+                COMMAND "${_vincent_pwsh_executable}"
+                        -NoProfile
+                        -ExecutionPolicy Bypass
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_windowsauthenticodepolicy.ps1"
+                        -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows.ps1"
+        )
+        set_tests_properties(tests_windowsauthenticodepolicy_pwsh PROPERTIES
+                ENVIRONMENT "${_vincent_test_environment}"
+        )
+    endif()
+
+    add_test(
+            NAME tests_windowsmsiauthoringcontract
+            COMMAND "${_vincent_powershell_executable}"
+                    -NoProfile
+                    -ExecutionPolicy Bypass
+                    -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_windowsmsiauthoringcontract.ps1"
+                    -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows.ps1"
+    )
+    set_tests_properties(tests_windowsmsiauthoringcontract PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+
+    add_test(
+            NAME tests_windowsstorepackagecontract
+            COMMAND "${_vincent_powershell_executable}"
+                    -NoProfile
+                    -ExecutionPolicy Bypass
+                    -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_windowsstorepackagecontract.ps1"
+                    -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows-store.ps1"
+                    -ManifestTemplatePath "${CMAKE_SOURCE_DIR}/packaging/windows/AppxManifest.xml.in"
+    )
+    set_tests_properties(tests_windowsstorepackagecontract PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+    if(_vincent_pwsh_executable)
+        add_test(
+                NAME tests_windowsstorepackagecontract_pwsh
+                COMMAND "${_vincent_pwsh_executable}"
+                        -NoProfile
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_windowsstorepackagecontract.ps1"
+                        -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows-store.ps1"
+                        -ManifestTemplatePath "${CMAKE_SOURCE_DIR}/packaging/windows/AppxManifest.xml.in"
+        )
+        set_tests_properties(tests_windowsstorepackagecontract_pwsh PROPERTIES
+                ENVIRONMENT "${_vincent_test_environment}"
+        )
+    endif()
+
     set_tests_properties(tests_windowsbinarycontract PROPERTIES
             ENVIRONMENT "${_vincent_test_environment}"
     )
@@ -195,6 +261,9 @@ if(WIN32)
             tests_macosbuildworkflowcontract
             tests_linuxbuildworkflowcontract
             tests_windowsbuildworkflowcontract
+            tests_windowsauthenticodepolicy
+            tests_windowsmsiauthoringcontract
+            tests_windowsstorepackagecontract
             tests_windowsbinarycontract
             tests_drawingsurfaceitem
             PROPERTIES

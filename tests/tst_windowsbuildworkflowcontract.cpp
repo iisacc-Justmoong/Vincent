@@ -1,4 +1,5 @@
 #include <QFile>
+#include <QRegularExpression>
 #include <QString>
 #include <QtTest>
 
@@ -21,6 +22,8 @@ class tst_WindowsBuildWorkflowContract : public QObject
 
 private slots:
     void windowsBuildScriptDefinesRunnablePackageContract();
+    void windowsMsiDefinitionProvidesInstallOptions();
+    void windowsBuildScriptDefinesAuthenticodeContract();
     void cmakeBuildsWindowsGuiExecutable();
     void windowsResourcesDefineNativeApplicationContract();
     void cmakeHasWindowsInstallAndPackageRules();
@@ -41,12 +44,13 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     const QString gitignoreSource = readTextFile(gitignorePath);
     QVERIFY(!gitignoreSource.contains(QStringLiteral("\nbuild-windows.ps1\n")));
     QVERIFY(!gitignoreSource.contains(QStringLiteral("\n/build-windows.ps1\n")));
+    QVERIFY(gitignoreSource.contains(QStringLiteral("!/packaging/windows/**")));
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.1\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
-    QVERIFY(source.contains(QStringLiteral("$MsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
+    QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
 
     QVERIFY(source.contains(QStringLiteral("$env:QT_PREFIX")));
@@ -57,6 +61,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Assert-MinGwRuntimeCompatibility")));
     QVERIFY(source.contains(QStringLiteral("Import-VisualStudioEnvironment")));
     QVERIFY(source.contains(QStringLiteral("windeployqt.exe")));
+    QVERIFY(source.contains(QStringLiteral("--no-system-dxc-compiler")));
 
     QVERIFY(source.contains(QStringLiteral("Get-RequiredCommand \"cmake.exe\"")));
     QVERIFY(source.contains(QStringLiteral("Get-RequiredCommand \"ninja.exe\"")));
@@ -65,14 +70,28 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Resolve-WixTools")));
     QVERIFY(source.contains(QStringLiteral("New-MsiInstaller")));
     QVERIFY(source.contains(QStringLiteral("Write-MsiProductFile")));
-    QVERIFY(source.contains(QStringLiteral("AllowSameVersionUpgrades=\"yes\"")));
-    QVERIFY(source.contains(QStringLiteral("InstallScope=\"perUser\"")));
-    QVERIFY(source.contains(QStringLiteral("LocalAppDataFolder")));
-    QVERIFY(source.contains(QStringLiteral("LocalProgramsFolder")));
-    QVERIFY(source.contains(QStringLiteral("-sice:ICE38")));
-    QVERIFY(source.contains(QStringLiteral("-sice:ICE64")));
-    QVERIFY(source.contains(QStringLiteral("-sice:ICE91")));
-    QVERIFY(!source.contains(QStringLiteral("ProgramFiles64Folder")));
+    QVERIFY(source.contains(QStringLiteral("Write-MsiLicenseRtf")));
+    QVERIFY(source.contains(QStringLiteral("WixUILicenseRtf")));
+    QVERIFY(source.contains(QStringLiteral("Join-Path $RepositoryRoot \"LICENSE\"")));
+    QVERIFY(!source.contains(QStringLiteral("AllowSameVersionUpgrades")));
+    QVERIFY(source.contains(QStringLiteral("Schedule=\"afterInstallInitialize\"")));
+    QVERIFY(!source.contains(QStringLiteral("InstallScope=\"perMachine\"")));
+    QVERIFY(source.contains(QStringLiteral("ProgramFiles64Folder")));
+    QVERIFY(source.contains(QStringLiteral("ProgramMenuFolder")));
+    QVERIFY(source.contains(QStringLiteral("ApplicationProgramsFolder")));
+    QVERIFY(source.contains(QStringLiteral("ApplicationStartMenuShortcut")));
+    QVERIFY(source.contains(QStringLiteral("Root=\"HKCU\"")));
+    QVERIFY(source.contains(QStringLiteral("Root=\"HKLM\"")));
+    QVERIFY(source.contains(QStringLiteral("ApplicationFolderName")));
+    QVERIFY(source.contains(QStringLiteral("WixAppFolder")));
+    QVERIFY(source.contains(QStringLiteral("WixPerUserFolder")));
+    QVERIFY(source.contains(QStringLiteral("ARPINSTALLLOCATION")));
+    QVERIFY(!source.contains(QStringLiteral("-sice:")));
+    QVERIFY(source.contains(QStringLiteral("Invoke-Native $heat @(\"dir\", $SourceDirectory, \"-wx\"")));
+    QVERIFY(source.contains(QStringLiteral("Invoke-Native $candle @(\"-wx\"")));
+    QVERIFY(source.contains(QStringLiteral("Invoke-Native $light @(\"-wx\"")));
+    QVERIFY(source.contains(QStringLiteral("\"-ag\"")));
+    QVERIFY(!source.contains(QStringLiteral("\"-gg\"")));
     QVERIFY(source.contains(QStringLiteral("\"-S\", $RepositoryRoot")));
     QVERIFY(source.contains(QStringLiteral("\"-B\", $BuildDir")));
     QVERIFY(source.contains(QStringLiteral("\"-DCMAKE_PREFIX_PATH=$prefixPath\"")));
@@ -86,10 +105,15 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Remove-EmbeddedDependencyQmlImport -ModuleName \"LVRS\"")));
     QVERIFY(source.contains(QStringLiteral("Remove-ReleaseOnlyQtArtifacts -Directory $StageDir -BuildType $BuildType")));
     QVERIFY(source.contains(QStringLiteral("\"qmltooling\"")));
+    QVERIFY(source.contains(QStringLiteral("\"generic\"")));
+    QVERIFY(source.contains(QStringLiteral("\"sqldrivers\"")));
+    QVERIFY(source.contains(QStringLiteral("\"Qt6InsightTracker.dll\"")));
+    QVERIFY(source.contains(QStringLiteral("\"Qt6Sql.dll\"")));
+    QVERIFY(source.contains(QStringLiteral("\"Qt6Quick3DUtils.dll\"")));
     QVERIFY(source.contains(QStringLiteral("\"imageformats\\qpdf.dll\"")));
     QVERIFY(source.contains(QStringLiteral("\"qml\\QtQuick\\VirtualKeyboard\"")));
-    QVERIFY(source.contains(QStringLiteral("\"sqldrivers\\qsqlpsql.dll\"")));
-    QVERIFY(source.contains(QStringLiteral("\"sqldrivers\\qsqlmimer.dll\"")));
+    QVERIFY(!source.contains(QStringLiteral("\"sqldrivers\\qsqlpsql.dll\"")));
+    QVERIFY(!source.contains(QStringLiteral("\"sqldrivers\\qsqlmimer.dll\"")));
     QVERIFY(source.contains(QStringLiteral("Get-PeSubsystem")));
     QVERIFY(source.contains(QStringLiteral("Assert-StagedPeImportClosure")));
     QVERIFY(source.contains(QStringLiteral("DLL Name:")));
@@ -102,11 +126,46 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Strip-WindowsRuntimeBinaries")));
     QVERIFY(source.contains(QStringLiteral("--strip-all")));
     QVERIFY(source.contains(QStringLiteral("\"--translations\", \"en,ko\"")));
-    QVERIFY(source.contains(QStringLiteral("\"--skip-plugin-types\", \"qmltooling\"")));
+    QVERIFY(source.contains(QStringLiteral("\"--skip-plugin-types\", \"qmltooling,generic,sqldrivers\"")));
+    QVERIFY(source.contains(QStringLiteral("\"--no-system-d3d-compiler\"")));
+    QVERIFY(source.contains(QStringLiteral("\"--no-opengl-sw\"")));
     QVERIFY(source.contains(QStringLiteral("\"--exclude-plugins\", \"qpdf,qtvirtualkeyboardplugin\"")));
     QVERIFY(source.contains(QStringLiteral("\"--verbose\", \"0\"")));
     QVERIFY(source.contains(QStringLiteral("Verify-WindowsStage -Directory $StageDir -ResolvedQtPrefix $QtPrefix -ExpectedFileVersion $WindowsFileVersion -BuildType $BuildType")));
     QVERIFY(source.contains(QStringLiteral("qml\\QtQuick\\Shapes\\qmlshapesplugin.dll")));
+    QVERIFY(source.contains(QStringLiteral("VINCENT_CORRESPONDING_SOURCE_URL")));
+    QVERIFY(source.contains(QStringLiteral("VINCENT_CORRESPONDING_SOURCE_SHA256")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-DependencyLicenseFile")));
+    QVERIFY(source.contains(QStringLiteral("Assert-PublicDistributionEvidence")));
+    QVERIFY(source.contains(QStringLiteral("Copy-WindowsLegalMaterials")));
+    QVERIFY(source.contains(QStringLiteral("Assert-WindowsLegalMaterials")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-StagedMinGwToolchainRoot")));
+    QVERIFY(source.contains(QStringLiteral("Public Windows packaging requires an explicit iiPaintEngine LICENSE")));
+    QVERIFY(source.contains(QStringLiteral("qtimageformats")));
+    QVERIFY(source.contains(QStringLiteral("COPYING.RUNTIME")));
+    QVERIFY(source.contains(QStringLiteral("COPYING.MinGW-w64-runtime.txt")));
+    QVERIFY(source.contains(QStringLiteral("winpthreads\\COPYING")));
+
+    const QString noticesPath = QFINDTESTDATA("../packaging/windows/THIRD_PARTY_NOTICES.txt");
+    QVERIFY2(!noticesPath.isEmpty(), "Windows third-party notices were not found");
+    const QString notices = readTextFile(noticesPath);
+    QVERIFY(notices.contains(QStringLiteral("iiPaintEngine")));
+    QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
+    QVERIFY(notices.contains(QStringLiteral("Pretendard 1.3.9")));
+    QVERIFY(notices.contains(QStringLiteral("Qt 6.8.3")));
+    QVERIFY(notices.contains(QStringLiteral("GCC / MinGW-w64")));
+
+    const QString pretendardLicensePath = QFINDTESTDATA("../packaging/windows/licenses/Pretendard-OFL-1.1.txt");
+    QVERIFY2(!pretendardLicensePath.isEmpty(), "Pretendard OFL license was not found");
+    QVERIFY(readTextFile(pretendardLicensePath).contains(QStringLiteral("SIL OPEN FONT LICENSE Version 1.1")));
+
+    const QString psdLicensePath = QFINDTESTDATA("../packaging/windows/licenses/psd_sdk-BSD-2-Clause.txt");
+    QVERIFY2(!psdLicensePath.isEmpty(), "psd_sdk BSD license was not found");
+    QVERIFY(readTextFile(psdLicensePath).contains(QStringLiteral("BSD 2-Clause License")));
+
+    const QString minizLicensePath = QFINDTESTDATA("../packaging/windows/licenses/psd_sdk-miniz-Unlicense.txt");
+    QVERIFY2(!minizLicensePath.isEmpty(), "psd_sdk miniz Unlicense was not found");
+    QVERIFY(readTextFile(minizLicensePath).contains(QStringLiteral("free and unencumbered software")));
     QVERIFY(source.contains(QStringLiteral("the Qt Quick Shapes QML plugin is missing")));
     QVERIFY(source.contains(QStringLiteral("libstdc++-6.dll")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
@@ -121,6 +180,202 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral(".vincent-install-root")));
     QVERIFY(source.contains(QStringLiteral("VersionInfo.ProductName -eq \"Vincent\"")));
     QVERIFY(source.contains(QStringLiteral("Remove-Item -LiteralPath $TargetDirectory -Recurse -Force")));
+}
+
+void tst_WindowsBuildWorkflowContract::windowsMsiDefinitionProvidesInstallOptions()
+{
+    const QString scriptPath = QFINDTESTDATA("../build-windows.ps1");
+    QVERIFY2(!scriptPath.isEmpty(), "build-windows.ps1 test data was not found");
+    const QString source = readTextFile(scriptPath);
+    QVERIFY(!source.isEmpty());
+
+    QVERIFY(source.contains(QStringLiteral("<UIRef Id=\"WixUI_Advanced\" />")));
+    QVERIFY(!source.contains(QStringLiteral("<UIRef Id=\"WixUI_FeatureTree\" />")));
+    QVERIFY(!source.contains(QStringLiteral("<UIRef Id=\"WixUI_InstallDir\" />")));
+    QVERIFY(!source.contains(QStringLiteral("ARPNOMODIFY")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"ApplicationFolderName\" Value=\"Vincent\" />")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"WixAppFolder\" Value=\"WixPerUserFolder\" />")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"ALLUSERS\" Value=\"2\" />")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"MSIINSTALLPERUSER\" Value=\"1\" />")));
+    QVERIFY(source.contains(QStringLiteral("function New-DeterministicProductCode")));
+    QVERIFY(source.contains(QStringLiteral("<Product Id=\"%%PRODUCT_CODE%%\"")));
+    QVERIFY(source.contains(QStringLiteral("$productSource.Replace(\"%%PRODUCT_CODE%%\", $productCode)")));
+    QVERIFY(!source.contains(QStringLiteral("<Product Id=\"*\"")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"VINCENT_EXISTING_USER_CONTEXT\" Secure=\"yes\">")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"VINCENT_EXISTING_MACHINE_CONTEXT\" Secure=\"yes\">")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"VINCENT_MACHINE_PROGRAMFILES64\" Secure=\"yes\">")));
+    QVERIFY(source.contains(QStringLiteral("Name=\"ProgramFilesDir\"")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"VINCENT_EXISTING_USER_INSTALLLOCATION\" Secure=\"yes\">")));
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"VINCENT_EXISTING_MACHINE_INSTALLLOCATION\" Secure=\"yes\">")));
+    QVERIFY(source.contains(QStringLiteral("Name=\"installContext\"")));
+    QVERIFY(source.contains(QStringLiteral("Name=\"InstallLocation\"")));
+    QVERIFY(source.contains(QStringLiteral("Name=\"machineStartMenuShortcut\"")));
+    QVERIFY(!source.contains(QStringLiteral("<FindRelatedProducts Suppress=\"yes\"")));
+    QVERIFY(source.contains(QStringLiteral("<AppSearch Sequence=\"10\" />")));
+    QVERIFY(source.contains(QStringLiteral("<ComponentRef Id=\"InstallContextComponent\" />")));
+    QVERIFY(source.contains(QStringLiteral("<Component Id=\"InstallContextComponent\" Guid=\"3048C76F-C0FC-4CEE-9C86-D154BDA6BCD8\"")));
+    QVERIFY(source.contains(QStringLiteral("Root=\"HKMU\"")));
+    QVERIFY(source.contains(QStringLiteral("Id=\"VincentSetExistingMachineContext\"")));
+    const QRegularExpression existingMachineContextAction(
+            QStringLiteral(R"(<CustomAction\s+Id="VincentSetExistingMachineContext"\s+Property="ALLUSERS"\s+Value="1"\s+Execute="firstSequence"\s*/>)"));
+    QVERIFY(existingMachineContextAction.match(source).hasMatch());
+    QVERIFY(source.contains(QStringLiteral("Installed OR REMOVE~=\"ALL\" OR NOT (")));
+    QVERIFY(source.contains(QStringLiteral("WIX_UPGRADE_DETECTED AND NOT (VINCENT_EXISTING_MACHINE_CONTEXT OR VINCENT_LEGACY_MACHINE_CONTEXT)")));
+
+    const QRegularExpression coreFeatureExpression(
+            QStringLiteral(R"(<Feature\s+Id="CoreFeature"[^>]*>)"));
+    const QRegularExpressionMatch coreFeatureMatch = coreFeatureExpression.match(source);
+    QVERIFY2(coreFeatureMatch.hasMatch(), "The MSI must define a CoreFeature.");
+    const QString coreFeatureTag = coreFeatureMatch.captured();
+    QVERIFY(coreFeatureTag.contains(QStringLiteral("Level=\"1\"")));
+    QVERIFY(coreFeatureTag.contains(QStringLiteral("Absent=\"disallow\"")));
+    QVERIFY(coreFeatureTag.contains(QStringLiteral("ConfigurableDirectory=\"APPLICATIONFOLDER\"")));
+
+    QVERIFY(source.contains(QStringLiteral("<Property Id=\"DISABLEADVTSHORTCUTS\" Value=\"1\" />")));
+    QVERIFY(source.contains(QStringLiteral("function Add-AdvertisedStartMenuShortcut")));
+    QVERIFY(source.contains(QStringLiteral("Advertise=`\"yes`\"")));
+    QVERIFY(source.contains(QStringLiteral("Directory=`\"ApplicationProgramsFolder`\"")));
+    QVERIFY(source.contains(QStringLiteral("Add-AdvertisedStartMenuShortcut -HarvestPath $runtimePath")));
+    QVERIFY(!source.contains(QStringLiteral("Id=\"StartMenuShortcutFeature\"")));
+    QVERIFY(!source.contains(QStringLiteral("ApplicationShortcutComponent")));
+    QVERIFY(!source.contains(QStringLiteral("MachineStartMenuShortcutComponent")));
+    QVERIFY(!source.contains(QStringLiteral("D3D91B09-F3E7-4CA5-8E42-F5F25C8ACD2A")));
+    QVERIFY(!source.contains(QStringLiteral("<Directory Id=\"CommonProgramsFolder\">")));
+
+    QVERIFY(source.contains(QStringLiteral("smoke.exe")));
+    QVERIFY(source.contains(QStringLiteral("-ice:ICE105")));
+    QVERIFY(source.contains(QStringLiteral("-nodefault")));
+    QVERIFY(source.contains(QStringLiteral("darice.cub")));
+}
+
+void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesAuthenticodeContract()
+{
+    const QString scriptPath = QFINDTESTDATA("../build-windows.ps1");
+    QVERIFY2(!scriptPath.isEmpty(), "build-windows.ps1 test data was not found");
+    const QString source = readTextFile(scriptPath);
+    QVERIFY(!source.isEmpty());
+
+    QVERIFY(source.contains(QStringLiteral("[switch]$Sign")));
+    QVERIFY(source.contains(QStringLiteral("[switch]$AllowUnsignedPackage")));
+    QVERIFY(source.contains(QStringLiteral("$env:VINCENT_SIGNING_CERTIFICATE_THUMBPRINT")));
+    QVERIFY(source.contains(QStringLiteral("$env:SIGNTOOL_PATH")));
+    QVERIFY(source.contains(QStringLiteral("http://timestamp.digicert.com")));
+    QVERIFY(source.contains(QStringLiteral("1.3.6.1.5.5.7.3.3")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-SignTool")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-CodeSigningCertificate")));
+    QVERIFY(source.contains(QStringLiteral("Assert-PublicCodeSigningChainEvidence")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-PublicCodeSigningCertificateTrust")));
+    QVERIFY(source.contains(QStringLiteral("X509RevocationMode]::Online")));
+    QVERIFY(source.contains(QStringLiteral("X509RevocationFlag]::ExcludeRoot")));
+    QVERIFY(source.contains(QStringLiteral("Cert:\\LocalMachine\\AuthRoot")));
+    QVERIFY(source.contains(QStringLiteral("Public release signing rejects self-signed certificate chains")));
+    QVERIFY(source.contains(QStringLiteral("Microsoft public trust root")));
+    QVERIFY(source.contains(QStringLiteral("Sign-AuthenticodeFile")));
+    QVERIFY(source.contains(QStringLiteral("Verify-AuthenticodeFile")));
+    QVERIFY(source.contains(QStringLiteral("Get-VincentOwnedStageFiles")));
+    QVERIFY(source.contains(QStringLiteral("Sign-WindowsStage")));
+    QVERIFY(source.contains(QStringLiteral("Verify-WindowsStageSignatures")));
+    QVERIFY(source.contains(QStringLiteral("Clear-WindowsPackageArtifacts")));
+    QVERIFY(source.contains(QStringLiteral("Write-Sha256File")));
+
+    QVERIFY(!source.contains(QStringLiteral("\"/as\"")));
+    QVERIFY(source.contains(QStringLiteral("\"/fd\", \"SHA256\"")));
+    QVERIFY(source.contains(QStringLiteral("\"/tr\", $TimestampUrl")));
+    QVERIFY(source.contains(QStringLiteral("\"/td\", \"SHA256\"")));
+    QVERIFY(source.contains(QStringLiteral("\"/sha1\", $CertificateThumbprint")));
+    QVERIFY(source.contains(QStringLiteral("\"verify\", \"/pa\", \"/all\", \"/tw\"")));
+    QVERIFY(!source.contains(QStringLiteral("\"sign\", \"/a\"")));
+    QVERIFY(!source.contains(QStringLiteral("\"/p\"")));
+
+    QVERIFY(source.contains(QStringLiteral("-Sign and -AllowUnsignedPackage cannot be used together")));
+    QVERIFY(source.contains(QStringLiteral("Public package creation requires -Sign")));
+    QVERIFY(source.contains(QStringLiteral("-unsigned")));
+    QVERIFY(source.contains(QStringLiteral("$UnsignedZipPath = Join-Path $DistRoot \"Vincent-$Version-Windows-unsigned.zip\"")));
+    QVERIFY(source.contains(QStringLiteral("$UnsignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows-unsigned.msi\"")));
+    QVERIFY(source.contains(QStringLiteral("$ZipChecksumPath = \"$ZipPath.sha256\"")));
+    QVERIFY(source.contains(QStringLiteral("$MsiChecksumPath = \"$MsiPath.sha256\"")));
+    QVERIFY(source.contains(QStringLiteral("$MsiPartialDebugPath")));
+    QVERIFY(source.contains(QStringLiteral("$CpackIncompleteZipPath")));
+    QVERIFY(source.contains(QStringLiteral("Code Signing EKU")));
+    QVERIFY(source.contains(QStringLiteral("DigitalSignature")));
+    QVERIFY(source.contains(QStringLiteral("Assert-CodeSigningCertificateKeyUsage")));
+    QVERIFY(source.contains(QStringLiteral("DigitalSignature")));
+    QVERIFY(source.contains(QStringLiteral("private key")));
+    QVERIFY(source.contains(QStringLiteral("RFC 3161")));
+    QVERIFY(source.contains(QStringLiteral("Authenticode release signing does not allow -SkipTests")));
+    QVERIFY(source.contains(QStringLiteral("\"Vincent.exe\", \"LVRS.dll\", \"libiiPaintEngine.dll\"")));
+    QVERIFY(source.contains(QStringLiteral("-ExpectedCertificateThumbprint $CertificateThumbprint")));
+    QVERIFY(!source.contains(QStringLiteral("Get-Command \"signtool.exe\"")));
+
+    const qsizetype stripIndex = source.lastIndexOf(QStringLiteral("Strip-WindowsRuntimeBinaries -Directory"));
+    const qsizetype structuralVerifyIndex = source.lastIndexOf(QStringLiteral("Verify-WindowsStage -Directory"));
+    const qsizetype signStageIndex = source.lastIndexOf(QStringLiteral("Sign-WindowsStage -Directory"));
+    const qsizetype signatureVerifyIndex = source.lastIndexOf(QStringLiteral("Verify-WindowsStageSignatures -Directory"));
+    const qsizetype zipIndex = source.lastIndexOf(QStringLiteral("Compress-Archive"));
+    const qsizetype zipChecksumIndex = source.lastIndexOf(QStringLiteral("-File $ZipPartialPath `"));
+    const qsizetype groupPublishIndex = source.lastIndexOf(QStringLiteral("-Artifacts $packageArtifacts `"));
+    QVERIFY(stripIndex >= 0);
+    QVERIFY(structuralVerifyIndex > stripIndex);
+    QVERIFY(signStageIndex > structuralVerifyIndex);
+    QVERIFY(signatureVerifyIndex > signStageIndex);
+    QVERIFY(zipIndex > signatureVerifyIndex);
+    QVERIFY(zipChecksumIndex > zipIndex);
+
+    const qsizetype createMsiIndex = source.lastIndexOf(QStringLiteral("New-MsiInstaller -SourceDirectory $StageDir -OutputPath $MsiPartialPath"));
+    const qsizetype signMsiIndex = source.lastIndexOf(QStringLiteral("Sign-AuthenticodeFile -File $MsiPartialPath"));
+    const qsizetype verifyMsiIndex = source.lastIndexOf(QStringLiteral("Verify-AuthenticodeFile -File $MsiPartialPath"));
+    const qsizetype databaseContractIndex = source.lastIndexOf(QStringLiteral("Assert-MsiDatabaseContract -MsiFile $MsiPartialPath"));
+    const qsizetype msiChecksumIndex = source.lastIndexOf(QStringLiteral("-File $MsiPartialPath `"));
+    QVERIFY(createMsiIndex >= 0);
+    QVERIFY(createMsiIndex > zipChecksumIndex);
+    QVERIFY(signMsiIndex > createMsiIndex);
+    QVERIFY(verifyMsiIndex > signMsiIndex);
+    QVERIFY(databaseContractIndex > verifyMsiIndex);
+    QVERIFY(source.contains(QStringLiteral("\"-MsiPath\", $MsiFile")));
+    QVERIFY(msiChecksumIndex > databaseContractIndex);
+    QVERIFY(groupPublishIndex > msiChecksumIndex);
+
+    const qsizetype policyIndex = source.lastIndexOf(QStringLiteral("Assert-AuthenticodePolicy `"));
+    const qsizetype signingIdentityIndex = source.lastIndexOf(QStringLiteral("$ResolvedSignTool = Resolve-SignTool -ConfiguredPath $SignToolPath"));
+    const qsizetype recoveryIndex = source.lastIndexOf(QStringLiteral("-Artifacts $recoveryArtifacts `"));
+    const qsizetype clearArtifactsIndex = source.lastIndexOf(QStringLiteral("Clear-WindowsPackageArtifacts -Paths $partialArtifacts"));
+    const qsizetype toolchainIndex = source.lastIndexOf(QStringLiteral("Write-Step \"Resolving toolchain\""));
+    QVERIFY(recoveryIndex >= 0);
+    QVERIFY(policyIndex > recoveryIndex);
+    QVERIFY(signingIdentityIndex > policyIndex);
+    QVERIFY(clearArtifactsIndex > signingIdentityIndex);
+    QVERIFY(toolchainIndex > clearArtifactsIndex);
+    QVERIFY(source.contains(QStringLiteral("$partialArtifacts += @($ZipPartialPath, $ZipChecksumPartialPath)")));
+    QVERIFY(source.contains(QStringLiteral("$partialArtifacts += @($MsiPartialPath, $MsiPartialDebugPath, $MsiChecksumPartialPath)")));
+    QVERIFY(source.contains(QStringLiteral("function Publish-PackageArtifact")));
+    QVERIFY(source.contains(QStringLiteral("function Publish-PackageArtifactSet")));
+    QVERIFY(source.contains(QStringLiteral("function Restore-PackageArtifactBackups")));
+    QVERIFY(source.contains(QStringLiteral("function Restore-PackageArtifactSetBackups")));
+    QVERIFY(source.contains(QStringLiteral("function Write-PackagePublicationJournal")));
+    QVERIFY(source.contains(QStringLiteral("function Remove-PackagePublicationJournal")));
+    QVERIFY(source.contains(QStringLiteral("function Enter-WindowsBuildMutex")));
+    QVERIFY(source.contains(QStringLiteral("Global\\Vincent.BuildWindows.")));
+    QVERIFY(source.contains(QStringLiteral("$mutex.WaitOne(0)")));
+    QVERIFY(source.contains(QStringLiteral("Another build-windows.ps1 process is already using this repository")));
+    QVERIFY(source.contains(QStringLiteral("$WindowsBuildMutex.ReleaseMutex()")));
+    QVERIFY(source.contains(QStringLiteral("$PackagePublicationJournalPath")));
+    QVERIFY(source.contains(QStringLiteral("$SignedPackagePublicationJournalPath")));
+    QVERIFY(source.contains(QStringLiteral("$UnsignedPackagePublicationJournalPath")));
+    QVERIFY(source.contains(QStringLiteral("$allowedFinalArtifacts")));
+    QVERIFY(source.contains(QStringLiteral("$requestedFinalArtifacts")));
+    QVERIFY(source.contains(QStringLiteral("Test-Path -LiteralPath $PackagePublicationJournalPath -PathType Leaf")));
+    QVERIFY(source.contains(QStringLiteral("if ($Clean)")));
+    QVERIFY(source.contains(QStringLiteral("JournalPath = $SignedPackagePublicationJournalPath")));
+    QVERIFY(source.contains(QStringLiteral("JournalPath = $UnsignedPackagePublicationJournalPath")));
+    QVERIFY(!source.contains(QStringLiteral("$PackageSelection")));
+    QVERIFY(source.contains(QStringLiteral("SchemaVersion = 1")));
+    QVERIFY(source.contains(QStringLiteral("-Phase \"prepared\"")));
+    QVERIFY(source.contains(QStringLiteral("-Phase \"committed\"")));
+    QVERIFY(source.contains(QStringLiteral("-JournalPath $PackagePublicationJournalPath")));
+    QVERIFY(source.contains(QStringLiteral("$FinalArtifactPath.previous")));
+    QVERIFY(source.contains(QStringLiteral("$FinalChecksumPath.previous")));
+    QVERIFY(!source.contains(QStringLiteral("Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue")));
+    QVERIFY(!source.contains(QStringLiteral("Remove-Item -LiteralPath $MsiPath -Force -ErrorAction SilentlyContinue")));
 }
 
 void tst_WindowsBuildWorkflowContract::cmakeBuildsWindowsGuiExecutable()
@@ -176,7 +431,7 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
 
     QVERIFY(source.contains(QStringLiteral("elseif(WIN32)\n    install(TARGETS Vincent RUNTIME DESTINATION \".\" COMPONENT Runtime)")));
     QVERIFY(source.contains(QStringLiteral("elseif(WIN32)\n    set(CPACK_GENERATOR \"ZIP\")")));
-    QVERIFY(source.contains(QStringLiteral("set(CPACK_PACKAGE_FILE_NAME \"Vincent-${CPACK_PACKAGE_VERSION}-Windows\")")));
+    QVERIFY(source.contains(QStringLiteral("set(CPACK_PACKAGE_FILE_NAME \"Vincent-${CPACK_PACKAGE_VERSION}-Windows-unsigned-cpack-incomplete\")")));
     QVERIFY(source.contains(QStringLiteral("if(WIN32)\n    add_custom_command(TARGET Vincent POST_BUILD")));
     QVERIFY(source.contains(QStringLiteral("if(WIN32 AND MINGW)")));
     QVERIFY(source.contains(QStringLiteral("get_filename_component(_vincent_mingw_runtime_dir \"${CMAKE_CXX_COMPILER}\" DIRECTORY)")));
@@ -193,6 +448,9 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(source.contains(QStringLiteral("set_source_files_properties(\"${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c\" PROPERTIES LANGUAGE CXX)")));
     QVERIFY(source.contains(QStringLiteral("UPDATE_DISCONNECTED TRUE")));
     QVERIFY(source.contains(QStringLiteral("lvrs_apply_platform_build_optimizations(vincent_psd_sdk)")));
+    QVERIFY(source.contains(QStringLiteral("-Wno-pragmas")));
+    QVERIFY(source.contains(QStringLiteral("INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE")));
+    QVERIFY(!source.contains(QStringLiteral("-flto=4")));
     QVERIFY(source.contains(QStringLiteral("resources/windows/Vincent.rc.in")));
     QVERIFY(source.contains(QStringLiteral("resources/windows/Vincent.manifest.in")));
     QVERIFY(source.contains(QStringLiteral("configure_file(\"${VINCENT_WINDOWS_RESOURCE_TEMPLATE}\"")));
@@ -203,6 +461,34 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     const QString testsSource = readTextFile(testsCmakePath);
     QVERIFY(testsSource.contains(QStringLiteral("ENVIRONMENT_MODIFICATION")));
     QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>")));
+    QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy")));
+    QVERIFY(testsSource.contains(QStringLiteral("tst_windowsauthenticodepolicy.ps1")));
+    QVERIFY(testsSource.contains(QStringLiteral("NAMES pwsh.exe")));
+    QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy_pwsh")));
+    QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsmsiauthoringcontract")));
+    QVERIFY(testsSource.contains(QStringLiteral("tst_windowsmsiauthoringcontract.ps1")));
+    QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsstorepackagecontract")));
+    QVERIFY(testsSource.contains(QStringLiteral("tst_windowsstorepackagecontract.ps1")));
+    QVERIFY(!testsSource.contains(QStringLiteral("NAME tests_windowsmsidatabasecontract")));
+    QVERIFY(!testsSource.contains(QStringLiteral("tst_windowsmsidatabasecontract.ps1")));
+    QVERIFY(!testsSource.contains(QStringLiteral("SKIP_RETURN_CODE 77")));
+
+    const QString databaseContractPath = QFINDTESTDATA("tst_windowsmsidatabasecontract.ps1");
+    QVERIFY2(!databaseContractPath.isEmpty(), "MSI database contract script was not found");
+    const QString databaseContractSource = readTextFile(databaseContractPath);
+    QVERIFY(databaseContractSource.contains(QStringLiteral(
+        "[Parameter(Mandatory = $true)]\n    [string]$MsiPath")));
+    QVERIFY(!databaseContractSource.contains(QStringLiteral("Vincent-$Version-Windows.msi")));
+    QVERIFY(!databaseContractSource.contains(QStringLiteral("Vincent-$Version-Windows-unsigned.msi")));
+    QVERIFY(!databaseContractSource.contains(QStringLiteral("skipping database contract")));
+    QVERIFY(!databaseContractSource.contains(QStringLiteral("exit 77")));
+
+    const QString buildScriptPath = QFINDTESTDATA("../build-windows.ps1");
+    QVERIFY2(!buildScriptPath.isEmpty(), "build-windows.ps1 test data was not found");
+    const QString buildScriptSource = readTextFile(buildScriptPath);
+    QVERIFY(buildScriptSource.contains(QStringLiteral(
+        "Assert-MsiDatabaseContract -MsiFile $MsiPartialPath")));
+    QVERIFY(buildScriptSource.contains(QStringLiteral("\"-MsiPath\", $MsiFile")));
 }
 
 void tst_WindowsBuildWorkflowContract::appEntryPointAvoidsNonExportedLvrsRuntimeSymbols()
@@ -281,8 +567,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(!source.isEmpty());
 
     QVERIFY(source.contains(QStringLiteral("## 1b. Windows Build, Package, and Current-User Install Script")));
-    QVERIFY(source.contains(QStringLiteral("powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -Clean")));
-    QVERIFY(source.contains(QStringLiteral("powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -InstallForCurrentUser")));
+    QVERIFY(source.contains(QStringLiteral("powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -Clean -SkipPackage")));
+    QVERIFY(source.contains(QStringLiteral("powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -SkipPackage -InstallForCurrentUser")));
     QVERIFY(source.contains(QStringLiteral("QT_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("LVRS_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("IIPAINTENGINE_PREFIX")));
@@ -296,14 +582,54 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0-Windows.msi")));
-    QVERIFY(source.contains(QStringLiteral("AllowSameVersionUpgrades")));
-    QVERIFY(source.contains(QStringLiteral("current user's Start Menu")));
-    QVERIFY(source.contains(QStringLiteral("below the current user's Local Application Data")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.1-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.1-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("Program Files")));
+    QVERIFY(source.contains(QStringLiteral("requires elevation")));
+    QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
+    QVERIFY(source.contains(QStringLiteral("same installation context")));
+    QVERIFY(source.contains(QStringLiteral("Unattended upgrades must not override `ALLUSERS` or `MSIINSTALLPERUSER`")));
+    QVERIFY(source.contains(QStringLiteral("upgrades the existing per-user 4.0.0")));
+    QVERIFY(source.contains(QStringLiteral("ALLUSERS=2")));
+    QVERIFY(source.contains(QStringLiteral("MSIINSTALLPERUSER=1")));
+    QVERIFY(source.contains(QStringLiteral("ICE105")));
+    QVERIFY(source.contains(QStringLiteral("installation-context marker")));
+    QVERIFY(source.contains(QStringLiteral("deterministic ProductCode")));
+    QVERIFY(source.contains(QStringLiteral("same version and architecture")));
+    QVERIFY(source.contains(QStringLiteral("markerless per-user upgrade")));
+    QVERIFY(source.contains(QStringLiteral("maintenance and removal remain available")));
+    QVERIFY(source.contains(QStringLiteral("first three ProductVersion fields")));
     QVERIFY(source.contains(QStringLiteral("does not allocate a console window")));
     QVERIFY(source.contains(QStringLiteral("1400x880 launch geometry")));
     QVERIFY(source.contains(QStringLiteral("does not resize the window after it becomes visible")));
+    QVERIFY(source.contains(QStringLiteral("-Sign")));
+    QVERIFY(source.contains(QStringLiteral("-AllowUnsignedPackage")));
+    QVERIFY(source.contains(QStringLiteral("VINCENT_SIGNING_CERTIFICATE_THUMBPRINT")));
+    QVERIFY(source.contains(QStringLiteral("signtool verify /pa /all /tw")));
+    QVERIFY(source.contains(QStringLiteral("RFC 3161")));
+    QVERIFY(source.contains(QStringLiteral("Code Signing EKU")));
+    QVERIFY(source.contains(QStringLiteral("-unsigned")));
+    QVERIFY(source.contains(QStringLiteral("`.sha256`")));
+    QVERIFY(source.contains(QStringLiteral("SmartScreen also evaluates publisher reputation")));
+    QVERIFY(source.contains(QStringLiteral("checksum alone proves equality, not publisher identity")));
+    QVERIFY(source.contains(QStringLiteral("online-revocation Code Signing chain")));
+    QVERIFY(source.contains(QStringLiteral("LocalMachine\\AuthRoot")));
+    QVERIFY(source.contains(QStringLiteral("clean stock Windows machine")));
+    QVERIFY(source.contains(QStringLiteral("expected Publisher subject or certificate thumbprint")));
+    QVERIFY(source.contains(QStringLiteral("unsigned-cpack-incomplete")));
+    QVERIFY(source.contains(QStringLiteral("generated under `.partial` names")));
+    QVERIFY(source.contains(QStringLiteral("last-known-good")));
+    QVERIFY(source.contains(QStringLiteral("complete verified set")));
+    QVERIFY(source.contains(QStringLiteral("root `LICENSE` into the MSI's RTF license control")));
+    QVERIFY(source.contains(QStringLiteral("## 1c. Microsoft Store MSIX")));
+    QVERIFY(source.contains(QStringLiteral("build-windows-store.ps1 -Mode Development -InstallDevelopment")));
+    QVERIFY(source.contains(QStringLiteral("build-windows-store.ps1 -Mode Store")));
+    QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
+    QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
+    QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.1-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("runFullTrust")));
+    QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

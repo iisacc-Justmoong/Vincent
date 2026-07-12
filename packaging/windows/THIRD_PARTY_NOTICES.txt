@@ -1,0 +1,41 @@
+Vincent 4.0.1 - Third-Party Notices
+====================================
+
+This distribution includes or links the components listed below. The complete
+license texts and machine-readable Qt package information are installed beside
+this file under legal/. Corresponding-source information is in SOURCE_OFFER.txt.
+
+Vincent
+  License: GNU Affero General Public License v3.0
+  Source: https://github.com/iisacc-Justmoong/Vincent
+
+LVRS
+  License: GNU Affero General Public License v3.0
+  Source: https://github.com/iisacc-Justmoong/LVRS
+
+iiPaintEngine
+  License: see legal/iiPaintEngine/LICENSE.txt
+  Source: https://github.com/iisacc-Justmoong/iiPaintEngine
+  Public packaging requires an explicit license supplied by its copyright holder.
+
+psd_sdk (pinned commit f51449543273cbf12058ae92b230e0c4209f5066)
+  License: BSD 2-Clause
+  Source: https://github.com/MolecularMatters/psd_sdk
+  Its embedded miniz implementation is released under the Unlicense.
+
+Pretendard 1.3.9
+  Copyright (c) 2021, Kil Hyung-jin
+  License: SIL Open Font License 1.1
+  Reserved Font Name: Pretendard
+  Source: https://github.com/orioncactus/pretendard
+
+Qt 6.8.3 runtime modules
+  License choices and third-party terms are recorded in legal/Qt/LICENSES and
+  legal/Qt/SBOM. This distribution uses dynamically linked Qt libraries.
+  Source: https://code.qt.io/cgit/qt/qt5.git/
+
+GCC / MinGW-w64 runtime libraries
+  The staged libgcc, libstdc++, and winpthreads runtime license texts are in
+  legal/MinGW. These notices do not change the license of Vincent itself.
+  Source: https://www.mingw-w64.org/ and https://gcc.gnu.org/
+

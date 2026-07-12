@@ -17,7 +17,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "${VINCENT_MIN_MACOS_VERSION}" CACHE STRING "Minimum macOS version" FORCE)
 endif()
 
-project(Vincent VERSION 4.0 LANGUAGES C CXX)
+project(Vincent VERSION 4.0.1 LANGUAGES C CXX)
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
@@ -144,6 +144,9 @@ set_source_files_properties("${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c" PROPERTIE
 add_library(vincent_psd_sdk STATIC ${_vincent_psd_sdk_sources})
 target_include_directories(vincent_psd_sdk PUBLIC "${psd_sdk_SOURCE_DIR}/src/Psd")
 target_compile_features(vincent_psd_sdk PUBLIC cxx_std_11)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(vincent_psd_sdk PRIVATE -Wno-pragmas)
+endif()
 lvrs_apply_platform_build_optimizations(vincent_psd_sdk)
 
 set(_vincent_local_dependency_runtime_paths)
@@ -298,6 +301,16 @@ set_target_properties(Vincent PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
 )
 lvrs_configure_qml_app(Vincent NO_PLATFORM_RUNTIME_TARGETS)
+if(WIN32 AND MINGW)
+    # MinGW 13's LTO plugin is not propagated consistently through Ninja's
+    # archive and generated-QML steps. Keep the native Release optimization
+    # flags and section GC, but do not emit fragile LTO objects on this toolchain.
+    set_target_properties(vincent_psd_sdk Vincent PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO FALSE
+            INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL FALSE
+    )
+endif()
 
 set(VINCENT_MACOS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.icns")
 set(VINCENT_WINDOWS_APP_ICON "${CMAKE_SOURCE_DIR}/resources/Appicon.ico")
@@ -437,7 +450,9 @@ if(APPLE)
     endif()
 elseif(WIN32)
     set(CPACK_GENERATOR "ZIP")
-    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Windows")
+    # CPack does not run windeployqt, PE closure checks, or Authenticode signing.
+    # Keep its output unmistakably separate from build-windows.ps1 release artifacts.
+    set(CPACK_PACKAGE_FILE_NAME "Vincent-${CPACK_PACKAGE_VERSION}-Windows-unsigned-cpack-incomplete")
     set(CPACK_PACKAGING_INSTALL_PREFIX "/")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_GENERATOR "TGZ")
