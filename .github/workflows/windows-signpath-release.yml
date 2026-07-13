@@ -105,7 +105,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Vincent-SignPath-input
-          path: build/signpath-input/Vincent-4.0.1-Windows.msi
+          path: build/signpath-input/Vincent-4.0.2-Windows.msi
           archive: false
           if-no-files-found: error
           retention-days: 7
@@ -128,7 +128,7 @@ jobs:
         if: ${{ inputs.submit-for-signing }}
         shell: pwsh
         run: |
-          $msi = Join-Path $env:RUNNER_TEMP "signed\Vincent-4.0.1-Windows.msi"
+          $msi = Join-Path $env:RUNNER_TEMP "signed\Vincent-4.0.2-Windows.msi"
           if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) {
               throw "SignPath did not return the canonical Vincent MSI."
           }
@@ -156,7 +156,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Vincent-website-release
-          path: '${{ runner.temp }}/signed/Vincent-4.0.1-Windows.msi'
+          path: '${{ runner.temp }}/signed/Vincent-4.0.2-Windows.msi'
           archive: false
           if-no-files-found: error
           retention-days: 30

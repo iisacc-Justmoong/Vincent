@@ -9,6 +9,7 @@
 - Windows Authenticode 정책 테스트가 Windows PowerShell 5.1에서도 안정적으로 실행되도록 기본 유틸리티 모듈 로딩과 임시 라이선스 파일 생성을 명시했다.
 - 비용 없는 자체 웹사이트 배포를 위해 SignPath Foundation OSS 후원 서명 경로를 추가했다. GitHub 호스팅 러너가 공개 소스에서 MSI를 재현하고, 외부 서명 전용 입력은 `build/signpath-input/`에 격리되며, SignPath가 반환한 공인 서명 MSI 한 개만 웹사이트 배포본이 된다.
 - README에 SignPath가 요구하는 Code signing policy, 담당 역할, 개인정보 및 시스템 변경 정책을 문서화하고 GitHub CODEOWNERS와 Windows 서명 workflow 계약 테스트를 추가했다.
+- 이미 공개된 `v4.0.1` 태그를 변경하지 않고 무료 서명 최종본의 애플리케이션·MSI·MSIX 버전을 `4.0.2`로 올렸다.
 
 ## 2026-07-02
 
