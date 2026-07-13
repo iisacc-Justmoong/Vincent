@@ -653,7 +653,7 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53")));
-    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 4530b3ac02f2f82badf95a1b6c6dff1fc6d90aaf")));
+    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
