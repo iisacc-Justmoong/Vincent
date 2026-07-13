@@ -12,6 +12,7 @@
 - 이미 공개된 `v4.0.1` 태그를 변경하지 않고 무료 서명 최종본의 애플리케이션·MSI·MSIX 버전을 `4.0.2`로 올렸다.
 - GitHub 러너의 Qt 6.8.3 모듈 목록에 실제로 존재하는 추가 모듈만 요청하고, SignPath 입출력 MSI를 버전 와일드카드로 단일 탐색하여 릴리스 버전 증가가 workflow 경로를 깨뜨리지 않게 했다.
 - 메모리가 제한된 GitHub 러너에서 LVRS의 대형 QML 리소스 번역 단위가 IPO/LTO로 장시간 정체되지 않도록 의존성 bootstrap의 IPO만 비활성화하고, LVRS와 iiPaintEngine 설치 단계를 분리했다.
+- PowerShell이 LVRS Rust CLI의 CMake 인자 구분자 `--`를 소비하지 않도록 전체 호출 인자를 배열로 구성해 전달한다.
 
 ## 2026-07-02
 
