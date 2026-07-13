@@ -464,6 +464,7 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     const QString testsSource = readTextFile(testsCmakePath);
     QVERIFY(testsSource.contains(QStringLiteral("ENVIRONMENT_MODIFICATION")));
     QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>")));
+    QVERIFY(testsSource.contains(QStringLiteral("QT_QPA_PLATFORM=set:offscreen")));
     QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy")));
     QVERIFY(testsSource.contains(QStringLiteral("tst_windowsauthenticodepolicy.ps1")));
     QVERIFY(testsSource.contains(QStringLiteral("NAMES pwsh.exe")));
@@ -475,6 +476,12 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(!testsSource.contains(QStringLiteral("NAME tests_windowsmsidatabasecontract")));
     QVERIFY(!testsSource.contains(QStringLiteral("tst_windowsmsidatabasecontract.ps1")));
     QVERIFY(!testsSource.contains(QStringLiteral("SKIP_RETURN_CODE 77")));
+
+    const QString authenticodePolicyPath = QFINDTESTDATA("tst_windowsauthenticodepolicy.ps1");
+    QVERIFY2(!authenticodePolicyPath.isEmpty(), "Authenticode policy test script was not found");
+    const QString authenticodePolicySource = readTextFile(authenticodePolicyPath);
+    QVERIFY(authenticodePolicySource.contains(QStringLiteral("$PSHOME")));
+    QVERIFY(authenticodePolicySource.contains(QStringLiteral("Microsoft.PowerShell.Utility.psd1")));
 
     const QString databaseContractPath = QFINDTESTDATA("tst_windowsmsidatabasecontract.ps1");
     QVERIFY2(!databaseContractPath.isEmpty(), "MSI database contract script was not found");
