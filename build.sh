@@ -21,7 +21,7 @@ Modes:
   local   Build, test, deploy Qt runtime, sign dist/Vincent.app for local use,
           and create unsigned local installer packages.
           Uses LOCAL_APP_CERT, the first valid Apple Development identity, or ad-hoc signing.
-  devid   Build, test, create the Developer ID pkg, notarize it, and staple it.
+  devid   Build, test, create the Developer ID pkg, notarize it, and staple it. (default)
   mas     Build, test, create the Mac App Store pkg.
   all     Build, test, create both Developer ID and Mac App Store pkgs.
 
@@ -207,7 +207,7 @@ to_lower() {
 # 템플릿 설정: 프로젝트별로 이 구역만 수정하는 것을 전제로 한다.
 # =============================================================================
 
-BUILD_MODE="${VINCENT_BUILD_MODE:-local}"
+BUILD_MODE="${VINCENT_BUILD_MODE:-devid}"
 CLEAN_BUILD_DIR="${CLEAN_BUILD_DIR:-0}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -303,11 +303,60 @@ NOTARY_TEAM_ID="${NOTARY_TEAM_ID:-5U49ST9XZH}"             # 10자리 Team ID
 NOTARY_APP_PASSWORD="${NOTARY_APP_PASSWORD:-}"        # xxxx-xxxx-xxxx-xxxx
 
 # 산출물
+OUT_LOCAL_DEVID_PKG="${DIST_DIR}/${APP_NAME}-local-unsigned.pkg"
+OUT_LOCAL_MAS_PKG="${DIST_DIR}/${APP_NAME}-appstore-local-unsigned.pkg"
 OUT_DEVID_PKG="${DIST_DIR}/${APP_NAME}.pkg"
 OUT_MAS_PKG="${DIST_DIR}/${APP_NAME}-appstore.pkg"
 
 # 디버깅/보존 옵션
 KEEP_STAGED_APPS="0"          # 1이면 dist에 배포 준비된 .app 사본도 남긴다(추가 산출물)
+# =============================================================================
+
+set_notary_auth_args() {
+  NOTARY_AUTH_ARGS=()
+
+  if [[ "$NOTARY_MODE" == "profile" ]]; then
+    NOTARY_AUTH_ARGS+=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")
+    if [[ -n "$NOTARY_KEYCHAIN_PATH" ]]; then
+      NOTARY_AUTH_ARGS+=(--keychain "$NOTARY_KEYCHAIN_PATH")
+    fi
+    if [[ -n "$NOTARY_TEAM_ID" ]]; then
+      NOTARY_AUTH_ARGS+=(--team-id "$NOTARY_TEAM_ID")
+    fi
+    return 0
+  fi
+
+  if [[ "$NOTARY_MODE" == "api" ]]; then
+    NOTARY_AUTH_ARGS+=(--key "$NOTARY_API_KEY_P8" --key-id "$NOTARY_API_KEY_ID")
+    if [[ -n "$NOTARY_API_ISSUER_ID" ]]; then
+      NOTARY_AUTH_ARGS+=(--issuer "$NOTARY_API_ISSUER_ID")
+    fi
+    return 0
+  fi
+
+  NOTARY_AUTH_ARGS+=(--apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_APP_PASSWORD")
+}
+
+validate_notary_credentials() {
+  set_notary_auth_args
+
+  local output=""
+  local rc=0
+  say "notarization credential preflight begins"
+  set +e
+  output="$(xcrun notarytool history "${NOTARY_AUTH_ARGS[@]}" 2>&1)"
+  rc=$?
+  set -e
+
+  if [[ "$rc" -ne 0 ]]; then
+    say "notarization credential preflight failed:" >&2
+    printf '%s\n' "$output" | sed -n '1,80p' >&2
+    die "notarization credential preflight failed; configure a valid NOTARY_KEYCHAIN_PROFILE or another supported credential mode"
+  fi
+
+  say "notarization credentials verified"
+}
+
 # =============================================================================
 # 도구 점검
 # =============================================================================
@@ -405,6 +454,7 @@ if mode_wants_devid; then
   if [[ "$NOTARY_MODE" == "appleid" && -z "$NOTARY_APP_PASSWORD" ]]; then
     die "appleid notarization mode selected but NOTARY_APP_PASSWORD is empty. Prefer keychain profile; otherwise set app-specific password."
   fi
+  validate_notary_credentials
 fi
 
 # =============================================================================
@@ -810,33 +860,6 @@ build_mas_pkg() {
 # 6) notarization + stapling (Developer ID pkg)
 # =============================================================================
 
-set_notary_auth_args() {
-  NOTARY_AUTH_ARGS=()
-
-  if [[ "$NOTARY_MODE" == "profile" ]]; then
-    NOTARY_AUTH_ARGS+=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")
-    if [[ -n "$NOTARY_KEYCHAIN_PATH" ]]; then
-      NOTARY_AUTH_ARGS+=(--keychain "$NOTARY_KEYCHAIN_PATH")
-    fi
-    # team-id는 profile에 포함되는 경우가 많지만, 명시해도 무방하다.
-    if [[ -n "$NOTARY_TEAM_ID" ]]; then
-      NOTARY_AUTH_ARGS+=(--team-id "$NOTARY_TEAM_ID")
-    fi
-    return 0
-  fi
-
-  if [[ "$NOTARY_MODE" == "api" ]]; then
-    NOTARY_AUTH_ARGS+=(--key "$NOTARY_API_KEY_P8" --key-id "$NOTARY_API_KEY_ID")
-    if [[ -n "$NOTARY_API_ISSUER_ID" ]]; then
-      NOTARY_AUTH_ARGS+=(--issuer "$NOTARY_API_ISSUER_ID")
-    fi
-    return 0
-  fi
-
-  # appleid
-  NOTARY_AUTH_ARGS+=(--apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_APP_PASSWORD")
-}
-
 notarize_and_staple_pkg() {
   local pkg="$1"
   require_file "$pkg"
@@ -900,8 +923,8 @@ say "BUILD_MODE       : $BUILD_MODE"
 say "DIST_DIR         : $DIST_DIR"
 say "INSTALL_DIR      : $INSTALL_DIR"
 if mode_wants_local; then
-  say "OUT_LOCAL_PKG    : $OUT_DEVID_PKG"
-  say "OUT_LOCAL_APPSTORE_PKG: $OUT_MAS_PKG"
+  say "OUT_LOCAL_PKG    : $OUT_LOCAL_DEVID_PKG"
+  say "OUT_LOCAL_APPSTORE_PKG: $OUT_LOCAL_MAS_PKG"
 fi
 if mode_wants_devid; then say "OUT_DEVID_PKG    : $OUT_DEVID_PKG"; fi
 if mode_wants_mas; then say "OUT_MAS_PKG      : $OUT_MAS_PKG"; fi
@@ -920,17 +943,17 @@ if mode_wants_local; then
   run codesign --verify --deep --strict --verbose=2 "$DIST_APP"
 
   say "Local unsigned pkg build begins"
-  build_unsigned_component_pkg "$DIST_APP" "$PKG_ID_DEVID" "$OUT_DEVID_PKG"
-  require_nonempty_file "$OUT_DEVID_PKG"
+  build_unsigned_component_pkg "$DIST_APP" "$PKG_ID_DEVID" "$OUT_LOCAL_DEVID_PKG"
+  require_nonempty_file "$OUT_LOCAL_DEVID_PKG"
 
   say "Local unsigned appstore-named pkg build begins"
-  build_unsigned_component_pkg "$DIST_APP" "$PKG_ID_MAS" "$OUT_MAS_PKG"
-  require_nonempty_file "$OUT_MAS_PKG"
+  build_unsigned_component_pkg "$DIST_APP" "$PKG_ID_MAS" "$OUT_LOCAL_MAS_PKG"
+  require_nonempty_file "$OUT_LOCAL_MAS_PKG"
 
   say "done"
   say "$DIST_APP"
-  say "$OUT_DEVID_PKG"
-  say "$OUT_MAS_PKG"
+  say "$OUT_LOCAL_DEVID_PKG"
+  say "$OUT_LOCAL_MAS_PKG"
   exit 0
 fi
 
@@ -951,6 +974,9 @@ if mode_wants_devid; then
   run rm -f "$OUT_DEVID_PKG" || true
   run mv "$TMP_DEVID_PKG" "$OUT_DEVID_PKG"
   require_nonempty_file "$OUT_DEVID_PKG"
+  run pkgutil --check-signature "$OUT_DEVID_PKG"
+  run xcrun stapler validate "$OUT_DEVID_PKG"
+  run spctl -a -vv -t install "$OUT_DEVID_PKG"
 fi
 
 if mode_wants_mas; then

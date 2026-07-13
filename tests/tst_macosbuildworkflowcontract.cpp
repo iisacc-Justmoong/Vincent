@@ -53,6 +53,7 @@ private slots:
     void platformAppIconsAreBundledFromResources();
     void buildScriptUsesIncrementalBuildsAndStripsDistributionBundles();
     void buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays();
+    void buildScriptFailsClosedOnMissingNotaryProfileBeforeBuild();
 };
 
 void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt403()
@@ -137,6 +138,7 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     const QString source = QString::fromUtf8(buildGuide.readAll());
 
     QVERIFY(source.contains(QStringLiteral("./build.sh local")));
+    QVERIFY(source.contains(QStringLiteral("`./build.sh` defaults to the Developer ID distribution flow")));
     QVERIFY(source.contains(QStringLiteral("repository-local `build/` CMake binary directory")));
     QVERIFY(source.contains(QStringLiteral("alternate build trees are rejected")));
     QVERIFY(!source.contains(legacyClionBuildTreeName()));
@@ -144,12 +146,14 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     QVERIFY(source.contains(QStringLiteral("Apple Development")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent.pkg")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-appstore.pkg")));
-    QVERIFY(source.contains(QStringLiteral("unsigned local installer packages")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-local-unsigned.pkg")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-appstore-local-unsigned.pkg")));
     QVERIFY(source.contains(QStringLiteral("VINCENT_BUILD_MODE=devid ./build.sh")));
     QVERIFY(source.contains(QStringLiteral("VINCENT_BUILD_MODE=mas ./build.sh")));
     QVERIFY(source.contains(QStringLiteral("Developer ID Application")));
     QVERIFY(source.contains(QStringLiteral("Apple Distribution")));
     QVERIFY(source.contains(QStringLiteral("NOTARY_APP_PASSWORD")));
+    QVERIFY(source.contains(QStringLiteral("validates notarization credentials before configuring")));
     QVERIFY(source.contains(QStringLiteral("Bash 3.2")));
     QVERIFY(source.contains(QStringLiteral("CMAKE_EXTRA_ARGS")));
     QVERIFY(source.contains(QStringLiteral("Contents/Resources/Appicon.icns")));
@@ -217,6 +221,15 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     const QString source = QString::fromUtf8(buildScript.readAll());
 
     QVERIFY(source.contains(QStringLiteral("Usage: ./build.sh [--clean] [local|devid|mas|all]")));
+    QVERIFY(source.contains(QStringLiteral("BUILD_MODE=\"${VINCENT_BUILD_MODE:-devid}\"")));
+    QVERIFY(source.contains(QStringLiteral("OUT_LOCAL_DEVID_PKG=\"${DIST_DIR}/${APP_NAME}-local-unsigned.pkg\"")));
+    QVERIFY(source.contains(QStringLiteral("OUT_LOCAL_MAS_PKG=\"${DIST_DIR}/${APP_NAME}-appstore-local-unsigned.pkg\"")));
+    QVERIFY(source.contains(QStringLiteral("validate_notary_credentials()")));
+    QVERIFY(source.contains(QStringLiteral("xcrun notarytool history \"${NOTARY_AUTH_ARGS[@]}\"")));
+    const qsizetype notaryPreflightIndex = source.indexOf(QStringLiteral("validate_notary_credentials\n"));
+    const qsizetype configureIndex = source.indexOf(QStringLiteral("say \"=== configure ===\""));
+    QVERIFY(notaryPreflightIndex >= 0);
+    QVERIFY(configureIndex > notaryPreflightIndex);
     QVERIFY(source.contains(QStringLiteral("CLEAN_BUILD_DIR=\"${CLEAN_BUILD_DIR:-0}\"")));
     QVERIFY(source.contains(QStringLiteral("--clean)")));
     QCOMPARE(source.count(QStringLiteral("CLEAN_BUILD_DIR=\"1\"")), 1);
@@ -401,8 +414,114 @@ esac
     QVERIFY2(output.contains(QStringLiteral("done")), qPrintable(output));
     QVERIFY2(!QDir(temp.filePath(QStringLiteral("dist/Vincent.app/Contents/PlugIns/sqldrivers"))).exists(),
              qPrintable(output));
-    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
-    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
+    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-local-unsigned.pkg"))), qPrintable(output));
+    QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore-local-unsigned.pkg"))), qPrintable(output));
+    QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
+    QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
+#endif
+}
+
+void tst_MacOSBuildWorkflowContract::buildScriptFailsClosedOnMissingNotaryProfileBeforeBuild()
+{
+#ifndef Q_OS_MACOS
+    QSKIP("build.sh depends on macOS packaging tools");
+#else
+    const QString sourceBuildScriptPath = QFINDTESTDATA("../build.sh");
+    QVERIFY2(!sourceBuildScriptPath.isEmpty(), "build.sh test data was not found");
+
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    QDir temp(tempDir.path());
+    QVERIFY(temp.mkpath(QStringLiteral("bin")));
+    QVERIFY(temp.mkpath(QStringLiteral("App/qml")));
+
+    const QString buildScriptPath = temp.filePath(QStringLiteral("build.sh"));
+    QVERIFY(QFile::copy(sourceBuildScriptPath, buildScriptPath));
+    QVERIFY(QFile::setPermissions(buildScriptPath,
+                                  QFileDevice::ReadOwner
+                                          | QFileDevice::WriteOwner
+                                          | QFileDevice::ExeOwner
+                                          | QFileDevice::ReadGroup
+                                          | QFileDevice::ExeGroup
+                                          | QFileDevice::ReadOther
+                                          | QFileDevice::ExeOther));
+
+    const QString binDir = temp.filePath(QStringLiteral("bin"));
+    const QByteArray fakeCmake = R"SH(#!/bin/sh
+set -eu
+printf 'cmake must not run before notarization credential validation\n' > cmake-was-run
+exit 1
+)SH";
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("cmake")), fakeCmake));
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("macdeployqt")),
+                            QByteArray("#!/bin/sh\nexit 0\n")));
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("codesign")),
+                            QByteArray("#!/bin/sh\nexit 0\n")));
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("ninja")),
+                            QByteArray("#!/bin/sh\nexit 0\n")));
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("pkgutil")),
+                            QByteArray("#!/bin/sh\nexit 0\n")));
+
+    const QByteArray fakeSecurity = R"SH(#!/bin/sh
+set -eu
+
+case "$*" in
+    *"find-identity -h"*)
+        printf 'Supported policies: basic, codesigning, installer\n'
+        ;;
+    *"-p codesigning"*)
+        printf '  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "Developer ID Application: MUYEONG YUN (5U49ST9XZH)"\n'
+        printf '     1 valid identities found\n'
+        ;;
+    *"-p installer"*)
+        printf '  1) BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB "Developer ID Installer: MUYEONG YUN (5U49ST9XZH)"\n'
+        printf '     1 valid identities found\n'
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+)SH";
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("security")), fakeSecurity));
+
+    const QByteArray fakeXcrun = R"SH(#!/bin/sh
+set -eu
+
+if [ "${1:-}" = "--find" ]; then
+    printf '/usr/bin/%s\n' "$2"
+    exit 0
+fi
+
+if [ "${1:-}" = "notarytool" ] && [ "${2:-}" = "history" ]; then
+    printf 'Error: No Keychain password item found for profile: notary-main\n' >&2
+    exit 69
+fi
+
+printf 'unsupported fake xcrun invocation: %s\n' "$*" >&2
+exit 1
+)SH";
+    QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("xcrun")), fakeXcrun));
+
+    QProcess process;
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("PATH"), binDir + QStringLiteral(":") + environment.value(QStringLiteral("PATH")));
+    environment.insert(QStringLiteral("RUN_TESTS"), QStringLiteral("0"));
+    environment.remove(QStringLiteral("VINCENT_BUILD_MODE"));
+    environment.remove(QStringLiteral("NOTARY_APP_PASSWORD"));
+    process.setProcessEnvironment(environment);
+    process.setWorkingDirectory(tempDir.path());
+    process.start(QStringLiteral("/bin/bash"), QStringList{QStringLiteral("./build.sh")});
+
+    QVERIFY2(process.waitForStarted(), qPrintable(process.errorString()));
+    QVERIFY2(process.waitForFinished(30000), qPrintable(process.errorString()));
+
+    const QString output = QString::fromUtf8(process.readAllStandardOutput() + process.readAllStandardError());
+    QVERIFY2(process.exitStatus() == QProcess::NormalExit, qPrintable(output));
+    QVERIFY2(process.exitCode() != 0, qPrintable(output));
+    QVERIFY2(output.contains(QStringLiteral("notarization credential preflight failed")), qPrintable(output));
+    QVERIFY2(!output.contains(QStringLiteral("=== configure ===")), qPrintable(output));
+    QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("cmake-was-run"))), qPrintable(output));
 #endif
 }
 

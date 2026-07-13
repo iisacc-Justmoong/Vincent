@@ -5,17 +5,21 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 ## 1. Prerequisites
 - Apple Developer Program membership with access to App Store Connect.
 - Certificates downloaded in Keychain Access:
+  - **Developer ID Application** and **Developer ID Installer** for notarized distribution outside the Mac App Store.
   - **Apple Distribution** (or legacy *3rd Party Mac Developer Application*).
   - **Apple Installer** (or legacy *3rd Party Mac Developer Installer*).
+- A `notarytool` credential profile for Developer ID notarization.
 - A macOS App Store provisioning profile that matches your bundle identifier.
 - Xcode command-line tools (`xcode-select --install`) and Transporter from the Mac App Store.
 - Qt toolchain (Core, Qml, Quick, QuickControls2, Svg) available in your `PATH` so that `macdeployqt` is callable.
 - iiPaintEngine installed under `$HOME/.local/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
 
-## 1a. Automated Local Build Script
-Use `./build.sh` or `./build.sh local` for local development validation. The default local mode configures `build/`, builds Vincent, runs `ctest --test-dir build --output-on-failure`, deploys Qt runtime files into `dist/Vincent.app`, signs that app with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature if no development certificate is installed, then regenerates unsigned local installer packages at `dist/Vincent.pkg` and `dist/Vincent-appstore.pkg`.
+## 1a. Automated macOS Build Script
+`./build.sh` defaults to the Developer ID distribution flow. It validates the Developer ID application and installer identities plus notarization credentials before configuring, builds in `build/`, runs `ctest --test-dir build --output-on-failure`, deploys the Qt runtime, signs the complete app tree with hardened runtime and a trusted timestamp, creates `dist/Vincent.pkg`, submits that package to Apple's notary service, staples the accepted ticket, and verifies the final package with `pkgutil`, `stapler`, and Gatekeeper. The canonical `dist/Vincent.pkg` path is published only by this signed and notarized flow.
 
-The default macOS workflow is incremental and preserves `build/`, including the disconnected `psd_sdk` FetchContent checkout. Use `./build.sh --clean local` or `CLEAN_BUILD_DIR=1 ./build.sh local` only after changing toolchains or when recovering a stale cache. Local packages keep symbols with `macdeployqt -no-strip`; Developer ID, Mac App Store, and combined distribution modes omit `-no-strip` so release bundles are stripped by the deployment tool. `MACDEPLOYQT_NO_STRIP=0|1` remains an explicit override.
+Use `./build.sh local` for local development validation. Local mode signs `dist/Vincent.app` with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature, then creates the explicitly non-distributable `dist/Vincent-local-unsigned.pkg` and `dist/Vincent-appstore-local-unsigned.pkg`. It never overwrites `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg`.
+
+The macOS workflow is incremental and preserves `build/`, including the disconnected `psd_sdk` FetchContent checkout. Use `./build.sh --clean` for a clean Developer ID distribution build, or `./build.sh --clean local` for clean local validation, only after changing toolchains or when recovering a stale cache. Local packages keep symbols with `macdeployqt -no-strip`; Developer ID, Mac App Store, and combined distribution modes omit `-no-strip` so release bundles are stripped by the deployment tool. `MACDEPLOYQT_NO_STRIP=0|1` remains an explicit override.
 
 After `macdeployqt`, the script inspects every Mach-O file with `otool -L` and every `LC_RPATH` with `otool -l`. Packaging fails if a deployed binary still references an absolute non-system dependency or RPATH, preventing a build-tree, `$HOME/.local`, Homebrew, or maintainer-specific path from escaping into the signed bundle.
 
@@ -23,7 +27,7 @@ The macOS build RPATH contains only the platform-specific LVRS and iiPaintEngine
 
 The portability audit accepts only the indented dependency rows from `otool -L`, so repeated filename headers for universal Mach-O architectures are not mistaken for dependencies. It also distinguishes a dylib's own `LC_ID_DYLIB` value from its dependency list, so an absolute self-identifier is not reported as an external dependency. Vincent does not link Qt SQL; `macdeployqt` may nevertheless copy the complete Qt SQL driver set while traversing QML imports, so the script removes `Contents/PlugIns/sqldrivers` before auditing and signing. This also prevents unused ODBC, PostgreSQL, or Mimer plugins from retaining machine-specific client-library paths.
 
-The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. A default local build must not require callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array before invoking `./build.sh`. Because `build.sh` is the official packaging entry point, it is tracked source and must not be ignored by `.gitignore`. Vincent's release version and generated macOS `CFBundleVersion` are both fixed to `4.0.3` by CMake and the configured Info.plist; the in-app `Vincent 4.0` label remains the product-family marketing name.
+The script is expected to run on the macOS system Bash 3.2 with `set -u` enabled and no custom extra CMake arguments. Neither the default distribution build nor explicit local mode requires callers to define `CMAKE_EXTRA_ARGS` or any other optional argument array. Because `build.sh` is the official packaging entry point, it is tracked source and must not be ignored by `.gitignore`. Vincent's release version and generated macOS `CFBundleVersion` are both fixed to `4.0.3` by CMake and the configured Info.plist; the in-app `Vincent 4.0` label remains the product-family marketing name.
 
 Vincent intentionally supports only the repository-local `build/` CMake binary directory. Configure, build, test, and package commands must use `-B build`, `cmake --build build`, and `ctest --test-dir build`; alternate build trees are rejected during CMake configure so CLion and shell workflows cannot silently produce stale bundles elsewhere.
 
@@ -41,15 +45,25 @@ tools/sync_app_icon_assets.sh
 
 The script rewrites `packaging/macos/Vincent.xcassets/AppIcon.appiconset`, including `AppIcon-1024.png`, from the canonical `.icns`. The CMake bundle target also removes stale `Contents/Resources/icon.icns` after each macOS build, so an incremental `build/` bundle cannot keep advertising the removed legacy icon.
 
-Signed distribution modes must be requested explicitly:
+The default Developer ID flow and explicit alternatives are:
 
 ```bash
+./build.sh
 VINCENT_BUILD_MODE=devid ./build.sh
+./build.sh local
 VINCENT_BUILD_MODE=mas ./build.sh
 VINCENT_BUILD_MODE=all ./build.sh
 ```
 
-`devid` requires `Developer ID Application` and `Developer ID Installer` certificates plus notarization credentials. `mas` requires `Apple Distribution` and `3rd Party Mac Developer Installer` certificates. `all` runs both distribution flows. The local `dist/Vincent.pkg` and `dist/Vincent-appstore.pkg` outputs are unsigned smoke/install artifacts only; they are not notarized or App Store upload packages. For Developer ID notarization, prefer `NOTARY_KEYCHAIN_PROFILE`; if Apple ID mode is used, provide the app-specific password through `NOTARY_APP_PASSWORD` rather than storing it in the script.
+`devid` requires `Developer ID Application` and `Developer ID Installer` certificates plus notarization credentials. `mas` requires `Apple Distribution` and `3rd Party Mac Developer Installer` certificates. `all` runs both distribution flows. For Developer ID notarization, prefer `NOTARY_KEYCHAIN_PROFILE`; if Apple ID mode is used, provide the app-specific password through `NOTARY_APP_PASSWORD` rather than storing it in the script. The default `notary-main` profile can be created without placing the app-specific password in shell history:
+
+```bash
+xcrun notarytool store-credentials notary-main \
+  --apple-id "<Apple ID>" \
+  --team-id "5U49ST9XZH"
+```
+
+Because `--password` is omitted, `notarytool` requests it through a secure prompt and validates the credentials before storing them in Keychain. Every Developer ID run also validates notarization credentials before configuring CMake, preventing a long signed build from ending at a missing or invalid profile.
 
 ## 1b. Windows Build, Package, and Current-User Install Script
 Run the Windows build from Windows PowerShell 5.1 or newer. The script expects Windows-built Qt, LVRS, and iiPaintEngine prefixes; macOS `.local` binaries cannot be reused on Windows. Set the prefix variables once per shell session:
@@ -392,7 +406,7 @@ productbuild \
 ```
 This produces the installer payload required by App Store Connect. Keep the `.pkg` under 4 GB.
 
-If installing `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg` shows an older app icon, treat the package as stale. A default local build now refreshes `dist/Vincent.app` and regenerates both unsigned package outputs from that app. Use `VINCENT_BUILD_MODE=devid ./build.sh`, `VINCENT_BUILD_MODE=mas ./build.sh`, or `VINCENT_BUILD_MODE=all ./build.sh` only when signed distribution packages are needed. You can inspect the package payload directly:
+If installing `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg` shows an older app icon, treat the package as stale. The default `./build.sh` refreshes `dist/Vincent.pkg` only after Developer ID signing, notarization, stapling, and final verification succeed. `VINCENT_BUILD_MODE=mas ./build.sh` refreshes the App Store package, while `./build.sh local` writes only the two `-local-unsigned.pkg` artifacts. You can inspect the package payload directly:
 
 ```bash
 pkgutil --payload-files dist/Vincent.pkg | grep 'Contents/Resources/.*icns'
