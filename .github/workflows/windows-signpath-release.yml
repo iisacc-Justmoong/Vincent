@@ -74,13 +74,15 @@ jobs:
           $lvrsPrefix = Join-Path $env:USERPROFILE ".local\LVRS"
           $env:LVRS_BOOTSTRAP_QT_PREFIX_WINDOWS = $env:QT_ROOT_DIR
           $env:LVRS_BOOTSTRAP_FRAMEWORK_PLATFORMS = "windows"
-          & (Join-Path $lvrsSource "install.ps1") `
-              --platforms windows `
-              --prefix $lvrsPrefix `
-              --build-type Release `
-              -- `
-              "-DLVRS_ENABLE_IPO=OFF" `
+          $lvrsArguments = @(
+              "--platforms", "windows",
+              "--prefix", $lvrsPrefix,
+              "--build-type", "Release",
+              "--",
+              "-DLVRS_ENABLE_IPO=OFF",
               "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF"
+          )
+          & (Join-Path $lvrsSource "install.ps1") @lvrsArguments
           if ($LASTEXITCODE -ne 0) { throw "LVRS installation failed." }
           "LVRS_PREFIX=$lvrsPrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
