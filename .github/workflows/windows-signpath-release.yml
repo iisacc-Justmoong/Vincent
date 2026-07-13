@@ -82,7 +82,9 @@ jobs:
               "--without-tests",
               "--",
               "-DLVRS_ENABLE_IPO=OFF",
-              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF"
+              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF",
+              "-DLVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF",
+              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF"
           )
           & (Join-Path $lvrsSource "install.ps1") @lvrsArguments
           if ($LASTEXITCODE -ne 0) { throw "LVRS installation failed." }

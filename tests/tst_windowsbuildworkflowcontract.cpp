@@ -657,6 +657,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("$lvrsArguments = @(")));
     QVERIFY(workflow.contains(QStringLiteral("@lvrsArguments")));
     QVERIFY(workflow.contains(QStringLiteral("\"--without-examples\",\n              \"--without-tests\",\n              \"--\"")));
