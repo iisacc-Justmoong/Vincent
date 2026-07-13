@@ -542,6 +542,16 @@ macdeployqt_run() {
   run "${cmd[@]}"
 }
 
+remove_unused_qt_sql_plugins() {
+  local app="$1"
+  local sql_plugins="$app/Contents/PlugIns/sqldrivers"
+
+  if [[ -d "$sql_plugins" ]]; then
+    say "removing unused Qt SQL driver plugins"
+    run rm -rf "$app/Contents/PlugIns/sqldrivers"
+  fi
+}
+
 assert_portable_macho_links() {
   local app="$1"
   local violations="${WORKDIR}/macho_path_violations_$(basename "$app")_$$.txt"
@@ -552,10 +562,16 @@ assert_portable_macho_links() {
       continue
     fi
 
+    local dylib_ids
+    dylib_ids="$(/usr/bin/otool -D "$binary" 2>/dev/null \
+      | sed -nE '/:$/d; /^[[:space:]]*$/d; p' || true)"
+
     /usr/bin/otool -L "$binary" \
-      | sed -n '2,$p' \
-      | sed -E 's/^[[:space:]]*([^[:space:]]+).*/\1/' \
+      | sed -nE 's/^[[:space:]]+([^[:space:]]+).*/\1/p' \
       | while IFS= read -r dependency; do
+          if grep -Fx "$dependency" <<<"$dylib_ids" >/dev/null; then
+            continue
+          fi
           case "$dependency" in
             ""|@*|/System/Library/*|/usr/lib/*) ;;
             /*) printf '%s: dependency %s\n' "$binary" "$dependency" >> "$violations" ;;
@@ -590,6 +606,7 @@ prepare_app() {
 
   say "macdeployqt begins: mode=$mode"
   macdeployqt_run "$out_app" "$mode"
+  remove_unused_qt_sql_plugins "$out_app"
   assert_portable_macho_links "$out_app"
 
   if [[ "$mode" == "mas" && -n "$MAS_PROVISIONPROFILE" ]]; then

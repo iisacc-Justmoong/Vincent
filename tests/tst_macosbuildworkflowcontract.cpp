@@ -47,6 +47,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
 private slots:
     void cmakeFixesApplicationVersionAt401();
     void cmakeRequiresRepositoryBuildDirectory();
+    void cmakeAvoidsRedundantMacOSRuntimeRpaths();
     void repositoryGuidelinesUseOnlyBuildDirectory();
     void buildGuideSeparatesLocalAndDistributionSigning();
     void platformAppIconsAreBundledFromResources();
@@ -95,6 +96,21 @@ void tst_MacOSBuildWorkflowContract::cmakeRequiresRepositoryBuildDirectory()
     QVERIFY(cmakeSource.contains(QStringLiteral("repository-local build/ directory")));
     QVERIFY(cmakeSource.contains(QStringLiteral("cmake -S ${CMAKE_SOURCE_DIR} -B ${_vincent_required_build_dir}")));
     QVERIFY(cmakeSource.contains(QStringLiteral("NOT _vincent_actual_build_dir STREQUAL _vincent_required_build_dir")));
+}
+
+void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
+{
+    const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
+
+    QFile cmakeFile(cmakePath);
+    QVERIFY(cmakeFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString source = QString::fromUtf8(cmakeFile.readAll());
+
+    QVERIFY(source.contains(QStringLiteral("if(UNIX AND NOT APPLE)\n"
+                                           "    list(APPEND _vincent_local_dependency_runtime_candidates")));
+    QVERIFY(!source.contains(QStringLiteral("if(UNIX)\n"
+                                            "    list(APPEND _vincent_local_dependency_runtime_candidates")));
 }
 
 void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()
@@ -212,9 +228,15 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     QVERIFY(source.contains(QStringLiteral("need_cmd /usr/bin/otool")));
     QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links()")));
     QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -L \"$binary\"")));
+    QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -D \"$binary\"")));
+    QVERIFY(source.contains(QStringLiteral("sed -nE 's/^[[:space:]]+([^[:space:]]+).*/\\1/p'")));
+    QVERIFY(source.contains(QStringLiteral("grep -Fx \"$dependency\" <<<\"$dylib_ids\"")));
     QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -l \"$binary\"")));
     QVERIFY(source.contains(QStringLiteral("LC_RPATH")));
     QVERIFY(source.contains(QStringLiteral("deployed app contains non-portable absolute Mach-O paths")));
+    QVERIFY(source.contains(QStringLiteral("remove_unused_qt_sql_plugins()")));
+    QVERIFY(source.contains(QStringLiteral("rm -rf \"$app/Contents/PlugIns/sqldrivers\"")));
+    QVERIFY(source.contains(QStringLiteral("remove_unused_qt_sql_plugins \"$out_app\"")));
     QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links \"$out_app\"")));
 }
 
@@ -304,7 +326,10 @@ PLIST
 
     QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("cmake")), fakeCmake));
     QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("macdeployqt")),
-                            QByteArray("#!/bin/sh\nexit 0\n")));
+                            QByteArray("#!/bin/sh\n"
+                                       "set -eu\n"
+                                       "mkdir -p \"$1/Contents/PlugIns/sqldrivers\"\n"
+                                       "printf 'unused SQL plugin\\n' > \"$1/Contents/PlugIns/sqldrivers/libunused.dylib\"\n")));
     QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("codesign")),
                             QByteArray("#!/bin/sh\nexit 0\n")));
     QVERIFY(writeExecutable(QDir(binDir).filePath(QStringLiteral("security")),
@@ -374,6 +399,8 @@ esac
     QVERIFY2(process.exitCode() == 0, qPrintable(output));
     QVERIFY2(!output.contains(QStringLiteral("unbound variable")), qPrintable(output));
     QVERIFY2(output.contains(QStringLiteral("done")), qPrintable(output));
+    QVERIFY2(!QDir(temp.filePath(QStringLiteral("dist/Vincent.app/Contents/PlugIns/sqldrivers"))).exists(),
+             qPrintable(output));
     QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
     QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
 #endif

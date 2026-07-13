@@ -66,6 +66,8 @@ private slots:
 
 namespace {
 
+constexpr int nativeWindowExposureTimeoutMs = 15000;
+
 QString qmlErrorsToString(const QList<QQmlError> &errors)
 {
     QStringList messages;
@@ -997,7 +999,8 @@ void tst_DrawingSurfaceItem::tracksBrushCursorDuringNativePointerInput()
     window.setGeometry(100, 100, 500, 360);
     rootItem->setParentItem(window.contentItem());
     window.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY2(QTest::qWaitForWindowExposed(&window, nativeWindowExposureTimeoutMs),
+             "The native pointer test window was not exposed before the compositor timeout");
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);

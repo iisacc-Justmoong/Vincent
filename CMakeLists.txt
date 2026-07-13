@@ -160,7 +160,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "$ENV{HOME}/.local/LVRS/platforms/linux/lib"
             "$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib")
 endif()
-if(UNIX)
+if(UNIX AND NOT APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/lib"
             "$ENV{HOME}/.local/iiPaintEngine/lib")
