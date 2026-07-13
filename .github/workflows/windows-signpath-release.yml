@@ -77,7 +77,7 @@ jobs:
           $lvrsArguments = @(
               "--platforms", "windows",
               "--prefix", $lvrsPrefix,
-              "--build-type", "Release",
+              "--build-type", "MinSizeRel",
               "--without-examples",
               "--without-tests",
               "--",

@@ -14,6 +14,7 @@
 - 메모리가 제한된 GitHub 러너에서 LVRS의 대형 QML 리소스 번역 단위가 IPO/LTO로 장시간 정체되지 않도록 의존성 bootstrap의 IPO만 비활성화하고, LVRS와 iiPaintEngine 설치 단계를 분리했다.
 - PowerShell이 LVRS Rust CLI의 CMake 인자 구분자 `--`를 소비하지 않도록 전체 호출 인자를 배열로 구성해 전달한다.
 - LVRS 설치 스크립트의 예제·테스트 제외 옵션을 `--` 앞에 명시하여 자동 추가 옵션이 CMake 인자로 잘못 이동하지 않게 했다.
+- 무료 GitHub 러너에서 대형 LVRS QML 리소스의 Release `-O3` 컴파일이 장시간 소요되어, 해당 의존성만 공식 배포 최적화 구성인 `MinSizeRel`로 빌드하도록 변경했다. Vincent 본체는 계속 Release로 빌드한다.
 
 ## 2026-07-02
 
