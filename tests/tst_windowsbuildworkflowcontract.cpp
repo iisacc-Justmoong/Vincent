@@ -653,6 +653,10 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 4530b3ac02f2f82badf95a1b6c6dff1fc6d90aaf")));
+    QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
+    QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("-ExternalSigning -SkipPackage -CreateMsi")));
     QVERIFY(workflow.contains(QStringLiteral("actions/upload-artifact")));
     QVERIFY(workflow.contains(QStringLiteral("archive: false")));
