@@ -659,6 +659,7 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("$lvrsArguments = @(")));
     QVERIFY(workflow.contains(QStringLiteral("@lvrsArguments")));
+    QVERIFY(workflow.contains(QStringLiteral("\"--without-examples\",\n              \"--without-tests\",\n              \"--\"")));
     QVERIFY(workflow.contains(QStringLiteral("-ExternalSigning -SkipPackage -CreateMsi")));
     QVERIFY(workflow.contains(QStringLiteral("actions/upload-artifact")));
     QVERIFY(workflow.contains(QStringLiteral("archive: false")));

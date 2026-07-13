@@ -78,6 +78,8 @@ jobs:
               "--platforms", "windows",
               "--prefix", $lvrsPrefix,
               "--build-type", "Release",
+              "--without-examples",
+              "--without-tests",
               "--",
               "-DLVRS_ENABLE_IPO=OFF",
               "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF"
