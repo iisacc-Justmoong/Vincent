@@ -647,6 +647,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("jurplel/install-qt-action")));
     QVERIFY(workflow.contains(QStringLiteral("version: '6.8.3'")));
     QVERIFY(workflow.contains(QStringLiteral("arch: 'win64_mingw'")));
+    QVERIFY(workflow.contains(QStringLiteral("modules: 'qtimageformats qtshadertools'")));
+    QVERIFY(!workflow.contains(QStringLiteral("modules: 'qtsvg")));
     QVERIFY(workflow.contains(QStringLiteral("source: true")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
@@ -662,7 +664,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("Windows Kits\\10\\bin")));
     QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
     QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
-    QVERIFY(workflow.contains(QStringLiteral("Vincent-4.0.2-Windows.msi")));
+    QVERIFY(workflow.contains(QStringLiteral("Vincent-*-Windows.msi")));
+    QVERIFY(!workflow.contains(QStringLiteral("Vincent-4.0.2-Windows.msi")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");

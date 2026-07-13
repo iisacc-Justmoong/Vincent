@@ -41,7 +41,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_mingw'
-          modules: 'qtsvg qtimageformats qtshadertools'
+          modules: 'qtimageformats qtshadertools'
           source: true
           src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools'
           tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
@@ -105,7 +105,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Vincent-SignPath-input
-          path: build/signpath-input/Vincent-4.0.2-Windows.msi
+          path: build/signpath-input/Vincent-*-Windows.msi
           archive: false
           if-no-files-found: error
           retention-days: 7
@@ -128,10 +128,12 @@ jobs:
         if: ${{ inputs.submit-for-signing }}
         shell: pwsh
         run: |
-          $msi = Join-Path $env:RUNNER_TEMP "signed\Vincent-4.0.2-Windows.msi"
-          if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) {
-              throw "SignPath did not return the canonical Vincent MSI."
+          $signedDirectory = Join-Path $env:RUNNER_TEMP "signed"
+          $signedCandidates = @(Get-ChildItem -LiteralPath $signedDirectory -Filter "Vincent-*-Windows.msi" -File)
+          if ($signedCandidates.Count -ne 1) {
+              throw "SignPath must return exactly one canonical Vincent MSI; found $($signedCandidates.Count)."
           }
+          $msi = $signedCandidates[0].FullName
           $signature = Get-AuthenticodeSignature -LiteralPath $msi
           if ($signature.Status -ne "Valid") {
               throw "The SignPath MSI Authenticode signature is not valid: $($signature.Status)"
@@ -156,7 +158,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: Vincent-website-release
-          path: '${{ runner.temp }}/signed/Vincent-4.0.2-Windows.msi'
+          path: '${{ runner.temp }}/signed/Vincent-*-Windows.msi'
           archive: false
           if-no-files-found: error
           retention-days: 30
