@@ -18,6 +18,7 @@
 - 단일 구성 Ninja에서 iiPaintEngine 설치 대상이 `NOCONFIG`만 내보내 Vincent Release 구성이 import library를 찾지 못하던 문제를 해결한 엔진 커밋을 고정했다.
 - 비대화형 GitHub 러너의 Qt GUI 테스트는 offscreen 플랫폼으로 고정하고, Windows PowerShell 정책 테스트는 `$PSHOME`의 내장 Utility 모듈을 명시적으로 불러 PowerShell 7 모듈 경로 상속의 영향을 제거했다.
 - 선택형 Qt 소스 아카이브가 최상위 `Src/LICENSES`를 만들지 않는 경우에는 동일한 5개 공통 라이선스 문서를 검증한 `qtbase/LICENSES`를 사용하고, 실제 배포되는 번역 모듈의 소스 라이선스도 CI에서 함께 받도록 수정했다.
+- 이미 공개된 소스 전용 `v4.0.2` 태그를 변경하지 않고, 공개 GitHub 러너에서 서명 직전 MSI까지 검증된 최종 배포 계보를 `4.0.3`으로 올렸다.
 
 ## 2026-07-02
 

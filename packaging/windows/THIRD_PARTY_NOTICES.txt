@@ -1,4 +1,4 @@
-Vincent 4.0.2 - Third-Party Notices
+Vincent 4.0.3 - Third-Party Notices
 ====================================
 
 This distribution includes or links the components listed below. The complete
