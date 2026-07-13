@@ -150,6 +150,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY2(!noticesPath.isEmpty(), "Windows third-party notices were not found");
     const QString notices = readTextFile(noticesPath);
     QVERIFY(notices.contains(QStringLiteral("iiPaintEngine")));
+    QVERIFY(notices.contains(QStringLiteral("AGPL-3.0-only")));
+    QVERIFY(notices.contains(QStringLiteral("legal/iiPaintEngine/LICENSE.txt")));
     QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
     QVERIFY(notices.contains(QStringLiteral("Pretendard 1.3.9")));
     QVERIFY(notices.contains(QStringLiteral("Qt 6.8.3")));

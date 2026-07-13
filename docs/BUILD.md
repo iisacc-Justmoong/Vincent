@@ -135,7 +135,7 @@ Every ZIP/MSI package stages `LICENSE.txt`, `THIRD_PARTY_NOTICES.txt`, `SOURCE_O
 
 Qt packaging requires the matching Qt `Sources` component and SBOM files from the selected kit. For Qt 6.8.3 they are resolved below `C:\Qt\6.8.3\Src` and `C:\Qt\6.8.3\mingw_64\sbom`. A MinGW package also resolves the exact `C:\Qt\Tools\mingw*` directory by comparing the staged runtime DLL hashes before copying its notices; an unrelated toolchain's license directory is rejected.
 
-Public distribution is currently fail-closed until the iiPaintEngine copyright holder makes a legal licensing decision. Do not infer a license merely because its repository is public. The copyright holder must add a root `LICENSE`, identify the SPDX license in its README, install that file as `share/licenses/iiPaintEngine/LICENSE`, add an installation-layout test, and publish the resulting source commit/tag. The selected license must be compatible with the way iiPaintEngine and the AGPL-3.0 Vincent application are combined; obtain qualified legal advice if ownership or compatibility is uncertain. Until then, `-AllowUnsignedPackage` remains a local test path and its `SOURCE_OFFER.txt` explicitly says that it is not for distribution.
+The iiPaintEngine copyright holder has selected `AGPL-3.0-only`. Its repository now contains the AGPL v3 text at root `LICENSE`, identifies the SPDX license in its README, installs the text as `share/licenses/iiPaintEngine/LICENSE`, and protects the layout with a contract test. Vincent copies that exact file to `legal/iiPaintEngine/LICENSE.txt` and verifies the staged bytes. `-AllowUnsignedPackage` remains a local test path because it deliberately has no finalized corresponding-source URL, regardless of the now-complete component license set.
 
 Before the first public build, create `Vincent-4.0.1-Corresponding-Source.zip` from clean, tagged Vincent, LVRS, and newly licensed iiPaintEngine sources plus the exact Qt corresponding source required for the conveyed libraries. Publish it at a location controlled by the publisher, calculate `Get-FileHash -Algorithm SHA256`, and set `VINCENT_CORRESPONDING_SOURCE_URL` and `VINCENT_CORRESPONDING_SOURCE_SHA256` to those exact values. An upstream Qt download link alone is not treated as the release's corresponding-source evidence. The signing script accepts only an absolute HTTPS URL and a 64-hex SHA-256 and writes both into the installed `SOURCE_OFFER.txt`.
 
@@ -192,7 +192,7 @@ That copies the staged runtime to `%LOCALAPPDATA%\Programs\Vincent` by default a
 
 Microsoft Store MSIX is Vincent's certificate-free public Windows distribution route. Microsoft re-signs an MSIX after certification, so the publisher does not buy, renew, export, or protect a public OV/EV certificate and customers do not receive a SmartScreen unknown-publisher warning for the Store installation. This applies to an actual MSIX submission only. Microsoft does not re-sign an MSI or EXE submitted through the separate Win32 installer path. See Microsoft's current [Windows code-signing options](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options) and [manual desktop MSIX packaging guide](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-manual-conversion).
 
-`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and writes SHA-256 sidecars. The manifest is x64, uses package version `4.0.1.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
+`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity and exact reserved app name into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and writes SHA-256 sidecars. The reserved name drives both `Package/Properties/DisplayName` and `uap:VisualElements/@DisplayName`; Partner Center rejects an unreserved package-level name even when the package identity and publisher are correct. The manifest is x64, uses package version `4.0.1.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
 
 ### Local self-signed MSIX verification
 
@@ -242,15 +242,21 @@ The legal account holder must complete the identity-sensitive steps. Start at [s
 After verification:
 
 1. Open Partner Center, choose **Apps and games**, **New product**, then **MSIX or PWA app**.
-2. Search for and reserve the exact public display name. Use `Vincent` only if Partner Center confirms it is available. A reservation can expire if it is not used for a submission.
+2. Search for and reserve the exact public display name. This product reserves `Vincent 4`; the package must use that exact text rather than `Vincent`. A reservation can expire if it is not used for a submission.
 3. Open **Product management > Product identity**.
-4. Copy these three values exactly, preserving case, spaces, commas, and punctuation:
+4. Copy these four values exactly, preserving case, spaces, commas, and punctuation:
+   - Reserved app name for `Package/Properties/DisplayName`
    - `Package/Identity/Name`
    - `Package/Identity/Publisher`
    - `Package/Properties/PublisherDisplayName`
 5. Store only those non-secret values in the current user's environment:
 
 ```powershell
+[Environment]::SetEnvironmentVariable(
+  "VINCENT_STORE_DISPLAY_NAME",
+  "<exact-reserved-app-name>",
+  "User"
+)
 [Environment]::SetEnvironmentVariable(
   "VINCENT_STORE_IDENTITY_NAME",
   "<exact-Package-Identity-Name>",
@@ -268,11 +274,11 @@ After verification:
 )
 ```
 
-An invented Name or Publisher produces a different package family and Partner Center rejects it. The local development Publisher is intentionally unrelated to the future Store Publisher and must not be substituted.
+An invented identity or publisher produces a different package family, while an unreserved display name fails package validation. Partner Center rejects either case. The local development Publisher and display name are intentionally unrelated to the Store values and must not be substituted.
 
 ### Legal release gate
 
-Store signing does not replace the publisher's license obligations. Before a public package can exist, the iiPaintEngine copyright holder must select and commit an explicit license in the iiPaintEngine repository. Do not infer or add a license without that authorization. Vincent's Store stage must then contain non-empty `legal/iiPaintEngine/LICENSE.txt`, all other staged third-party notices, and a corresponding-source offer for the exact release.
+Store signing does not replace the publisher's license obligations. The iiPaintEngine copyright holder has authorized `AGPL-3.0-only`, and the installed engine package now supplies that exact license. Vincent's Store stage requires non-empty `legal/iiPaintEngine/LICENSE.txt`, all other staged third-party notices, and a corresponding-source offer for the exact release.
 
 Create a complete source archive for the shipped Vincent, LVRS, iiPaintEngine, patched/build-required dependency sources, build scripts, and license material; publish it at an HTTPS location controlled by the publisher; and record the SHA-256 of those exact bytes. Configure the evidence as follows:
 
