@@ -25,7 +25,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.1"
+$Version = "4.0.2"
 $PackageVersion = "$Version.0"
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDirectory = Join-Path $RepositoryRoot "build"

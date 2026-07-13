@@ -33,7 +33,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.1"
+$Version = "4.0.2"
 $windowsVersionParts = @($Version -split '\.')
 while ($windowsVersionParts.Count -lt 4) {
     $windowsVersionParts += "0"
