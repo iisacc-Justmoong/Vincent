@@ -140,6 +140,9 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Assert-PublicDistributionEvidence")));
     QVERIFY(source.contains(QStringLiteral("Copy-WindowsLegalMaterials")));
     QVERIFY(source.contains(QStringLiteral("Assert-WindowsLegalMaterials")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-QtGlobalLicenseDirectory")));
+    QVERIFY(source.contains(QStringLiteral("qtbase\\LICENSES")));
+    QVERIFY(source.contains(QStringLiteral("Qt-GPL-exception-1.0.txt")));
     QVERIFY(source.contains(QStringLiteral("Resolve-StagedMinGwToolchainRoot")));
     QVERIFY(source.contains(QStringLiteral("Public Windows packaging requires an explicit iiPaintEngine LICENSE")));
     QVERIFY(source.contains(QStringLiteral("qtimageformats")));
@@ -657,6 +660,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("modules: 'qtimageformats qtshadertools'")));
     QVERIFY(!workflow.contains(QStringLiteral("modules: 'qtsvg")));
     QVERIFY(workflow.contains(QStringLiteral("source: true")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53")));

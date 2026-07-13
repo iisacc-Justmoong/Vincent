@@ -1297,6 +1297,46 @@ function Copy-LegalDirectory {
     }
 }
 
+function Resolve-QtGlobalLicenseDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$QtSourceRoot
+    )
+
+    $requiredFiles = @(
+        "GPL-2.0-only.txt",
+        "GPL-3.0-only.txt",
+        "LGPL-3.0-only.txt",
+        "LicenseRef-Qt-Commercial.txt",
+        "Qt-GPL-exception-1.0.txt"
+    )
+    $candidates = @(
+        (Join-Path $QtSourceRoot "LICENSES"),
+        (Join-Path $QtSourceRoot "qtbase\LICENSES")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Container)) {
+            continue
+        }
+
+        $complete = $true
+        foreach ($requiredFile in $requiredFiles) {
+            $path = Join-Path $candidate $requiredFile
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                (Get-Item -LiteralPath $path).Length -le 0) {
+                $complete = $false
+                break
+            }
+        }
+        if ($complete) {
+            return $candidate
+        }
+    }
+
+    throw "The matching Qt source tree does not contain a complete global license set under LICENSES or qtbase\LICENSES: $QtSourceRoot"
+}
+
 function Resolve-StagedMinGwToolchainRoot {
     param(
         [string]$Directory,
@@ -1419,8 +1459,9 @@ function Copy-WindowsLegalMaterials {
     $qtVersionRoot = Split-Path -Parent $ResolvedQtPrefix
     $qtVersion = Split-Path -Leaf $qtVersionRoot
     $qtSourceRoot = Join-Path $qtVersionRoot "Src"
+    $qtGlobalLicenseDirectory = Resolve-QtGlobalLicenseDirectory -QtSourceRoot $qtSourceRoot
     Copy-LegalDirectory `
-        -Source (Join-Path $qtSourceRoot "LICENSES") `
+        -Source $qtGlobalLicenseDirectory `
         -Destination (Join-Path $legalRoot "Qt\LICENSES\global")
     $qtModules = @("qtbase", "qtdeclarative", "qtsvg", "qtimageformats", "qttranslations")
     foreach ($qtModule in $qtModules) {
