@@ -15,7 +15,7 @@ permissions:
 
 env:
   LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53
-  IIPAINTENGINE_COMMIT: 4530b3ac02f2f82badf95a1b6c6dff1fc6d90aaf
+  IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e
 
 jobs:
   build-and-sign:
