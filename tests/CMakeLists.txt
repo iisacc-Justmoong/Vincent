@@ -271,3 +271,9 @@ if(WIN32)
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
     )
 endif()
+
+set_property(
+        TEST tests_drawingsurfaceitem
+        APPEND PROPERTY ENVIRONMENT_MODIFICATION
+        "QT_QPA_PLATFORM=set:offscreen"
+)
