@@ -188,11 +188,28 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -SkipPackage -Insta
 
 That copies the staged runtime to `%LOCALAPPDATA%\Programs\Vincent` by default and creates a shortcut in the current user's Start Menu. `-InstallDir <path>` may override the location only below the current user's Local Application Data directory. An existing non-empty target must contain Vincent's ownership marker or a versioned `Vincent.exe`; drive roots, user data roots, reparse points, unrelated directories, and the staged source are rejected before recursive deletion. If the Qt kit is MSVC-based and `cl.exe` is not already in `PATH`, the script tries to load the Visual Studio C++ build environment through `vswhere.exe`; otherwise, launch it from a Developer PowerShell for VS.
 
+### Free website release through SignPath Foundation
+
+The no-cost website distribution path uses the SignPath Foundation open-source sponsorship. It does not install a private signing key on a maintainer machine. Instead, `.github/workflows/windows-signpath-release.yml` builds on a GitHub-hosted Windows runner from the public Vincent, LVRS, and iiPaintEngine repositories, uploads the unsigned MSI as a GitHub workflow artifact, and asks SignPath to apply the sponsored public Authenticode signature. This adds no application runtime dependency; SignPath and the GitHub actions are release infrastructure only. SignPath Foundation's OSS terms, manual approval requirement, availability, and certificate sponsorship remain external service dependencies and can be changed or withdrawn by their maintainers.
+
+`build-windows.ps1 -ExternalSigning -SkipPackage -CreateMsi` is deliberately separate from `-AllowUnsignedPackage`. The external-signing mode accepts only Release or MinSizeRel, requires the complete test suite and public corresponding-source evidence, creates exactly `build/signpath-input/Vincent-4.0.1-Windows.msi`, and labels the staged files and MSI as non-distributable input. It does not publish anything under `dist/`. `-ExternalSigning` cannot be combined with `-Sign` or `-AllowUnsignedPackage`, cannot create a ZIP, and cannot skip MSI creation.
+
+Before enabling submission, the repository owner must:
+
+1. obtain approval for Vincent from the SignPath Foundation OSS program;
+2. install the SignPath GitHub App for this repository and retain MFA on GitHub and SignPath;
+3. configure a SignPath artifact configuration that signs the Vincent-owned `Vincent.exe` inside the MSI and then signs the MSI container, while leaving upstream Qt, LVRS, iiPaintEngine, and MinGW binaries under their own publisher identities or unsigned as permitted by the OSS policy;
+4. require manual approval in the SignPath release signing policy;
+5. configure the repository variables `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`, `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`, `VINCENT_CORRESPONDING_SOURCE_URL`, and `VINCENT_CORRESPONDING_SOURCE_SHA256`, plus the `SIGNPATH_API_TOKEN` repository secret;
+6. dispatch the workflow from an immutable release tag with `submit-for-signing` enabled.
+
+The workflow verifies the returned Authenticode chain, SignPath Foundation subject, timestamp, and MSI database contract. Download the unarchived workflow artifact `Vincent-website-release`, install/launch/remove it on a clean Windows system, and place only the returned `Vincent-4.0.1-Windows.msi` under `dist/` and on the website. The standalone MSI is sufficient for installation; an adjacent checksum can be retained internally but is not required because Authenticode binds the complete installer and publisher identity.
+
 ## 1c. Microsoft Store MSIX
 
 Microsoft Store MSIX is Vincent's certificate-free public Windows distribution route. Microsoft re-signs an MSIX after certification, so the publisher does not buy, renew, export, or protect a public OV/EV certificate and customers do not receive a SmartScreen unknown-publisher warning for the Store installation. This applies to an actual MSIX submission only. Microsoft does not re-sign an MSI or EXE submitted through the separate Win32 installer path. See Microsoft's current [Windows code-signing options](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options) and [manual desktop MSIX packaging guide](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-manual-conversion).
 
-`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity and exact reserved app name into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and writes SHA-256 sidecars. The reserved name drives both `Package/Properties/DisplayName` and `uap:VisualElements/@DisplayName`; Partner Center rejects an unreserved package-level name even when the package identity and publisher are correct. The manifest is x64, uses package version `4.0.1.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
+`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity and exact reserved app name into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and publishes the Store files and SHA-256 sidecars under `dist/`. The reserved name drives both `Package/Properties/DisplayName` and `uap:VisualElements/@DisplayName`; Partner Center rejects an unreserved package-level name even when the package identity and publisher are correct. The manifest is x64, uses package version `4.0.1.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
 
 ### Local self-signed MSIX verification
 
@@ -307,8 +324,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows-store.ps1 -Mode Store
 
 This always rebuilds in Release mode and runs the complete test suite. It creates:
 
-- `build/Vincent-4.0.1-Windows-Store-x64.msix`, intentionally unsigned for Store ingestion;
-- `build/Vincent-4.0.1-Windows-Store-x64.msixupload`, a ZIP container holding exactly that x64 MSIX and no fake symbol archive;
+- `dist/Vincent-4.0.1-Windows-Store-x64.msix`, intentionally unsigned for Store ingestion;
+- `dist/Vincent-4.0.1-Windows-Store-x64.msixupload`, a ZIP container holding exactly that x64 MSIX and no fake symbol archive;
 - a `.sha256` sidecar for each file.
 
 MinGW does not produce a Microsoft PDB, so `.appxsym` is deliberately omitted. Do not sign the Store upload with the private development certificate. Upload the `.msixupload` on the submission's **Packages** page; Partner Center performs the authoritative manifest, malware, policy, and technical certification and then replaces the package signature with Microsoft's Store signature.

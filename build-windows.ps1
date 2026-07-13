@@ -16,6 +16,7 @@ param(
     [switch]$SkipPackage,
     [switch]$Sign,
     [switch]$AllowUnsignedPackage,
+    [switch]$ExternalSigning,
     [string]$SigningCertificateThumbprint = $env:VINCENT_SIGNING_CERTIFICATE_THUMBPRINT,
     [ValidateSet("CurrentUser", "LocalMachine")]
     [string]$SigningCertificateStoreLocation = "CurrentUser",
@@ -51,21 +52,28 @@ $UnsignedZipPartialPath = Join-Path $DistRoot "Vincent-$Version-Windows-unsigned
 $ZipPartialPath = if ($AllowUnsignedPackage) { $UnsignedZipPartialPath } else { $SignedZipPartialPath }
 $ZipChecksumPartialPath = "$ZipChecksumPath.partial"
 $MsiWorkDir = Join-Path $BuildDir "msi"
+$ExternalSigningInputDir = Join-Path $BuildDir "signpath-input"
 $SignedMsiPath = Join-Path $BuildDir "Vincent-$Version-Windows.msi"
 $UnsignedMsiPath = Join-Path $BuildDir "Vincent-$Version-Windows-unsigned.msi"
-$MsiPath = if ($AllowUnsignedPackage) { $UnsignedMsiPath } else { $SignedMsiPath }
+$ExternalSigningMsiPath = Join-Path $ExternalSigningInputDir "Vincent-$Version-Windows.msi"
+$MsiPath = if ($ExternalSigning) { $ExternalSigningMsiPath } elseif ($AllowUnsignedPackage) { $UnsignedMsiPath } else { $SignedMsiPath }
 $MsiChecksumPath = "$MsiPath.sha256"
 $SignedMsiPartialPath = Join-Path $BuildDir "Vincent-$Version-Windows.partial.msi"
 $UnsignedMsiPartialPath = Join-Path $BuildDir "Vincent-$Version-Windows-unsigned.partial.msi"
-$MsiPartialPath = if ($AllowUnsignedPackage) { $UnsignedMsiPartialPath } else { $SignedMsiPartialPath }
+$ExternalSigningMsiPartialPath = Join-Path $ExternalSigningInputDir "Vincent-$Version-Windows.partial.msi"
+$MsiPartialPath = if ($ExternalSigning) { $ExternalSigningMsiPartialPath } elseif ($AllowUnsignedPackage) { $UnsignedMsiPartialPath } else { $SignedMsiPartialPath }
 $SignedMsiPartialDebugPath = [System.IO.Path]::ChangeExtension($SignedMsiPartialPath, ".wixpdb")
 $UnsignedMsiPartialDebugPath = [System.IO.Path]::ChangeExtension($UnsignedMsiPartialPath, ".wixpdb")
-$MsiPartialDebugPath = if ($AllowUnsignedPackage) { $UnsignedMsiPartialDebugPath } else { $SignedMsiPartialDebugPath }
+$ExternalSigningMsiPartialDebugPath = [System.IO.Path]::ChangeExtension($ExternalSigningMsiPartialPath, ".wixpdb")
+$MsiPartialDebugPath = if ($ExternalSigning) { $ExternalSigningMsiPartialDebugPath } elseif ($AllowUnsignedPackage) { $UnsignedMsiPartialDebugPath } else { $SignedMsiPartialDebugPath }
 $MsiChecksumPartialPath = "$MsiChecksumPath.partial"
 $CpackIncompleteZipPath = Join-Path $BuildDir "Vincent-$Version-Windows-unsigned-cpack-incomplete.zip"
 $SignedPackagePublicationJournalPath = Join-Path $DistRoot ".Vincent-$Version-Windows.publication.json"
 $UnsignedPackagePublicationJournalPath = Join-Path $DistRoot ".Vincent-$Version-Windows-unsigned.publication.json"
-$PackagePublicationJournalPath = if ($AllowUnsignedPackage) {
+$ExternalSigningPublicationJournalPath = Join-Path $ExternalSigningInputDir ".Vincent-$Version-Windows-signpath-input.publication.json"
+$PackagePublicationJournalPath = if ($ExternalSigning) {
+    $ExternalSigningPublicationJournalPath
+} elseif ($AllowUnsignedPackage) {
     $UnsignedPackagePublicationJournalPath
 } else {
     $SignedPackagePublicationJournalPath
@@ -123,6 +131,7 @@ function Assert-AuthenticodePolicy {
     param(
         [bool]$SigningRequested,
         [bool]$UnsignedPackageAllowed,
+        [bool]$ExternalSigningRequested = $false,
         [bool]$ZipPackageSkipped,
         [bool]$MsiRequested,
         [bool]$TestsSkipped,
@@ -134,12 +143,30 @@ function Assert-AuthenticodePolicy {
     if ($SigningRequested -and $UnsignedPackageAllowed) {
         throw "-Sign and -AllowUnsignedPackage cannot be used together."
     }
-
-    $packageRequested = (-not $ZipPackageSkipped) -or $MsiRequested
-    if ($packageRequested -and (-not $SigningRequested) -and (-not $UnsignedPackageAllowed)) {
-        throw "Public package creation requires -Sign. Use -AllowUnsignedPackage only for an explicitly marked local test package."
+    if ($ExternalSigningRequested -and ($SigningRequested -or $UnsignedPackageAllowed)) {
+        throw "-ExternalSigning cannot be combined with -Sign or -AllowUnsignedPackage."
+    }
+    if ($ExternalSigningRequested -and (-not $ZipPackageSkipped)) {
+        throw "External signing input is MSI-only; use -SkipPackage."
+    }
+    if ($ExternalSigningRequested -and (-not $MsiRequested)) {
+        throw "External signing requires -CreateMsi."
     }
 
+    $packageRequested = (-not $ZipPackageSkipped) -or $MsiRequested
+    if ($packageRequested -and (-not $SigningRequested) -and (-not $UnsignedPackageAllowed) -and (-not $ExternalSigningRequested)) {
+        throw "Public package creation requires -Sign or -ExternalSigning. Use -AllowUnsignedPackage only for an explicitly marked local test package."
+    }
+
+    if ($ExternalSigningRequested) {
+        if ($Configuration -notin @("Release", "MinSizeRel")) {
+            throw "External signing requires Release or MinSizeRel, not $Configuration."
+        }
+        if ($TestsSkipped) {
+            throw "External signing does not allow -SkipTests."
+        }
+        return
+    }
     if (-not $SigningRequested) {
         return
     }
@@ -2498,13 +2525,25 @@ $unsignedFinalArtifacts = @(
         FinalChecksumPath = "$UnsignedMsiPath.sha256"
     }
 )
-$allowedFinalArtifacts = if ($AllowUnsignedPackage) { $unsignedFinalArtifacts } else { $signedFinalArtifacts }
+$externalSigningFinalArtifacts = @(
+    [pscustomobject]@{
+        FinalArtifactPath = $ExternalSigningMsiPath
+        FinalChecksumPath = "$ExternalSigningMsiPath.sha256"
+    }
+)
+$allowedFinalArtifacts = if ($ExternalSigning) { $externalSigningFinalArtifacts } elseif ($AllowUnsignedPackage) { $unsignedFinalArtifacts } else { $signedFinalArtifacts }
 $requestedFinalArtifacts = @()
-if (-not $SkipPackage) {
-    $requestedFinalArtifacts += $allowedFinalArtifacts[0]
-}
-if ($CreateMsi) {
-    $requestedFinalArtifacts += $allowedFinalArtifacts[1]
+if ($ExternalSigning) {
+    if ($CreateMsi) {
+        $requestedFinalArtifacts += $externalSigningFinalArtifacts[0]
+    }
+} else {
+    if (-not $SkipPackage) {
+        $requestedFinalArtifacts += $allowedFinalArtifacts[0]
+    }
+    if ($CreateMsi) {
+        $requestedFinalArtifacts += $allowedFinalArtifacts[1]
+    }
 }
 
 if ($Clean) {
@@ -2516,6 +2555,10 @@ if ($Clean) {
             [pscustomobject]@{
                 JournalPath = $UnsignedPackagePublicationJournalPath
                 Artifacts = $unsignedFinalArtifacts
+            },
+            [pscustomobject]@{
+                JournalPath = $ExternalSigningPublicationJournalPath
+                Artifacts = $externalSigningFinalArtifacts
             }
         )) {
         if (Test-Path -LiteralPath $recoverySet.JournalPath -PathType Leaf) {
@@ -2538,6 +2581,7 @@ if ($Clean) {
 Assert-AuthenticodePolicy `
     -SigningRequested ([bool]$Sign) `
     -UnsignedPackageAllowed ([bool]$AllowUnsignedPackage) `
+    -ExternalSigningRequested ([bool]$ExternalSigning) `
     -ZipPackageSkipped ([bool]$SkipPackage) `
     -MsiRequested ([bool]$CreateMsi) `
     -TestsSkipped ([bool]$SkipTests) `
@@ -2625,7 +2669,7 @@ if ($windowsPackageRequested) {
         ) `
         -AdditionalCandidates @((Join-Path $dependencySourceRoot "iiPaintEngine\LICENSE"))
     Assert-PublicDistributionEvidence `
-        -PublicRelease ([bool]$Sign) `
+        -PublicRelease ([bool]($Sign -or $ExternalSigning)) `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
@@ -2651,7 +2695,17 @@ if ($Clean) {
         "$SignedPackagePublicationJournalPath.previous",
         $UnsignedPackagePublicationJournalPath,
         "$UnsignedPackagePublicationJournalPath.partial",
-        "$UnsignedPackagePublicationJournalPath.previous"
+        "$UnsignedPackagePublicationJournalPath.previous",
+        $ExternalSigningMsiPath,
+        "$ExternalSigningMsiPath.sha256",
+        $ExternalSigningMsiPartialPath,
+        $ExternalSigningMsiPartialDebugPath,
+        "$ExternalSigningMsiPath.sha256.partial",
+        "$ExternalSigningMsiPath.previous",
+        "$ExternalSigningMsiPath.sha256.previous",
+        $ExternalSigningPublicationJournalPath,
+        "$ExternalSigningPublicationJournalPath.partial",
+        "$ExternalSigningPublicationJournalPath.previous"
     )
     Clear-WindowsPackageArtifacts -Paths $cleanPackagePaths
     Remove-Item $BuildDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -2721,7 +2775,7 @@ if ($windowsPackageRequested) {
         -ResolvedQtPrefix $QtPrefix `
         -LvrsLicenseFile $lvrsLicenseFile `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
-        -PublicRelease ([bool]$Sign) `
+        -PublicRelease ([bool]($Sign -or $ExternalSigning)) `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
 }
@@ -2732,6 +2786,8 @@ if ($Sign) {
     Write-Step "Signing and verifying staged Windows binaries"
     Sign-WindowsStage -Directory $StageDir -SignTool $ResolvedSignTool -CertificateThumbprint $ResolvedSigningCertificateThumbprint -StoreLocation $SigningCertificateStoreLocation -TimestampUrl $TimestampUrl
     Verify-WindowsStageSignatures -Directory $StageDir -SignTool $ResolvedSignTool -CertificateThumbprint $ResolvedSigningCertificateThumbprint
+} elseif ($ExternalSigning) {
+    Write-Warning "The staged application is an unsigned SignPath input and must not be distributed before external signing completes."
 } else {
     Write-Warning "The staged application is unsigned and is for local testing only."
 }
@@ -2755,11 +2811,16 @@ try {
 
     if ($CreateMsi) {
         Write-Step "Creating MSI installer"
+        if ($ExternalSigning) {
+            New-Item -ItemType Directory -Path $ExternalSigningInputDir -Force | Out-Null
+        }
         $msiVersion = if ($Version -match '^\d+\.\d+$') { "$Version.0" } else { $Version }
         New-MsiInstaller -SourceDirectory $StageDir -OutputPath $MsiPartialPath -WorkDirectory $MsiWorkDir -ToolsDirectory $WixToolsDir -ProductVersion $msiVersion
         if ($Sign) {
             Sign-AuthenticodeFile -File $MsiPartialPath -SignTool $ResolvedSignTool -CertificateThumbprint $ResolvedSigningCertificateThumbprint -StoreLocation $SigningCertificateStoreLocation -TimestampUrl $TimestampUrl
             Verify-AuthenticodeFile -File $MsiPartialPath -SignTool $ResolvedSignTool -ExpectedCertificateThumbprint $ResolvedSigningCertificateThumbprint
+        } elseif ($ExternalSigning) {
+            Write-Warning "The MSI is an unsigned SignPath input and must not be distributed before external signing completes."
         } else {
             Write-Warning "The MSI is unsigned and is for local testing only."
         }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-13
+
+### Windows Store 최종 배포 경로
+
+- Windows Store용 `.msix`, `.msixupload` 및 각 SHA-256 파일을 임시 빌드 산출물과 구분하여 저장소의 `dist/`에 직접 게시하도록 변경했다.
+- Store 공개 패키지는 기존과 같이 깨끗한 Release 빌드와 전체 테스트, manifest·라이선스·corresponding-source 검증을 모두 통과해야 생성된다.
+- Windows Authenticode 정책 테스트가 Windows PowerShell 5.1에서도 안정적으로 실행되도록 기본 유틸리티 모듈 로딩과 임시 라이선스 파일 생성을 명시했다.
+- 비용 없는 자체 웹사이트 배포를 위해 SignPath Foundation OSS 후원 서명 경로를 추가했다. GitHub 호스팅 러너가 공개 소스에서 MSI를 재현하고, 외부 서명 전용 입력은 `build/signpath-input/`에 격리되며, SignPath가 반환한 공인 서명 MSI 한 개만 웹사이트 배포본이 된다.
+- README에 SignPath가 요구하는 Code signing policy, 담당 역할, 개인정보 및 시스템 변경 정책을 문서화하고 GitHub CODEOWNERS와 Windows 서명 workflow 계약 테스트를 추가했다.
+
 ## 2026-07-02
 
 ### 현재 작업트리 수정본

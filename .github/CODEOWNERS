@@ -1,0 +1,4 @@
+/.github/ @iisacc-Justmoong
+/build-windows.ps1 @iisacc-Justmoong
+/packaging/windows/ @iisacc-Justmoong
+/tests/tst_windows* @iisacc-Justmoong

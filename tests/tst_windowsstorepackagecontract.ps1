@@ -41,6 +41,8 @@ Assert-Condition ($scriptSource.Contains('VINCENT_DEVELOPMENT_SIGNING_CERTIFICAT
 Assert-Condition ($scriptSource.Contains('LocalMachine\TrustedPeople')) "Development MSIX installation must require machine TrustedPeople trust."
 Assert-Condition ($scriptSource.Contains('Store mode does not allow -SkipBuild')) "Store output must require a current build and tests."
 Assert-Condition ($scriptSource.Contains('Vincent-$Version-Windows-Store-x64')) "The canonical Store artifact name is missing."
+Assert-Condition ($scriptSource.Contains('$DistDirectory = Join-Path $RepositoryRoot "dist"')) "Store release artifacts must use the repository dist directory."
+Assert-Condition ($scriptSource.Contains('$outputDirectory = if ($Mode -eq "Store") { $DistDirectory } else { $developmentOutputDirectory }')) "Store release artifacts must be published to dist instead of build."
 Assert-Condition ($scriptSource.Contains('intentionally unsigned')) "The Store upload must document that it remains unsigned before Store ingestion."
 
 $manifestTemplateSource = Get-Content -LiteralPath $ManifestTemplatePath -Raw
