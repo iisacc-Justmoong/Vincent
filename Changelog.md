@@ -17,6 +17,7 @@
 - 무료 GitHub 러너에서 대형 LVRS QML 리소스의 Release `-O3` 컴파일이 장시간 소요되어, 해당 의존성만 공식 배포 최적화 구성인 `MinSizeRel`로 빌드하도록 변경했다. 또한 LVRS의 플랫폼 최적화가 별도로 LTO를 다시 켜 MinGW 13 링크 단계에서 내부 컴파일러 오류를 일으키지 않도록 두 최적화 스위치를 모두 끈다. framework bootstrap이 두 스위치를 내부 구성에 전달하지 않거나 명시적인 `OFF` 값을 누락하던 LVRS 결함을 고친 커밋으로 의존성을 갱신했다. Vincent 본체는 계속 Release로 빌드한다.
 - 단일 구성 Ninja에서 iiPaintEngine 설치 대상이 `NOCONFIG`만 내보내 Vincent Release 구성이 import library를 찾지 못하던 문제를 해결한 엔진 커밋을 고정했다.
 - 비대화형 GitHub 러너의 Qt GUI 테스트는 offscreen 플랫폼으로 고정하고, Windows PowerShell 정책 테스트는 `$PSHOME`의 내장 Utility 모듈을 명시적으로 불러 PowerShell 7 모듈 경로 상속의 영향을 제거했다.
+- 선택형 Qt 소스 아카이브가 최상위 `Src/LICENSES`를 만들지 않는 경우에는 동일한 5개 공통 라이선스 문서를 검증한 `qtbase/LICENSES`를 사용하고, 실제 배포되는 번역 모듈의 소스 라이선스도 CI에서 함께 받도록 수정했다.
 
 ## 2026-07-02
 

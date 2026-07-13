@@ -43,7 +43,7 @@ jobs:
           arch: 'win64_mingw'
           modules: 'qtimageformats qtshadertools'
           source: true
-          src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools'
+          src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'
           tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
           cache: true
 
