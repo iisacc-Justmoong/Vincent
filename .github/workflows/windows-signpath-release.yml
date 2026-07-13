@@ -67,25 +67,35 @@ jobs:
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiPaintEngine.git $engineSource
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
 
-      - name: Build and install pinned frameworks
+      - name: Build and install pinned LVRS
         shell: pwsh
         run: |
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
-          $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
           $lvrsPrefix = Join-Path $env:USERPROFILE ".local\LVRS"
-          $enginePrefix = Join-Path $env:USERPROFILE ".local\iiPaintEngine"
           $env:LVRS_BOOTSTRAP_QT_PREFIX_WINDOWS = $env:QT_ROOT_DIR
           $env:LVRS_BOOTSTRAP_FRAMEWORK_PLATFORMS = "windows"
-          & (Join-Path $lvrsSource "install.ps1") --platforms windows --prefix $lvrsPrefix --build-type Release
+          & (Join-Path $lvrsSource "install.ps1") `
+              --platforms windows `
+              --prefix $lvrsPrefix `
+              --build-type Release `
+              -- `
+              "-DLVRS_ENABLE_IPO=OFF" `
+              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF"
           if ($LASTEXITCODE -ne 0) { throw "LVRS installation failed." }
+          "LVRS_PREFIX=$lvrsPrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and install pinned iiPaintEngine
+        shell: pwsh
+        run: |
+          $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
+          $enginePrefix = Join-Path $env:USERPROFILE ".local\iiPaintEngine"
           $env:IIPAINTENGINE_PREFIX = $enginePrefix
           $env:IIPAINTENGINE_INSTALL_PLATFORMS = "windows"
           $env:IIPAINTENGINE_WINDOWS_QT_PREFIX = $env:QT_ROOT_DIR
-          $env:IIPAINTENGINE_LVRS_PREFIX = $lvrsPrefix
+          $env:IIPAINTENGINE_LVRS_PREFIX = $env:LVRS_PREFIX
           $env:IIPAINTENGINE_SKIP_TESTS = "ON"
           & (Join-Path $engineSource "install.ps1")
           if ($LASTEXITCODE -ne 0) { throw "iiPaintEngine installation failed." }
-          "LVRS_PREFIX=$lvrsPrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "IIPAINTENGINE_PREFIX=$enginePrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build verified MSI input
