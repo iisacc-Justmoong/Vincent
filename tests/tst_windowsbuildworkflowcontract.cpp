@@ -29,6 +29,7 @@ private slots:
     void cmakeHasWindowsInstallAndPackageRules();
     void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void appEntryPointShowsFinalGeometryOnlyOnce();
+    void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
 };
 
@@ -632,6 +633,46 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("Vincent-4.0.1-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
+}
+
+void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteReleaseContract()
+{
+    const QString workflowPath = QFINDTESTDATA("../.github/workflows/windows-signpath-release.yml");
+    QVERIFY2(!workflowPath.isEmpty(), "The SignPath Windows release workflow was not found");
+    const QString workflow = readTextFile(workflowPath);
+    QVERIFY(!workflow.isEmpty());
+
+    QVERIFY(workflow.contains(QStringLiteral("name: Windows SignPath release")));
+    QVERIFY(workflow.contains(QStringLiteral("runs-on: windows-2022")));
+    QVERIFY(workflow.contains(QStringLiteral("jurplel/install-qt-action")));
+    QVERIFY(workflow.contains(QStringLiteral("version: '6.8.3'")));
+    QVERIFY(workflow.contains(QStringLiteral("arch: 'win64_mingw'")));
+    QVERIFY(workflow.contains(QStringLiteral("source: true")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
+    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 4530b3ac02f2f82badf95a1b6c6dff1fc6d90aaf")));
+    QVERIFY(workflow.contains(QStringLiteral("-ExternalSigning -SkipPackage -CreateMsi")));
+    QVERIFY(workflow.contains(QStringLiteral("actions/upload-artifact")));
+    QVERIFY(workflow.contains(QStringLiteral("archive: false")));
+    QVERIFY(workflow.contains(QStringLiteral("signpath/github-action-submit-signing-request")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_API_TOKEN")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_ORGANIZATION_ID")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_PROJECT_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_SIGNING_POLICY_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("Windows Kits\\10\\bin")));
+    QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
+    QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
+    QVERIFY(workflow.contains(QStringLiteral("Vincent-4.0.1-Windows.msi")));
+
+    const QString readmePath = QFINDTESTDATA("../README.md");
+    QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
+    const QString readme = readTextFile(readmePath);
+    QVERIFY(readme.contains(QStringLiteral("## Code signing policy")));
+    QVERIFY(readme.contains(QStringLiteral("Free code signing provided by [SignPath.io]")));
+    QVERIFY(readme.contains(QStringLiteral("certificate by [SignPath Foundation]")));
+    QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
+    QVERIFY(readme.contains(QStringLiteral("Approver")));
+    QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

@@ -29,6 +29,7 @@ $Version = "4.0.1"
 $PackageVersion = "$Version.0"
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDirectory = Join-Path $RepositoryRoot "build"
+$DistDirectory = Join-Path $RepositoryRoot "dist"
 $StageDirectory = Join-Path $RepositoryRoot "dist\Vincent-Windows"
 $WorkDirectory = Join-Path $BuildDirectory "msix-store"
 $ContentDirectory = Join-Path $WorkDirectory "content"
@@ -655,7 +656,7 @@ Assert-StorePackageContent -Directory $ContentDirectory -StoreSubmission ($Mode 
 $developmentOutputDirectory = Join-Path $BuildDirectory "development-only"
 $storeBaseName = "Vincent-$Version-Windows-Store-x64"
 $developmentBaseName = "Vincent-$Version-Windows-Sideload-Development-x64"
-$outputDirectory = if ($Mode -eq "Store") { $BuildDirectory } else { $developmentOutputDirectory }
+$outputDirectory = if ($Mode -eq "Store") { $DistDirectory } else { $developmentOutputDirectory }
 $baseName = if ($Mode -eq "Store") { $storeBaseName } else { $developmentBaseName }
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 if ($Mode -eq "Development") {
