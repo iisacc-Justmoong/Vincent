@@ -12,6 +12,7 @@ param(
 
     [string]$IdentityName = $env:VINCENT_STORE_IDENTITY_NAME,
     [string]$Publisher = $env:VINCENT_STORE_PUBLISHER,
+    [string]$DisplayName = $env:VINCENT_STORE_DISPLAY_NAME,
     [string]$PublisherDisplayName = $env:VINCENT_STORE_PUBLISHER_DISPLAY_NAME,
     [string]$DevelopmentCertificateThumbprint = $env:VINCENT_DEVELOPMENT_SIGNING_CERTIFICATE_THUMBPRINT,
     [string]$CorrespondingSourceUrl = $env:VINCENT_CORRESPONDING_SOURCE_URL,
@@ -24,10 +25,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.1"
+$Version = "4.0.3"
 $PackageVersion = "$Version.0"
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDirectory = Join-Path $RepositoryRoot "build"
+$DistDirectory = Join-Path $RepositoryRoot "dist"
 $StageDirectory = Join-Path $RepositoryRoot "dist\Vincent-Windows"
 $WorkDirectory = Join-Path $BuildDirectory "msix-store"
 $ContentDirectory = Join-Path $WorkDirectory "content"
@@ -59,6 +61,7 @@ function Assert-StorePackagePolicy {
         [string]$Mode,
         [string]$IdentityName,
         [string]$Publisher,
+        [string]$DisplayName,
         [string]$PublisherDisplayName,
         [string]$PackageVersion,
         [string]$DevelopmentCertificateThumbprint
@@ -69,6 +72,9 @@ function Assert-StorePackagePolicy {
     }
     if ([string]::IsNullOrWhiteSpace($Publisher)) {
         throw "Package/Identity/Publisher is required. Copy it exactly from Partner Center Product identity."
+    }
+    if ([string]::IsNullOrWhiteSpace($DisplayName)) {
+        throw "Package/Properties/DisplayName is required. Copy an exact reserved app name from Partner Center."
     }
     if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) {
         throw "Package/Properties/PublisherDisplayName is required. Copy it exactly from Partner Center Product identity."
@@ -105,6 +111,7 @@ function Write-StoreAppxManifest {
         [string]$OutputPath,
         [string]$IdentityName,
         [string]$Publisher,
+        [string]$DisplayName,
         [string]$PublisherDisplayName,
         [string]$PackageVersion
     )
@@ -117,6 +124,7 @@ function Write-StoreAppxManifest {
     $replacements = [ordered]@{
         "@IDENTITY_NAME@" = ConvertTo-XmlAttributeValue $IdentityName
         "@PUBLISHER@" = ConvertTo-XmlAttributeValue $Publisher
+        "@DISPLAY_NAME@" = ConvertTo-XmlAttributeValue $DisplayName
         "@PUBLISHER_DISPLAY_NAME@" = ConvertTo-XmlAttributeValue $PublisherDisplayName
         "@PACKAGE_VERSION@" = ConvertTo-XmlAttributeValue $PackageVersion
     }
@@ -556,6 +564,9 @@ if ($Mode -eq "Development") {
     if ([string]::IsNullOrWhiteSpace($Publisher)) {
         $Publisher = "CN=Vincent Development Local Only"
     }
+    if ([string]::IsNullOrWhiteSpace($DisplayName)) {
+        $DisplayName = "Vincent Development"
+    }
     if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) {
         $PublisherDisplayName = "IISACC Development"
     }
@@ -572,6 +583,7 @@ Assert-StorePackagePolicy `
     -Mode $Mode `
     -IdentityName $IdentityName `
     -Publisher $Publisher `
+    -DisplayName $DisplayName `
     -PublisherDisplayName $PublisherDisplayName `
     -PackageVersion $PackageVersion `
     -DevelopmentCertificateThumbprint $DevelopmentCertificateThumbprint
@@ -614,6 +626,7 @@ Write-StoreAppxManifest `
     -OutputPath (Join-Path $ContentDirectory "AppxManifest.xml") `
     -IdentityName $IdentityName `
     -Publisher $Publisher `
+    -DisplayName $DisplayName `
     -PublisherDisplayName $PublisherDisplayName `
     -PackageVersion $PackageVersion
 
@@ -643,7 +656,7 @@ Assert-StorePackageContent -Directory $ContentDirectory -StoreSubmission ($Mode 
 $developmentOutputDirectory = Join-Path $BuildDirectory "development-only"
 $storeBaseName = "Vincent-$Version-Windows-Store-x64"
 $developmentBaseName = "Vincent-$Version-Windows-Sideload-Development-x64"
-$outputDirectory = if ($Mode -eq "Store") { $BuildDirectory } else { $developmentOutputDirectory }
+$outputDirectory = if ($Mode -eq "Store") { $DistDirectory } else { $developmentOutputDirectory }
 $baseName = if ($Mode -eq "Store") { $storeBaseName } else { $developmentBaseName }
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 if ($Mode -eq "Development") {

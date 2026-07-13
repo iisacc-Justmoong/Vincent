@@ -45,7 +45,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
     Q_OBJECT
 
 private slots:
-    void cmakeFixesApplicationVersionAt401();
+    void cmakeFixesApplicationVersionAt403();
     void cmakeRequiresRepositoryBuildDirectory();
     void cmakeAvoidsRedundantMacOSRuntimeRpaths();
     void repositoryGuidelinesUseOnlyBuildDirectory();
@@ -55,7 +55,7 @@ private slots:
     void buildScriptRunsLocalModeWithEmptyOptionalArgumentArrays();
 };
 
-void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt401()
+void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt403()
 {
     const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
     QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
@@ -71,10 +71,10 @@ void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt401()
     QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
-    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0.1 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0.3 LANGUAGES C CXX)")));
     QVERIFY(cmakeSource.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
     const qsizetype deploymentTargetIndex = cmakeSource.indexOf(QStringLiteral("set(CMAKE_OSX_DEPLOYMENT_TARGET"));
-    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0.1 LANGUAGES C CXX)"));
+    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0.3 LANGUAGES C CXX)"));
     QVERIFY(deploymentTargetIndex >= 0);
     QVERIFY(projectIndex > deploymentTargetIndex);
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"${PROJECT_VERSION}\")")));
@@ -318,7 +318,7 @@ cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>4.0.1</string>
+    <string>4.0.3</string>
 </dict>
 </plist>
 PLIST

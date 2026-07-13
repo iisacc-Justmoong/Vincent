@@ -29,6 +29,7 @@ private slots:
     void cmakeHasWindowsInstallAndPackageRules();
     void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void appEntryPointShowsFinalGeometryOnlyOnce();
+    void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
 };
 
@@ -48,7 +49,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.1\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.3\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
@@ -139,6 +140,9 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("Assert-PublicDistributionEvidence")));
     QVERIFY(source.contains(QStringLiteral("Copy-WindowsLegalMaterials")));
     QVERIFY(source.contains(QStringLiteral("Assert-WindowsLegalMaterials")));
+    QVERIFY(source.contains(QStringLiteral("Resolve-QtGlobalLicenseDirectory")));
+    QVERIFY(source.contains(QStringLiteral("qtbase\\LICENSES")));
+    QVERIFY(source.contains(QStringLiteral("Qt-GPL-exception-1.0.txt")));
     QVERIFY(source.contains(QStringLiteral("Resolve-StagedMinGwToolchainRoot")));
     QVERIFY(source.contains(QStringLiteral("Public Windows packaging requires an explicit iiPaintEngine LICENSE")));
     QVERIFY(source.contains(QStringLiteral("qtimageformats")));
@@ -150,6 +154,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY2(!noticesPath.isEmpty(), "Windows third-party notices were not found");
     const QString notices = readTextFile(noticesPath);
     QVERIFY(notices.contains(QStringLiteral("iiPaintEngine")));
+    QVERIFY(notices.contains(QStringLiteral("AGPL-3.0-only")));
+    QVERIFY(notices.contains(QStringLiteral("legal/iiPaintEngine/LICENSE.txt")));
     QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
     QVERIFY(notices.contains(QStringLiteral("Pretendard 1.3.9")));
     QVERIFY(notices.contains(QStringLiteral("Qt 6.8.3")));
@@ -461,6 +467,7 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     const QString testsSource = readTextFile(testsCmakePath);
     QVERIFY(testsSource.contains(QStringLiteral("ENVIRONMENT_MODIFICATION")));
     QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>")));
+    QVERIFY(testsSource.contains(QStringLiteral("QT_QPA_PLATFORM=set:offscreen")));
     QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy")));
     QVERIFY(testsSource.contains(QStringLiteral("tst_windowsauthenticodepolicy.ps1")));
     QVERIFY(testsSource.contains(QStringLiteral("NAMES pwsh.exe")));
@@ -472,6 +479,12 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(!testsSource.contains(QStringLiteral("NAME tests_windowsmsidatabasecontract")));
     QVERIFY(!testsSource.contains(QStringLiteral("tst_windowsmsidatabasecontract.ps1")));
     QVERIFY(!testsSource.contains(QStringLiteral("SKIP_RETURN_CODE 77")));
+
+    const QString authenticodePolicyPath = QFINDTESTDATA("tst_windowsauthenticodepolicy.ps1");
+    QVERIFY2(!authenticodePolicyPath.isEmpty(), "Authenticode policy test script was not found");
+    const QString authenticodePolicySource = readTextFile(authenticodePolicyPath);
+    QVERIFY(authenticodePolicySource.contains(QStringLiteral("$PSHOME")));
+    QVERIFY(authenticodePolicySource.contains(QStringLiteral("Microsoft.PowerShell.Utility.psd1")));
 
     const QString databaseContractPath = QFINDTESTDATA("tst_windowsmsidatabasecontract.ps1");
     QVERIFY2(!databaseContractPath.isEmpty(), "MSI database contract script was not found");
@@ -582,8 +595,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.1-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.1-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.3-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.3-Windows.msi")));
     QVERIFY(source.contains(QStringLiteral("Program Files")));
     QVERIFY(source.contains(QStringLiteral("requires elevation")));
     QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
@@ -627,9 +640,65 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
     QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
     QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
-    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.1-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.3-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
+}
+
+void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteReleaseContract()
+{
+    const QString workflowPath = QFINDTESTDATA("../.github/workflows/windows-signpath-release.yml");
+    QVERIFY2(!workflowPath.isEmpty(), "The SignPath Windows release workflow was not found");
+    const QString workflow = readTextFile(workflowPath);
+    QVERIFY(!workflow.isEmpty());
+
+    QVERIFY(workflow.contains(QStringLiteral("name: Windows SignPath release")));
+    QVERIFY(workflow.contains(QStringLiteral("runs-on: windows-2022")));
+    QVERIFY(workflow.contains(QStringLiteral("jurplel/install-qt-action")));
+    QVERIFY(workflow.contains(QStringLiteral("version: '6.8.3'")));
+    QVERIFY(workflow.contains(QStringLiteral("arch: 'win64_mingw'")));
+    QVERIFY(workflow.contains(QStringLiteral("modules: 'qtimageformats qtshadertools'")));
+    QVERIFY(!workflow.contains(QStringLiteral("modules: 'qtsvg")));
+    QVERIFY(workflow.contains(QStringLiteral("source: true")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
+    QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53")));
+    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
+    QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF")));
+    QVERIFY(workflow.contains(QStringLiteral("$lvrsArguments = @(")));
+    QVERIFY(workflow.contains(QStringLiteral("@lvrsArguments")));
+    QVERIFY(workflow.contains(QStringLiteral("\"--without-examples\",\n              \"--without-tests\",\n              \"--\"")));
+    QVERIFY(workflow.contains(QStringLiteral("\"--build-type\", \"MinSizeRel\"")));
+    QVERIFY(workflow.contains(QStringLiteral("-ExternalSigning -SkipPackage -CreateMsi")));
+    QVERIFY(workflow.contains(QStringLiteral("actions/upload-artifact")));
+    QVERIFY(workflow.contains(QStringLiteral("archive: false")));
+    QVERIFY(workflow.contains(QStringLiteral("signpath/github-action-submit-signing-request")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_API_TOKEN")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_ORGANIZATION_ID")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_PROJECT_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_SIGNING_POLICY_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("Windows Kits\\10\\bin")));
+    QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
+    QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
+    QVERIFY(workflow.contains(QStringLiteral("Vincent-*-Windows.msi")));
+    QVERIFY(!workflow.contains(QStringLiteral("Vincent-4.0.3-Windows.msi")));
+
+    const QString readmePath = QFINDTESTDATA("../README.md");
+    QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
+    const QString readme = readTextFile(readmePath);
+    QVERIFY(readme.contains(QStringLiteral("## Code signing policy")));
+    QVERIFY(readme.contains(QStringLiteral("Free code signing provided by [SignPath.io]")));
+    QVERIFY(readme.contains(QStringLiteral("certificate by [SignPath Foundation]")));
+    QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
+    QVERIFY(readme.contains(QStringLiteral("Approver")));
+    QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

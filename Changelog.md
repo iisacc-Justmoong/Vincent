@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-13
+
+### Windows Store 최종 배포 경로
+
+- Windows Store용 `.msix`, `.msixupload` 및 각 SHA-256 파일을 임시 빌드 산출물과 구분하여 저장소의 `dist/`에 직접 게시하도록 변경했다.
+- Store 공개 패키지는 기존과 같이 깨끗한 Release 빌드와 전체 테스트, manifest·라이선스·corresponding-source 검증을 모두 통과해야 생성된다.
+- Windows Authenticode 정책 테스트가 Windows PowerShell 5.1에서도 안정적으로 실행되도록 기본 유틸리티 모듈 로딩과 임시 라이선스 파일 생성을 명시했다.
+- 비용 없는 자체 웹사이트 배포를 위해 SignPath Foundation OSS 후원 서명 경로를 추가했다. GitHub 호스팅 러너가 공개 소스에서 MSI를 재현하고, 외부 서명 전용 입력은 `build/signpath-input/`에 격리되며, SignPath가 반환한 공인 서명 MSI 한 개만 웹사이트 배포본이 된다.
+- README에 SignPath가 요구하는 Code signing policy, 담당 역할, 개인정보 및 시스템 변경 정책을 문서화하고 GitHub CODEOWNERS와 Windows 서명 workflow 계약 테스트를 추가했다.
+- 이미 공개된 `v4.0.1` 태그를 변경하지 않고 무료 서명 최종본의 애플리케이션·MSI·MSIX 버전을 `4.0.2`로 올렸다.
+- GitHub 러너의 Qt 6.8.3 모듈 목록에 실제로 존재하는 추가 모듈만 요청하고, SignPath 입출력 MSI를 버전 와일드카드로 단일 탐색하여 릴리스 버전 증가가 workflow 경로를 깨뜨리지 않게 했다.
+- 메모리가 제한된 GitHub 러너에서 LVRS의 대형 QML 리소스 번역 단위가 IPO/LTO로 장시간 정체되지 않도록 의존성 bootstrap의 IPO만 비활성화하고, LVRS와 iiPaintEngine 설치 단계를 분리했다.
+- PowerShell이 LVRS Rust CLI의 CMake 인자 구분자 `--`를 소비하지 않도록 전체 호출 인자를 배열로 구성해 전달한다.
+- LVRS 설치 스크립트의 예제·테스트 제외 옵션을 `--` 앞에 명시하여 자동 추가 옵션이 CMake 인자로 잘못 이동하지 않게 했다.
+- 무료 GitHub 러너에서 대형 LVRS QML 리소스의 Release `-O3` 컴파일이 장시간 소요되어, 해당 의존성만 공식 배포 최적화 구성인 `MinSizeRel`로 빌드하도록 변경했다. 또한 LVRS의 플랫폼 최적화가 별도로 LTO를 다시 켜 MinGW 13 링크 단계에서 내부 컴파일러 오류를 일으키지 않도록 두 최적화 스위치를 모두 끈다. framework bootstrap이 두 스위치를 내부 구성에 전달하지 않거나 명시적인 `OFF` 값을 누락하던 LVRS 결함을 고친 커밋으로 의존성을 갱신했다. Vincent 본체는 계속 Release로 빌드한다.
+- 단일 구성 Ninja에서 iiPaintEngine 설치 대상이 `NOCONFIG`만 내보내 Vincent Release 구성이 import library를 찾지 못하던 문제를 해결한 엔진 커밋을 고정했다.
+- 비대화형 GitHub 러너의 Qt GUI 테스트는 offscreen 플랫폼으로 고정하고, Windows PowerShell 정책 테스트는 `$PSHOME`의 내장 Utility 모듈을 명시적으로 불러 PowerShell 7 모듈 경로 상속의 영향을 제거했다.
+- 선택형 Qt 소스 아카이브가 최상위 `Src/LICENSES`를 만들지 않는 경우에는 동일한 5개 공통 라이선스 문서를 검증한 `qtbase/LICENSES`를 사용하고, 실제 배포되는 번역 모듈의 소스 라이선스도 CI에서 함께 받도록 수정했다.
+- 이미 공개된 소스 전용 `v4.0.2` 태그를 변경하지 않고, 공개 GitHub 러너에서 서명 직전 MSI까지 검증된 최종 배포 계보를 `4.0.3`으로 올렸다.
+
 ## 2026-07-02
 
 ### 현재 작업트리 수정본

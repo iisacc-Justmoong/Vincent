@@ -1,0 +1,180 @@
+name: Windows SignPath release
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit-for-signing:
+        description: Submit the verified MSI to SignPath after the OSS project is approved
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53
+  IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e
+
+jobs:
+  build-and-sign:
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out Vincent
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Require a tag for a signing request
+        if: ${{ inputs.submit-for-signing }}
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -ne "tag") {
+              throw "SignPath release signing must run from an immutable Git tag."
+          }
+
+      - name: Install Qt 6.8.3 and the matching MinGW toolchain
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: '6.8.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          modules: 'qtimageformats qtshadertools'
+          source: true
+          src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'
+          tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
+          cache: true
+
+      - name: Install WiX Toolset 3.14.1
+        shell: pwsh
+        run: |
+          choco install wixtoolset --version=3.14.1.20250415 --yes --no-progress
+          $wixTools = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          if (-not (Test-Path -LiteralPath (Join-Path $wixTools "light.exe"))) {
+              throw "WiX Toolset 3.14 was not installed at the expected path."
+          }
+          "WIX_TOOLS_DIR=$wixTools" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Check out pinned framework sources
+        shell: pwsh
+        run: |
+          $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
+          $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/LVRS.git $lvrsSource
+          git -C $lvrsSource checkout --detach $env:LVRS_COMMIT
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiPaintEngine.git $engineSource
+          git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
+
+      - name: Build and install pinned LVRS
+        shell: pwsh
+        run: |
+          $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
+          $lvrsPrefix = Join-Path $env:USERPROFILE ".local\LVRS"
+          $env:LVRS_BOOTSTRAP_QT_PREFIX_WINDOWS = $env:QT_ROOT_DIR
+          $env:LVRS_BOOTSTRAP_FRAMEWORK_PLATFORMS = "windows"
+          $lvrsArguments = @(
+              "--platforms", "windows",
+              "--prefix", $lvrsPrefix,
+              "--build-type", "MinSizeRel",
+              "--without-examples",
+              "--without-tests",
+              "--",
+              "-DLVRS_ENABLE_IPO=OFF",
+              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF",
+              "-DLVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF",
+              "-DLVRS_BOOTSTRAP_LVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF"
+          )
+          & (Join-Path $lvrsSource "install.ps1") @lvrsArguments
+          if ($LASTEXITCODE -ne 0) { throw "LVRS installation failed." }
+          "LVRS_PREFIX=$lvrsPrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and install pinned iiPaintEngine
+        shell: pwsh
+        run: |
+          $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
+          $enginePrefix = Join-Path $env:USERPROFILE ".local\iiPaintEngine"
+          $env:IIPAINTENGINE_PREFIX = $enginePrefix
+          $env:IIPAINTENGINE_INSTALL_PLATFORMS = "windows"
+          $env:IIPAINTENGINE_WINDOWS_QT_PREFIX = $env:QT_ROOT_DIR
+          $env:IIPAINTENGINE_LVRS_PREFIX = $env:LVRS_PREFIX
+          $env:IIPAINTENGINE_SKIP_TESTS = "ON"
+          & (Join-Path $engineSource "install.ps1")
+          if ($LASTEXITCODE -ne 0) { throw "iiPaintEngine installation failed." }
+          "IIPAINTENGINE_PREFIX=$enginePrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build verified MSI input
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ vars.VINCENT_CORRESPONDING_SOURCE_URL }}") -or
+              [string]::IsNullOrWhiteSpace("${{ vars.VINCENT_CORRESPONDING_SOURCE_SHA256 }}")) {
+              throw "Configure the public corresponding-source URL and SHA-256 repository variables."
+          }
+          $env:QT_PREFIX = $env:QT_ROOT_DIR
+          $env:VINCENT_CORRESPONDING_SOURCE_URL = "${{ vars.VINCENT_CORRESPONDING_SOURCE_URL }}"
+          $env:VINCENT_CORRESPONDING_SOURCE_SHA256 = "${{ vars.VINCENT_CORRESPONDING_SOURCE_SHA256 }}"
+          .\build-windows.ps1 -BuildType Release -ExternalSigning -SkipPackage -CreateMsi
+
+      - name: Upload unsigned SignPath input
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Vincent-SignPath-input
+          path: build/signpath-input/Vincent-*-Windows.msi
+          archive: false
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Submit signing request
+        if: ${{ inputs.submit-for-signing }}
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
+          signing-policy-slug: '${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          artifact-configuration-slug: '${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}'
+          github-artifact-id: '${{ steps.upload-unsigned-artifact.outputs.artifact-id }}'
+          wait-for-completion: true
+          skip-decompress: true
+          output-artifact-directory: '${{ runner.temp }}/signed'
+
+      - name: Verify signed MSI
+        if: ${{ inputs.submit-for-signing }}
+        shell: pwsh
+        run: |
+          $signedDirectory = Join-Path $env:RUNNER_TEMP "signed"
+          $signedCandidates = @(Get-ChildItem -LiteralPath $signedDirectory -Filter "Vincent-*-Windows.msi" -File)
+          if ($signedCandidates.Count -ne 1) {
+              throw "SignPath must return exactly one canonical Vincent MSI; found $($signedCandidates.Count)."
+          }
+          $msi = $signedCandidates[0].FullName
+          $signature = Get-AuthenticodeSignature -LiteralPath $msi
+          if ($signature.Status -ne "Valid") {
+              throw "The SignPath MSI Authenticode signature is not valid: $($signature.Status)"
+          }
+          if ($signature.SignerCertificate.Subject -notmatch "SignPath Foundation") {
+              throw "The MSI was not signed by the approved SignPath Foundation identity."
+          }
+          $windowsKitsBin = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+          $signTool = Get-ChildItem -LiteralPath $windowsKitsBin -Filter "signtool.exe" -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object -Property FullName -Descending |
+              Select-Object -First 1
+          if ($null -eq $signTool) {
+              throw "Windows SDK SignTool was not found on the GitHub-hosted runner."
+          }
+          & $signTool.FullName verify /pa /all /tw /v $msi
+          if ($LASTEXITCODE -ne 0) { throw "SignTool rejected the signed MSI." }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -MsiPath $msi
+
+      - name: Upload the single website release file
+        if: ${{ inputs.submit-for-signing }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Vincent-website-release
+          path: '${{ runner.temp }}/signed/Vincent-*-Windows.msi'
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

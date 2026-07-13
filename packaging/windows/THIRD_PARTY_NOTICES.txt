@@ -1,4 +1,4 @@
-Vincent 4.0.1 - Third-Party Notices
+Vincent 4.0.3 - Third-Party Notices
 ====================================
 
 This distribution includes or links the components listed below. The complete
@@ -14,9 +14,9 @@ LVRS
   Source: https://github.com/iisacc-Justmoong/LVRS
 
 iiPaintEngine
-  License: see legal/iiPaintEngine/LICENSE.txt
+  License: GNU Affero General Public License v3.0 only (AGPL-3.0-only)
   Source: https://github.com/iisacc-Justmoong/iiPaintEngine
-  Public packaging requires an explicit license supplied by its copyright holder.
+  Full text: legal/iiPaintEngine/LICENSE.txt
 
 psd_sdk (pinned commit f51449543273cbf12058ae92b230e0c4209f5066)
   License: BSD 2-Clause
@@ -38,4 +38,3 @@ GCC / MinGW-w64 runtime libraries
   The staged libgcc, libstdc++, and winpthreads runtime license texts are in
   legal/MinGW. These notices do not change the license of Vincent itself.
   Source: https://www.mingw-w64.org/ and https://gcc.gnu.org/
-

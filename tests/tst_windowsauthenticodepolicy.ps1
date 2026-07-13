@@ -6,6 +6,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$utilityModuleManifest = Join-Path $PSHOME "Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1"
+Import-Module $utilityModuleManifest -Force -ErrorAction Stop
 
 function Assert-Condition {
     param(
@@ -73,17 +75,33 @@ Assert-Throws {
 Assert-Throws {
     Assert-AuthenticodePolicy -SigningRequested $true -UnsignedPackageAllowed $false -ZipPackageSkipped $false -MsiRequested $false -TestsSkipped $false -Configuration Release -CertificateThumbprint $thumbprint -Rfc3161TimestampUrl "file:///timestamp"
 } "RFC 3161 TimestampUrl"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "MSI-only"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $false -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "requires -CreateMsi"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "cannot be combined"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $true -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "does not allow -SkipTests"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Debug -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "requires Release or MinSizeRel"
 
 Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $true -Configuration Debug -CertificateThumbprint "" -Rfc3161TimestampUrl ""
 Assert-AuthenticodePolicy -SigningRequested $true -UnsignedPackageAllowed $false -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint $thumbprint -Rfc3161TimestampUrl "http://timestamp.digicert.com"
+Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
 
 Assert-PublicDistributionEvidence -PublicRelease $false -IiPaintEngineLicenseFile "" -SourceUrl "" -SourceSha256 ""
 Assert-Throws {
     Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
 } "explicit iiPaintEngine LICENSE"
-$temporaryLicenseFile = New-TemporaryFile
+$temporaryLicenseFile = Join-Path ([System.IO.Path]::GetTempPath()) ("Vincent-LicenseTest-" + [Guid]::NewGuid().ToString("N") + ".txt")
 try {
-    Set-Content -LiteralPath $temporaryLicenseFile -Value "test license" -Encoding UTF8
+    [System.IO.File]::WriteAllText($temporaryLicenseFile, "test license", [System.Text.Encoding]::UTF8)
     Assert-Throws {
         Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -SourceUrl "http://example.invalid/source.zip" -SourceSha256 ("A" * 64)
     } "absolute HTTPS URL"
