@@ -186,7 +186,7 @@ void tst_WindowsBinaryContract::versionResourceMatchesProjectVersion()
     QVERIFY(fixedInfoSize >= sizeof(VS_FIXEDFILEINFO));
     QCOMPARE(HIWORD(fixedInfo->dwFileVersionMS), WORD(4));
     QCOMPARE(LOWORD(fixedInfo->dwFileVersionMS), WORD(0));
-    QCOMPARE(HIWORD(fixedInfo->dwFileVersionLS), WORD(3));
+    QCOMPARE(HIWORD(fixedInfo->dwFileVersionLS), WORD(4));
     QCOMPARE(LOWORD(fixedInfo->dwFileVersionLS), WORD(0));
     QCOMPARE(fixedInfo->dwProductVersionMS, fixedInfo->dwFileVersionMS);
     QCOMPARE(fixedInfo->dwProductVersionLS, fixedInfo->dwFileVersionLS);

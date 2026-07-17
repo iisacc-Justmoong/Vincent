@@ -29,9 +29,52 @@ private slots:
     void cmakeHasWindowsInstallAndPackageRules();
     void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void appEntryPointShowsFinalGeometryOnlyOnce();
+    void correspondingSourceToolDefinesImmutableReleaseContract();
     void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
 };
+
+void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableReleaseContract()
+{
+    const QString scriptPath = QFINDTESTDATA("../tools/new-corresponding-source.ps1");
+    QVERIFY2(!scriptPath.isEmpty(), "tools/new-corresponding-source.ps1 test data was not found");
+    const QString source = readTextFile(scriptPath);
+    QVERIFY(!source.isEmpty());
+
+    QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
+    QVERIFY(source.contains(QStringLiteral("[ValidatePattern(\"^\\d+\\.\\d+\\.\\d+$\")]")));
+    QVERIFY(source.contains(QStringLiteral("Join-Path $RepositoryRoot \"build\"")));
+    QVERIFY(source.contains(QStringLiteral("Join-Path $buildRoot \"release-source\"")));
+    QVERIFY(source.contains(QStringLiteral("Assert-PathWithinRoot")));
+    QVERIFY(source.contains(QStringLiteral("git status --porcelain")));
+    QVERIFY(source.contains(QStringLiteral("git archive --format=zip")));
+    QVERIFY(source.contains(QStringLiteral(
+        "throw \"Vincent release revision does not declare version $Version.\"")));
+    QVERIFY(source.contains(QStringLiteral("07efeb4490304b08454d645001c186e89735bb53")));
+    QVERIFY(source.contains(QStringLiteral("83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(source.contains(QStringLiteral("f51449543273cbf12058ae92b230e0c4209f5066")));
+    QVERIFY(source.contains(QStringLiteral("qtbase")));
+    QVERIFY(source.contains(QStringLiteral("qtdeclarative")));
+    QVERIFY(source.contains(QStringLiteral("qtsvg")));
+    QVERIFY(source.contains(QStringLiteral("qtimageformats")));
+    QVERIFY(source.contains(QStringLiteral("qttranslations")));
+    QVERIFY(source.contains(QStringLiteral("ARCHIVE-CONTENTS-SHA256.txt")));
+    QVERIFY(source.contains(QStringLiteral("tar.exe")));
+    QVERIFY(source.contains(QStringLiteral("MissingRequired")));
+    QVERIFY(source.contains(QStringLiteral("(^|/)\\.git(/|$)")));
+    QVERIFY(!source.contains(QStringLiteral("(^|/)build(/|$)")));
+    QVERIFY(source.contains(QStringLiteral("$buildGuideTemplate = @'")));
+    QVERIFY(source.contains(QStringLiteral(
+        "$buildGuide = $buildGuideTemplate.Replace(\"@@VERSION@@\", $Version)")));
+    QVERIFY(source.contains(QStringLiteral(
+        "From `Vincent`, configure, build, and test using the repository-local `build/` directory.")));
+
+    const QString buildGuidePath = QFINDTESTDATA("../docs/BUILD.md");
+    QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
+    const QString buildGuide = readTextFile(buildGuidePath);
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.4 -VincentRevision v4.0.4")));
+}
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
 {
@@ -49,7 +92,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.3\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.4\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
@@ -595,8 +638,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.3-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.3-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.4-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.4-Windows.msi")));
     QVERIFY(source.contains(QStringLiteral("Program Files")));
     QVERIFY(source.contains(QStringLiteral("requires elevation")));
     QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
@@ -640,7 +683,7 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
     QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
     QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
-    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.3-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.4-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
 }
@@ -688,7 +731,13 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
     QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
     QVERIFY(workflow.contains(QStringLiteral("Vincent-*-Windows.msi")));
-    QVERIFY(!workflow.contains(QStringLiteral("Vincent-4.0.3-Windows.msi")));
+    QVERIFY(!workflow.contains(QStringLiteral("Vincent-4.0.4-Windows.msi")));
+    QVERIFY(workflow.contains(QStringLiteral("CMAKE_PROJECT_VERSION:STATIC=")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\tst_windowsmsidatabasecontract.ps1 "
+        "-BuildDirectory .\\build -Version $expectedVersion -MsiPath $msi")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "throw \"MSI database contract rejected the signed MSI.\"")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
@@ -699,6 +748,12 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
     QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
+
+    const QString buildGuidePath = QFINDTESTDATA("../docs/BUILD.md");
+    QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
+    const QString buildGuide = readTextFile(buildGuidePath);
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        "passes the build directory and configured project version to the MSI database contract")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)
