@@ -167,7 +167,20 @@ jobs:
           }
           & $signTool.FullName verify /pa /all /tw /v $msi
           if ($LASTEXITCODE -ne 0) { throw "SignTool rejected the signed MSI." }
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -MsiPath $msi
+          $cmakeCache = Join-Path $env:GITHUB_WORKSPACE "build\CMakeCache.txt"
+          $versionEntries = @(Get-Content -LiteralPath $cmakeCache |
+              Where-Object { $_ -match '^CMAKE_PROJECT_VERSION:STATIC=' })
+          if ($versionEntries.Count -ne 1) {
+              throw "The configured Vincent project version was not found exactly once in CMakeCache.txt."
+          }
+          $expectedVersion = ($versionEntries[0] -split '=', 2)[1]
+          if ($expectedVersion -notmatch '^\d+\.\d+\.\d+$') {
+              throw "The configured Vincent project version is invalid: $expectedVersion"
+          }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -BuildDirectory .\build -Version $expectedVersion -MsiPath $msi
+          if ($LASTEXITCODE -ne 0) {
+              throw "MSI database contract rejected the signed MSI."
+          }
 
       - name: Upload the single website release file
         if: ${{ inputs.submit-for-signing }}
