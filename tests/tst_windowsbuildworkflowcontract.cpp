@@ -727,6 +727,10 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_ORGANIZATION_ID")));
     QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_PROJECT_SLUG")));
     QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_SIGNING_POLICY_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("SIGNPATH_ARTIFACT_CONFIGURATION_SLUG")));
+    QVERIFY(workflow.contains(QStringLiteral("Require SignPath configuration")));
+    QVERIFY(workflow.contains(QStringLiteral("Require the matching version tag")));
+    QVERIFY(workflow.contains(QStringLiteral("$expectedTag = \"v$expectedVersion\"")));
     QVERIFY(workflow.contains(QStringLiteral("Windows Kits\\10\\bin")));
     QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
     QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
@@ -738,6 +742,10 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
         "-BuildDirectory .\\build -Version $expectedVersion -MsiPath $msi")));
     QVERIFY(workflow.contains(QStringLiteral(
         "throw \"MSI database contract rejected the signed MSI.\"")));
+    QVERIFY(workflow.contains(QStringLiteral("Extract signed MSI payload for nested signature verification")));
+    QVERIFY(workflow.contains(QStringLiteral("Vincent.exe")));
+    QVERIFY(workflow.contains(QStringLiteral("The installed Vincent executable is not Authenticode-signed")));
+    QVERIFY(workflow.contains(QStringLiteral("SignTool rejected the installed Vincent executable")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
@@ -754,6 +762,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
         "passes the build directory and configured project version to the MSI database contract")));
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        "administrative image and independently verifies the nested `Vincent.exe` signature")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

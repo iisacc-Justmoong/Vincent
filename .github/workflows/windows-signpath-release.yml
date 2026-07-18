@@ -34,6 +34,30 @@ jobs:
               throw "SignPath release signing must run from an immutable Git tag."
           }
 
+      - name: Require SignPath configuration
+        if: ${{ inputs.submit-for-signing }}
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          SIGNPATH_ORGANIZATION_ID: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
+          SIGNPATH_PROJECT_SLUG: '${{ vars.SIGNPATH_PROJECT_SLUG }}'
+          SIGNPATH_SIGNING_POLICY_SLUG: '${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}'
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: '${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}'
+        run: |
+          $requiredNames = @(
+              "SIGNPATH_API_TOKEN",
+              "SIGNPATH_ORGANIZATION_ID",
+              "SIGNPATH_PROJECT_SLUG",
+              "SIGNPATH_SIGNING_POLICY_SLUG",
+              "SIGNPATH_ARTIFACT_CONFIGURATION_SLUG"
+          )
+          foreach ($name in $requiredNames) {
+              $value = [Environment]::GetEnvironmentVariable($name)
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                  throw "Required SignPath secret or repository variable is missing: $name"
+              }
+          }
+
       - name: Install Qt 6.8.3 and the matching MinGW toolchain
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
@@ -116,6 +140,25 @@ jobs:
           $env:VINCENT_CORRESPONDING_SOURCE_SHA256 = "${{ vars.VINCENT_CORRESPONDING_SOURCE_SHA256 }}"
           .\build-windows.ps1 -BuildType Release -ExternalSigning -SkipPackage -CreateMsi
 
+      - name: Require the matching version tag
+        if: ${{ inputs.submit-for-signing }}
+        shell: pwsh
+        run: |
+          $cmakeCache = Join-Path $env:GITHUB_WORKSPACE "build\CMakeCache.txt"
+          $versionEntries = @(Get-Content -LiteralPath $cmakeCache |
+              Where-Object { $_ -match '^CMAKE_PROJECT_VERSION:STATIC=' })
+          if ($versionEntries.Count -ne 1) {
+              throw "The configured Vincent project version was not found exactly once in CMakeCache.txt."
+          }
+          $expectedVersion = ($versionEntries[0] -split '=', 2)[1]
+          if ($expectedVersion -notmatch '^\d+\.\d+\.\d+$') {
+              throw "The configured Vincent project version is invalid: $expectedVersion"
+          }
+          $expectedTag = "v$expectedVersion"
+          if ($env:GITHUB_REF_NAME -cne $expectedTag) {
+              throw "The signing tag must match the configured Vincent version: expected $expectedTag, received $($env:GITHUB_REF_NAME)."
+          }
+
       - name: Upload unsigned SignPath input
         id: upload-unsigned-artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -180,6 +223,56 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -BuildDirectory .\build -Version $expectedVersion -MsiPath $msi
           if ($LASTEXITCODE -ne 0) {
               throw "MSI database contract rejected the signed MSI."
+          }
+
+      - name: Extract signed MSI payload for nested signature verification
+        if: ${{ inputs.submit-for-signing }}
+        shell: pwsh
+        run: |
+          $signedDirectory = Join-Path $env:RUNNER_TEMP "signed"
+          $signedCandidates = @(Get-ChildItem -LiteralPath $signedDirectory -Filter "Vincent-*-Windows.msi" -File)
+          if ($signedCandidates.Count -ne 1) {
+              throw "SignPath must return exactly one canonical Vincent MSI before nested verification; found $($signedCandidates.Count)."
+          }
+          $msi = $signedCandidates[0].FullName
+          $administrativeImageDirectory = Join-Path $env:RUNNER_TEMP "signed-msi-administrative-image"
+          New-Item -ItemType Directory -Path $administrativeImageDirectory -Force | Out-Null
+          $msiExecPath = Join-Path $env:SystemRoot "System32\msiexec.exe"
+          $msiExecArguments = @(
+              "/a",
+              "`"$msi`"",
+              "/qn",
+              "TARGETDIR=`"$administrativeImageDirectory`""
+          )
+          $msiExecProcess = Start-Process -FilePath $msiExecPath -ArgumentList $msiExecArguments `
+              -Wait -PassThru -WindowStyle Hidden
+          if ($msiExecProcess.ExitCode -ne 0) {
+              throw "Administrative extraction of the signed MSI failed with exit code $($msiExecProcess.ExitCode)."
+          }
+          $executableCandidates = @(Get-ChildItem -LiteralPath $administrativeImageDirectory `
+              -Filter "Vincent.exe" -Recurse -File)
+          if ($executableCandidates.Count -ne 1) {
+              throw "The signed MSI must install exactly one Vincent.exe; found $($executableCandidates.Count)."
+          }
+          $executable = $executableCandidates[0].FullName
+          $executableSignature = Get-AuthenticodeSignature -LiteralPath $executable
+          if ($executableSignature.Status -ne "Valid") {
+              throw "The installed Vincent executable is not Authenticode-signed: $($executableSignature.Status)"
+          }
+          if ($executableSignature.SignerCertificate.Subject -notmatch "SignPath Foundation") {
+              throw "The installed Vincent executable was not signed by the approved SignPath Foundation identity."
+          }
+          $windowsKitsBin = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+          $signTool = Get-ChildItem -LiteralPath $windowsKitsBin -Filter "signtool.exe" -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object -Property FullName -Descending |
+              Select-Object -First 1
+          if ($null -eq $signTool) {
+              throw "Windows SDK SignTool was not found on the GitHub-hosted runner."
+          }
+          & $signTool.FullName verify /pa /all /tw /v $executable
+          if ($LASTEXITCODE -ne 0) {
+              throw "SignTool rejected the installed Vincent executable."
           }
 
       - name: Upload the single website release file
