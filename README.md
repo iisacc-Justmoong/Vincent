@@ -1,6 +1,14 @@
 # Vincent 4.0
 
-Vincent 4.0 is a minimalist raster drawing app built with Qt 6.
+Vincent 4.0 is a private, local-first raster drawing app built with Qt 6 and
+QML. It provides a focused desktop canvas for drawing, handwriting, layered
+raster editing, and PSD-compatible import and export without accounts,
+telemetry, advertising, or automatic network access.
+
+![Vincent 4.0 running on Windows with a sample raster artwork](docs/marketing/vincent-windows-editor.png)
+
+_Vincent 4.0 on Windows editing a sample raster artwork. The artwork is a
+demonstration asset; the surrounding interface is the running application._
 
 ## System Requirements
 - macOS 12 or later (Apple Silicon or Intel)
