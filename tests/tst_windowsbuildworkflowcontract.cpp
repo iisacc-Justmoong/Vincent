@@ -751,8 +751,9 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
     const QString readme = readTextFile(readmePath);
     QVERIFY(readme.contains(QStringLiteral("## Code signing policy")));
-    QVERIFY(readme.contains(QStringLiteral("Free code signing provided by [SignPath.io]")));
-    QVERIFY(readme.contains(QStringLiteral("certificate by [SignPath Foundation]")));
+    QVERIFY(readme.contains(QStringLiteral("No SignPath Foundation certificate is currently active for Vincent")));
+    QVERIFY(readme.contains(QStringLiteral("must not submit a release signing request until the Foundation has explicitly approved the project")));
+    QVERIFY(readme.contains(QStringLiteral("every self-signed trial artifact are development-only files")));
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
     QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
