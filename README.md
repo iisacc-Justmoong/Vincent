@@ -80,6 +80,13 @@ Normal startup performs no startup-log file I/O. To diagnose launch timing from 
 - Initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible, while new canvases use the dimensions entered in the toolbar modal
 - Large new canvases are automatically zoomed down on creation so the full canvas remains visible inside the current workspace viewport
 
+## Community and Contributing
+
+- Join [GitHub Discussions](https://github.com/iisacc-Justmoong/Vincent/discussions) for general feedback, questions, and ideas.
+- Report reproducible defects through [GitHub Issues](https://github.com/iisacc-Justmoong/Vincent/issues).
+- Help validate Vincent 4.0.4 through the [Windows 10/11 testing issue](https://github.com/iisacc-Justmoong/Vincent/issues/18).
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing code, QML, documentation, or release-workflow changes.
+
 ## Testing
 ```bash
 cmake -S . -B build -DBUILD_TESTING=ON

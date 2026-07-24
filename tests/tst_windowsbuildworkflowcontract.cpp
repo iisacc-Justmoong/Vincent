@@ -757,6 +757,17 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
     QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
+    QVERIFY(readme.contains(QStringLiteral("## Community and Contributing")));
+    QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/discussions")));
+    QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/issues/18")));
+
+    const QString contributingPath = QFINDTESTDATA("../../CONTRIBUTING.md");
+    QVERIFY2(!contributingPath.isEmpty(), "CONTRIBUTING.md test data was not found");
+    const QString contributing = readTextFile(contributingPath);
+    QVERIFY(contributing.contains(QStringLiteral("repository-local `build/` directory")));
+    QVERIFY(contributing.contains(QStringLiteral("QML changes must use the `.local/LVRS/` framework")));
+    QVERIFY(contributing.contains(QStringLiteral("self-signed SignPath trial outputs are development-only artifacts")));
+    QVERIFY(contributing.contains(QStringLiteral("outer MSI and nested `Vincent.exe`")));
 
     const QString buildGuidePath = QFINDTESTDATA("../docs/BUILD.md");
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
