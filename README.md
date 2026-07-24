@@ -38,7 +38,7 @@ For the certificate-free public Store route, maintainers reserve the app in Part
 
 ## Code signing policy
 
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/). Windows website releases are built from this public repository on GitHub-hosted runners, submitted through the repository's SignPath workflow, and require an authorized maintainer's manual signing approval. The unsigned `build/signpath-input` artifact is never a release file; only the returned MSI whose container and nested `Vincent.exe` both have valid, timestamped SignPath Foundation Authenticode signatures may be published.
+Vincent is seeking free code signing provided by [SignPath.io](https://signpath.io/), with a certificate sponsored by [SignPath Foundation](https://signpath.org/). No SignPath Foundation certificate is currently active for Vincent. The prepared GitHub workflow must not submit a release signing request until the Foundation has explicitly approved the project and supplied the required identifiers. Windows website releases are built from this public repository on GitHub-hosted runners and require an authorized maintainer's manual signing approval. The unsigned `build/signpath-input` artifact and every self-signed trial artifact are development-only files; only a returned MSI whose container and nested `Vincent.exe` both have valid, timestamped SignPath Foundation Authenticode signatures may be published.
 
 - Committer and reviewer: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)
 - Approver: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)
