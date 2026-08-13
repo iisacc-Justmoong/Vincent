@@ -91,7 +91,16 @@ Assert-Throws {
     Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Debug -CertificateThumbprint "" -Rfc3161TimestampUrl ""
 } "requires Release or MinSizeRel"
 
-Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $true -Configuration Debug -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $true -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "does not allow -SkipTests"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Debug -CertificateThumbprint "" -Rfc3161TimestampUrl ""
+} "requires Release or MinSizeRel"
+Assert-Throws {
+    Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl "" -CurrentTimeUtc ([DateTimeOffset]::Parse("2027-01-01T00:00:00Z"))
+} "policy expired"
+Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl "" -CurrentTimeUtc ([DateTimeOffset]::Parse("2026-12-31T23:59:59Z"))
 Assert-AuthenticodePolicy -SigningRequested $true -UnsignedPackageAllowed $false -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint $thumbprint -Rfc3161TimestampUrl "http://timestamp.digicert.com"
 Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
 

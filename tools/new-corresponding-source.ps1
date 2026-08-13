@@ -266,16 +266,16 @@ $componentLines += @(
 $buildGuideTemplate = @'
 # Vincent @@VERSION@@ Corresponding Source
 
-This archive accompanies the externally signed Windows website build of Vincent @@VERSION@@. It contains the exact committed first-party source trees used for the release, the pinned psd_sdk and QtKeychain sources, the Qt 6.8.3 module sources conveyed with the application, build and packaging scripts, and license material.
+This archive accompanies the Windows website build of Vincent @@VERSION@@. It contains the exact committed first-party source trees used for the release, the pinned psd_sdk and QtKeychain sources, the Qt 6.8.3 module sources conveyed with the application, build and packaging scripts, and license material.
 
 ## Windows build
 
 1. Install Qt 6.8.3 MinGW 64-bit and the matching MinGW 13.1.0 and Ninja tools.
 2. Install LVRS and iiPaintEngine using their included PowerShell install scripts.
 3. From `Vincent`, configure, build, and test using the repository-local `build/` directory.
-4. Set the public URL and SHA-256 of this archive, then run `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -BuildType Release -ExternalSigning -SkipPackage -CreateMsi`.
+4. Set the public URL and SHA-256 of this archive. During the temporary 2026 unsigned policy, run `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -BuildType Release -AllowUnsignedPackage -SkipPackage -CreateMsi`. After trusted signing is available, use `-ExternalSigning` instead.
 
-The generated input MSI is intentionally unsigned and is not a release file. The GitHub SignPath workflow submits it for the sponsored SignPath Foundation signature; only the returned, verified MSI is a public website release.
+The unsigned MSI is a temporary website release only through 2026. It exposes an authenticated SHA-256 but has no Authenticode publisher identity, so Windows may display Unknown publisher or SmartScreen warnings. The SignPath path remains the preferred signed successor.
 
 Repository metadata under `_release_metadata` records each exact committed release revision. Local working-tree changes are excluded. `ARCHIVE-CONTENTS-SHA256.txt` records every file in this source tree before compression.
 '@

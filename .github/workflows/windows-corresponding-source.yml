@@ -1,0 +1,75 @@
+name: Windows corresponding source
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53
+  IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e
+  PSD_SDK_COMMIT: f51449543273cbf12058ae92b230e0c4209f5066
+  QTKEYCHAIN_COMMIT: 875f77d9f61bd97fd84cca47ce3bc71186dfbd09
+
+jobs:
+  package-source:
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out Vincent
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Install matching Qt source modules
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: '6.8.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          modules: 'qtimageformats qtshadertools'
+          source: true
+          src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'
+          tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
+          cache: true
+
+      - name: Check out pinned source dependencies
+        shell: pwsh
+        run: |
+          $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
+          $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
+          $dependencyRoot = Join-Path $env:GITHUB_WORKSPACE "build\_deps"
+          $psdSource = Join-Path $dependencyRoot "psd_sdk-src"
+          $qtKeychainSource = Join-Path $dependencyRoot "qtkeychain-src"
+          New-Item -ItemType Directory -Path $dependencyRoot -Force | Out-Null
+
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/LVRS.git $lvrsSource
+          git -C $lvrsSource checkout --detach $env:LVRS_COMMIT
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiPaintEngine.git $engineSource
+          git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
+          git clone --filter=blob:none https://github.com/MolecularMatters/psd_sdk.git $psdSource
+          git -C $psdSource checkout --detach $env:PSD_SDK_COMMIT
+          git clone --filter=blob:none https://github.com/frankosterfeld/qtkeychain.git $qtKeychainSource
+          git -C $qtKeychainSource checkout --detach $env:QTKEYCHAIN_COMMIT
+
+      - name: Create and verify corresponding source
+        shell: pwsh
+        run: |
+          $qtSourceRoot = Join-Path (Split-Path -Parent $env:QT_ROOT_DIR) "Src"
+          .\tools\new-corresponding-source.ps1 `
+              -Version 4.0.5 `
+              -VincentRevision $env:GITHUB_SHA `
+              -QtSourceRoot $qtSourceRoot
+
+      - name: Upload corresponding source and checksum
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Vincent-4.0.5-corresponding-source
+          path: |
+            build/release-source/Vincent-4.0.5-Corresponding-Source.zip
+            build/release-source/Vincent-4.0.5-Corresponding-Source.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

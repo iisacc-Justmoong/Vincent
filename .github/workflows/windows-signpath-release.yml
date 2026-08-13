@@ -1,10 +1,10 @@
-name: Windows SignPath release
+name: Windows website release
 
 on:
   workflow_dispatch:
     inputs:
       submit-for-signing:
-        description: Submit the verified MSI to SignPath after the OSS project is approved
+        description: Submit to SignPath instead of publishing the temporary 2026 unsigned MSI
         required: true
         default: false
         type: boolean
@@ -128,7 +128,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "iiPaintEngine installation failed." }
           "IIPAINTENGINE_PREFIX=$enginePrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build verified MSI input
+      - name: Build verified Windows MSI
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace("${{ vars.VINCENT_CORRESPONDING_SOURCE_URL }}") -or
@@ -138,7 +138,11 @@ jobs:
           $env:QT_PREFIX = $env:QT_ROOT_DIR
           $env:VINCENT_CORRESPONDING_SOURCE_URL = "${{ vars.VINCENT_CORRESPONDING_SOURCE_URL }}"
           $env:VINCENT_CORRESPONDING_SOURCE_SHA256 = "${{ vars.VINCENT_CORRESPONDING_SOURCE_SHA256 }}"
-          .\build-windows.ps1 -BuildType Release -ExternalSigning -SkipPackage -CreateMsi
+          if ('${{ inputs.submit-for-signing }}' -eq 'true') {
+              .\build-windows.ps1 -BuildType Release -ExternalSigning -SkipPackage -CreateMsi
+          } else {
+              .\build-windows.ps1 -BuildType Release -AllowUnsignedPackage -SkipPackage -CreateMsi
+          }
 
       - name: Require the matching version tag
         if: ${{ inputs.submit-for-signing }}
@@ -160,6 +164,7 @@ jobs:
           }
 
       - name: Upload unsigned SignPath input
+        if: ${{ inputs.submit-for-signing }}
         id: upload-unsigned-artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -168,6 +173,16 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload the temporary unsigned website release
+        if: ${{ !inputs.submit-for-signing }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Vincent-website-release-unsigned
+          path: build/Vincent-*-Windows-unsigned.msi
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Submit signing request
         if: ${{ inputs.submit-for-signing }}

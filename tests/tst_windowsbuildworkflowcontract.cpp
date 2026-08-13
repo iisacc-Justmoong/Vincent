@@ -331,6 +331,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesAuthenticodeCont
 
     QVERIFY(source.contains(QStringLiteral("[switch]$Sign")));
     QVERIFY(source.contains(QStringLiteral("[switch]$AllowUnsignedPackage")));
+    QVERIFY(source.contains(QStringLiteral("2027-01-01T00:00:00Z")));
+    QVERIFY(source.contains(QStringLiteral("temporary unsigned public release does not allow -SkipTests")));
     QVERIFY(source.contains(QStringLiteral("$env:VINCENT_SIGNING_CERTIFICATE_THUMBPRINT")));
     QVERIFY(source.contains(QStringLiteral("$env:SIGNTOOL_PATH")));
     QVERIFY(source.contains(QStringLiteral("http://timestamp.digicert.com")));
@@ -727,7 +729,7 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     const QString workflow = readTextFile(workflowPath);
     QVERIFY(!workflow.isEmpty());
 
-    QVERIFY(workflow.contains(QStringLiteral("name: Windows SignPath release")));
+    QVERIFY(workflow.contains(QStringLiteral("name: Windows website release")));
     QVERIFY(workflow.contains(QStringLiteral("runs-on: windows-2022")));
     QVERIFY(workflow.contains(QStringLiteral("jurplel/install-qt-action")));
     QVERIFY(workflow.contains(QStringLiteral("version: '6.8.3'")));
@@ -752,6 +754,9 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("\"--without-examples\",\n              \"--without-tests\",\n              \"--\"")));
     QVERIFY(workflow.contains(QStringLiteral("\"--build-type\", \"MinSizeRel\"")));
     QVERIFY(workflow.contains(QStringLiteral("-ExternalSigning -SkipPackage -CreateMsi")));
+    QVERIFY(workflow.contains(QStringLiteral("-AllowUnsignedPackage -SkipPackage -CreateMsi")));
+    QVERIFY(workflow.contains(QStringLiteral("Vincent-website-release-unsigned")));
+    QVERIFY(workflow.contains(QStringLiteral("build/Vincent-*-Windows-unsigned.msi")));
     QVERIFY(workflow.contains(QStringLiteral("actions/upload-artifact")));
     QVERIFY(workflow.contains(QStringLiteral("archive: false")));
     QVERIFY(workflow.contains(QStringLiteral("signpath/github-action-submit-signing-request")));
@@ -779,13 +784,21 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("The installed Vincent executable is not Authenticode-signed")));
     QVERIFY(workflow.contains(QStringLiteral("SignTool rejected the installed Vincent executable")));
 
+    const QString sourceWorkflowPath = QFINDTESTDATA("../.github/workflows/windows-corresponding-source.yml");
+    QVERIFY2(!sourceWorkflowPath.isEmpty(), "The Windows corresponding-source workflow was not found");
+    const QString sourceWorkflow = readTextFile(sourceWorkflowPath);
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("name: Windows corresponding source")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("fetch-depth: 0")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("-VincentRevision $env:GITHUB_SHA")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("Vincent-4.0.5-Corresponding-Source.zip")));
+
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
     const QString readme = readTextFile(readmePath);
     QVERIFY(readme.contains(QStringLiteral("## Code signing policy")));
     QVERIFY(readme.contains(QStringLiteral("No SignPath Foundation certificate is currently active for Vincent")));
-    QVERIFY(readme.contains(QStringLiteral("must not submit a release signing request until the Foundation has explicitly approved the project")));
-    QVERIFY(readme.contains(QStringLiteral("every self-signed trial artifact are development-only files")));
+    QVERIFY(readme.contains(QStringLiteral("publishes an explicitly named unsigned website artifact through 2026")));
+    QVERIFY(readme.contains(QStringLiteral("Unknown publisher")));
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
     QVERIFY(readme.contains(QStringLiteral("transfers only the purchaser-entered account email, license key")));
@@ -806,9 +819,9 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
-        "passes the build directory and configured project version to the MSI database contract")));
+        "uploads `Vincent-website-release-unsigned` only from the explicit unsigned branch")));
     QVERIFY(buildGuide.contains(QStringLiteral(
-        "administrative image and independently verifies the nested `Vincent.exe` signature")));
+        "preserves the existing nested Authenticode verification")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

@@ -34,6 +34,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $Version = "4.0.5"
+$UnsignedPublicReleaseExpiresAtUtc = [DateTimeOffset]::Parse("2027-01-01T00:00:00Z")
 $windowsVersionParts = @($Version -split '\.')
 while ($windowsVersionParts.Count -lt 4) {
     $windowsVersionParts += "0"
@@ -137,7 +138,9 @@ function Assert-AuthenticodePolicy {
         [bool]$TestsSkipped,
         [string]$Configuration,
         [string]$CertificateThumbprint,
-        [string]$Rfc3161TimestampUrl
+        [string]$Rfc3161TimestampUrl,
+        [DateTimeOffset]$CurrentTimeUtc = [DateTimeOffset]::UtcNow,
+        [DateTimeOffset]$UnsignedReleaseExpiresAtUtc = [DateTimeOffset]::Parse("2027-01-01T00:00:00Z")
     )
 
     if ($SigningRequested -and $UnsignedPackageAllowed) {
@@ -153,9 +156,21 @@ function Assert-AuthenticodePolicy {
         throw "External signing requires -CreateMsi."
     }
 
+    if ($UnsignedPackageAllowed) {
+        if ($Configuration -notin @("Release", "MinSizeRel")) {
+            throw "The temporary unsigned public release requires Release or MinSizeRel, not $Configuration."
+        }
+        if ($TestsSkipped) {
+            throw "The temporary unsigned public release does not allow -SkipTests."
+        }
+        if ($CurrentTimeUtc.ToUniversalTime() -ge $UnsignedReleaseExpiresAtUtc.ToUniversalTime()) {
+            throw "The temporary unsigned public release policy expired at $($UnsignedReleaseExpiresAtUtc.ToString('u'))."
+        }
+    }
+
     $packageRequested = (-not $ZipPackageSkipped) -or $MsiRequested
     if ($packageRequested -and (-not $SigningRequested) -and (-not $UnsignedPackageAllowed) -and (-not $ExternalSigningRequested)) {
-        throw "Public package creation requires -Sign or -ExternalSigning. Use -AllowUnsignedPackage only for an explicitly marked local test package."
+        throw "Public package creation requires -Sign, -ExternalSigning, or -AllowUnsignedPackage under the temporary 2026 policy."
     }
 
     if ($ExternalSigningRequested) {
@@ -2632,7 +2647,8 @@ Assert-AuthenticodePolicy `
     -TestsSkipped ([bool]$SkipTests) `
     -Configuration $BuildType `
     -CertificateThumbprint $SigningCertificateThumbprint `
-    -Rfc3161TimestampUrl $TimestampUrl
+    -Rfc3161TimestampUrl $TimestampUrl `
+    -UnsignedReleaseExpiresAtUtc $UnsignedPublicReleaseExpiresAtUtc
 
 $ResolvedSignTool = ""
 $ResolvedSigningCertificateThumbprint = ""
@@ -2714,7 +2730,7 @@ if ($windowsPackageRequested) {
         ) `
         -AdditionalCandidates @((Join-Path $dependencySourceRoot "iiPaintEngine\LICENSE"))
     Assert-PublicDistributionEvidence `
-        -PublicRelease ([bool]($Sign -or $ExternalSigning)) `
+        -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
@@ -2820,7 +2836,7 @@ if ($windowsPackageRequested) {
         -ResolvedQtPrefix $QtPrefix `
         -LvrsLicenseFile $lvrsLicenseFile `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
-        -PublicRelease ([bool]($Sign -or $ExternalSigning)) `
+        -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
 }
@@ -2834,7 +2850,7 @@ if ($Sign) {
 } elseif ($ExternalSigning) {
     Write-Warning "The staged application is an unsigned SignPath input and must not be distributed before external signing completes."
 } else {
-    Write-Warning "The staged application is unsigned and is for local testing only."
+    Write-Warning "The staged application is an unsigned public release under the temporary 2026 policy. Windows may show Unknown publisher or SmartScreen warnings."
 }
 
 $packageArtifacts = @()
@@ -2867,7 +2883,7 @@ try {
         } elseif ($ExternalSigning) {
             Write-Warning "The MSI is an unsigned SignPath input and must not be distributed before external signing completes."
         } else {
-            Write-Warning "The MSI is unsigned and is for local testing only."
+            Write-Warning "The MSI is an unsigned public release under the temporary 2026 policy. Publish its authenticated SHA-256 with the download."
         }
         Assert-MsiDatabaseContract -MsiFile $MsiPartialPath
         Write-Sha256File `
