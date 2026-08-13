@@ -214,6 +214,7 @@ foreach ($requiredLegalFileName in @(
         "LICENSE.txt",
         "THIRD_PARTY_NOTICES.txt",
         "SOURCE_OFFER.txt",
+        "COPYING.txt",
         "miniz-Unlicense.txt",
         "GCC-Runtime-Library-Exception-3.1.txt",
         "COPYING.MinGW-w64-runtime.txt",

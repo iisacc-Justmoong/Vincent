@@ -10,6 +10,7 @@ param(
     [string]$LvrsSource = "",
     [string]$IiPaintEngineSource = "",
     [string]$PsdSdkSource = "",
+    [string]$QtKeychainSource = "",
     [string]$QtSourceRoot = $env:QT_SOURCE_ROOT,
     [string]$OutputDirectory = "",
 
@@ -18,7 +19,9 @@ param(
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$IiPaintEngineRevision = "83a199fbdc827b92ce346f42db0e33d85a520a1e",
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
-    [string]$PsdSdkRevision = "f51449543273cbf12058ae92b230e0c4209f5066"
+    [string]$PsdSdkRevision = "f51449543273cbf12058ae92b230e0c4209f5066",
+    [ValidatePattern("^[0-9a-fA-F]{40}$")]
+    [string]$QtKeychainRevision = "875f77d9f61bd97fd84cca47ce3bc71186dfbd09"
 )
 
 Set-StrictMode -Version Latest
@@ -41,6 +44,9 @@ if ([string]::IsNullOrWhiteSpace($IiPaintEngineSource)) {
 }
 if ([string]::IsNullOrWhiteSpace($PsdSdkSource)) {
     $PsdSdkSource = Join-Path $RepositoryRoot "build\_deps\psd_sdk-src"
+}
+if ([string]::IsNullOrWhiteSpace($QtKeychainSource)) {
+    $QtKeychainSource = Join-Path $RepositoryRoot "build\_deps\qtkeychain-src"
 }
 if ([string]::IsNullOrWhiteSpace($QtSourceRoot)) {
     $QtSourceRoot = "C:\Qt\6.8.3\Src"
@@ -218,6 +224,11 @@ $components += Copy-GitRevision `
     -Destination (Join-Path $stageDirectory "third_party\psd_sdk") `
     -Label "psd_sdk" `
     -Revision $PsdSdkRevision
+$components += Copy-GitRevision `
+    -Source $QtKeychainSource `
+    -Destination (Join-Path $stageDirectory "third_party\qtkeychain") `
+    -Label "QtKeychain" `
+    -Revision $QtKeychainRevision
 
 $QtSourceRoot = [System.IO.Path]::GetFullPath($QtSourceRoot)
 $qtDestination = Join-Path $stageDirectory "third_party\Qt-6.8.3"
@@ -255,7 +266,7 @@ $componentLines += @(
 $buildGuideTemplate = @'
 # Vincent @@VERSION@@ Corresponding Source
 
-This archive accompanies the externally signed Windows website build of Vincent @@VERSION@@. It contains the exact committed first-party source trees used for the release, the pinned psd_sdk source, the Qt 6.8.3 module sources conveyed with the application, build and packaging scripts, and license material.
+This archive accompanies the externally signed Windows website build of Vincent @@VERSION@@. It contains the exact committed first-party source trees used for the release, the pinned psd_sdk and QtKeychain sources, the Qt 6.8.3 module sources conveyed with the application, build and packaging scripts, and license material.
 
 ## Windows build
 
@@ -300,6 +311,7 @@ $requiredSuffixes = @(
     "/LVRS/CMakeLists.txt",
     "/iiPaintEngine/LICENSE",
     "/third_party/psd_sdk/LICENSE",
+    "/third_party/qtkeychain/COPYING",
     "/third_party/Qt-6.8.3/qtbase/LICENSES/LGPL-3.0-only.txt",
     "/BUILD-SOURCE.md",
     "/COMPONENTS.txt",

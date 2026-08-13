@@ -29,10 +29,25 @@ private slots:
     void cmakeHasWindowsInstallAndPackageRules();
     void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void appEntryPointShowsFinalGeometryOnlyOnce();
+    void secureCredentialStoreDisallowsPlaintextFallback();
     void correspondingSourceToolDefinesImmutableReleaseContract();
     void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
 };
+
+void tst_WindowsBuildWorkflowContract::secureCredentialStoreDisallowsPlaintextFallback()
+{
+    const QString storePath = QFINDTESTDATA("../App/models/license/licensecredentialstore.cpp");
+    QVERIFY2(!storePath.isEmpty(), "license credential store source was not found");
+    const QString source = readTextFile(storePath);
+    QVERIFY(!source.isEmpty());
+
+    QVERIFY(source.contains(QStringLiteral("QKeychain::ReadPasswordJob")));
+    QVERIFY(source.contains(QStringLiteral("QKeychain::WritePasswordJob")));
+    QVERIFY(source.contains(QStringLiteral("QKeychain::DeletePasswordJob")));
+    QCOMPARE(source.count(QStringLiteral("setInsecureFallback(false)")), 3);
+    QVERIFY(!source.contains(QStringLiteral("QSettings")));
+}
 
 void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableReleaseContract()
 {
@@ -53,6 +68,9 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(source.contains(QStringLiteral("07efeb4490304b08454d645001c186e89735bb53")));
     QVERIFY(source.contains(QStringLiteral("83a199fbdc827b92ce346f42db0e33d85a520a1e")));
     QVERIFY(source.contains(QStringLiteral("f51449543273cbf12058ae92b230e0c4209f5066")));
+    QVERIFY(source.contains(QStringLiteral("875f77d9f61bd97fd84cca47ce3bc71186dfbd09")));
+    QVERIFY(source.contains(QStringLiteral("third_party\\qtkeychain")));
+    QVERIFY(source.contains(QStringLiteral("/third_party/qtkeychain/COPYING")));
     QVERIFY(source.contains(QStringLiteral("qtbase")));
     QVERIFY(source.contains(QStringLiteral("qtdeclarative")));
     QVERIFY(source.contains(QStringLiteral("qtsvg")));
@@ -73,7 +91,7 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
-        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.4 -VincentRevision v4.0.4")));
+        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.5 -VincentRevision v4.0.5")));
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
@@ -92,7 +110,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.4\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.5\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
@@ -192,6 +210,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("COPYING.RUNTIME")));
     QVERIFY(source.contains(QStringLiteral("COPYING.MinGW-w64-runtime.txt")));
     QVERIFY(source.contains(QStringLiteral("winpthreads\\COPYING")));
+    QVERIFY(source.contains(QStringLiteral("legal\\QtKeychain\\COPYING.txt")));
+    QVERIFY(source.contains(QStringLiteral("QtKeychain-BSD-3-Clause.txt")));
 
     const QString noticesPath = QFINDTESTDATA("../packaging/windows/THIRD_PARTY_NOTICES.txt");
     QVERIFY2(!noticesPath.isEmpty(), "Windows third-party notices were not found");
@@ -200,6 +220,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(notices.contains(QStringLiteral("AGPL-3.0-only")));
     QVERIFY(notices.contains(QStringLiteral("legal/iiPaintEngine/LICENSE.txt")));
     QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
+    QVERIFY(notices.contains(QStringLiteral("QtKeychain 0.17.0")));
+    QVERIFY(notices.contains(QStringLiteral("legal/QtKeychain/COPYING.txt")));
     QVERIFY(notices.contains(QStringLiteral("Pretendard 1.3.9")));
     QVERIFY(notices.contains(QStringLiteral("Qt 6.8.3")));
     QVERIFY(notices.contains(QStringLiteral("GCC / MinGW-w64")));
@@ -215,6 +237,9 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     const QString minizLicensePath = QFINDTESTDATA("../packaging/windows/licenses/psd_sdk-miniz-Unlicense.txt");
     QVERIFY2(!minizLicensePath.isEmpty(), "psd_sdk miniz Unlicense was not found");
     QVERIFY(readTextFile(minizLicensePath).contains(QStringLiteral("free and unencumbered software")));
+    const QString qtKeychainLicensePath = QFINDTESTDATA("../packaging/common/licenses/QtKeychain-BSD-3-Clause.txt");
+    QVERIFY2(!qtKeychainLicensePath.isEmpty(), "QtKeychain BSD license was not found");
+    QVERIFY(readTextFile(qtKeychainLicensePath).contains(QStringLiteral("Redistribution and use in source and binary forms")));
     QVERIFY(source.contains(QStringLiteral("the Qt Quick Shapes QML plugin is missing")));
     QVERIFY(source.contains(QStringLiteral("libstdc++-6.dll")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
@@ -496,6 +521,13 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(source.contains(QStringLiteral("set(CPACK_GENERATOR \"productbuild\")")));
     QVERIFY(source.contains(QStringLiteral("set_source_files_properties(\"${psd_sdk_SOURCE_DIR}/src/Psd/Psdminiz.c\" PROPERTIES LANGUAGE CXX)")));
     QVERIFY(source.contains(QStringLiteral("UPDATE_DISCONNECTED TRUE")));
+    QVERIFY(source.contains(QStringLiteral("FetchContent_Declare(qtkeychain")));
+    QVERIFY(source.contains(QStringLiteral("GIT_TAG 875f77d9f61bd97fd84cca47ce3bc71186dfbd09")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_SHARED_LIBS OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_TRANSLATIONS OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_TESTING OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(USE_CREDENTIAL_STORE ON)")));
+    QVERIFY(source.contains(QStringLiteral("target_link_libraries(Vincent PRIVATE qt6keychain)")));
     QVERIFY(source.contains(QStringLiteral("lvrs_apply_platform_build_optimizations(vincent_psd_sdk)")));
     QVERIFY(source.contains(QStringLiteral("-Wno-pragmas")));
     QVERIFY(source.contains(QStringLiteral("INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE")));
@@ -638,8 +670,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.4-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.4-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.5-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.5-Windows.msi")));
     QVERIFY(source.contains(QStringLiteral("Program Files")));
     QVERIFY(source.contains(QStringLiteral("requires elevation")));
     QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
@@ -683,7 +715,7 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
     QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
     QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
-    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.4-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.5-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
 }
@@ -756,7 +788,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(readme.contains(QStringLiteral("every self-signed trial artifact are development-only files")));
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
-    QVERIFY(readme.contains(QStringLiteral("will not transfer any information to other networked systems")));
+    QVERIFY(readme.contains(QStringLiteral("transfers only the purchaser-entered account email, license key")));
+    QVERIFY(readme.contains(QStringLiteral("contains no telemetry, analytics, advertising")));
     QVERIFY(readme.contains(QStringLiteral("## Community and Contributing")));
     QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/discussions")));
     QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/issues/18")));

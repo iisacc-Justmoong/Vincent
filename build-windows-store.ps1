@@ -25,7 +25,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.4"
+$Version = "4.0.5"
 $PackageVersion = "$Version.0"
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDirectory = Join-Path $RepositoryRoot "build"
@@ -162,6 +162,7 @@ function Assert-StorePackageContent {
         "LICENSE.txt",
         "THIRD_PARTY_NOTICES.txt",
         "SOURCE_OFFER.txt",
+        "legal\QtKeychain\COPYING.txt",
         "Assets\StoreLogo.png",
         "Assets\Square44x44Logo.png",
         "Assets\Square150x150Logo.png"

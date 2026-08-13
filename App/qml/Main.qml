@@ -3,6 +3,7 @@ import QtQuick.Controls as Controls
 import QtQuick.Window as QtQuickWindow
 import LVRS 1.0 as LV
 import "./canvas" as CanvasViews
+import "./license" as LicenseViews
 
 LV.ApplicationWindow {
     id: window
@@ -22,6 +23,8 @@ LV.ApplicationWindow {
     navigationEnabled: false
 
     property var canvasPage: null
+    property bool canvasIncubationRequested: false
+    readonly property bool licenseGranted: VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
     readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
     readonly property string currentToolMode: canvasPage && canvasPage.vm ? canvasPage.vm.toolMode : ""
@@ -59,7 +62,7 @@ LV.ApplicationWindow {
     readonly property string shortcutToggleFullScreen: Qt.platform.os === "osx" ? "Ctrl+Meta+F" : "F11"
 
     Component.onCompleted: Qt.callLater(function () {
-        painterPageLoader.active = true;
+        window.canvasIncubationRequested = true;
     })
 
     function requestNewCanvas() {
@@ -802,10 +805,8 @@ LV.ApplicationWindow {
                 }
             }
 
-            Controls.MenuSeparator {}
-
             Controls.MenuItem {
-                text: qsTr("Vincent 4.0")
+                text: qsTr("Vincent %1").arg(Qt.application.version)
                 enabled: false
             }
         }
@@ -814,7 +815,7 @@ LV.ApplicationWindow {
     Loader {
         id: painterPageLoader
         anchors.fill: parent
-        active: false
+        active: window.canvasIncubationRequested && window.licenseGranted
         asynchronous: true
         sourceComponent: CanvasViews.PainterCanvasPage {
             id: painterPage
@@ -823,9 +824,26 @@ LV.ApplicationWindow {
         }
     }
 
+    LicenseViews.LicenseActivationPage {
+        anchors.fill: parent
+        visible: !window.licenseGranted
+    }
+
+    LV.AppCard {
+        objectName: "licensePersistenceWarning"
+        anchors.top: parent.top
+        anchors.topMargin: LV.Theme.gap24
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(560, Math.max(320, parent.width - LV.Theme.gap24 * 2))
+        z: 1000
+        visible: window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
+        title: qsTr("Vincent could not remember this license")
+        subtitle: qsTr("The canvas is unlocked for this session. Enter the license again the next time Vincent starts.")
+    }
+
     LV.Label {
         anchors.centerIn: parent
-        visible: painterPageLoader.status !== Loader.Ready
+        visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready
         text: qsTr("Loading canvas…")
     }
 }

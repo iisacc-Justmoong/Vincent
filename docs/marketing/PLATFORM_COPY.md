@@ -8,15 +8,15 @@ publicly trusted Authenticode-signed release has been verified.
 ## Canonical facts
 
 - Product: Vincent 4.0
-- Current source release: 4.0.4
+- Current source release: 4.0.5
 - Category: raster drawing, digital paper, handwriting, note-taking
 - Platforms: Windows, macOS, and Linux source/build support
 - License: GNU AGPLv3
-- Price: free and open source
-- Privacy: no account, telemetry, analytics, advertising, or automatic updater
+- Price: commercial Vincent license sold through iisacc.com; source available under GNU AGPLv3
+- Privacy: account email and license key are used only for online license validation; no telemetry, analytics, advertising, document upload, or automatic updater
 - Public project URL: https://github.com/iisacc-Justmoong/Vincent
 - Source release URL:
-  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v4.0.4
+  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v4.0.5
 - Feedback URL:
   https://github.com/iisacc-Justmoong/Vincent/discussions/17
 - Windows testing URL:
@@ -28,34 +28,36 @@ Private, local-first digital paper for focused drawing.
 
 ## Short description
 
-Vincent is a free, open-source raster drawing app for focused drawing,
-handwriting, layered editing, and PSD-compatible workflows. It runs locally
-without accounts, telemetry, advertising, or automatic network access.
+Vincent is a local-first raster drawing app for focused drawing, handwriting,
+layered editing, and PSD-compatible workflows. A purchased iisacc account
+license unlocks the canvas through online verification, while documents remain
+local with no telemetry, advertising, or automatic updater.
 
 ## Directory summary
 
 Vincent 4.0 is a Qt 6 desktop raster editor for drawing, handwriting, layered
 canvas work, and PSD-compatible import and export. Its local-first design keeps
-documents on the user's device and contains no account system, telemetry,
-advertising, or automatic updater. The source is available under GNU AGPLv3.
+documents on the user's device; the app sends only account-license credentials
+for activation and contains no telemetry, advertising, or automatic updater.
+The source is available under GNU AGPLv3.
 A publicly trusted Windows package is in preparation.
 
 ## Product Hunt description
 
-Vincent is an open-source, local-first raster drawing app for handwriting,
-layered artwork, and PSD-compatible workflows—without accounts, telemetry,
-ads, or automatic network access. Source is available now; a signed Windows
-release is in preparation.
+Vincent is a local-first raster drawing app for handwriting, layered artwork,
+and PSD-compatible workflows. A purchased license is checked online while
+documents stay on the device with no telemetry or ads. AGPLv3 source is
+available now; a signed Windows release is in preparation.
 
 ## First launch comment
 
 I built Vincent because a drawing surface should feel like paper, not a
 service. It is a native Qt 6 desktop application with pressure-aware brushes,
 layers, shapes, text, image import, and PSD-compatible workflows. Documents
-stay local and the application has no account, telemetry, advertising, or
-automatic updater.
+stay local. Vincent uses the purchaser's iisacc account email and license key
+only for activation, and has no telemetry, advertising, or automatic updater.
 
-Version 4.0.4 is available as complete AGPLv3 source. We are currently
+Version 4.0.5 is available as complete AGPLv3 source. We are currently
 preparing the publicly trusted Windows distribution and would especially value
 feedback from artists, pen-tablet users, Qt developers, and Windows testers.
 

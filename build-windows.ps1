@@ -33,7 +33,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.4"
+$Version = "4.0.5"
 $windowsVersionParts = @($Version -split '\.')
 while ($windowsVersionParts.Count -lt 4) {
     $windowsVersionParts += "0"
@@ -1385,6 +1385,7 @@ function Assert-WindowsLegalMaterials {
         "THIRD_PARTY_NOTICES.txt",
         "SOURCE_OFFER.txt",
         "legal\LVRS\LICENSE.txt",
+        "legal\QtKeychain\COPYING.txt",
         "legal\psd_sdk\BSD-2-Clause.txt",
         "legal\psd_sdk\miniz-Unlicense.txt",
         "legal\Pretendard\OFL-1.1.txt",
@@ -1441,6 +1442,9 @@ function Copy-WindowsLegalMaterials {
     Copy-LegalFile -Source (Join-Path $RepositoryRoot "LICENSE") -Destination (Join-Path $Directory "LICENSE.txt")
     Copy-LegalFile -Source (Join-Path $packagingRoot "THIRD_PARTY_NOTICES.txt") -Destination (Join-Path $Directory "THIRD_PARTY_NOTICES.txt")
     Copy-LegalFile -Source $LvrsLicenseFile -Destination (Join-Path $legalRoot "LVRS\LICENSE.txt")
+    Copy-LegalFile `
+        -Source (Join-Path $RepositoryRoot "packaging\common\licenses\QtKeychain-BSD-3-Clause.txt") `
+        -Destination (Join-Path $legalRoot "QtKeychain\COPYING.txt")
     if ($IiPaintEngineLicenseFile) {
         Copy-LegalFile -Source $IiPaintEngineLicenseFile -Destination (Join-Path $legalRoot "iiPaintEngine\LICENSE.txt")
     } else {

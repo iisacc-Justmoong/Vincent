@@ -41,11 +41,11 @@ New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 try {
     $product401X64A = New-DeterministicProductCode -ProductVersion "4.0.1" -Architecture "x64"
     $product401X64B = New-DeterministicProductCode -ProductVersion "4.0.1" -Architecture "x64"
-    $product403X64 = New-DeterministicProductCode -ProductVersion "4.0.3" -Architecture "x64"
+    $product404X64 = New-DeterministicProductCode -ProductVersion "4.0.4" -Architecture "x64"
     $product401Arm64 = New-DeterministicProductCode -ProductVersion "4.0.1" -Architecture "arm64"
     Assert-Condition ($product401X64A -eq $product401X64B) `
         "The same MSI version and architecture must produce the same ProductCode."
-    Assert-Condition ($product401X64A -ne $product403X64) `
+    Assert-Condition ($product401X64A -ne $product404X64) `
         "Different MSI versions must produce different ProductCodes."
     Assert-Condition ($product401X64A -ne $product401Arm64) `
         "Different MSI architectures must produce different ProductCodes."

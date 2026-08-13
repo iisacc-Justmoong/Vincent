@@ -97,6 +97,8 @@ resources/UIIcons/.DS_Store
 /packaging/*
 !/packaging/linux/
 !/packaging/linux/com.iisacc.vincent.painter.desktop
+!/packaging/common/
+!/packaging/common/**
 !/packaging/windows/
 !/packaging/windows/**
 packaging.sh

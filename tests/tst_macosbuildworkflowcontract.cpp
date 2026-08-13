@@ -45,7 +45,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
     Q_OBJECT
 
 private slots:
-    void cmakeFixesApplicationVersionAt403();
+    void cmakeFixesApplicationVersionAt405();
     void cmakeRequiresRepositoryBuildDirectory();
     void cmakeAvoidsRedundantMacOSRuntimeRpaths();
     void repositoryGuidelinesUseOnlyBuildDirectory();
@@ -56,7 +56,7 @@ private slots:
     void buildScriptFailsClosedOnMissingNotaryProfileBeforeBuild();
 };
 
-void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt403()
+void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt405()
 {
     const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
     QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
@@ -72,10 +72,10 @@ void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt403()
     QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
-    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0.4 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0.5 LANGUAGES C CXX)")));
     QVERIFY(cmakeSource.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
     const qsizetype deploymentTargetIndex = cmakeSource.indexOf(QStringLiteral("set(CMAKE_OSX_DEPLOYMENT_TARGET"));
-    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0.4 LANGUAGES C CXX)"));
+    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0.5 LANGUAGES C CXX)"));
     QVERIFY(deploymentTargetIndex >= 0);
     QVERIFY(projectIndex > deploymentTargetIndex);
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"${PROJECT_VERSION}\")")));
@@ -112,6 +112,13 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
                                            "    list(APPEND _vincent_local_dependency_runtime_candidates")));
     QVERIFY(!source.contains(QStringLiteral("if(UNIX)\n"
                                             "    list(APPEND _vincent_local_dependency_runtime_candidates")));
+    QVERIFY(source.contains(QStringLiteral("GIT_TAG 875f77d9f61bd97fd84cca47ce3bc71186dfbd09")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_TRANSLATIONS OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_SHARED_LIBS OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(BUILD_TESTING OFF)")));
+    QVERIFY(source.contains(QStringLiteral("set(USE_CREDENTIAL_STORE ON)")));
+    QVERIFY(source.contains(QStringLiteral("target_link_libraries(Vincent PRIVATE qt6keychain)")));
+    QVERIFY(source.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources/legal/QtKeychain\"")));
 }
 
 void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()
@@ -331,7 +338,9 @@ cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>4.0.4</string>
+    <string>4.0.5</string>
+    <key>CFBundleVersion</key>
+    <string>4.0.5</string>
 </dict>
 </plist>
 PLIST
@@ -386,6 +395,17 @@ case "${1:-}" in
     --payload-files)
         printf './Vincent.app/Contents/MacOS/Vincent\n'
         printf './Vincent.app/Contents/Resources/Appicon.icns\n'
+        ;;
+    --expand)
+        mkdir -p "${3:-}"
+        cat > "${3:-}/Distribution" <<'DISTRIBUTION'
+<installer-gui-script minSpecVersion="2" hostArchitectures="arm64">
+<allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
+<bundle path="Vincent.app" CFBundleShortVersionString="4.0.5" CFBundleVersion="4.0.5"/>
+<pkg-ref id="com.iisacc.app.vincent.pkg" version="4.0.5"/>
+<pkg-ref id="com.iisacc.vincent.painter" version="4.0.5"/>
+</installer-gui-script>
+DISTRIBUTION
         ;;
     *)
         printf 'unsupported fake pkgutil command: %s\n' "${1:-}" >&2

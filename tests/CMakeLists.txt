@@ -64,6 +64,30 @@ vincent_configure_local_runtime_paths(tests_mainqmlcontract)
 
 add_test(NAME tests_mainqmlcontract COMMAND tests_mainqmlcontract)
 
+add_executable(tests_licensemanager
+        tst_licensemanager.cpp
+        ../App/models/license/licensecredentialstore.cpp
+        ../App/models/license/licensecredentialstore.h
+        ../App/models/license/licensemanager.cpp
+        ../App/models/license/licensemanager.h
+)
+
+target_include_directories(tests_licensemanager PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/license
+)
+
+target_link_libraries(tests_licensemanager PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::Test
+)
+if(APPLE OR WIN32)
+    target_link_libraries(tests_licensemanager PRIVATE qt6keychain)
+endif()
+vincent_configure_local_runtime_paths(tests_licensemanager)
+
+add_test(NAME tests_licensemanager COMMAND tests_licensemanager)
+
 add_executable(tests_macosbuildworkflowcontract
         tst_macosbuildworkflowcontract.cpp
 )
@@ -172,6 +196,7 @@ set_tests_properties(
         tests_psdcompatibilitydocument
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
+        tests_licensemanager
         tests_macosbuildworkflowcontract
         tests_linuxbuildworkflowcontract
         tests_windowsbuildworkflowcontract
@@ -258,6 +283,7 @@ if(WIN32)
             tests_psdcompatibilitydocument
             tests_canvastoolbarqmlcontract
             tests_mainqmlcontract
+            tests_licensemanager
             tests_macosbuildworkflowcontract
             tests_linuxbuildworkflowcontract
             tests_windowsbuildworkflowcontract

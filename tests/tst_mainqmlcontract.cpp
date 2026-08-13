@@ -13,6 +13,7 @@ private slots:
     void applicationWindowPassesOnlyTheActiveMacOsDragHeightToCanvasPage();
     void applicationWindowCreatesAtFixedLaunchGeometry();
     void applicationWindowUsesDeferredCanvasIncubation();
+    void applicationWindowRequiresOnlineLicenseBeforeCanvasIncubation();
     void applicationWindowProvidesApplicationMenuBar();
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
@@ -100,12 +101,69 @@ void tst_MainQmlContract::applicationWindowUsesDeferredCanvasIncubation()
     QVERIFY(mainSource.contains(QStringLiteral("minimumHeight: minimumWindowHeight")));
     QVERIFY(mainSource.contains(QStringLiteral("Loader {")));
     QVERIFY(mainSource.contains(QStringLiteral("id: painterPageLoader")));
-    QVERIFY(mainSource.contains(QStringLiteral("active: false")));
+    QVERIFY(mainSource.contains(QStringLiteral("property bool canvasIncubationRequested: false")));
     QVERIFY(mainSource.contains(QStringLiteral("asynchronous: true")));
     QVERIFY(mainSource.contains(QStringLiteral("sourceComponent: CanvasViews.PainterCanvasPage")));
     QVERIFY(mainSource.contains(QStringLiteral("Qt.callLater(function ()")));
-    QVERIFY(mainSource.contains(QStringLiteral("painterPageLoader.active = true;")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasIncubationRequested = true;")));
     QVERIFY(mainSource.contains(QStringLiteral("LV.Label {")));
+}
+
+void tst_MainQmlContract::applicationWindowRequiresOnlineLicenseBeforeCanvasIncubation()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString activationPagePath = QFINDTESTDATA("../App/qml/license/LicenseActivationPage.qml");
+    const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!activationPagePath.isEmpty(), "LicenseActivationPage.qml test data was not found");
+    QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
+
+    auto readSource = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString mainSource = readSource(mainQmlPath);
+    const QString activationSource = readSource(activationPagePath);
+    const QString appEntrySource = readSource(appEntryPath);
+    QVERIFY(!mainSource.isEmpty());
+    QVERIFY(!activationSource.isEmpty());
+    QVERIFY(!appEntrySource.isEmpty());
+
+    QVERIFY(mainSource.contains(QStringLiteral("readonly property bool licenseGranted: VincentLicenseManager.licensed")));
+    QVERIFY(mainSource.contains(QStringLiteral("active: window.canvasIncubationRequested && window.licenseGranted")));
+    QVERIFY(mainSource.contains(QStringLiteral("LicenseViews.LicenseActivationPage")));
+    QVERIFY(mainSource.contains(QStringLiteral("visible: !window.licenseGranted")));
+    QVERIFY(mainSource.contains(QStringLiteral("objectName: \"licensePersistenceWarning\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.licenseGranted && VincentLicenseManager.resultCode === \"secure_storage_unavailable\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready")));
+
+    QVERIFY(activationSource.contains(QStringLiteral("LV.AppCard")));
+    QCOMPARE(activationSource.count(QStringLiteral("LV.InputField")), 2);
+    QVERIFY(activationSource.contains(QStringLiteral("objectName: \"licenseEmailInput\"")));
+    QVERIFY(activationSource.contains(QStringLiteral("objectName: \"licenseKeyInput\"")));
+    QVERIFY(activationSource.contains(QStringLiteral("maximumLength: 254")));
+    QVERIFY(activationSource.contains(QStringLiteral("echoMode: TextInput.Password")));
+    QVERIFY(activationSource.contains(QStringLiteral("Qt.ImhSensitiveData | Qt.ImhNoPredictiveText")));
+    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Verified account email\")")));
+    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Vincent license key\")")));
+    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Activate Vincent\")")));
+    QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.validateLicense(emailInput.text, licenseKeyInput.text)")));
+    QVERIFY(activationSource.contains(QStringLiteral("visible: VincentLicenseManager.hasStoredLicense")));
+    QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.retryStoredLicense()")));
+    QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.forgetLicense()")));
+    QVERIFY(activationSource.contains(QStringLiteral("objectName: \"retryStoredLicenseButton\"")));
+    QVERIFY(activationSource.contains(QStringLiteral("objectName: \"forgetStoredLicenseButton\"")));
+    QVERIFY(!mainSource.contains(QStringLiteral("VincentLicenseManager.forgetLicense()")));
+    QVERIFY(activationSource.contains(QStringLiteral("text: qsTr(\"Vincent\")")));
+    QVERIFY(!activationSource.contains(QStringLiteral("productIdInput")));
+    QVERIFY(!activationSource.contains(QStringLiteral("productIdField")));
+
+    QVERIFY(appEntrySource.contains(QStringLiteral("new LicenseManager(&engine)")));
+    QVERIFY(appEntrySource.contains(QStringLiteral("setContextProperty(\"VincentLicenseManager\", licenseManager)")));
 }
 
 void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
@@ -155,7 +213,7 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Fit Canvas to Window\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Reset Canvas View\")")));
     QVERIFY(mainSource.contains(QStringLiteral("title: qsTr(\"Keyboard Shortcuts\")")));
-    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent 4.0\")")));
+    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent %1\").arg(Qt.application.version)")));
 }
 
 void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere()
@@ -181,6 +239,7 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QFile appEntry(appEntryPath);
     QVERIFY(appEntry.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString appEntrySource = QString::fromUtf8(appEntry.readAll());
+    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setApplicationVersion(QStringLiteral(VINCENT_VERSION))")));
     QVERIFY(!appEntrySource.contains(QStringLiteral("AA_DontUseNativeMenuBar")));
 }
 

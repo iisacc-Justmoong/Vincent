@@ -238,6 +238,8 @@ CMAKE_SOURCE_DIR="."
 BUILD_DIR="./build"
 DIST_DIR="./dist"
 BUILD_TYPE="Release"          # 보통 Release 고정
+VINCENT_MIN_MACOS_VERSION="${VINCENT_MIN_MACOS_VERSION:-12.0}"
+VINCENT_MACOS_ARCHITECTURE="arm64"
 CMAKE_PRESET=""               # 사용 시 preset의 binaryDir가 BUILD_DIR와 일치하도록 맞추는 것이 정석이다.
 CMAKE_GENERATOR="Ninja"       # Qt Quick + CMake + Ninja 전제
 declare -a CMAKE_EXTRA_ARGS
@@ -377,6 +379,7 @@ need_cmd cmp
 need_cmd /usr/bin/plutil
 need_cmd /usr/libexec/PlistBuddy
 need_cmd /usr/bin/file
+need_cmd /usr/bin/lipo
 need_cmd /usr/bin/otool
 if [[ "$RUN_TESTS" == "1" ]]; then
   need_cmd ctest
@@ -487,6 +490,8 @@ else
     CMAKE_CONFIGURE_ARGS+=("${GEN_ARGS[@]}")
   fi
   CMAKE_CONFIGURE_ARGS+=(-DCMAKE_BUILD_TYPE="$BUILD_TYPE")
+  CMAKE_CONFIGURE_ARGS+=(-DCMAKE_OSX_DEPLOYMENT_TARGET="$VINCENT_MIN_MACOS_VERSION")
+  CMAKE_CONFIGURE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES="$VINCENT_MACOS_ARCHITECTURE")
   if [[ "${#TESTING_ARGS[@]}" -gt 0 ]]; then
     CMAKE_CONFIGURE_ARGS+=("${TESTING_ARGS[@]}")
   fi
@@ -544,15 +549,19 @@ run xattr -rc "$DIST_APP" || true
 require_nonempty_file "$DIST_APP/Contents/MacOS/$APP_NAME"
 assert_app_icon_bundle "$DIST_APP"
 
-# APP_VERSION 자동 결정(비어 있으면 dist 앱 Info.plist에서 추출)
+# APP_VERSION 자동 결정(비어 있으면 dist 앱 Info.plist에서 추출) 후 두 버전 키를 함께 검증한다.
+INFO_PLIST="${DIST_APP}/Contents/Info.plist"
+require_file "$INFO_PLIST"
+PLIST_MARKETING_VERSION="$(plist_get "$INFO_PLIST" CFBundleShortVersionString)"
+PLIST_BUNDLE_VERSION="$(plist_get "$INFO_PLIST" CFBundleVersion)"
 if [[ -z "$APP_VERSION" ]]; then
-  INFO_PLIST="${DIST_APP}/Contents/Info.plist"
-  require_file "$INFO_PLIST"
-  APP_VERSION="$(plist_get "$INFO_PLIST" CFBundleShortVersionString)"
-  if [[ -z "$APP_VERSION" ]]; then
-    die "APP_VERSION is empty and CFBundleShortVersionString not found in Info.plist. Set APP_VERSION explicitly."
-  fi
+  APP_VERSION="$PLIST_MARKETING_VERSION"
 fi
+[[ -n "$APP_VERSION" ]] || die "APP_VERSION is empty and CFBundleShortVersionString not found in Info.plist. Set APP_VERSION explicitly."
+[[ "$PLIST_MARKETING_VERSION" == "$APP_VERSION" ]] \
+  || die "CFBundleShortVersionString does not match APP_VERSION: ${PLIST_MARKETING_VERSION:-<missing>} != $APP_VERSION"
+[[ "$PLIST_BUNDLE_VERSION" == "$APP_VERSION" ]] \
+  || die "CFBundleVersion does not match APP_VERSION: ${PLIST_BUNDLE_VERSION:-<missing>} != $APP_VERSION"
 say "APP_VERSION: $APP_VERSION"
 
 # =============================================================================
@@ -645,6 +654,84 @@ assert_portable_macho_links() {
   fi
 }
 
+assert_macos_deployment_targets() {
+  local app="$1"
+  local violations="${WORKDIR}/macho_deployment_target_violations_$(basename "$app")_$$.txt"
+  : > "$violations"
+
+  while IFS= read -r -d '' binary; do
+    if ! /usr/bin/file -b "$binary" 2>/dev/null | grep -q 'Mach-O'; then
+      continue
+    fi
+
+    local deployment_targets
+    deployment_targets="$(/usr/bin/otool -l "$binary" 2>/dev/null \
+      | awk '$1 == "cmd" && $2 == "LC_BUILD_VERSION" { mode = "build"; next }
+             $1 == "cmd" && $2 == "LC_VERSION_MIN_MACOSX" { mode = "legacy"; next }
+             mode == "build" && $1 == "minos" { print $2; mode = ""; next }
+             mode == "legacy" && $1 == "version" { print $2; mode = ""; next }' || true)"
+
+    if [[ -z "$deployment_targets" ]]; then
+      printf '%s: missing macOS deployment target load command\n' "$binary" >> "$violations"
+      continue
+    fi
+
+    while IFS= read -r deployment_target; do
+      if [[ "$deployment_target" != "$VINCENT_MIN_MACOS_VERSION" ]]; then
+        printf '%s: minos %s does not match required macOS deployment target %s\n' \
+          "$binary" "$deployment_target" "$VINCENT_MIN_MACOS_VERSION" >> "$violations"
+      fi
+    done <<< "$deployment_targets"
+  done < <(find "${app}/Contents" -type f -print0)
+
+  if [[ -s "$violations" ]]; then
+    sed -n '1,80p' "$violations" >&2
+    die "deployed app contains Mach-O binaries with an incompatible macOS deployment target: $app"
+  fi
+}
+
+assert_macos_architectures() {
+  local app="$1"
+  local violations="${WORKDIR}/macho_architecture_violations_$(basename "$app")_$$.txt"
+  : > "$violations"
+
+  while IFS= read -r -d '' binary; do
+    if ! /usr/bin/file -b "$binary" 2>/dev/null | grep -q 'Mach-O'; then
+      continue
+    fi
+
+    local architectures
+    architectures="$(/usr/bin/lipo -archs "$binary" 2>/dev/null || true)"
+    if [[ -z "$architectures" ]]; then
+      printf '%s: unable to read Mach-O architectures\n' "$binary" >> "$violations"
+      continue
+    fi
+
+    case " $architectures " in
+      *" $VINCENT_MACOS_ARCHITECTURE "*) ;;
+      *)
+        printf '%s: architectures %s do not include required %s slice\n' \
+          "$binary" "$architectures" "$VINCENT_MACOS_ARCHITECTURE" >> "$violations"
+        ;;
+    esac
+
+    local relative_path="${binary#${app}/Contents/}"
+    case "$relative_path" in
+      "MacOS/${APP_NAME}"|Frameworks/libLVRS.dylib|Frameworks/libiiPaintEngine.dylib)
+        if [[ "$architectures" != "$VINCENT_MACOS_ARCHITECTURE" ]]; then
+          printf '%s: Vincent-owned Mach-O architectures %s must be exactly %s\n' \
+            "$binary" "$architectures" "$VINCENT_MACOS_ARCHITECTURE" >> "$violations"
+        fi
+        ;;
+    esac
+  done < <(find "${app}/Contents" -type f -print0)
+
+  if [[ -s "$violations" ]]; then
+    sed -n '1,80p' "$violations" >&2
+    die "deployed app contains Mach-O binaries with incompatible architectures: $app"
+  fi
+}
+
 prepare_app() {
   local mode="$1"
   local stage_dir="$2"
@@ -658,6 +745,8 @@ prepare_app() {
   macdeployqt_run "$out_app" "$mode"
   remove_unused_qt_sql_plugins "$out_app"
   assert_portable_macho_links "$out_app"
+  assert_macos_deployment_targets "$out_app"
+  assert_macos_architectures "$out_app"
 
   if [[ "$mode" == "mas" && -n "$MAS_PROVISIONPROFILE" ]]; then
     say "embedding provisioning profile for MAS"
@@ -769,6 +858,38 @@ sign_app_tree() {
 # 5) pkg 생성: INSTALL_DIR 고정(/Applications)
 # =============================================================================
 
+write_product_requirements() {
+  local requirements_plist="$1"
+
+  run rm -f "$requirements_plist" || true
+  run /usr/bin/plutil -create xml1 "$requirements_plist"
+  run /usr/bin/plutil -insert os -json "[\"$VINCENT_MIN_MACOS_VERSION\"]" "$requirements_plist"
+  run /usr/bin/plutil -insert arch -json "[\"$VINCENT_MACOS_ARCHITECTURE\"]" "$requirements_plist"
+  lint_plist "$requirements_plist"
+}
+
+verify_pkg_distribution() {
+  local pkg="$1"
+  local pkg_id="$2"
+  local expanded_dir="${WORKDIR}/distribution_$(basename "$pkg" .pkg)"
+  local distribution="${expanded_dir}/Distribution"
+
+  run rm -rf "$expanded_dir" || true
+  run pkgutil --expand "$pkg" "$expanded_dir"
+  require_file "$distribution"
+
+  grep -F "hostArchitectures=\"$VINCENT_MACOS_ARCHITECTURE\"" "$distribution" >/dev/null \
+    || die "package Distribution is not ${VINCENT_MACOS_ARCHITECTURE}-only: $pkg"
+  grep -F "<os-version min=\"$VINCENT_MIN_MACOS_VERSION\"" "$distribution" >/dev/null \
+    || die "package Distribution does not require macOS $VINCENT_MIN_MACOS_VERSION or later: $pkg"
+  grep -F "path=\"${APP_NAME}.app\"" "$distribution" \
+    | grep -F "CFBundleShortVersionString=\"$APP_VERSION\"" \
+    | grep -F "CFBundleVersion=\"$APP_VERSION\"" >/dev/null \
+    || die "package Distribution app bundle versions do not match APP_VERSION: $pkg"
+  grep -F "<pkg-ref id=\"$pkg_id\" version=\"$APP_VERSION\"" "$distribution" >/dev/null \
+    || die "package Distribution pkg-ref version does not match APP_VERSION: $pkg"
+}
+
 build_signed_pkg() {
   local app="$1"
   local pkg_id="$2"
@@ -782,8 +903,9 @@ build_signed_pkg() {
   local comp_plist="${WORKDIR}/components_${base}.plist"
   local comp_pkg="${WORKDIR}/component_${base}.pkg"
   local unsigned_pkg="${WORKDIR}/unsigned_${base}.pkg"
+  local requirements_plist="${WORKDIR}/requirements_${base}.plist"
 
-  run rm -rf "$payload_root" "$comp_plist" "$comp_pkg" "$unsigned_pkg" "$out_pkg" || true
+  run rm -rf "$payload_root" "$comp_plist" "$comp_pkg" "$unsigned_pkg" "$requirements_plist" "$out_pkg" || true
   run mkdir -p "$payload_root"
 
   # payload_root에 .app을 직접 배치하고 install-location을 /Applications로 고정한다.
@@ -801,7 +923,9 @@ build_signed_pkg() {
     --version "$APP_VERSION" \
     "$comp_pkg"
 
+  write_product_requirements "$requirements_plist"
   run xcrun productbuild \
+    --product "$requirements_plist" \
     --package "$comp_pkg" \
     "$unsigned_pkg"
 
@@ -812,6 +936,7 @@ build_signed_pkg() {
 
   run pkgutil --check-signature "$out_pkg"
   verify_pkg_icon_payload "$out_pkg" "$app"
+  verify_pkg_distribution "$out_pkg" "$pkg_id"
 }
 
 # =============================================================================
@@ -822,11 +947,14 @@ build_unsigned_component_pkg() {
   local app="$1"
   local pkg_id="$2"
   local out_pkg="$3"
+  local requirements_plist="${WORKDIR}/requirements_$(basename "$out_pkg" .pkg).plist"
 
   require_dir "$app"
 
-  run rm -f "$out_pkg" || true
+  run rm -f "$requirements_plist" "$out_pkg" || true
+  write_product_requirements "$requirements_plist"
   run xcrun productbuild \
+    --product "$requirements_plist" \
     --component "$app" "$INSTALL_DIR" \
     --identifier "$pkg_id" \
     --version "$APP_VERSION" \
@@ -834,6 +962,7 @@ build_unsigned_component_pkg() {
 
   run pkgutil --check-signature "$out_pkg" || true
   verify_pkg_icon_payload "$out_pkg" "$app"
+  verify_pkg_distribution "$out_pkg" "$pkg_id"
 }
 
 build_mas_pkg() {
@@ -841,11 +970,14 @@ build_mas_pkg() {
   local pkg_id="$2"
   local installer_identity="$3"
   local out_pkg="$4"
+  local requirements_plist="${WORKDIR}/requirements_$(basename "$out_pkg" .pkg).plist"
 
   require_dir "$app"
 
-  run rm -f "$out_pkg" || true
+  run rm -f "$requirements_plist" "$out_pkg" || true
+  write_product_requirements "$requirements_plist"
   run xcrun productbuild \
+    --product "$requirements_plist" \
     --component "$app" "$INSTALL_DIR" \
     --identifier "$pkg_id" \
     --version "$APP_VERSION" \
@@ -854,6 +986,7 @@ build_mas_pkg() {
 
   run pkgutil --check-signature "$out_pkg"
   verify_pkg_icon_payload "$out_pkg" "$app"
+  verify_pkg_distribution "$out_pkg" "$pkg_id"
 }
 
 # =============================================================================

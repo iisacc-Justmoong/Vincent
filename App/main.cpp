@@ -18,6 +18,7 @@
 #include <qqml.h>
 
 #include "models/canvas/canvasdocumentviewmodel.h"
+#include "models/license/licensemanager.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "models/brush/paletteutils.h"
 
@@ -194,6 +195,7 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("Vincent"));
+    QGuiApplication::setApplicationVersion(QStringLiteral(VINCENT_VERSION));
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     traceStartup(QStringLiteral("Vincent startup initialized in %1 ms").arg(launchTimer.elapsed()));
 
@@ -206,6 +208,8 @@ int main(int argc, char *argv[])
 
     auto *paletteUtils = new PaletteUtils(&engine);
     engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
+    auto *licenseManager = new LicenseManager(&engine);
+    engine.rootContext()->setContextProperty("VincentLicenseManager", licenseManager);
     registerViewModels(engine, paletteUtils);
 
     QObject::connect(&engine,

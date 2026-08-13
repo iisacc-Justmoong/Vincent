@@ -17,7 +17,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "${VINCENT_MIN_MACOS_VERSION}" CACHE STRING "Minimum macOS version" FORCE)
 endif()
 
-project(Vincent VERSION 4.0.4 LANGUAGES C CXX)
+project(Vincent VERSION 4.0.5 LANGUAGES C CXX)
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
@@ -108,12 +108,33 @@ include(FeatureSummary)
 include(FetchContent)
 
 # Qt6
-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Qml Quick QuickControls2 Svg)
+find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Core Network Qml Quick QuickControls2 Svg)
 if(BUILD_TESTING)
     find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Test)
 endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
+
+if(APPLE OR WIN32)
+    FetchContent_Declare(qtkeychain
+            GIT_REPOSITORY https://github.com/frankosterfeld/qtkeychain.git
+            GIT_TAG 875f77d9f61bd97fd84cca47ce3bc71186dfbd09
+            GIT_SHALLOW FALSE
+            UPDATE_DISCONNECTED TRUE
+    )
+    function(vincent_add_qtkeychain)
+        set(BUILD_WITH_QT5 OFF)
+        set(BUILD_TEST_APPLICATION OFF)
+        set(BUILD_QTQUICK_DEMO OFF)
+        set(BUILD_TRANSLATIONS OFF)
+        set(BUILD_SHARED_LIBS OFF)
+        set(BUILD_TESTING OFF)
+        set(USE_CREDENTIAL_STORE ON)
+        set(USE_COMPAT_NAMING_SCHEME OFF)
+        FetchContent_MakeAvailable(qtkeychain)
+    endfunction()
+    vincent_add_qtkeychain()
+endif()
 
 FetchContent_Declare(psd_sdk
         GIT_REPOSITORY https://github.com/MolecularMatters/psd_sdk.git
@@ -202,6 +223,7 @@ qt_add_qml_module(Vincent
         VERSION ${VINCENT_QML_MODULE_VERSION}
         QML_FILES
         App/qml/Main.qml
+        App/qml/license/LicenseActivationPage.qml
         App/qml/canvas/PainterCanvasPage.qml
         App/qml/brush/CanvasToolBar.qml
         App/qml/brush/HslTriangleColorPicker.qml
@@ -249,9 +271,15 @@ endif()
 
 # 링크
 target_link_libraries(Vincent PRIVATE
-        Qt6::Core Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
+        Qt6::Core Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
         iiPaintEngine::iiPaintEngine
         vincent_psd_sdk
+)
+if(APPLE OR WIN32)
+    target_link_libraries(Vincent PRIVATE qt6keychain)
+endif()
+target_compile_definitions(Vincent PRIVATE
+        VINCENT_VERSION="${PROJECT_VERSION}"
 )
 vincent_configure_local_runtime_paths(Vincent)
 
@@ -332,6 +360,11 @@ endif()
 if(APPLE)
     get_filename_component(VINCENT_MACOS_APP_ICON_FILE "${VINCENT_MACOS_APP_ICON}" NAME)
     set(VINCENT_LEGACY_MACOS_APP_ICON_FILE "icon.icns")
+    set(VINCENT_QTKEYCHAIN_LICENSE
+            "${CMAKE_SOURCE_DIR}/packaging/common/licenses/QtKeychain-BSD-3-Clause.txt")
+    set_source_files_properties("${VINCENT_QTKEYCHAIN_LICENSE}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources/legal/QtKeychain")
+    target_sources(Vincent PRIVATE "${VINCENT_QTKEYCHAIN_LICENSE}")
 endif()
 
 if(APPLE)
