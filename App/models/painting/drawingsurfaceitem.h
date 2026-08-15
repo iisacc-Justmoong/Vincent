@@ -11,7 +11,9 @@
 class CanvasViewModelBridge;
 class QEvent;
 class QMouseEvent;
+class QNetworkAccessManager;
 class QObject;
+class QUrl;
 
 class DrawingSurfaceItem : public CanvasAdapter
 {
@@ -43,6 +45,9 @@ public:
                                                qreal maximumObjectHeight = 0) const;
     Q_INVOKABLE QVariantMap clipboardImageObject(qreal maximumObjectWidth = 0,
                                                  qreal maximumObjectHeight = 0) const;
+    Q_INVOKABLE bool canImportDroppedImage(QObject* dropEvent) const;
+    Q_INVOKABLE void importDroppedImage(QObject* dropEvent, qreal maximumObjectWidth = 0,
+                                        qreal maximumObjectHeight = 0);
     Q_INVOKABLE QVariantMap psdImportDocument(const QString &fileUrl) const;
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);
@@ -87,8 +92,10 @@ signals:
     void canRedoChanged();
     void rasterContentChanged();
     void inputStateChanged();
+    void droppedImageReady(const QVariantMap& imageObject, qreal dropX, qreal dropY);
+    void droppedImageFailed(const QString& errorCode);
 
-protected:
+  protected:
     bool event(QEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -108,6 +115,8 @@ private:
     [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
     void syncCanvasSize();
     void emitUndoRedoSignals();
+    void requestRemoteDroppedImage(const QUrl& url, qreal maximumObjectWidth,
+                                   qreal maximumObjectHeight, qreal dropX, qreal dropY);
     QMouseEvent makeMouseEvent(QEvent::Type eventType,
                                qreal pointX,
                                qreal pointY,
@@ -115,6 +124,7 @@ private:
                                Qt::MouseButtons buttons) const;
 
     CanvasViewModelBridge *m_viewModelBridge = nullptr;
+    QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_viewId;
     QString m_backgroundSource;
     bool m_hasBackground = false;

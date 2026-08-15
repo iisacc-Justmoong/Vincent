@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/build/_deps/psd_sdk-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/build/_deps/qtkeychain-src" vcs="Git" />
   </component>
 </project>

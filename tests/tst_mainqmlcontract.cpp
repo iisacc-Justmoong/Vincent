@@ -18,8 +18,35 @@ private slots:
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
     void applicationActionsAreTheOnlyOwnersOfPortableShortcuts();
+    void clipboardPasteFailuresAreExplainedWithoutBlockingCanvas();
     void manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque();
 };
+
+void tst_MainQmlContract::clipboardPasteFailuresAreExplainedWithoutBlockingCanvas()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+
+    QFile mainQml(mainQmlPath);
+    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+
+    QVERIFY(mainSource.contains(QStringLiteral("function clipboardPasteFailureText(errorCode)")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"no-image\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"decode-failed\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"image-too-large\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"cache-write-failed\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"download-failed\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"download-too-large\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("function showClipboardPasteFailure(errorCode)")));
+    QVERIFY(mainSource.contains(QStringLiteral("clipboardPasteFailureTimer.restart();")));
+    QVERIFY(mainSource.contains(QStringLiteral("onClipboardImagePasteFailed:")));
+    QVERIFY(mainSource.contains(QStringLiteral("onImageDropFailed:")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: clipboardPasteFailureCard")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: window.clipboardPasteFailureMessage.length > 0")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: clipboardPasteFailureTimer")));
+}
 
 void tst_MainQmlContract::manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque()
 {
@@ -135,7 +162,9 @@ void tst_MainQmlContract::applicationWindowPassesOnlyTheActiveMacOsDragHeightToC
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("topChromeReservedHeight: window.windowDragHandleEnabled ? "
+                       "window.windowDragHandleHeight : 0")));
 }
 
 void tst_MainQmlContract::applicationWindowCreatesAtFixedLaunchGeometry()
@@ -207,7 +236,9 @@ void tst_MainQmlContract::applicationWindowRequiresOnlineLicenseBeforeCanvasIncu
     QVERIFY(mainSource.contains(QStringLiteral("LicenseViews.LicenseActivationPage")));
     QVERIFY(mainSource.contains(QStringLiteral("visible: !window.licenseGranted")));
     QVERIFY(mainSource.contains(QStringLiteral("objectName: \"licensePersistenceWarning\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("window.licenseGranted && VincentLicenseManager.resultCode === \"secure_storage_unavailable\"")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("window.licenseGranted && VincentLicenseManager.resultCode === "
+                       "\"secure_storage_unavailable\"")));
     QVERIFY(mainSource.contains(QStringLiteral("visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready")));
 
     QVERIFY(activationSource.contains(QStringLiteral("LV.AppCard")));
@@ -323,10 +354,16 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property string menuCommandModifier: Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("readonly property string menuCommandModifier: "
+                                           "Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutSaveImageAs: menuCommandModifier + \"+S\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutRedo: Qt.platform.os === \"osx\" ? \"Meta+Shift+Z\" : (Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\")")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === \"osx\" ? \"Ctrl+Meta+F\" : \"F11\"")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "readonly property string shortcutRedo: Qt.platform.os === \"osx\" ? \"Meta+Shift+Z\" : "
+        "(Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\")")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === "
+                       "\"osx\" ? \"Ctrl+Meta+F\" : \"F11\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function shortcutReference(commandName, shortcutText)")));
 
     const QStringList actionShortcutContracts = {
@@ -414,7 +451,9 @@ void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts(
     QVERIFY(!surfaceSource.isEmpty());
 
     QVERIFY(pageSource.contains(QStringLiteral("readonly property bool dialogActive: canvasToolBar.dialogActive")));
-    QVERIFY(pageSource.contains(QStringLiteral("readonly property bool textEditingActive: drawingSurface.textEditingActive || painterPage.layerRenameActive")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("readonly property bool textEditingActive: drawingSurface.textEditingActive "
+                       "|| painterPage.layerRenameActive")));
     QVERIFY(pageSource.contains(QStringLiteral("toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasCommandsEnabled")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasEditingCommandsEnabled")));

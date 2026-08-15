@@ -36,6 +36,9 @@ Item {
     property real layerRenameEditorHeight: 20
 
     signal pageReady
+    signal clipboardImagePasteFailed(string errorCode)
+    signal imageDropSucceeded
+    signal imageDropFailed(string errorCode)
 
     function refreshViewModel() {
         painterPage.vm = LV.ViewModels.getForView(painterPage.viewId);
@@ -121,6 +124,8 @@ Item {
         if (pasted) {
             painterPage.setToolMode("move");
             Qt.callLater(painterPage.syncLayerHierarchySelection);
+        } else {
+            clipboardImagePasteFailed(drawingSurface.clipboardImagePasteErrorCode || "decode-failed");
         }
         return pasted;
     }
@@ -352,6 +357,12 @@ Item {
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onBrushDeltaRequested: delta => painterPage.adjustBrush(delta)
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
+                onImageDropSucceeded: {
+                    painterPage.setToolMode("move");
+                    Qt.callLater(painterPage.syncLayerHierarchySelection);
+                    painterPage.imageDropSucceeded();
+                }
+                onImageDropFailed: errorCode => painterPage.imageDropFailed(errorCode)
             }
 
             Connections {

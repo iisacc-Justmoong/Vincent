@@ -7,7 +7,9 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QByteArray>
+#include <QBuffer>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QEvent>
@@ -17,9 +19,14 @@
 #include <QGuiApplication>
 #include <QHash>
 #include <QImage>
+#include <QImageReader>
+#include <QImageWriter>
 #include <QList>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QObject>
 #include <QPainter>
 #include <QPainterPath>
@@ -29,17 +36,24 @@
 #include <QPointingDevice>
 #include <QQuickItemGrabResult>
 #include <QRectF>
+#include <QRegularExpression>
 #include <QSize>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTabletEvent>
 #include <QTemporaryFile>
 #include <QTextDocument>
+#include <QTextBlock>
+#include <QTextFragment>
+#include <QTextImageFormat>
 #include <QTextOption>
 #include <QUrl>
 #include <QVariantMap>
 #include <QVector>
 #include <QtMath>
 #include <QtGlobal>
+
+#include <memory>
 
 namespace {
 
@@ -56,6 +70,10 @@ constexpr qreal speechBubbleTailRightBaseXRatio = 0.44;
 constexpr qreal ellipseBubbleTailLeftAngle = 2.15;
 constexpr qreal ellipseBubbleTailRightAngle = 1.70;
 constexpr int ellipseBubbleArcSegmentCount = 32;
+constexpr int maximumInsertedImageDimension = 32768;
+constexpr qint64 maximumInsertedImagePixelCount = 64LL * 1024LL * 1024LL;
+constexpr qint64 maximumRemoteImageDownloadBytes = 64LL * 1024LL * 1024LL;
+constexpr int remoteImageDownloadTimeoutMs = 30000;
 
 QString localFileSource(const QString &fileUrl)
 {
@@ -172,21 +190,27 @@ QImage opaqueCanvasBackgroundImage(const QImage &rasterImage)
     return image;
 }
 
-QDir writableCacheDirectory(const QString &subdirectoryName)
+QString writableCacheDirectoryPath(const QString& subdirectoryName)
 {
     const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
         ? QDir::tempPath()
         : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QDir cacheDir(cacheRoot + QLatin1Char('/') + subdirectoryName);
-    if (!cacheDir.exists()) {
-        cacheDir.mkpath(QStringLiteral("."));
+    if (!cacheDir.exists() && !cacheDir.mkpath(QStringLiteral(".")))
+    {
+        return {};
     }
-    return cacheDir;
+    return cacheDir.absolutePath();
 }
 
 QString writableCacheFilePath(const QString &subdirectoryName, const QString &fileTemplate)
 {
-    const QDir cacheDir = writableCacheDirectory(subdirectoryName);
+    const QString cacheDirectoryPath = writableCacheDirectoryPath(subdirectoryName);
+    if (cacheDirectoryPath.isEmpty())
+    {
+        return {};
+    }
+    const QDir cacheDir(cacheDirectoryPath);
 
     QTemporaryFile file(cacheDir.filePath(fileTemplate));
     file.setAutoRemove(false);
@@ -264,13 +288,97 @@ QString cachedPngSourceForImage(const QString &subdirectoryName, const QImage &i
     cacheKey.append(reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes());
 
     const QString digest = QString::fromLatin1(QCryptographicHash::hash(cacheKey, QCryptographicHash::Sha256).toHex());
-    const QDir cacheDir = writableCacheDirectory(subdirectoryName);
+    const QString cacheDirectoryPath = writableCacheDirectoryPath(subdirectoryName);
+    if (cacheDirectoryPath.isEmpty())
+    {
+        return {};
+    }
+    const QDir cacheDir(cacheDirectoryPath);
     const QString imagePath = cacheDir.filePath(digest + QStringLiteral(".png"));
-    if (!QFileInfo::exists(imagePath) && !image.save(imagePath, "PNG")) {
+    const QFileInfo cachedImageInfo(imagePath);
+    if (cachedImageInfo.isFile() && !cachedImageInfo.isSymLink())
+    {
+        QImageReader cachedImageReader(imagePath);
+        const QImage cachedImage = cachedImageReader.read();
+        if (!cachedImage.isNull() && cachedImage.size() == image.size())
+        {
+            return QUrl::fromLocalFile(imagePath).toString();
+        }
+    }
+
+    QSaveFile cacheFile(imagePath);
+    if (!cacheFile.open(QIODevice::WriteOnly))
+    {
+        return {};
+    }
+
+    QImageWriter imageWriter(&cacheFile, "PNG");
+    if (!imageWriter.write(image))
+    {
+        cacheFile.cancelWriting();
+        return {};
+    }
+    if (!cacheFile.commit())
+    {
+        return {};
+    }
+
+    QImageReader writtenImageReader(imagePath);
+    const QImage writtenImage = writtenImageReader.read();
+    if (writtenImage.isNull() || writtenImage.size() != image.size())
+    {
         QFile::remove(imagePath);
         return {};
     }
     return QUrl::fromLocalFile(imagePath).toString();
+}
+
+QVariantMap imageImportResult(const QString& status)
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("status"), status);
+    return result;
+}
+
+QImage firstLocalClipboardImage(const QList<QUrl>& urls)
+{
+    for (const QUrl& url : urls)
+    {
+        if (!url.isLocalFile())
+        {
+            continue;
+        }
+
+        const QFileInfo fileInfo(url.toLocalFile());
+        if (!fileInfo.isFile() || !fileInfo.isReadable())
+        {
+            continue;
+        }
+
+        const QImage image = imageFromFileUrl(url.toString());
+        if (!image.isNull())
+        {
+            return image;
+        }
+    }
+    return {};
+}
+
+bool imageSizeExceedsSafetyLimit(const QSize& size)
+{
+    if (size.width() > maximumInsertedImageDimension ||
+        size.height() > maximumInsertedImageDimension)
+    {
+        return true;
+    }
+
+    const qint64 pixelCount = static_cast<qint64>(size.width()) * size.height();
+    return pixelCount > maximumInsertedImagePixelCount;
+}
+
+bool imageExceedsSafetyLimit(const QImage& image)
+{
+    return imageSizeExceedsSafetyLimit(image.size());
 }
 
 QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
@@ -313,6 +421,270 @@ QVariantMap imageObjectForImage(const QImage& image, const QString& source,
     object.insert(QStringLiteral("originalWidth"), image.width());
     object.insert(QStringLiteral("originalHeight"), image.height());
     return object;
+}
+
+bool isSupportedImageMimeFormat(const QString& format)
+{
+    const QString normalized = format.trimmed().toLower();
+    return normalized.startsWith(QStringLiteral("image/")) ||
+           normalized == QStringLiteral("application/x-qt-image");
+}
+
+QStringList dropEventFormats(QObject* dropEvent)
+{
+    return dropEvent ? dropEvent->property("formats").toStringList() : QStringList();
+}
+
+QList<QUrl> dropEventUrls(QObject* dropEvent)
+{
+    if (!dropEvent)
+    {
+        return {};
+    }
+
+    const QVariant urlsValue = dropEvent->property("urls");
+    if (urlsValue.canConvert<QList<QUrl>>())
+    {
+        return urlsValue.value<QList<QUrl>>();
+    }
+
+    QList<QUrl> urls;
+    const QVariantList urlValues = urlsValue.toList();
+    urls.reserve(urlValues.size());
+    for (const QVariant& urlValue : urlValues)
+    {
+        const QUrl url = urlValue.toUrl();
+        if (url.isValid())
+        {
+            urls.append(url);
+        }
+    }
+    return urls;
+}
+
+QByteArray dropEventData(QObject* dropEvent, const QString& format)
+{
+    QByteArray data;
+    if (!dropEvent)
+    {
+        return data;
+    }
+
+    QMetaObject::invokeMethod(dropEvent, "getDataAsArrayBuffer", Qt::DirectConnection,
+                              Q_RETURN_ARG(QByteArray, data), Q_ARG(QString, format));
+    return data;
+}
+
+bool isRemoteImageUrl(const QUrl& url)
+{
+    const QString scheme = url.scheme().toLower();
+    return url.isValid() && (scheme == QStringLiteral("http") || scheme == QStringLiteral("https"));
+}
+
+bool isImageDataUrl(const QUrl& url)
+{
+    return url.isValid() &&
+           url.scheme().compare(QStringLiteral("data"), Qt::CaseInsensitive) == 0 &&
+           url.toEncoded().startsWith("data:image/");
+}
+
+QByteArray encodedImageFromDataUrl(const QUrl& url)
+{
+    const QByteArray encodedUrl = url.toEncoded(QUrl::FullyEncoded);
+    const qsizetype commaIndex = encodedUrl.indexOf(',');
+    if (commaIndex < 0)
+    {
+        return {};
+    }
+
+    const QByteArray metadata = encodedUrl.mid(5, commaIndex - 5).toLower();
+    if (!metadata.startsWith("image/"))
+    {
+        return {};
+    }
+
+    const QByteArray payload = encodedUrl.mid(commaIndex + 1);
+    if (metadata.contains(";base64"))
+    {
+        return QByteArray::fromBase64(payload, QByteArray::AbortOnBase64DecodingErrors);
+    }
+    return QByteArray::fromPercentEncoding(payload);
+}
+
+QList<QUrl> imageUrlsFromHtml(const QString& html)
+{
+    if (html.trimmed().isEmpty())
+    {
+        return {};
+    }
+
+    QTextDocument document;
+    document.setHtml(html);
+
+    QList<QUrl> urls;
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next())
+    {
+        for (QTextBlock::iterator iterator = block.begin(); !iterator.atEnd(); ++iterator)
+        {
+            const QTextFragment fragment = iterator.fragment();
+            if (!fragment.isValid() || !fragment.charFormat().isImageFormat())
+            {
+                continue;
+            }
+
+            const QUrl url(fragment.charFormat().toImageFormat().name());
+            if (url.isValid())
+            {
+                urls.append(url);
+            }
+        }
+    }
+    return urls;
+}
+
+QUrl imageUrlFromText(const QString& text)
+{
+    const QString firstLine =
+        text.split(QRegularExpression(QStringLiteral("[\\r\\n\\t]")), Qt::SkipEmptyParts)
+            .value(0)
+            .trimmed();
+    if (firstLine.isEmpty())
+    {
+        return {};
+    }
+
+    const QUrl url(firstLine);
+    if (url.isLocalFile() || isRemoteImageUrl(url) || isImageDataUrl(url))
+    {
+        return url;
+    }
+    return {};
+}
+
+void appendUniqueUrl(QList<QUrl>& urls, const QUrl& url)
+{
+    if (!url.isValid() || urls.contains(url))
+    {
+        return;
+    }
+    urls.append(url);
+}
+
+QString suggestedImageName(const QUrl& sourceUrl)
+{
+    if (!sourceUrl.isValid() || isImageDataUrl(sourceUrl))
+    {
+        return {};
+    }
+
+    const QString decodedPath = QUrl::fromPercentEncoding(sourceUrl.path().toUtf8());
+    return QFileInfo(decodedPath).fileName();
+}
+
+QVariantMap cachedInsertedImageObject(const QImage& image, const QUrl& originalSource,
+                                      qreal maximumObjectWidth, qreal maximumObjectHeight)
+{
+    if (image.isNull())
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+    if (imageExceedsSafetyLimit(image))
+    {
+        return imageImportResult(QStringLiteral("image-too-large"));
+    }
+
+    const QString cachedSource = cachedPngSourceForImage(QStringLiteral("inserted-images"), image);
+    if (cachedSource.isEmpty())
+    {
+        return imageImportResult(QStringLiteral("cache-write-failed"));
+    }
+
+    QVariantMap object =
+        imageObjectForImage(image, cachedSource, maximumObjectWidth, maximumObjectHeight);
+    if (object.isEmpty())
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+
+    object.insert(QStringLiteral("status"), QStringLiteral("ready"));
+    if (originalSource.isValid() && !originalSource.isEmpty() && !isImageDataUrl(originalSource))
+    {
+        QUrl storedSource = originalSource;
+        if (isRemoteImageUrl(storedSource))
+        {
+            storedSource.setUserInfo(QString());
+            storedSource.setQuery(QString());
+            storedSource.setFragment(QString());
+        }
+        object.insert(QStringLiteral("originalSource"), storedSource.toString());
+        const QString suggestedName = suggestedImageName(originalSource);
+        if (!suggestedName.isEmpty())
+        {
+            object.insert(QStringLiteral("suggestedName"), suggestedName);
+        }
+    }
+    return object;
+}
+
+QVariantMap imageObjectForEncodedData(const QByteArray& encodedData, const QUrl& originalSource,
+                                      qreal maximumObjectWidth, qreal maximumObjectHeight)
+{
+    if (encodedData.isEmpty())
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+
+    QBuffer buffer;
+    buffer.setData(encodedData);
+    if (!buffer.open(QIODevice::ReadOnly))
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+
+    QImageReader imageReader(&buffer);
+    imageReader.setAutoTransform(true);
+    const QSize decodedSize = imageReader.size();
+    if (decodedSize.isValid() && imageSizeExceedsSafetyLimit(decodedSize))
+    {
+        return imageImportResult(QStringLiteral("image-too-large"));
+    }
+
+    const QImage image = imageReader.read();
+    return cachedInsertedImageObject(image, originalSource, maximumObjectWidth,
+                                     maximumObjectHeight);
+}
+
+QVariantMap imageObjectForLocalDrop(const QUrl& url, qreal maximumObjectWidth,
+                                    qreal maximumObjectHeight)
+{
+    if (!url.isLocalFile())
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+
+    const QString filePath = url.toLocalFile();
+    const QFileInfo fileInfo(filePath);
+    if (!fileInfo.isFile() || !fileInfo.isReadable())
+    {
+        return imageImportResult(QStringLiteral("decode-failed"));
+    }
+
+    if (PsdImageReader::canReadPath(filePath))
+    {
+        return cachedInsertedImageObject(PsdImageReader::readMergedImage(filePath), url,
+                                         maximumObjectWidth, maximumObjectHeight);
+    }
+
+    QImageReader imageReader(filePath);
+    imageReader.setAutoTransform(true);
+    const QSize decodedSize = imageReader.size();
+    if (decodedSize.isValid() && imageSizeExceedsSafetyLimit(decodedSize))
+    {
+        return imageImportResult(QStringLiteral("image-too-large"));
+    }
+
+    return cachedInsertedImageObject(imageReader.read(), url, maximumObjectWidth,
+                                     maximumObjectHeight);
 }
 
 QString normalizedShapeKind(const QString &shapeKind)
@@ -866,24 +1238,265 @@ QVariantMap DrawingSurfaceItem::clipboardImageObject(qreal maximumObjectWidth,
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (!clipboard)
     {
-        return {};
+        return imageImportResult(QStringLiteral("clipboard-unavailable"));
     }
 
     const QMimeData* mimeData = clipboard->mimeData(QClipboard::Clipboard);
-    if (!mimeData || !mimeData->hasImage())
+    if (!mimeData)
     {
-        return {};
+        return imageImportResult(QStringLiteral("no-image"));
     }
 
-    const QImage image = clipboard->image(QClipboard::Clipboard);
+    const bool imageAdvertised = mimeData->hasImage();
+    QImage image = imageAdvertised ? clipboard->image(QClipboard::Clipboard) : QImage();
+    if (image.isNull() && mimeData->hasUrls())
+    {
+        image = firstLocalClipboardImage(mimeData->urls());
+    }
     if (image.isNull())
     {
-        return {};
+        return imageImportResult(imageAdvertised ? QStringLiteral("decode-failed")
+                                                 : QStringLiteral("no-image"));
     }
 
-    return imageObjectForImage(image,
-                               cachedPngSourceForImage(QStringLiteral("clipboard-images"), image),
-                               maximumObjectWidth, maximumObjectHeight);
+    return cachedInsertedImageObject(image, {}, maximumObjectWidth, maximumObjectHeight);
+}
+
+bool DrawingSurfaceItem::canImportDroppedImage(QObject* dropEvent) const
+{
+    if (!dropEvent)
+    {
+        return false;
+    }
+
+    const QStringList formats = dropEventFormats(dropEvent);
+    for (const QString& format : formats)
+    {
+        if (isSupportedImageMimeFormat(format))
+        {
+            return true;
+        }
+    }
+
+    const auto urlCanRepresentImage = [](const QUrl& url)
+    {
+        if (isRemoteImageUrl(url) || isImageDataUrl(url))
+        {
+            return true;
+        }
+        if (!url.isLocalFile())
+        {
+            return false;
+        }
+
+        const QString filePath = url.toLocalFile();
+        const QFileInfo fileInfo(filePath);
+        return fileInfo.isFile() && fileInfo.isReadable() &&
+               (PsdImageReader::canReadPath(filePath) ||
+                !QImageReader::imageFormat(filePath).isEmpty());
+    };
+
+    const QList<QUrl> urls = dropEventUrls(dropEvent);
+    for (const QUrl& url : urls)
+    {
+        if (urlCanRepresentImage(url))
+        {
+            return true;
+        }
+    }
+
+    const QList<QUrl> htmlImageUrls = imageUrlsFromHtml(dropEvent->property("html").toString());
+    for (const QUrl& url : htmlImageUrls)
+    {
+        if (urlCanRepresentImage(url))
+        {
+            return true;
+        }
+    }
+
+    return urlCanRepresentImage(imageUrlFromText(dropEvent->property("text").toString()));
+}
+
+void DrawingSurfaceItem::importDroppedImage(QObject* dropEvent, qreal maximumObjectWidth,
+                                            qreal maximumObjectHeight)
+{
+    if (!dropEvent)
+    {
+        emit droppedImageFailed(QStringLiteral("no-image"));
+        return;
+    }
+
+    const qreal dropX = dropEvent->property("x").toReal();
+    const qreal dropY = dropEvent->property("y").toReal();
+    const auto emitReadyOrTerminalFailure = [this, dropX, dropY](const QVariantMap& object)
+    {
+        const QString status = object.value(QStringLiteral("status")).toString();
+        if (status == QStringLiteral("ready"))
+        {
+            emit droppedImageReady(object, dropX, dropY);
+            return true;
+        }
+        if (!status.isEmpty() && status != QStringLiteral("decode-failed"))
+        {
+            emit droppedImageFailed(status);
+            return true;
+        }
+        return false;
+    };
+
+    bool imageDataAdvertised = false;
+    const QStringList formats = dropEventFormats(dropEvent);
+    for (const QString& format : formats)
+    {
+        if (!isSupportedImageMimeFormat(format))
+        {
+            continue;
+        }
+
+        imageDataAdvertised = true;
+        const QByteArray encodedData = dropEventData(dropEvent, format);
+        if (encodedData.isEmpty())
+        {
+            continue;
+        }
+
+        const QVariantMap object =
+            imageObjectForEncodedData(encodedData, {}, maximumObjectWidth, maximumObjectHeight);
+        if (emitReadyOrTerminalFailure(object))
+        {
+            return;
+        }
+    }
+
+    bool imageUrlAdvertised = false;
+    const QList<QUrl> droppedUrls = dropEventUrls(dropEvent);
+    for (const QUrl& url : droppedUrls)
+    {
+        if (!url.isLocalFile())
+        {
+            continue;
+        }
+
+        imageUrlAdvertised = true;
+        const QVariantMap object =
+            imageObjectForLocalDrop(url, maximumObjectWidth, maximumObjectHeight);
+        if (emitReadyOrTerminalFailure(object))
+        {
+            return;
+        }
+    }
+
+    QList<QUrl> webImageUrls;
+    const QList<QUrl> htmlImageUrls = imageUrlsFromHtml(dropEvent->property("html").toString());
+    for (const QUrl& url : htmlImageUrls)
+    {
+        appendUniqueUrl(webImageUrls, url);
+    }
+    for (const QUrl& url : droppedUrls)
+    {
+        appendUniqueUrl(webImageUrls, url);
+    }
+    appendUniqueUrl(webImageUrls, imageUrlFromText(dropEvent->property("text").toString()));
+
+    for (const QUrl& url : webImageUrls)
+    {
+        if (!isImageDataUrl(url))
+        {
+            continue;
+        }
+
+        imageUrlAdvertised = true;
+        const QVariantMap object = imageObjectForEncodedData(
+            encodedImageFromDataUrl(url), url, maximumObjectWidth, maximumObjectHeight);
+        if (emitReadyOrTerminalFailure(object))
+        {
+            return;
+        }
+    }
+
+    for (const QUrl& url : webImageUrls)
+    {
+        if (!isRemoteImageUrl(url))
+        {
+            continue;
+        }
+
+        requestRemoteDroppedImage(url, maximumObjectWidth, maximumObjectHeight, dropX, dropY);
+        return;
+    }
+
+    emit droppedImageFailed(imageDataAdvertised || imageUrlAdvertised
+                                ? QStringLiteral("decode-failed")
+                                : QStringLiteral("no-image"));
+}
+
+void DrawingSurfaceItem::requestRemoteDroppedImage(const QUrl& url, qreal maximumObjectWidth,
+                                                   qreal maximumObjectHeight, qreal dropX,
+                                                   qreal dropY)
+{
+    if (!isRemoteImageUrl(url))
+    {
+        emit droppedImageFailed(QStringLiteral("download-failed"));
+        return;
+    }
+
+    if (!m_networkAccessManager)
+    {
+        m_networkAccessManager = new QNetworkAccessManager(this);
+    }
+
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setMaximumRedirectsAllowed(5);
+    request.setTransferTimeout(remoteImageDownloadTimeoutMs);
+    const QString version = QCoreApplication::applicationVersion().isEmpty()
+                                ? QStringLiteral("development")
+                                : QCoreApplication::applicationVersion();
+    request.setRawHeader("User-Agent", QStringLiteral("Vincent/%1").arg(version).toUtf8());
+
+    QNetworkReply* reply = m_networkAccessManager->get(request);
+    const auto downloadTooLarge = std::make_shared<bool>(false);
+    connect(reply, &QNetworkReply::downloadProgress, reply,
+            [reply, downloadTooLarge](qint64 receivedBytes, qint64 totalBytes)
+            {
+                if (receivedBytes > maximumRemoteImageDownloadBytes ||
+                    totalBytes > maximumRemoteImageDownloadBytes)
+                {
+                    *downloadTooLarge = true;
+                    reply->abort();
+                }
+            });
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, downloadTooLarge, url, maximumObjectWidth, maximumObjectHeight, dropX,
+             dropY]()
+            {
+                const QNetworkReply::NetworkError networkError = reply->error();
+                const QByteArray encodedData = reply->readAll();
+                reply->deleteLater();
+
+                if (*downloadTooLarge || encodedData.size() > maximumRemoteImageDownloadBytes)
+                {
+                    emit droppedImageFailed(QStringLiteral("download-too-large"));
+                    return;
+                }
+                if (networkError != QNetworkReply::NoError)
+                {
+                    emit droppedImageFailed(QStringLiteral("download-failed"));
+                    return;
+                }
+
+                const QVariantMap object = imageObjectForEncodedData(
+                    encodedData, url, maximumObjectWidth, maximumObjectHeight);
+                const QString status = object.value(QStringLiteral("status")).toString();
+                if (status != QStringLiteral("ready"))
+                {
+                    emit droppedImageFailed(status.isEmpty() ? QStringLiteral("decode-failed")
+                                                             : status);
+                    return;
+                }
+                emit droppedImageReady(object, dropX, dropY);
+            });
 }
 
 QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const

@@ -204,6 +204,7 @@ target_link_libraries(tests_drawingsurfaceitem PRIVATE
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
+        Qt6::Network
         Qt6::Test
         iiPaintEngine::iiPaintEngine
         vincent_psd_sdk

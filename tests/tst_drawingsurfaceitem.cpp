@@ -1,7 +1,12 @@
+#include <QBuffer>
 #include <QClipboard>
+#include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QHostAddress>
 #include <QImage>
 #include <QLineF>
 #include <QMap>
@@ -13,7 +18,10 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QStringList>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QVariantList>
@@ -30,43 +38,45 @@ class tst_DrawingSurfaceItem : public QObject
     Q_OBJECT
 
 private slots:
-    void createsInitialCanvasInsideWorkspaceMargins();
-    void createsNewCanvasAtCurrentWorkspaceSize();
-    void constrainsShapeDragWithShiftModifier();
-    void pansCanvasWithHandToolDrag();
-    void zoomsCanvasWithHorizontalDrag();
-    void usesToolAppropriateCanvasCursors();
-    void tracksBrushCursorDuringNativePointerInput();
-    void pastesSystemClipboardImageAsTransformableObject();
-    void movesAndResizesDrawableObjects();
-    void constrainsDrawableObjectTransformWithShiftModifier();
-    void deletesSelectedDrawableObject();
-    void deletesBackgroundLayerLikeRegularLayer();
-    void addsBlankLayerRowsWithoutTransformHitTesting();
-    void shapeAndTextToolsCreateSeparateLayerRows();
-    void savesRasterLayerItemsAsIndependentCanvasLayers();
-    void deletingRasterLayerRemovesItsPaintFromQmlComposite();
-    void addsManyRasterLayersWithoutSnapshotChurn();
-    void renamesLayerRowsAndDrawableObjectMetadata();
-    void layersExposeHierarchyRowsAndReorderDrawableObjects();
-    void drawsAndSavesStroke();
-    void pressureSensitiveManualStrokesPreserveInputPressure();
-    void erasesCommittedStrokePixels();
-    void commitsTextToRasterCanvas();
-    void commitsShapeToRasterCanvas();
-    void commitsSpeechBubbleTailsAsIntegratedSolidShapes();
-    void fillsContiguousRasterRegion();
-    void cachesLayerBitmapThumbnails();
-    void savesCompositeDrawableObjectsWithoutFlatteningRaster();
-    void savesBlankCanvasAsOpaquePsdBackground();
-    void savesPsdLayerRecordsInBottomToTopOrder();
-    void savesCompositeDrawableObjectsAsLayeredPsdWithMetadata();
-    void opensLayeredPsdThroughPsdSdkReader();
-    void createsPsdDrawablePreviewForQmlImage();
-    void supportsUndoRedo();
-    void opensRasterBackground();
-    void opensLargeRasterAtOriginalImageSize();
-    void opensRasterImagesAsCanvasAtSourceResolution();
+  void initTestCase();
+  void createsInitialCanvasInsideWorkspaceMargins();
+  void createsNewCanvasAtCurrentWorkspaceSize();
+  void constrainsShapeDragWithShiftModifier();
+  void pansCanvasWithHandToolDrag();
+  void zoomsCanvasWithHorizontalDrag();
+  void usesToolAppropriateCanvasCursors();
+  void tracksBrushCursorDuringNativePointerInput();
+  void pastesSystemClipboardImageAsTransformableObject();
+  void importsDraggedImageMimeFilesAndWebImages();
+  void movesAndResizesDrawableObjects();
+  void constrainsDrawableObjectTransformWithShiftModifier();
+  void deletesSelectedDrawableObject();
+  void deletesBackgroundLayerLikeRegularLayer();
+  void addsBlankLayerRowsWithoutTransformHitTesting();
+  void shapeAndTextToolsCreateSeparateLayerRows();
+  void savesRasterLayerItemsAsIndependentCanvasLayers();
+  void deletingRasterLayerRemovesItsPaintFromQmlComposite();
+  void addsManyRasterLayersWithoutSnapshotChurn();
+  void renamesLayerRowsAndDrawableObjectMetadata();
+  void layersExposeHierarchyRowsAndReorderDrawableObjects();
+  void drawsAndSavesStroke();
+  void pressureSensitiveManualStrokesPreserveInputPressure();
+  void erasesCommittedStrokePixels();
+  void commitsTextToRasterCanvas();
+  void commitsShapeToRasterCanvas();
+  void commitsSpeechBubbleTailsAsIntegratedSolidShapes();
+  void fillsContiguousRasterRegion();
+  void cachesLayerBitmapThumbnails();
+  void savesCompositeDrawableObjectsWithoutFlatteningRaster();
+  void savesBlankCanvasAsOpaquePsdBackground();
+  void savesPsdLayerRecordsInBottomToTopOrder();
+  void savesCompositeDrawableObjectsAsLayeredPsdWithMetadata();
+  void opensLayeredPsdThroughPsdSdkReader();
+  void createsPsdDrawablePreviewForQmlImage();
+  void supportsUndoRedo();
+  void opensRasterBackground();
+  void opensLargeRasterAtOriginalImageSize();
+  void opensRasterImagesAsCanvasAtSourceResolution();
 };
 
 namespace {
@@ -143,6 +153,66 @@ class ClipboardContentsGuard
     bool m_hasImage = false;
     bool m_hasText = false;
     bool m_hasUrls = false;
+};
+
+class CachePathCleanupGuard
+{
+  public:
+    explicit CachePathCleanupGuard(QString path) : m_path(std::move(path)) {}
+
+    ~CachePathCleanupGuard()
+    {
+        if (m_path.isEmpty())
+        {
+            return;
+        }
+
+        const QFileInfo pathInfo(m_path);
+        if (pathInfo.isDir())
+        {
+            QDir().rmdir(m_path);
+        }
+        else if (pathInfo.exists())
+        {
+            QFile::remove(m_path);
+        }
+    }
+
+    void dismiss() { m_path.clear(); }
+
+  private:
+    QString m_path;
+};
+
+class FakeDropEvent : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(qreal x READ x CONSTANT)
+    Q_PROPERTY(qreal y READ y CONSTANT)
+    Q_PROPERTY(QStringList formats READ formats CONSTANT)
+    Q_PROPERTY(QList<QUrl> urls READ urls CONSTANT)
+    Q_PROPERTY(QString html READ html CONSTANT)
+    Q_PROPERTY(QString text READ text CONSTANT)
+
+  public:
+    qreal x() const { return m_x; }
+    qreal y() const { return m_y; }
+    QStringList formats() const { return m_dataByFormat.keys(); }
+    QList<QUrl> urls() const { return m_urls; }
+    QString html() const { return m_html; }
+    QString text() const { return m_text; }
+
+    Q_INVOKABLE QByteArray getDataAsArrayBuffer(const QString& format) const
+    {
+        return m_dataByFormat.value(format);
+    }
+
+    qreal m_x = 0;
+    qreal m_y = 0;
+    QMap<QString, QByteArray> m_dataByFormat;
+    QList<QUrl> m_urls;
+    QString m_html;
+    QString m_text;
 };
 
 QString qmlErrorsToString(const QList<QQmlError> &errors)
@@ -348,6 +418,11 @@ QStringList psdLayerRecordNames(const QByteArray &psd)
 }
 
 } // namespace
+
+void tst_DrawingSurfaceItem::initTestCase()
+{
+    QStandardPaths::setTestModeEnabled(true);
+}
 
 void tst_DrawingSurfaceItem::createsInitialCanvasInsideWorkspaceMargins()
 {
@@ -770,11 +845,12 @@ void tst_DrawingSurfaceItem::pansCanvasWithHandToolDrag()
     QVERIFY2(!releaseTemporaryPan.hasError(), qPrintable(releaseTemporaryPan.error().toString()));
     QCOMPARE(releaseTemporaryPanResult.toString(), QStringLiteral("brush,brush,35,24"));
 
-    QQmlExpression textEditingSpace(engine.rootContext(),
-                                    object.data(),
-                                    QStringLiteral("toolMode = \"text\";"
-                                                   "beginTextPlacement(20, 24);"
-                                                   "[beginSpacePanMode(), effectiveToolMode(), spacePanActive, textEditingActive].join(\",\");"));
+    QQmlExpression textEditingSpace(
+        engine.rootContext(), object.data(),
+        QStringLiteral("toolMode = \"text\";"
+                       "beginTextPlacement(20, 24);"
+                       "[beginSpacePanMode(), effectiveToolMode(), spacePanActive, "
+                       "textEditingActive].join(\",\");"));
     const QVariant textEditingSpaceResult = textEditingSpace.evaluate();
     QVERIFY2(!textEditingSpace.hasError(), qPrintable(textEditingSpace.error().toString()));
     QCOMPARE(textEditingSpaceResult.toString(), QStringLiteral("false,text,false,true"));
@@ -908,20 +984,23 @@ void tst_DrawingSurfaceItem::usesToolAppropriateCanvasCursors()
     QVERIFY(rootItem);
 
     QQmlExpression cursorContract(
-        engine.rootContext(),
-        object.data(),
+        engine.rootContext(), object.data(),
         QStringLiteral("var matches = [];"
-                       "function matchesCursor(mode, cursor) { toolMode = mode; return canvasCursorShape(20, 20) === cursor; }"
+                       "function matchesCursor(mode, cursor) { toolMode = mode; return "
+                       "canvasCursorShape(20, 20) === cursor; }"
                        "matches.push(matchesCursor(\"brush\", Qt.BlankCursor));"
                        "matches.push(matchesCursor(\"eraser\", Qt.BlankCursor));"
                        "matches.push(matchesCursor(\"zoom\", Qt.CrossCursor));"
                        "matches.push(matchesCursor(\"shape\", Qt.CrossCursor));"
                        "matches.push(matchesCursor(\"fill\", Qt.PointingHandCursor));"
                        "matches.push(matchesCursor(\"text\", Qt.IBeamCursor));"
-                       "toolMode = \"pan\"; panDraggingActive = false; matches.push(canvasCursorShape(20, 20) === Qt.OpenHandCursor);"
-                       "panDraggingActive = true; matches.push(canvasCursorShape(20, 20) === Qt.ClosedHandCursor);"
+                       "toolMode = \"pan\"; panDraggingActive = false; "
+                       "matches.push(canvasCursorShape(20, 20) === Qt.OpenHandCursor);"
+                       "panDraggingActive = true; matches.push(canvasCursorShape(20, 20) === "
+                       "Qt.ClosedHandCursor);"
                        "panDraggingActive = false;"
-                       "appendDrawableObject({ id: 2, type: \"shape\", x: 100, y: 80, width: 100, height: 80, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "appendDrawableObject({ id: 2, type: \"shape\", x: 100, y: 80, width: 100, "
+                       "height: 80, shapeKind: \"rectangle\", color: \"#1976d2\" });"
                        "toolMode = \"move\";"
                        "matches.push(canvasCursorShape(20, 20) === Qt.ArrowCursor);"
                        "matches.push(canvasCursorShape(150, 120) === Qt.SizeAllCursor);"
@@ -1202,20 +1281,97 @@ void tst_DrawingSurfaceItem::pastesSystemClipboardImageAsTransformableObject()
     QTRY_VERIFY(canvasItem->width() > 100);
     QTRY_VERIFY(canvasItem->height() > 100);
 
-    QVERIFY(canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height()).isEmpty());
+    QQmlExpression beginDraftText(
+        engine.rootContext(), object.data(),
+        QStringLiteral("toolMode = \"text\"; beginTextPlacement(24, 24);"));
+    beginDraftText.evaluate();
+    QVERIFY2(!beginDraftText.hasError(), qPrintable(beginDraftText.error().toString()));
+    QQuickItem* textToolEditor = findItemByObjectName(rootItem, QStringLiteral("textToolEditor"));
+
+    QVERIFY(textToolEditor);
+    QVERIFY(textToolEditor->setProperty("text", QStringLiteral("Uncommitted draft")));
+    QVERIFY(rootItem->property("textEditingActive").toBool());
+
+    const QVariantList objectsBeforeFailure = rootItem->property("drawableObjects").toList();
+    const int selectedObjectBeforeFailure = rootItem->property("selectedDrawableObjectId").toInt();
+    const QVariantMap textClipboardResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(textClipboardResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("no-image"));
+    QVERIFY(!textClipboardResult.contains(QStringLiteral("source")));
     QQmlExpression pasteTextOnlyClipboard(engine.rootContext(), object.data(),
                                           QStringLiteral("pasteClipboardImage();"));
     QCOMPARE(pasteTextOnlyClipboard.evaluate().toBool(), false);
     QVERIFY2(!pasteTextOnlyClipboard.hasError(),
              qPrintable(pasteTextOnlyClipboard.error().toString()));
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(),
+             QStringLiteral("no-image"));
+    QCOMPARE(rootItem->property("drawableObjects").toList(), objectsBeforeFailure);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), selectedObjectBeforeFailure);
+    QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("text"));
+    QVERIFY(rootItem->property("textEditingActive").toBool());
+    QCOMPARE(textToolEditor->property("text").toString(), QStringLiteral("Uncommitted draft"));
+
+    QQmlExpression cancelDraftText(engine.rootContext(), object.data(),
+                                   QStringLiteral("cancelActiveText(); toolMode = \"move\";"));
+    cancelDraftText.evaluate();
+    QVERIFY2(!cancelDraftText.hasError(), qPrintable(cancelDraftText.error().toString()));
+
+    auto* invalidImageMimeData = new QMimeData();
+    invalidImageMimeData->setData(QStringLiteral("application/x-qt-image"),
+                                  QByteArrayLiteral("not an encoded image"));
+    clipboard->setMimeData(invalidImageMimeData, QClipboard::Clipboard);
+    const QVariantMap invalidClipboardResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(invalidClipboardResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("decode-failed"));
+    QQmlExpression pasteInvalidClipboard(engine.rootContext(), object.data(),
+                                         QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteInvalidClipboard.evaluate().toBool(), false);
+    QVERIFY2(!pasteInvalidClipboard.hasError(),
+             qPrintable(pasteInvalidClipboard.error().toString()));
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(),
+             QStringLiteral("decode-failed"));
+    QCOMPARE(rootItem->property("drawableObjects").toList(), objectsBeforeFailure);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), selectedObjectBeforeFailure);
+
+    QImage oversizedClipboardImage(32769, 1, QImage::Format_ARGB32_Premultiplied);
+    oversizedClipboardImage.fill(Qt::black);
+    clipboard->setImage(oversizedClipboardImage, QClipboard::Clipboard);
+    const QVariantMap oversizedClipboardResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(oversizedClipboardResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("image-too-large"));
+    QQmlExpression pasteOversizedClipboard(engine.rootContext(), object.data(),
+                                           QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteOversizedClipboard.evaluate().toBool(), false);
+    QVERIFY2(!pasteOversizedClipboard.hasError(),
+             qPrintable(pasteOversizedClipboard.error().toString()));
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(),
+             QStringLiteral("image-too-large"));
+    QCOMPARE(rootItem->property("drawableObjects").toList(), objectsBeforeFailure);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), selectedObjectBeforeFailure);
 
     QImage clipboardImage(640, 320, QImage::Format_ARGB32_Premultiplied);
     clipboardImage.fill(QColor(QStringLiteral("#5e35b1")));
     clipboard->setImage(clipboardImage, QClipboard::Clipboard);
 
+    QVERIFY(rootItem->setProperty("canvasItemReady", false));
+    QQmlExpression pasteBeforeCanvasReady(engine.rootContext(), object.data(),
+                                          QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteBeforeCanvasReady.evaluate().toBool(), false);
+    QVERIFY2(!pasteBeforeCanvasReady.hasError(),
+             qPrintable(pasteBeforeCanvasReady.error().toString()));
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(),
+             QStringLiteral("canvas-unavailable"));
+    QCOMPARE(rootItem->property("drawableObjects").toList(), objectsBeforeFailure);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(), selectedObjectBeforeFailure);
+    QVERIFY(rootItem->setProperty("canvasItemReady", true));
+
     const QVariantMap clipboardObject =
         canvasItem->clipboardImageObject(canvasItem->width() * 0.8, canvasItem->height() * 0.8);
     QVERIFY(!clipboardObject.isEmpty());
+    QCOMPARE(clipboardObject.value(QStringLiteral("status")).toString(), QStringLiteral("ready"));
     QCOMPARE(clipboardObject.value(QStringLiteral("originalWidth")).toInt(),
              clipboardImage.width());
     QCOMPARE(clipboardObject.value(QStringLiteral("originalHeight")).toInt(),
@@ -1273,6 +1429,331 @@ void tst_DrawingSurfaceItem::pastesSystemClipboardImageAsTransformableObject()
              pastedObject.value(QStringLiteral("x")).toReal() + 24.0);
     QCOMPARE(movedObject.value(QStringLiteral("y")).toReal(),
              pastedObject.value(QStringLiteral("y")).toReal() + 16.0);
+
+    const int objectCountBeforeDuplicatePaste =
+        rootItem->property("drawableObjects").toList().size();
+    QQmlExpression pasteDuplicateClipboardImage(engine.rootContext(), object.data(),
+                                                QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteDuplicateClipboardImage.evaluate().toBool(), true);
+    QVERIFY2(!pasteDuplicateClipboardImage.hasError(),
+             qPrintable(pasteDuplicateClipboardImage.error().toString()));
+    const QVariantList objectsAfterDuplicatePaste = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objectsAfterDuplicatePaste.size(), objectCountBeforeDuplicatePaste + 1);
+    const QVariantMap duplicatePastedObject = objectsAfterDuplicatePaste.constLast().toMap();
+    QCOMPARE(duplicatePastedObject.value(QStringLiteral("source")).toString(),
+             cachedSource.toString());
+    QCOMPARE(duplicatePastedObject.value(QStringLiteral("x")).toReal(),
+             qMin(canvasItem->width() - expectedObjectSize.width(),
+                  (canvasItem->width() - expectedObjectSize.width()) / 2.0 + 16.0));
+    QCOMPARE(duplicatePastedObject.value(QStringLiteral("y")).toReal(),
+             qMin(canvasItem->height() - expectedObjectSize.height(),
+                  (canvasItem->height() - expectedObjectSize.height()) / 2.0 + 16.0));
+    QVERIFY(duplicatePastedObject.value(QStringLiteral("id")).toInt() !=
+            pastedObject.value(QStringLiteral("id")).toInt());
+
+    const QString cachedImagePath = cachedSource.toLocalFile();
+    QVERIFY(QFile::remove(cachedImagePath));
+    QVERIFY(QDir().mkpath(cachedImagePath));
+    CachePathCleanupGuard obstructedCachePath(cachedImagePath);
+    const QVariantList objectsBeforeCacheFailure = rootItem->property("drawableObjects").toList();
+    const int selectedObjectBeforeCacheFailure =
+        rootItem->property("selectedDrawableObjectId").toInt();
+    const QVariantMap obstructedCacheResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(obstructedCacheResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("cache-write-failed"));
+    QQmlExpression pasteWithObstructedCache(engine.rootContext(), object.data(),
+                                            QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteWithObstructedCache.evaluate().toBool(), false);
+    QVERIFY2(!pasteWithObstructedCache.hasError(),
+             qPrintable(pasteWithObstructedCache.error().toString()));
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(),
+             QStringLiteral("cache-write-failed"));
+    QCOMPARE(rootItem->property("drawableObjects").toList(), objectsBeforeCacheFailure);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(),
+             selectedObjectBeforeCacheFailure);
+    QVERIFY(QDir().rmdir(cachedImagePath));
+    obstructedCachePath.dismiss();
+
+    const QVariantMap recoveredCacheResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(recoveredCacheResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("ready"));
+    QVERIFY(QFileInfo::exists(cachedImagePath));
+
+    QFile corruptedCacheFile(cachedImagePath);
+    QVERIFY(corruptedCacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(corruptedCacheFile.write("corrupted PNG cache entry"), 25);
+    corruptedCacheFile.close();
+    const QVariantMap repairedCacheResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(repairedCacheResult.value(QStringLiteral("status")).toString(),
+             QStringLiteral("ready"));
+    const QImage repairedCachedImage(cachedImagePath);
+    QCOMPARE(repairedCachedImage.size(), clipboardImage.size());
+    QCOMPARE(repairedCachedImage.pixelColor(0, 0), clipboardImage.pixelColor(0, 0));
+
+    QTemporaryDir copiedFileDirectory;
+    QVERIFY(copiedFileDirectory.isValid());
+    QImage copiedFileImage(72, 48, QImage::Format_ARGB32_Premultiplied);
+    copiedFileImage.fill(QColor(QStringLiteral("#00897b")));
+    const QString copiedFilePath = copiedFileDirectory.filePath(QStringLiteral("copied-image.png"));
+    QVERIFY(copiedFileImage.save(copiedFilePath, "PNG"));
+    auto* copiedFileMimeData = new QMimeData();
+    copiedFileMimeData->setUrls({QUrl::fromLocalFile(copiedFilePath)});
+    clipboard->setMimeData(copiedFileMimeData, QClipboard::Clipboard);
+
+    const QVariantMap copiedFileResult =
+        canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height());
+    QCOMPARE(copiedFileResult.value(QStringLiteral("status")).toString(), QStringLiteral("ready"));
+    QCOMPARE(copiedFileResult.value(QStringLiteral("originalWidth")).toInt(),
+             copiedFileImage.width());
+    QCOMPARE(copiedFileResult.value(QStringLiteral("originalHeight")).toInt(),
+             copiedFileImage.height());
+
+    const int objectCountBeforeFilePaste = rootItem->property("drawableObjects").toList().size();
+    QQmlExpression pasteCopiedFile(engine.rootContext(), object.data(),
+                                   QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteCopiedFile.evaluate().toBool(), true);
+    QVERIFY2(!pasteCopiedFile.hasError(), qPrintable(pasteCopiedFile.error().toString()));
+    QCOMPARE(rootItem->property("drawableObjects").toList().size(), objectCountBeforeFilePaste + 1);
+    QCOMPARE(rootItem->property("clipboardImagePasteErrorCode").toString(), QString());
+
+    const QUrl copiedFileCachedSource(copiedFileResult.value(QStringLiteral("source")).toString());
+    QVERIFY(copiedFileCachedSource.isLocalFile());
+    clipboard->clear(QClipboard::Clipboard);
+    const QImage imageAfterClipboardOwnershipEnded(copiedFileCachedSource.toLocalFile());
+    QCOMPARE(imageAfterClipboardOwnershipEnded.size(), copiedFileImage.size());
+    QCOMPARE(imageAfterClipboardOwnershipEnded.pixelColor(0, 0), copiedFileImage.pixelColor(0, 0));
+}
+
+void tst_DrawingSurfaceItem::importsDraggedImageMimeFilesAndWebImages()
+{
+    DrawingSurfaceItem canvasItem;
+    QSignalSpy readySpy(&canvasItem, &DrawingSurfaceItem::droppedImageReady);
+    QSignalSpy failedSpy(&canvasItem, &DrawingSurfaceItem::droppedImageFailed);
+
+    QImage sourceImage(96, 64, QImage::Format_ARGB32_Premultiplied);
+    sourceImage.fill(QColor(QStringLiteral("#3949ab")));
+    QByteArray encodedPng;
+    QBuffer encodedPngBuffer(&encodedPng);
+    QVERIFY(encodedPngBuffer.open(QIODevice::WriteOnly));
+    QVERIFY(sourceImage.save(&encodedPngBuffer, "PNG"));
+
+    FakeDropEvent mimeDrop;
+    mimeDrop.m_x = 135.5;
+    mimeDrop.m_y = 82.25;
+    mimeDrop.m_dataByFormat.insert(QStringLiteral("image/png"), encodedPng);
+    QVERIFY(canvasItem.canImportDroppedImage(&mimeDrop));
+    canvasItem.importDroppedImage(&mimeDrop, 320, 240);
+    QCOMPARE(readySpy.count(), 1);
+    QCOMPARE(failedSpy.count(), 0);
+
+    const QList<QVariant> mimeReadyArguments = readySpy.takeFirst();
+    const QVariantMap mimeObject = mimeReadyArguments.at(0).toMap();
+    QCOMPARE(mimeObject.value(QStringLiteral("status")).toString(), QStringLiteral("ready"));
+    QCOMPARE(mimeObject.value(QStringLiteral("originalWidth")).toInt(), sourceImage.width());
+    QCOMPARE(mimeObject.value(QStringLiteral("originalHeight")).toInt(), sourceImage.height());
+    QCOMPARE(mimeReadyArguments.at(1).toReal(), mimeDrop.m_x);
+    QCOMPARE(mimeReadyArguments.at(2).toReal(), mimeDrop.m_y);
+    const QUrl mimeCachedSource(mimeObject.value(QStringLiteral("source")).toString());
+    QVERIFY(mimeCachedSource.isLocalFile());
+    QCOMPARE(QImage(mimeCachedSource.toLocalFile()).size(), sourceImage.size());
+
+    QTemporaryDir localImageDirectory;
+    QVERIFY(localImageDirectory.isValid());
+    const QString localImagePath = localImageDirectory.filePath(QStringLiteral("finder-image.png"));
+    QVERIFY(sourceImage.save(localImagePath, "PNG"));
+
+    FakeDropEvent localFileDrop;
+    localFileDrop.m_x = 48;
+    localFileDrop.m_y = 52;
+    localFileDrop.m_urls = {QUrl::fromLocalFile(localImagePath)};
+    QVERIFY(canvasItem.canImportDroppedImage(&localFileDrop));
+    canvasItem.importDroppedImage(&localFileDrop, 320, 240);
+    QCOMPARE(readySpy.count(), 1);
+    QCOMPARE(failedSpy.count(), 0);
+
+    const QVariantMap localFileObject = readySpy.takeFirst().at(0).toMap();
+    QCOMPARE(localFileObject.value(QStringLiteral("status")).toString(), QStringLiteral("ready"));
+    QCOMPARE(localFileObject.value(QStringLiteral("originalSource")).toString(),
+             QUrl::fromLocalFile(localImagePath).toString());
+    QCOMPARE(localFileObject.value(QStringLiteral("suggestedName")).toString(),
+             QStringLiteral("finder-image.png"));
+    const QUrl localFileCachedSource(localFileObject.value(QStringLiteral("source")).toString());
+    QVERIFY(localFileCachedSource.isLocalFile());
+    QVERIFY(QFile::remove(localImagePath));
+    QCOMPARE(QImage(localFileCachedSource.toLocalFile()).size(), sourceImage.size());
+
+    QTcpServer imageServer;
+    QVERIFY(imageServer.listen(QHostAddress::LocalHost));
+    connect(&imageServer, &QTcpServer::newConnection, &imageServer,
+            [&imageServer, encodedPng]()
+            {
+                while (QTcpSocket* socket = imageServer.nextPendingConnection())
+                {
+                    connect(
+                        socket, &QTcpSocket::readyRead, socket,
+                        [socket, encodedPng]()
+                        {
+                            socket->readAll();
+                            QByteArray response = QByteArrayLiteral(
+                                "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: ");
+                            response.append(QByteArray::number(encodedPng.size()));
+                            response.append(QByteArrayLiteral("\r\nConnection: close\r\n\r\n"));
+                            response.append(encodedPng);
+                            socket->write(response);
+                            socket->disconnectFromHost();
+                        });
+                }
+            });
+
+    const QUrl remoteImageUrl(
+        QStringLiteral("http://127.0.0.1:%1/site-image.png?token=secret#drag-fragment")
+            .arg(imageServer.serverPort()));
+    QUrl storedRemoteImageUrl = remoteImageUrl;
+    storedRemoteImageUrl.setQuery(QString());
+    storedRemoteImageUrl.setFragment(QString());
+    FakeDropEvent webImageDrop;
+    webImageDrop.m_x = 210;
+    webImageDrop.m_y = 160;
+    webImageDrop.m_html = QStringLiteral("<a href=\"https://example.test\"><img src=\"%1\"></a>")
+                              .arg(remoteImageUrl.toString());
+    QVERIFY(canvasItem.canImportDroppedImage(&webImageDrop));
+    canvasItem.importDroppedImage(&webImageDrop, 320, 240);
+    QTRY_COMPARE_WITH_TIMEOUT(readySpy.count(), 1, 5000);
+    QCOMPARE(failedSpy.count(), 0);
+
+    const QList<QVariant> webReadyArguments = readySpy.takeFirst();
+    const QVariantMap webObject = webReadyArguments.at(0).toMap();
+    QCOMPARE(webObject.value(QStringLiteral("status")).toString(), QStringLiteral("ready"));
+    QCOMPARE(webObject.value(QStringLiteral("originalSource")).toString(),
+             storedRemoteImageUrl.toString());
+    QCOMPARE(webObject.value(QStringLiteral("suggestedName")).toString(),
+             QStringLiteral("site-image.png"));
+    QCOMPARE(webReadyArguments.at(1).toReal(), webImageDrop.m_x);
+    QCOMPARE(webReadyArguments.at(2).toReal(), webImageDrop.m_y);
+    QCOMPARE(
+        QImage(QUrl(webObject.value(QStringLiteral("source")).toString()).toLocalFile()).size(),
+        sourceImage.size());
+
+    FakeDropEvent nonImageDrop;
+    nonImageDrop.m_text = QStringLiteral("plain text");
+    QVERIFY(!canvasItem.canImportDroppedImage(&nonImageDrop));
+
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject*>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+    QScopedPointer<QObject> surfaceObject(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(surfaceObject, qPrintable(qmlErrorsToString(component.errors())));
+    auto* rootItem = qobject_cast<QQuickItem*>(surfaceObject.data());
+    QVERIFY(rootItem);
+    QQuickWindow dropWindow;
+    dropWindow.resize(500, 360);
+    rootItem->setParentItem(dropWindow.contentItem());
+    dropWindow.show();
+    QTRY_VERIFY_WITH_TIMEOUT(dropWindow.isExposed(), nativeWindowExposureTimeoutMs);
+    DrawingSurfaceItem* qmlCanvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(qmlCanvasItem);
+    QTRY_VERIFY(qmlCanvasItem->width() > 100);
+    QTRY_VERIFY(qmlCanvasItem->height() > 100);
+
+    engine.rootContext()->setContextProperty(QStringLiteral("testDroppedImageObject"), webObject);
+    QSignalSpy insertedSpy(rootItem, SIGNAL(imageDropSucceeded()));
+    QSignalSpy insertionFailedSpy(rootItem, SIGNAL(imageDropFailed(QString)));
+    QQmlExpression insertAtDropPoint(
+        engine.rootContext(), surfaceObject.data(),
+        QStringLiteral("insertDroppedImageObject(testDroppedImageObject, 210, 160);"));
+    QCOMPARE(insertAtDropPoint.evaluate().toBool(), true);
+    QVERIFY2(!insertAtDropPoint.hasError(), qPrintable(insertAtDropPoint.error().toString()));
+    QCOMPARE(insertedSpy.count(), 1);
+    QCOMPARE(insertionFailedSpy.count(), 0);
+
+    const QVariantList drawableObjects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(drawableObjects.size(), 2);
+    const QVariantMap droppedObject = drawableObjects.constLast().toMap();
+    QCOMPARE(droppedObject.value(QStringLiteral("type")).toString(), QStringLiteral("image"));
+    QCOMPARE(droppedObject.value(QStringLiteral("name")).toString(),
+             QStringLiteral("site-image.png"));
+    QCOMPARE(droppedObject.value(QStringLiteral("originalSource")).toString(),
+             storedRemoteImageUrl.toString());
+    QCOMPARE(droppedObject.value(QStringLiteral("x")).toReal(), 210.0 - sourceImage.width() / 2.0);
+    QCOMPARE(droppedObject.value(QStringLiteral("y")).toReal(), 160.0 - sourceImage.height() / 2.0);
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(),
+             droppedObject.value(QStringLiteral("id")).toInt());
+
+    QTemporaryDir nativeDropDirectory;
+    QVERIFY(nativeDropDirectory.isValid());
+    QImage nativeDropImage(44, 28, QImage::Format_ARGB32_Premultiplied);
+    nativeDropImage.fill(QColor(QStringLiteral("#f4511e")));
+    const QString nativeDropPath =
+        nativeDropDirectory.filePath(QStringLiteral("native-finder-drop.png"));
+    QVERIFY(nativeDropImage.save(nativeDropPath, "PNG"));
+
+    QMimeData nativeDropMimeData;
+    nativeDropMimeData.setUrls({QUrl::fromLocalFile(nativeDropPath)});
+    const QPointF canvasDropPoint = qmlCanvasItem->mapToScene(
+        QPointF(qmlCanvasItem->width() * 0.7, qmlCanvasItem->height() * 0.6));
+    QDragEnterEvent dragEnterEvent(canvasDropPoint.toPoint(), Qt::CopyAction, &nativeDropMimeData,
+                                   Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(&dropWindow, &dragEnterEvent);
+    QVERIFY(dragEnterEvent.isAccepted());
+
+    QDropEvent dropEvent(canvasDropPoint, Qt::CopyAction, &nativeDropMimeData, Qt::LeftButton,
+                         Qt::NoModifier);
+    QCoreApplication::sendEvent(&dropWindow, &dropEvent);
+    QVERIFY(dropEvent.isAccepted());
+    QTRY_COMPARE(insertedSpy.count(), 2);
+    QCOMPARE(insertionFailedSpy.count(), 0);
+
+    const QVariantList objectsAfterNativeDrop = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objectsAfterNativeDrop.size(), 3);
+    const QVariantMap nativeDroppedObject = objectsAfterNativeDrop.constLast().toMap();
+    QCOMPARE(nativeDroppedObject.value(QStringLiteral("name")).toString(),
+             QStringLiteral("native-finder-drop.png"));
+    QCOMPARE(nativeDroppedObject.value(QStringLiteral("originalSource")).toString(),
+             QUrl::fromLocalFile(nativeDropPath).toString());
+
+    QMimeData nativeWebDropMimeData;
+    nativeWebDropMimeData.setHtml(webImageDrop.m_html);
+    const QPointF webCanvasDropPoint = qmlCanvasItem->mapToScene(
+        QPointF(qmlCanvasItem->width() * 0.35, qmlCanvasItem->height() * 0.4));
+    QDragEnterEvent webDragEnterEvent(webCanvasDropPoint.toPoint(), Qt::CopyAction,
+                                      &nativeWebDropMimeData, Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(&dropWindow, &webDragEnterEvent);
+    QVERIFY(webDragEnterEvent.isAccepted());
+
+    QDropEvent webDropEvent(webCanvasDropPoint, Qt::CopyAction, &nativeWebDropMimeData,
+                            Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(&dropWindow, &webDropEvent);
+    QVERIFY(webDropEvent.isAccepted());
+    QTRY_COMPARE_WITH_TIMEOUT(insertedSpy.count(), 3, 5000);
+    QCOMPARE(insertionFailedSpy.count(), 0);
+
+    const QVariantList objectsAfterWebDrop = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objectsAfterWebDrop.size(), 4);
+    const QVariantMap webDroppedObject = objectsAfterWebDrop.constLast().toMap();
+    QCOMPARE(webDroppedObject.value(QStringLiteral("name")).toString(),
+             QStringLiteral("site-image.png"));
+    QCOMPARE(webDroppedObject.value(QStringLiteral("originalSource")).toString(),
+             storedRemoteImageUrl.toString());
+
+    rootItem->setParentItem(nullptr);
+    dropWindow.hide();
 }
 
 void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
@@ -1320,10 +1801,12 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QVERIFY2(!handleTargetContract.hasError(), qPrintable(handleTargetContract.error().toString()));
     QCOMPARE(handleTargetContractResult.toString(), QStringLiteral("10,32,8,true,true"));
 
-    QQmlExpression moveObject(engine.rootContext(),
-                              object.data(),
-                              QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
-                                             "beginDrawableObjectTransform(20, 30); updateDrawableObjectTransform(40, 60); commitDrawableObjectTransform();"));
+    QQmlExpression moveObject(
+        engine.rootContext(), object.data(),
+        QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, "
+                       "height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "beginDrawableObjectTransform(20, 30); updateDrawableObjectTransform(40, "
+                       "60); commitDrawableObjectTransform();"));
     moveObject.evaluate();
     QVERIFY2(!moveObject.hasError(), qPrintable(moveObject.error().toString()));
 
@@ -1335,9 +1818,10 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QCOMPARE(movedObject.value(QStringLiteral("width")).toReal(), 30.0);
     QCOMPARE(movedObject.value(QStringLiteral("height")).toReal(), 28.0);
 
-    QQmlExpression resizeObject(engine.rootContext(),
-                                object.data(),
-                                QStringLiteral("beginDrawableObjectTransform(60, 78); updateDrawableObjectTransform(90, 100); commitDrawableObjectTransform();"));
+    QQmlExpression resizeObject(
+        engine.rootContext(), object.data(),
+        QStringLiteral("beginDrawableObjectTransform(60, 78); updateDrawableObjectTransform(90, "
+                       "100); commitDrawableObjectTransform();"));
     resizeObject.evaluate();
     QVERIFY2(!resizeObject.hasError(), qPrintable(resizeObject.error().toString()));
 
@@ -1349,9 +1833,10 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
     QCOMPARE(resizedObject.value(QStringLiteral("width")).toReal(), 60.0);
     QCOMPARE(resizedObject.value(QStringLiteral("height")).toReal(), 50.0);
 
-    QQmlExpression moveOutsideCanvas(engine.rootContext(),
-                                     object.data(),
-                                     QStringLiteral("beginDrawableObjectTransform(40, 60); updateDrawableObjectTransform(-90, -80); commitDrawableObjectTransform();"));
+    QQmlExpression moveOutsideCanvas(
+        engine.rootContext(), object.data(),
+        QStringLiteral("beginDrawableObjectTransform(40, 60); updateDrawableObjectTransform(-90, "
+                       "-80); commitDrawableObjectTransform();"));
     moveOutsideCanvas.evaluate();
     QVERIFY2(!moveOutsideCanvas.hasError(), qPrintable(moveOutsideCanvas.error().toString()));
 
@@ -1383,22 +1868,24 @@ void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()
             + resizedOutsideObject.value(QStringLiteral("height")).toReal()
             > canvasItem->height());
 
-    QQmlExpression forgivingHandleHitTargets(engine.rootContext(),
-                                             object.data(),
-                                             QStringLiteral("var objectX = testCanvasWidth + 200;"
-                                                            "var objectY = testCanvasHeight + 200;"
-                                                            "appendDrawableObject({ id: 3, type: \"shape\", x: objectX, y: objectY, width: 40, height: 30, shapeKind: \"rectangle\", color: \"#ef6c00\" });"
-                                                            "var cornerMode = drawableObjectHandleAt(objectX + 55, objectY + 45);"
-                                                            "beginDrawableObjectTransform(objectX + 55, objectY + 45);"
-                                                            "updateDrawableObjectTransform(objectX + 75, objectY + 65);"
-                                                            "commitDrawableObjectTransform();"
-                                                            "var afterCorner = selectedDrawableObject();"
-                                                            "var edgeMode = drawableObjectHandleAt(objectX + 30, objectY - 15);"
-                                                            "beginDrawableObjectTransform(objectX + 30, objectY - 15);"
-                                                            "updateDrawableObjectTransform(objectX + 30, objectY - 25);"
-                                                            "commitDrawableObjectTransform();"
-                                                            "var afterEdge = selectedDrawableObject();"
-                                                            "[cornerMode, edgeMode, afterCorner.width, afterCorner.height, afterEdge.y === objectY - 10, afterEdge.height].join(\",\");"));
+    QQmlExpression forgivingHandleHitTargets(
+        engine.rootContext(), object.data(),
+        QStringLiteral("var objectX = testCanvasWidth + 200;"
+                       "var objectY = testCanvasHeight + 200;"
+                       "appendDrawableObject({ id: 3, type: \"shape\", x: objectX, y: objectY, "
+                       "width: 40, height: 30, shapeKind: \"rectangle\", color: \"#ef6c00\" });"
+                       "var cornerMode = drawableObjectHandleAt(objectX + 55, objectY + 45);"
+                       "beginDrawableObjectTransform(objectX + 55, objectY + 45);"
+                       "updateDrawableObjectTransform(objectX + 75, objectY + 65);"
+                       "commitDrawableObjectTransform();"
+                       "var afterCorner = selectedDrawableObject();"
+                       "var edgeMode = drawableObjectHandleAt(objectX + 30, objectY - 15);"
+                       "beginDrawableObjectTransform(objectX + 30, objectY - 15);"
+                       "updateDrawableObjectTransform(objectX + 30, objectY - 25);"
+                       "commitDrawableObjectTransform();"
+                       "var afterEdge = selectedDrawableObject();"
+                       "[cornerMode, edgeMode, afterCorner.width, afterCorner.height, afterEdge.y "
+                       "=== objectY - 10, afterEdge.height].join(\",\");"));
     const QVariant forgivingHandleHitTargetsResult = forgivingHandleHitTargets.evaluate();
     QVERIFY2(!forgivingHandleHitTargets.hasError(), qPrintable(forgivingHandleHitTargets.error().toString()));
     QCOMPARE(forgivingHandleHitTargetsResult.toString(), QStringLiteral("resize-se,resize-n,60,50,true,60"));
@@ -1432,15 +1919,16 @@ void tst_DrawingSurfaceItem::constrainsDrawableObjectTransformWithShiftModifier(
     auto *rootItem = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(rootItem);
 
-    QQmlExpression constrainedMove(engine.rootContext(),
-                                   object.data(),
-                                   QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 40, height: 20, shapeKind: \"rectangle\", color: \"#1976d2\" });"
-                                                  "beginDrawableObjectTransform(20, 30);"
-                                                  "updateDrawableObjectTransform(80, 50, true);"
-                                                  "commitDrawableObjectTransform();"
-                                                  "beginDrawableObjectTransform(80, 30);"
-                                                  "updateDrawableObjectTransform(90, 120, true);"
-                                                  "commitDrawableObjectTransform();"));
+    QQmlExpression constrainedMove(
+        engine.rootContext(), object.data(),
+        QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 40, "
+                       "height: 20, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "beginDrawableObjectTransform(20, 30);"
+                       "updateDrawableObjectTransform(80, 50, true);"
+                       "commitDrawableObjectTransform();"
+                       "beginDrawableObjectTransform(80, 30);"
+                       "updateDrawableObjectTransform(90, 120, true);"
+                       "commitDrawableObjectTransform();"));
     constrainedMove.evaluate();
     QVERIFY2(!constrainedMove.hasError(), qPrintable(constrainedMove.error().toString()));
 
@@ -1511,11 +1999,13 @@ void tst_DrawingSurfaceItem::deletesSelectedDrawableObject()
     auto *rootItem = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(rootItem);
 
-    QQmlExpression deleteObject(engine.rootContext(),
-                                object.data(),
-                                QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
-                                               "appendDrawableObject({ id: 3, type: \"text\", x: 40, y: 50, width: 120, height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"
-                                               "deleteSelectedDrawableObject();"));
+    QQmlExpression deleteObject(
+        engine.rootContext(), object.data(),
+        QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, "
+                       "height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "appendDrawableObject({ id: 3, type: \"text\", x: 40, y: 50, width: 120, "
+                       "height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"
+                       "deleteSelectedDrawableObject();"));
     const QVariant deleteResult = deleteObject.evaluate();
     QVERIFY2(!deleteObject.hasError(), qPrintable(deleteObject.error().toString()));
     QCOMPARE(deleteResult.toBool(), true);
@@ -2180,10 +2670,12 @@ void tst_DrawingSurfaceItem::layersExposeHierarchyRowsAndReorderDrawableObjects(
     auto *rootItem = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(rootItem);
 
-    QQmlExpression appendObjects(engine.rootContext(),
-                                 object.data(),
-                                 QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
-                                                "appendDrawableObject({ id: 3, type: \"text\", x: 40, y: 50, width: 120, height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"));
+    QQmlExpression appendObjects(
+        engine.rootContext(), object.data(),
+        QStringLiteral("appendDrawableObject({ id: 2, type: \"shape\", x: 10, y: 20, width: 30, "
+                       "height: 28, shapeKind: \"rectangle\", color: \"#1976d2\" });"
+                       "appendDrawableObject({ id: 3, type: \"text\", x: 40, y: 50, width: 120, "
+                       "height: 32, text: \"Label\", fontPixelSize: 18, color: \"#111111\" });"));
     appendObjects.evaluate();
     QVERIFY2(!appendObjects.hasError(), qPrintable(appendObjects.error().toString()));
 

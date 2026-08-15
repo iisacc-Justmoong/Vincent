@@ -23,6 +23,7 @@ LV.ApplicationWindow {
 
     property var canvasPage: null
     property bool canvasIncubationRequested: false
+    property string clipboardPasteFailureMessage: ""
     readonly property bool licenseGranted: VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
     readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
@@ -103,8 +104,42 @@ LV.ApplicationWindow {
 
     function requestPasteImage() {
         if (window.canvasPage) {
-            window.canvasPage.pasteClipboardImage();
+            const pasted = window.canvasPage.pasteClipboardImage();
+            if (pasted) {
+                window.clipboardPasteFailureMessage = "";
+                clipboardPasteFailureTimer.stop();
+            }
+            return pasted;
         }
+        return false;
+    }
+
+    function clipboardPasteFailureText(errorCode) {
+        switch (String(errorCode || "")) {
+        case "clipboard-unavailable":
+            return qsTr("The system clipboard is unavailable.");
+        case "canvas-unavailable":
+            return qsTr("The canvas is still loading. Try pasting again in a moment.");
+        case "no-image":
+            return qsTr("Copy an image or a local image file, then paste again.");
+        case "decode-failed":
+            return qsTr("Vincent could not read the image. Try another image or copy it and paste again.");
+        case "image-too-large":
+            return qsTr("The image is too large. Use an image up to 32,768 pixels per side and 64 megapixels.");
+        case "cache-write-failed":
+            return qsTr("Vincent could not store the image. Check available disk space and cache-folder permissions.");
+        case "download-failed":
+            return qsTr("Vincent could not download the dropped web image. Check the connection, or save the image locally and drop it again.");
+        case "download-too-large":
+            return qsTr("The dropped web image download exceeds the 64 MB safety limit. Save or resize it locally, then drop it again.");
+        default:
+            return qsTr("Vincent could not paste the clipboard image.");
+        }
+    }
+
+    function showClipboardPasteFailure(errorCode) {
+        window.clipboardPasteFailureMessage = window.clipboardPasteFailureText(errorCode);
+        clipboardPasteFailureTimer.restart();
     }
 
     function requestAddLayer() {
@@ -861,6 +896,12 @@ LV.ApplicationWindow {
             id: painterPage
             topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
             onPageReady: window.canvasPage = painterPage
+            onClipboardImagePasteFailed: errorCode => window.showClipboardPasteFailure(errorCode)
+            onImageDropSucceeded: {
+                window.clipboardPasteFailureMessage = "";
+                clipboardPasteFailureTimer.stop();
+            }
+            onImageDropFailed: errorCode => window.showClipboardPasteFailure(errorCode)
         }
     }
 
@@ -879,6 +920,28 @@ LV.ApplicationWindow {
         visible: window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
         title: qsTr("Vincent could not remember this license")
         subtitle: qsTr("The canvas is unlocked for this session. Enter the license again the next time Vincent starts.")
+    }
+
+    LV.AppCard {
+        id: clipboardPasteFailureCard
+        objectName: "clipboardPasteFailureCard"
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: LV.Theme.gap24
+        width: Math.min(620, Math.max(320, parent.width - LV.Theme.gap24 * 2))
+        z: 1100
+        visible: window.clipboardPasteFailureMessage.length > 0
+        title: qsTr("Image not pasted")
+        subtitle: window.clipboardPasteFailureMessage
+        Accessible.name: title + ": " + subtitle
+        Accessible.role: Accessible.AlertMessage
+    }
+
+    Timer {
+        id: clipboardPasteFailureTimer
+        interval: 5000
+        repeat: false
+        onTriggered: window.clipboardPasteFailureMessage = ""
     }
 
     LV.Label {

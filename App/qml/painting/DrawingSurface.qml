@@ -32,6 +32,7 @@ Rectangle {
     property string toolMode: "brush"
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
+    property string clipboardImagePasteErrorCode: ""
     property bool spacePanActive: false
     property bool textEditingActive: false
     property bool toolShortcutsEnabled: true
@@ -82,7 +83,9 @@ Rectangle {
     readonly property int drawableObjectMinimumDimension: 8
     readonly property int drawableObjectHandleSize: 10
     readonly property int drawableObjectHandleHitSize: 32
-    readonly property real clipboardImageMaximumCanvasRatio: 0.8
+    readonly property real imageInsertionMaximumCanvasRatio: 0.8
+    readonly property int imageInsertionDuplicateOffset: 16
+    readonly property bool imageDropActive: canvasImageDropArea.containsDrag
     readonly property real defaultCanvasZoomScale: 1
     readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
@@ -167,6 +170,8 @@ Rectangle {
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
+    signal imageDropSucceeded
+    signal imageDropFailed(string errorCode)
 
     onSelectedDrawableObjectIdChanged: {
         surface.drawableObjectHoverHandleMode = "";
@@ -273,39 +278,101 @@ Rectangle {
         return true;
     }
 
-    function pasteClipboardImage() {
-        if (!canvasItemReady) {
+    function imageInsertionPlacement(sourceValue, objectWidth, objectHeight, requestedCenterX, requestedCenterY) {
+        let duplicateCount = 0;
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const drawableObject = surface.drawableObjects[index];
+            if (drawableObject && drawableObject.type === "image" && String(drawableObject.source || "") === sourceValue) {
+                duplicateCount++;
+            }
+        }
+
+        const offsetRing = Math.ceil(duplicateCount / 2);
+        const offsetDirection = duplicateCount % 2 === 0 ? -1 : 1;
+        const offset = duplicateCount === 0 ? 0 : offsetRing * surface.imageInsertionDuplicateOffset * offsetDirection;
+        const hasRequestedCenter = isFinite(requestedCenterX) && isFinite(requestedCenterY);
+        const centerX = hasRequestedCenter ? Number(requestedCenterX) : canvasSurface.width / 2;
+        const centerY = hasRequestedCenter ? Number(requestedCenterY) : canvasSurface.height / 2;
+        const centeredX = centerX - objectWidth / 2;
+        const centeredY = centerY - objectHeight / 2;
+        return {
+            x: Math.max(0, Math.min(canvasSurface.width - objectWidth, centeredX + offset)),
+            y: Math.max(0, Math.min(canvasSurface.height - objectHeight, centeredY + offset))
+        };
+    }
+
+    function clipboardImagePlacement(sourceValue, objectWidth, objectHeight) {
+        return imageInsertionPlacement(sourceValue, objectWidth, objectHeight, NaN, NaN);
+    }
+
+    function insertImageObject(imageObject, requestedCenterX, requestedCenterY, fallbackName) {
+        const status = imageObject ? String(imageObject.status || "decode-failed") : "decode-failed";
+        if (status !== "ready") {
             return false;
         }
 
-        const maximumObjectWidth = Math.max(1, canvasSurface.width * surface.clipboardImageMaximumCanvasRatio);
-        const maximumObjectHeight = Math.max(1, canvasSurface.height * surface.clipboardImageMaximumCanvasRatio);
-        const clipboardObject = canvasSurface.clipboardImageObject(maximumObjectWidth, maximumObjectHeight);
-        if (!clipboardObject || !clipboardObject.source) {
+        const source = String(imageObject.source || "");
+        const objectWidth = Number(imageObject.width);
+        const objectHeight = Number(imageObject.height);
+        const originalWidth = Number(imageObject.originalWidth || objectWidth);
+        const originalHeight = Number(imageObject.originalHeight || objectHeight);
+        if (source.length === 0 || !isFinite(objectWidth) || objectWidth <= 0 || !isFinite(objectHeight) || objectHeight <= 0 || !isFinite(originalWidth) || originalWidth <= 0 || !isFinite(originalHeight) || originalHeight <= 0) {
             return false;
         }
 
+        const placement = imageInsertionPlacement(source, objectWidth, objectHeight, requestedCenterX, requestedCenterY);
         commitActiveText();
         cancelActiveShape();
         resetDrawableObjectTransform();
 
-        const objectWidth = Math.max(1, Number(clipboardObject.width || 1));
-        const objectHeight = Math.max(1, Number(clipboardObject.height || 1));
-        const pastedObject = {
+        const insertedObject = {
             id: surface.nextDrawableObjectId++,
             type: "image",
-            name: qsTr("Pasted Image"),
-            source: clipboardObject.source,
-            x: (canvasSurface.width - objectWidth) / 2,
-            y: (canvasSurface.height - objectHeight) / 2,
+            name: String(imageObject.suggestedName || fallbackName),
+            source: source,
+            originalSource: String(imageObject.originalSource || ""),
+            x: placement.x,
+            y: placement.y,
             width: objectWidth,
             height: objectHeight,
-            originalWidth: Math.max(1, Number(clipboardObject.originalWidth || objectWidth)),
-            originalHeight: Math.max(1, Number(clipboardObject.originalHeight || objectHeight)),
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
             opacity: 1,
             visible: true
         };
-        appendDrawableObject(pastedObject);
+        appendDrawableObject(insertedObject);
+        return true;
+    }
+
+    function pasteClipboardImage() {
+        surface.clipboardImagePasteErrorCode = "";
+        if (!canvasItemReady) {
+            surface.clipboardImagePasteErrorCode = "canvas-unavailable";
+            return false;
+        }
+
+        const maximumObjectWidth = Math.max(1, canvasSurface.width * surface.imageInsertionMaximumCanvasRatio);
+        const maximumObjectHeight = Math.max(1, canvasSurface.height * surface.imageInsertionMaximumCanvasRatio);
+        const clipboardObject = canvasSurface.clipboardImageObject(maximumObjectWidth, maximumObjectHeight);
+        const clipboardStatus = clipboardObject ? String(clipboardObject.status || "decode-failed") : "decode-failed";
+        if (clipboardStatus !== "ready") {
+            surface.clipboardImagePasteErrorCode = clipboardStatus;
+            return false;
+        }
+
+        if (!insertImageObject(clipboardObject, NaN, NaN, qsTr("Pasted Image"))) {
+            surface.clipboardImagePasteErrorCode = "decode-failed";
+            return false;
+        }
+        return true;
+    }
+
+    function insertDroppedImageObject(imageObject, dropX, dropY) {
+        if (!insertImageObject(imageObject, dropX, dropY, qsTr("Dropped Image"))) {
+            surface.imageDropFailed("decode-failed");
+            return false;
+        }
+        surface.imageDropSucceeded();
         return true;
     }
 
@@ -1951,8 +2018,8 @@ Rectangle {
             transformOrigin: Item.Center
             scale: surface.canvasZoomScale
             color: surface.backgroundLayerPresent ? surface.canvasColor : "transparent"
-            border.color: "#b8bcc4"
-            border.width: canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0
+            border.color: surface.imageDropActive ? surface.textToolAccentColor : "#b8bcc4"
+            border.width: surface.imageDropActive ? 2 : (canvasPaper.width < surface.width || canvasPaper.height < surface.height ? 1 : 0)
 
             Image {
                 objectName: "transparencyGridBackground"
@@ -2002,6 +2069,33 @@ Rectangle {
             }
 
             onRasterContentChanged: surface.requestBackgroundLayerThumbnailRefresh()
+            onDroppedImageReady: (imageObject, dropX, dropY) => surface.insertDroppedImageObject(imageObject, dropX, dropY)
+            onDroppedImageFailed: errorCode => surface.imageDropFailed(errorCode)
+
+            DropArea {
+                id: canvasImageDropArea
+                objectName: "canvasImageDropArea"
+                parent: canvasSurface
+                anchors.fill: parent
+                z: 20
+
+                onEntered: function (drag) {
+                    const accepted = canvasSurface.canImportDroppedImage(drag);
+                    drag.accepted = accepted;
+                    if (accepted) {
+                        drag.acceptProposedAction();
+                    }
+                }
+
+                onDropped: function (drop) {
+                    if (!canvasSurface.canImportDroppedImage(drop)) {
+                        drop.accepted = false;
+                        return;
+                    }
+                    canvasSurface.importDroppedImage(drop, Math.max(1, canvasSurface.width * surface.imageInsertionMaximumCanvasRatio), Math.max(1, canvasSurface.height * surface.imageInsertionMaximumCanvasRatio));
+                    drop.acceptProposedAction();
+                }
+            }
         }
 
         Timer {
