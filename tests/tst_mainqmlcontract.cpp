@@ -18,7 +18,76 @@ private slots:
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
     void applicationActionsAreTheOnlyOwnersOfPortableShortcuts();
+    void manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque();
 };
+
+void tst_MainQmlContract::manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString updateManagerPath =
+        QFINDTESTDATA("../App/models/update/vincentupdatemanager.cpp");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!updateManagerPath.isEmpty(), "Vincent update manager test data was not found");
+
+    QFile mainQml(mainQmlPath);
+    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+    QFile updateManager(updateManagerPath);
+    QVERIFY(updateManager.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString updateManagerSource = QString::fromUtf8(updateManager.readAll());
+
+    QVERIFY(mainSource.contains(QStringLiteral("Check for Updates…")));
+    QVERIFY(mainSource.contains(QStringLiteral("LV.Modal")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.checkForUpdates()")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.updateNow()")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.cancelUpdate()")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.progress")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("enabled: VincentUpdateManager.selfUpdateSupported")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: VincentUpdateManager.selfUpdateSupported")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("GetCurrentPackageFullName")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("APPMODEL_ERROR_NO_PACKAGE")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("_MASReceipt/receipt")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("IISACCDistributionChannel")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("Vincent will not quit automatically")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("platform safety policy")));
+    QVERIFY(!updateManagerSource.contains(QStringLiteral("platform signature")));
+    QVERIFY(updateManagerSource.contains(
+        QStringLiteral("case UpdateManager::UpdateError::DownloadInvalidResponse:")));
+    const qsizetype canCancelStart = updateManagerSource.indexOf(
+        QStringLiteral("bool VincentUpdateManager::canCancel() const noexcept"));
+    const qsizetype canCancelEnd = updateManagerSource.indexOf(
+        QStringLiteral("bool VincentUpdateManager::checkForUpdates()"), canCancelStart);
+    QVERIFY(canCancelStart >= 0);
+    QVERIFY(canCancelEnd > canCancelStart);
+    const QString canCancelBlock = updateManagerSource.mid(
+        canCancelStart, canCancelEnd - canCancelStart);
+    QVERIFY(canCancelBlock.contains(QStringLiteral("State::Authorizing")));
+    QVERIFY(canCancelBlock.contains(QStringLiteral("State::Downloading")));
+    QVERIFY(canCancelBlock.contains(QStringLiteral("State::Verifying")));
+    QVERIFY(canCancelBlock.contains(QStringLiteral("State::LaunchingInstaller")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("dismissOnBackground: !VincentUpdateManager.busy")));
+
+    QVERIFY(!mainSource.contains(QStringLiteral("licenseKey")));
+    QVERIFY(!mainSource.contains(QStringLiteral("signedUrl")));
+    QVERIFY(!mainSource.contains(QStringLiteral("artifactPath")));
+    QVERIFY(!mainSource.contains(QStringLiteral("onUpdateAvailable:")));
+    QVERIFY(!mainSource.contains(QStringLiteral("onInstallerLaunched: Qt.quit")));
+
+    const qsizetype startupStart = mainSource.indexOf(QStringLiteral("Component.onCompleted:"));
+    const qsizetype startupEnd = mainSource.indexOf(QStringLiteral("\n    function "), startupStart);
+    QVERIFY(startupStart >= 0);
+    QVERIFY(startupEnd > startupStart);
+    const QString startupBlock = mainSource.mid(startupStart, startupEnd - startupStart);
+    QVERIFY(!startupBlock.contains(QStringLiteral("VincentUpdateManager")));
+}
 
 void tst_MainQmlContract::applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome()
 {
@@ -192,6 +261,7 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.openSaveDialog();")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.undoActiveRasterSurface();")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.redoActiveRasterSurface();")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.pasteClipboardImage();")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.addLayer();")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.deleteCurrentLayer();")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.setToolMode(toolMode);")));
@@ -206,6 +276,7 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Clear Canvas\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Undo\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Redo\")")));
+    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Paste Image\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Add Layer\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Delete Current Layer\")")));
     QVERIFY(mainSource.contains(QStringLiteral("title: qsTr(\"Tools\")")));
@@ -266,6 +337,7 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
             QStringLiteral("shortcutQuit|quitAction"),
             QStringLiteral("shortcutUndo|undoAction"),
             QStringLiteral("shortcutRedo|redoAction"),
+            QStringLiteral("shortcutPasteImage|pasteImageAction"),
             QStringLiteral("shortcutAddLayer|addLayerAction"),
             QStringLiteral("shortcutDeleteCurrentLayer|deleteCurrentLayerAction"),
             QStringLiteral("shortcutBrushTool|brushToolAction"),

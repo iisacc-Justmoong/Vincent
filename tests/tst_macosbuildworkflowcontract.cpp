@@ -119,6 +119,8 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
     QVERIFY(source.contains(QStringLiteral("set(USE_CREDENTIAL_STORE ON)")));
     QVERIFY(source.contains(QStringLiteral("target_link_libraries(Vincent PRIVATE qt6keychain)")));
     QVERIFY(source.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources/legal/QtKeychain\"")));
+    QVERIFY(source.contains(QStringLiteral("find_package(iiUpdateManager 0.2 CONFIG REQUIRED)")));
+    QVERIFY(source.contains(QStringLiteral("iiUpdateManager::iiUpdateManager")));
 }
 
 void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()
@@ -172,6 +174,7 @@ void tst_MacOSBuildWorkflowContract::buildGuideSeparatesLocalAndDistributionSign
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-appstore.pkg")));
     QVERIFY(source.contains(QStringLiteral("App Store Connect record")));
     QVERIFY(source.contains(QStringLiteral("cmp resources/Appicon.icns")));
+    QVERIFY(source.contains(QStringLiteral("Distribution `product`")));
 }
 
 void tst_MacOSBuildWorkflowContract::platformAppIconsAreBundledFromResources()
@@ -247,6 +250,15 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     QVERIFY(source.contains(QStringLiteral("if [[ \"$MACDEPLOYQT_NO_STRIP\" == \"1\" ]]; then cmd+=(\"-no-strip\"); fi")));
     QVERIFY(source.contains(QStringLiteral("need_cmd /usr/bin/otool")));
     QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links()")));
+    QVERIFY(source.contains(QStringLiteral("assert_update_manager_runtime()")));
+    QVERIFY(source.contains(QStringLiteral("libiiUpdateManager*.dylib")));
+    QVERIFY(source.contains(QStringLiteral("assert_update_manager_runtime \"$out_app\"")));
+    QVERIFY(source.contains(QStringLiteral("package payload is missing the iiUpdateManager runtime")));
+    QVERIFY(source.contains(QStringLiteral("IISACCDistributionChannel")));
+    QVERIFY(source.contains(QStringLiteral("distribution_channel=\"direct\"")));
+    QVERIFY(source.contains(QStringLiteral("distribution_channel=\"appstore\"")));
+    QVERIFY(source.contains(QStringLiteral("verify_pkg_distribution \"$out_pkg\" \"$pkg_id\" \"pkg-ref\"")));
+    QVERIFY(source.contains(QStringLiteral("verify_pkg_distribution \"$out_pkg\" \"$pkg_id\" \"product\"")));
     QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -L \"$binary\"")));
     QVERIFY(source.contains(QStringLiteral("/usr/bin/otool -D \"$binary\"")));
     QVERIFY(source.contains(QStringLiteral("sed -nE 's/^[[:space:]]+([^[:space:]]+).*/\\1/p'")));
@@ -285,6 +297,14 @@ void tst_MacOSBuildWorkflowContract::buildScriptRunsLocalModeWithEmptyOptionalAr
     QDir temp(tempDir.path());
     QVERIFY(temp.mkpath(QStringLiteral("bin")));
     QVERIFY(temp.mkpath(QStringLiteral("App/qml")));
+    const QString updateManagerPrefix = temp.filePath(QStringLiteral("iiUpdateManager"));
+    QVERIFY(temp.mkpath(QStringLiteral("iiUpdateManager/lib/cmake/iiUpdateManager")));
+    QFile updateManagerConfig(
+        temp.filePath(QStringLiteral(
+            "iiUpdateManager/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake")));
+    QVERIFY(updateManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(updateManagerConfig.write("# fake installed dependency\n") > 0);
+    updateManagerConfig.close();
 
     const QString buildScriptPath = temp.filePath(QStringLiteral("build.sh"));
     QVERIFY(QFile::copy(sourceBuildScriptPath, buildScriptPath));
@@ -395,14 +415,19 @@ case "${1:-}" in
     --payload-files)
         printf './Vincent.app/Contents/MacOS/Vincent\n'
         printf './Vincent.app/Contents/Resources/Appicon.icns\n'
+        printf './Vincent.app/Contents/Frameworks/libiiUpdateManager.0.dylib\n'
         ;;
     --expand)
         mkdir -p "${3:-}"
-        cat > "${3:-}/Distribution" <<'DISTRIBUTION'
+        case "${2:-}" in
+            *appstore*) product_id="com.iisacc.vincent.painter" ;;
+            *) product_id="com.iisacc.app.vincent.pkg" ;;
+        esac
+        cat > "${3:-}/Distribution" <<DISTRIBUTION
 <installer-gui-script minSpecVersion="2" hostArchitectures="arm64">
 <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
 <bundle path="Vincent.app" CFBundleShortVersionString="4.0.5" CFBundleVersion="4.0.5"/>
-<pkg-ref id="com.iisacc.app.vincent.pkg" version="4.0.5"/>
+<product id="$product_id" version="4.0.5"/>
 <pkg-ref id="com.iisacc.vincent.painter" version="4.0.5"/>
 </installer-gui-script>
 DISTRIBUTION
@@ -420,6 +445,7 @@ esac
     environment.insert(QStringLiteral("PATH"), binDir + QStringLiteral(":") + environment.value(QStringLiteral("PATH")));
     environment.insert(QStringLiteral("RUN_TESTS"), QStringLiteral("0"));
     environment.insert(QStringLiteral("VINCENT_BUILD_MODE"), QStringLiteral("local"));
+    environment.insert(QStringLiteral("IIUPDATEMANAGER_PREFIX"), updateManagerPrefix);
     process.setProcessEnvironment(environment);
     process.setWorkingDirectory(tempDir.path());
     process.start(QStringLiteral("/bin/bash"), QStringList{QStringLiteral("./build.sh")});
@@ -438,6 +464,11 @@ esac
     QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore-local-unsigned.pkg"))), qPrintable(output));
     QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
     QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
+    QFile stagedInfoPlist(temp.filePath(QStringLiteral("dist/Vincent.app/Contents/Info.plist")));
+    QVERIFY(stagedInfoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString stagedInfoSource = QString::fromUtf8(stagedInfoPlist.readAll());
+    QVERIFY(stagedInfoSource.contains(QStringLiteral("IISACCDistributionChannel")));
+    QVERIFY(stagedInfoSource.contains(QStringLiteral("<string>direct</string>")));
 #endif
 }
 
@@ -455,6 +486,14 @@ void tst_MacOSBuildWorkflowContract::buildScriptFailsClosedOnMissingNotaryProfil
     QDir temp(tempDir.path());
     QVERIFY(temp.mkpath(QStringLiteral("bin")));
     QVERIFY(temp.mkpath(QStringLiteral("App/qml")));
+    const QString updateManagerPrefix = temp.filePath(QStringLiteral("iiUpdateManager"));
+    QVERIFY(temp.mkpath(QStringLiteral("iiUpdateManager/lib/cmake/iiUpdateManager")));
+    QFile updateManagerConfig(
+        temp.filePath(QStringLiteral(
+            "iiUpdateManager/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake")));
+    QVERIFY(updateManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(updateManagerConfig.write("# fake installed dependency\n") > 0);
+    updateManagerConfig.close();
 
     const QString buildScriptPath = temp.filePath(QStringLiteral("build.sh"));
     QVERIFY(QFile::copy(sourceBuildScriptPath, buildScriptPath));
@@ -527,6 +566,7 @@ exit 1
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("PATH"), binDir + QStringLiteral(":") + environment.value(QStringLiteral("PATH")));
     environment.insert(QStringLiteral("RUN_TESTS"), QStringLiteral("0"));
+    environment.insert(QStringLiteral("IIUPDATEMANAGER_PREFIX"), updateManagerPrefix);
     environment.remove(QStringLiteral("VINCENT_BUILD_MODE"));
     environment.remove(QStringLiteral("NOTARY_APP_PASSWORD"));
     process.setProcessEnvironment(environment);

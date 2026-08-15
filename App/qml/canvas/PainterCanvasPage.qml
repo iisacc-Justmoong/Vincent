@@ -116,6 +116,15 @@ Item {
         drawingSurface.openRaster(fileUrl);
     }
 
+    function pasteClipboardImage() {
+        const pasted = drawingSurface.pasteClipboardImage();
+        if (pasted) {
+            painterPage.setToolMode("move");
+            Qt.callLater(painterPage.syncLayerHierarchySelection);
+        }
+        return pasted;
+    }
+
     function openNewCanvasDialog() {
         canvasToolBar.openNewCanvasDialog();
     }

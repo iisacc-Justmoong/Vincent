@@ -29,6 +29,7 @@ Environment:
   VINCENT_BUILD_MODE may be used instead of the positional mode.
   CLEAN_BUILD_DIR=1 or --clean discards build/ before configuring.
   RUN_TESTS=0 skips ctest.
+  IIUPDATEMANAGER_PREFIX selects the installed iiUpdateManager 0.2 prefix.
 USAGE
 }
 
@@ -196,6 +197,10 @@ verify_pkg_icon_payload() {
   if [[ "$legacy_icon" != "$expected_icon" ]] && grep -Fx "$legacy_icon" "$payload_list" >/dev/null; then
     die "package payload still contains legacy app icon: $legacy_icon"
   fi
+
+  grep -E "^\\./${app_bundle}/Contents/Frameworks/libiiUpdateManager([.][^/]*)?[.]dylib$" \
+    "$payload_list" >/dev/null \
+    || die "package payload is missing the iiUpdateManager runtime"
 }
 
 to_lower() {
@@ -244,6 +249,8 @@ CMAKE_PRESET=""               # 사용 시 preset의 binaryDir가 BUILD_DIR와 �
 CMAKE_GENERATOR="Ninja"       # Qt Quick + CMake + Ninja 전제
 declare -a CMAKE_EXTRA_ARGS
 CMAKE_EXTRA_ARGS=()
+IIUPDATEMANAGER_PREFIX="${IIUPDATEMANAGER_PREFIX:-${HOME}/.local/iiUpdateManager}"
+CMAKE_EXTRA_ARGS+=("-DiiUpdateManager_DIR=${IIUPDATEMANAGER_PREFIX}/lib/cmake/iiUpdateManager")
 # 빌드 병렬도(빈 값이면 cmake 기본 동작)
 CMAKE_BUILD_PARALLEL=""       # 예: "12"
 
@@ -253,7 +260,7 @@ QML_DIR="./App/qml"               # Qt Quick 프로젝트의 QML 루트(필수�
 MACDEPLOYQT_VERBOSE="2"       # 0-3
 MACDEPLOYQT_NO_STRIP="${MACDEPLOYQT_NO_STRIP:-}"
 MACDEPLOYQT_ALWAYS_OVERWRITE="1" # 1이면 -always-overwrite
-MACDEPLOYQT_LIBPATH=""        # 서드파티 dylib 탐색 경로가 필요하면 지정
+MACDEPLOYQT_LIBPATH="${MACDEPLOYQT_LIBPATH:-${IIUPDATEMANAGER_PREFIX}/lib}"
 # macdeployqt 추가 옵션이 필요하면 아래 배열에 추가한다.
 MACDEPLOYQT_EXTRA_ARGS=(
   # "-codesign="
@@ -407,6 +414,8 @@ fi
 # =============================================================================
 
 require_dir "$CMAKE_SOURCE_DIR"
+require_file "${IIUPDATEMANAGER_PREFIX}/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake"
+require_dir "${IIUPDATEMANAGER_PREFIX}/lib"
 run mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
 [[ "$INSTALL_DIR" == /* ]] || die "INSTALL_DIR must be an absolute path, got: $INSTALL_DIR"
@@ -654,6 +663,29 @@ assert_portable_macho_links() {
   fi
 }
 
+assert_update_manager_runtime() {
+  local app="$1"
+  local executable="${app}/Contents/MacOS/${APP_NAME}"
+  require_nonempty_file "$executable"
+
+  # Contract tests use a shell-script stand-in; deployed Vincent binaries are Mach-O.
+  if ! /usr/bin/file -b "$executable" 2>/dev/null | grep -q 'Mach-O'; then
+    return 0
+  fi
+
+  /usr/bin/otool -L "$executable" \
+    | sed -nE 's#^[[:space:]]+(@rpath/libiiUpdateManager[^[:space:]]*[.]dylib).*#\1#p' \
+    | grep -q . \
+    || die "Vincent does not link the iiUpdateManager runtime"
+
+  local runtime
+  runtime="$(find "${app}/Contents/Frameworks" -maxdepth 1 \
+    \( -type f -o -type l \) -name 'libiiUpdateManager*.dylib' -print -quit 2>/dev/null || true)"
+  require_nonempty_file "$runtime"
+  /usr/bin/file -b "$runtime" | grep -q 'Mach-O' \
+    || die "bundled iiUpdateManager runtime is not a Mach-O library: $runtime"
+}
+
 assert_macos_deployment_targets() {
   local app="$1"
   local violations="${WORKDIR}/macho_deployment_target_violations_$(basename "$app")_$$.txt"
@@ -717,7 +749,7 @@ assert_macos_architectures() {
 
     local relative_path="${binary#${app}/Contents/}"
     case "$relative_path" in
-      "MacOS/${APP_NAME}"|Frameworks/libLVRS.dylib|Frameworks/libiiPaintEngine.dylib)
+      "MacOS/${APP_NAME}"|Frameworks/libLVRS.dylib|Frameworks/libiiPaintEngine.dylib|Frameworks/libiiUpdateManager*.dylib)
         if [[ "$architectures" != "$VINCENT_MACOS_ARCHITECTURE" ]]; then
           printf '%s: Vincent-owned Mach-O architectures %s must be exactly %s\n' \
             "$binary" "$architectures" "$VINCENT_MACOS_ARCHITECTURE" >> "$violations"
@@ -732,6 +764,20 @@ assert_macos_architectures() {
   fi
 }
 
+set_distribution_channel() {
+  local app="$1"
+  local distribution_channel="$2"
+  local info_plist="${app}/Contents/Info.plist"
+
+  require_file "$info_plist"
+  if /usr/bin/plutil -extract IISACCDistributionChannel raw "$info_plist" >/dev/null 2>&1; then
+    run /usr/bin/plutil -replace IISACCDistributionChannel -string "$distribution_channel" "$info_plist"
+  else
+    run /usr/bin/plutil -insert IISACCDistributionChannel -string "$distribution_channel" "$info_plist"
+  fi
+  lint_plist "$info_plist"
+}
+
 prepare_app() {
   local mode="$1"
   local stage_dir="$2"
@@ -741,9 +787,16 @@ prepare_app() {
   run ditto --rsrc "$DIST_APP" "$out_app"
   run xattr -rc "$out_app" || true
 
+  local distribution_channel="direct"
+  if [[ "$mode" == "mas" ]]; then
+    distribution_channel="appstore"
+  fi
+  set_distribution_channel "$out_app" "$distribution_channel"
+
   say "macdeployqt begins: mode=$mode"
   macdeployqt_run "$out_app" "$mode"
   remove_unused_qt_sql_plugins "$out_app"
+  assert_update_manager_runtime "$out_app"
   assert_portable_macho_links "$out_app"
   assert_macos_deployment_targets "$out_app"
   assert_macos_architectures "$out_app"
@@ -871,6 +924,7 @@ write_product_requirements() {
 verify_pkg_distribution() {
   local pkg="$1"
   local pkg_id="$2"
+  local identity_kind="$3"
   local expanded_dir="${WORKDIR}/distribution_$(basename "$pkg" .pkg)"
   local distribution="${expanded_dir}/Distribution"
 
@@ -886,8 +940,19 @@ verify_pkg_distribution() {
     | grep -F "CFBundleShortVersionString=\"$APP_VERSION\"" \
     | grep -F "CFBundleVersion=\"$APP_VERSION\"" >/dev/null \
     || die "package Distribution app bundle versions do not match APP_VERSION: $pkg"
-  grep -F "<pkg-ref id=\"$pkg_id\" version=\"$APP_VERSION\"" "$distribution" >/dev/null \
-    || die "package Distribution pkg-ref version does not match APP_VERSION: $pkg"
+  case "$identity_kind" in
+    pkg-ref)
+      grep -F "<pkg-ref id=\"$pkg_id\" version=\"$APP_VERSION\"" "$distribution" >/dev/null \
+        || die "package Distribution component identity/version does not match APP_VERSION: $pkg"
+      ;;
+    product)
+      grep -F "<product id=\"$pkg_id\" version=\"$APP_VERSION\"" "$distribution" >/dev/null \
+        || die "package Distribution product identity/version does not match APP_VERSION: $pkg"
+      ;;
+    *)
+      die "unsupported package Distribution identity kind: $identity_kind"
+      ;;
+  esac
 }
 
 build_signed_pkg() {
@@ -936,7 +1001,7 @@ build_signed_pkg() {
 
   run pkgutil --check-signature "$out_pkg"
   verify_pkg_icon_payload "$out_pkg" "$app"
-  verify_pkg_distribution "$out_pkg" "$pkg_id"
+  verify_pkg_distribution "$out_pkg" "$pkg_id" "pkg-ref"
 }
 
 # =============================================================================
@@ -962,7 +1027,7 @@ build_unsigned_component_pkg() {
 
   run pkgutil --check-signature "$out_pkg" || true
   verify_pkg_icon_payload "$out_pkg" "$app"
-  verify_pkg_distribution "$out_pkg" "$pkg_id"
+  verify_pkg_distribution "$out_pkg" "$pkg_id" "product"
 }
 
 build_mas_pkg() {
@@ -986,7 +1051,7 @@ build_mas_pkg() {
 
   run pkgutil --check-signature "$out_pkg"
   verify_pkg_icon_payload "$out_pkg" "$app"
-  verify_pkg_distribution "$out_pkg" "$pkg_id"
+  verify_pkg_distribution "$out_pkg" "$pkg_id" "product"
 }
 
 # =============================================================================

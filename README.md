@@ -5,7 +5,7 @@ QML. It provides a focused desktop canvas for drawing, handwriting, layered
 raster editing, and PSD-compatible import and export. A purchased Vincent
 license is verified online with the account email and receipt/dashboard key;
 documents remain local and Vincent contains no telemetry, analytics, ads, or
-automatic updater.
+automatic/background update checks. Updates run only after explicit user actions.
 
 ![Vincent 4.0 running on Windows with a sample raster artwork](docs/marketing/vincent-windows-editor.png)
 
@@ -36,6 +36,28 @@ again next time. Linux has no supported secure
 credential backend in this release and therefore requires manual activation
 each launch. No document content is included in license requests.
 
+## Manual updates
+
+Vincent performs no update polling, startup check, scheduled request, or retry.
+Website and Developer ID distributions expose **Help → Check for Updates…** to make one small manifest request to
+`iisacc.com`. If a newer version is available, nothing is downloaded until you
+choose **Update now**. That second action reads the existing secure license,
+requests one short-lived download grant, downloads the platform installer to a
+temporary file, checks its declared size and SHA-256 plus the current platform
+safety policy, and opens the verified installer. The notarized macOS package is
+checked against Apple signing/notarization policy. The current Windows MSI is
+explicitly unsigned, so its server-issued download-grant SHA-256 and unsigned-package
+disclosure remain mandatory until a trusted Authenticode release replaces it.
+Email, license key, temporary path, and signed
+download URL never enter QML. Vincent does not quit automatically after opening
+the installer: save current work, follow the installer instructions, and close
+Vincent only when ready. Cancelling stops the active update flow without a retry.
+Mac App Store builds carry an `appstore` distribution marker and also detect an
+App Store receipt; Windows Store/MSIX builds detect their package identity.
+Those store-managed installations hide the self-update action and reject its
+C++ check/update methods without making a request, so updates remain exclusively
+owned by the App Store or Microsoft Store.
+
 ## Install (macOS)
 1. Download `Vincent-4.0.5-macOS.pkg` through your authorized iisacc.com account delivery.
 2. Double-click the installer and follow the prompts to install Vincent 4.0 in Applications.
@@ -59,7 +81,7 @@ Vincent is seeking free code signing provided by [SignPath.io](https://signpath.
 
 - Committer and reviewer: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)
 - Approver: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)
-- Privacy: Vincent transfers only the purchaser-entered account email, license key, and fixed `vincent` product ID to `https://iisacc.com/api/account/license/validate` for activation and launch verification. Documents and editing activity stay local; Vincent contains no telemetry, analytics, advertising, or automatic network update client.
+- Privacy: Vincent transfers only the purchaser-entered account email, license key, and fixed `vincent` product ID to `https://iisacc.com/api/account/license/validate` for activation and launch verification. Documents and editing activity stay local; Vincent contains no telemetry, analytics, advertising, polling, or automatic update checks. A manual **Check for Updates…** makes one version-manifest request; **Update now** alone authorizes and downloads a verified installer.
 - System changes: the MSI announces installation scope and destination, installs the application and Start Menu shortcut together, and provides standard Windows Installer repair and removal.
 
 After SignPath approval and signature verification, the externally signed website release will replace the temporary unsigned file. Its embedded Authenticode signature will supply publisher identity and integrity.
@@ -90,8 +112,9 @@ Normal startup performs no startup-log file I/O. To diagnose launch timing from 
 - Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging; holding Space temporarily enters pan input without changing the selected tool
 - Zoom mode scales the canvas by dragging horizontally anywhere in the canvas workspace: right to zoom in, left to zoom out
 - Drag-to-insert solid shapes for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds
+- Clipboard images can be pasted with Command/Ctrl+V as centered, separately selected image-layer objects. Vincent preserves their pixels in its local cache, fits oversized clipboard images inside 80% of the canvas without stretching them, switches to the move tool, and exposes the same movement, resize, reorder, delete, PSD, and raster-export behavior as other inserted objects. Text and layer-name editors retain their native text paste behavior.
 - Inserted image, shape, and text objects are created as separate layer rows, can be selected with the move tool, dragged or resized past the canvas bounds from enlarged corner and edge transform handles while their visible pixels stay clipped to the canvas, Shift-dragged along the dominant straight movement axis, Shift-resized with their original aspect ratio, and deleted with Delete or Backspace before raster export
-- Global menu shortcuts cover every actionable menu item: Command/Ctrl+N/O/S for new/open/save-as, Command/Ctrl+Z and platform redo for history, Command/Ctrl+Shift+N/Delete for layer creation/deletion, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, [/] for brush size, and Command/Ctrl+0/1/M plus platform fullscreen for window controls. Tool shortcuts also support matching two-beolsik Korean key positions on the canvas.
+- Global menu shortcuts cover every actionable menu item: Command/Ctrl+N/O/S for new/open/save-as, Command/Ctrl+V for clipboard-image paste, Command/Ctrl+Z and platform redo for history, Command/Ctrl+Shift+N/Delete for layer creation/deletion, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, [/] for brush size, and Command/Ctrl+0/1/M plus platform fullscreen for window controls. Tool shortcuts also support matching two-beolsik Korean key positions on the canvas.
 - Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting
 - LVRS solid chrome keeps native window controls. Windows and Linux use their native title bars without a redundant logical drag region or toolbar gap; macOS reserves the LVRS drag surface only for its full-size content title bar in normal-window mode and removes it in full screen
 - Initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible, while new canvases use the dimensions entered in the toolbar modal

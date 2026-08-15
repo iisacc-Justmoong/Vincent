@@ -1,0 +1,22 @@
+#pragma once
+
+#include <iiUpdateManager/UpdateCredentialProvider.h>
+
+#include <QPointer>
+
+class LicenseManager;
+
+class VincentUpdateCredentialProvider final
+    : public iisacc::updates::UpdateCredentialProvider
+{
+public:
+    explicit VincentUpdateCredentialProvider(LicenseManager *licenseManager,
+                                             QObject *parent = nullptr);
+
+    void requestCredentials(Completion completion) override;
+    void cancel() noexcept override;
+
+private:
+    QPointer<LicenseManager> m_licenseManager;
+    quint64 m_requestGeneration = 0;
+};

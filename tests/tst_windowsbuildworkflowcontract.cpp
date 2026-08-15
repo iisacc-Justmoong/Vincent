@@ -32,8 +32,36 @@ private slots:
     void secureCredentialStoreDisallowsPlaintextFallback();
     void correspondingSourceToolDefinesImmutableReleaseContract();
     void signPathWorkflowDefinesFreeWebsiteReleaseContract();
+    void storePackagedBuildDisablesExternalUpdater();
     void buildGuideDocumentsWindowsScript();
 };
+
+void tst_WindowsBuildWorkflowContract::storePackagedBuildDisablesExternalUpdater()
+{
+    const QString managerPath = QFINDTESTDATA("../App/models/update/vincentupdatemanager.cpp");
+    QVERIFY2(!managerPath.isEmpty(), "Vincent update manager source was not found");
+    const QString manager = readTextFile(managerPath);
+    QVERIFY(!manager.isEmpty());
+
+    QVERIFY(manager.contains(QStringLiteral("GetCurrentPackageFullName")));
+    QVERIFY(manager.contains(QStringLiteral("APPMODEL_ERROR_NO_PACKAGE")));
+    QVERIFY(manager.contains(QStringLiteral(
+        "return packageResult == APPMODEL_ERROR_NO_PACKAGE;")));
+
+    const QString qmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    QVERIFY2(!qmlPath.isEmpty(), "App/qml/Main.qml test data was not found");
+    const QString qml = readTextFile(qmlPath);
+    QVERIFY(qml.contains(QStringLiteral(
+        "enabled: VincentUpdateManager.selfUpdateSupported")));
+    QVERIFY(qml.contains(QStringLiteral(
+        "visible: VincentUpdateManager.selfUpdateSupported")));
+
+    const QString buildGuidePath = QFINDTESTDATA("../docs/BUILD.md");
+    QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
+    const QString buildGuide = readTextFile(buildGuidePath);
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        "Windows Store/MSIX packaged context is detected at runtime through `GetCurrentPackageFullName`")));
+}
 
 void tst_WindowsBuildWorkflowContract::secureCredentialStoreDisallowsPlaintextFallback()
 {
@@ -67,6 +95,10 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
         "throw \"Vincent release revision does not declare version $Version.\"")));
     QVERIFY(source.contains(QStringLiteral("07efeb4490304b08454d645001c186e89735bb53")));
     QVERIFY(source.contains(QStringLiteral("83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(source.contains(QStringLiteral("IiUpdateManagerRevision")));
+    QVERIFY(source.contains(QStringLiteral("IiUpdateManagerSource")));
+    QVERIFY(source.contains(QStringLiteral("-Label \"iiUpdateManager\"")));
+    QVERIFY(source.contains(QStringLiteral("/iiUpdateManager/CMakeLists.txt")));
     QVERIFY(source.contains(QStringLiteral("f51449543273cbf12058ae92b230e0c4209f5066")));
     QVERIFY(source.contains(QStringLiteral("875f77d9f61bd97fd84cca47ce3bc71186dfbd09")));
     QVERIFY(source.contains(QStringLiteral("third_party\\qtkeychain")));
@@ -91,7 +123,7 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
-        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.5 -VincentRevision v4.0.5")));
+        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.5 -VincentRevision v4.0.5 -IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
@@ -118,6 +150,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("$env:QT_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:LVRS_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:IIPAINTENGINE_PREFIX")));
+    QVERIFY(source.contains(QStringLiteral("$env:IIUPDATEMANAGER_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("Resolve-QtPrefix")));
     QVERIFY(source.contains(QStringLiteral("Resolve-Objdump")));
     QVERIFY(source.contains(QStringLiteral("Assert-MinGwRuntimeCompatibility")));
@@ -162,6 +195,9 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("\"--qmldir\", (Join-Path $RepositoryRoot \"App\\qml\")")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"LVRS\"")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiPaintEngine\"")));
+    QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiUpdateManager\"")));
+    QVERIFY(source.contains(QStringLiteral("iiUpdateManager.dll")));
+    QVERIFY(source.contains(QStringLiteral("libiiUpdateManager.dll")));
     QVERIFY(!source.contains(QStringLiteral("Copy-DependencyQmlImports -Name \"LVRS\"")));
     QVERIFY(!source.contains(QStringLiteral("Remove-QmlResourcePreferDirectives -ModuleName \"LVRS\"")));
     QVERIFY(source.contains(QStringLiteral("Remove-EmbeddedDependencyQmlImport -ModuleName \"LVRS\"")));
@@ -743,6 +779,10 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53")));
     QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(workflow.contains(QStringLiteral("Require pinned iiUpdateManager provenance")));
+    QVERIFY(workflow.contains(QStringLiteral("IIUPDATEMANAGER_REPOSITORY")));
+    QVERIFY(workflow.contains(QStringLiteral("IIUPDATEMANAGER_COMMIT")));
+    QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiUpdateManager")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
@@ -783,6 +823,11 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("Vincent.exe")));
     QVERIFY(workflow.contains(QStringLiteral("The installed Vincent executable is not Authenticode-signed")));
     QVERIFY(workflow.contains(QStringLiteral("SignTool rejected the installed Vincent executable")));
+    QVERIFY(workflow.contains(QStringLiteral("iiUpdateManager.dll")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "The installed iiUpdateManager runtime is not Authenticode-signed")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "SignTool rejected the installed iiUpdateManager runtime")));
 
     const QString sourceWorkflowPath = QFINDTESTDATA("../.github/workflows/windows-corresponding-source.yml");
     QVERIFY2(!sourceWorkflowPath.isEmpty(), "The Windows corresponding-source workflow was not found");
@@ -791,6 +836,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(sourceWorkflow.contains(QStringLiteral("fetch-depth: 0")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("-VincentRevision $env:GITHUB_SHA")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("Vincent-4.0.5-Corresponding-Source.zip")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("Require pinned iiUpdateManager provenance")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("-IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
@@ -803,11 +850,13 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(readme.contains(QStringLiteral("Approver")));
     QVERIFY(readme.contains(QStringLiteral("transfers only the purchaser-entered account email, license key")));
     QVERIFY(readme.contains(QStringLiteral("contains no telemetry, analytics, advertising")));
+    QVERIFY(readme.contains(QStringLiteral("server-issued download-grant SHA-256")));
+    QVERIFY(!readme.contains(QStringLiteral("manifest hash")));
     QVERIFY(readme.contains(QStringLiteral("## Community and Contributing")));
     QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/discussions")));
     QVERIFY(readme.contains(QStringLiteral("https://github.com/iisacc-Justmoong/Vincent/issues/18")));
 
-    const QString contributingPath = QFINDTESTDATA("../../CONTRIBUTING.md");
+    const QString contributingPath = QFINDTESTDATA("../CONTRIBUTING.md");
     QVERIFY2(!contributingPath.isEmpty(), "CONTRIBUTING.md test data was not found");
     const QString contributing = readTextFile(contributingPath);
     QVERIFY(contributing.contains(QStringLiteral("repository-local `build/` directory")));
@@ -822,6 +871,10 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
         "uploads `Vincent-website-release-unsigned` only from the explicit unsigned branch")));
     QVERIFY(buildGuide.contains(QStringLiteral(
         "preserves the existing nested Authenticode verification")));
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        "copies the LVRS, iiPaintEngine, and iiUpdateManager runtime DLLs")));
+    QVERIFY(buildGuide.contains(QStringLiteral(
+        "`Vincent.exe`, `LVRS.dll`, `libiiPaintEngine.dll`, and the updater runtime")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

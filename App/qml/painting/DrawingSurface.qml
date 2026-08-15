@@ -82,6 +82,7 @@ Rectangle {
     readonly property int drawableObjectMinimumDimension: 8
     readonly property int drawableObjectHandleSize: 10
     readonly property int drawableObjectHandleHitSize: 32
+    readonly property real clipboardImageMaximumCanvasRatio: 0.8
     readonly property real defaultCanvasZoomScale: 1
     readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
@@ -269,6 +270,42 @@ Rectangle {
         resizeRasterLayerItems(canvasSurface.width, canvasSurface.height);
         fitCanvasZoomToCurrentCanvas();
         addDefaultDrawingLayer();
+        return true;
+    }
+
+    function pasteClipboardImage() {
+        if (!canvasItemReady) {
+            return false;
+        }
+
+        const maximumObjectWidth = Math.max(1, canvasSurface.width * surface.clipboardImageMaximumCanvasRatio);
+        const maximumObjectHeight = Math.max(1, canvasSurface.height * surface.clipboardImageMaximumCanvasRatio);
+        const clipboardObject = canvasSurface.clipboardImageObject(maximumObjectWidth, maximumObjectHeight);
+        if (!clipboardObject || !clipboardObject.source) {
+            return false;
+        }
+
+        commitActiveText();
+        cancelActiveShape();
+        resetDrawableObjectTransform();
+
+        const objectWidth = Math.max(1, Number(clipboardObject.width || 1));
+        const objectHeight = Math.max(1, Number(clipboardObject.height || 1));
+        const pastedObject = {
+            id: surface.nextDrawableObjectId++,
+            type: "image",
+            name: qsTr("Pasted Image"),
+            source: clipboardObject.source,
+            x: (canvasSurface.width - objectWidth) / 2,
+            y: (canvasSurface.height - objectHeight) / 2,
+            width: objectWidth,
+            height: objectHeight,
+            originalWidth: Math.max(1, Number(clipboardObject.originalWidth || objectWidth)),
+            originalHeight: Math.max(1, Number(clipboardObject.originalHeight || objectHeight)),
+            opacity: 1,
+            visible: true
+        };
+        appendDrawableObject(pastedObject);
         return true;
     }
 

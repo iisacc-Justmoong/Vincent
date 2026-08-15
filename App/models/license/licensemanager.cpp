@@ -10,6 +10,8 @@
 #include <QPointer>
 #include <QRegularExpression>
 
+#include <utility>
+
 namespace
 {
 constexpr int maximumResponseSize = 64 * 1024;
@@ -70,6 +72,13 @@ bool parseStoredCredentials(const QByteArray &data, QString *email, QString *lic
     }
 
     const QJsonObject object = document.object();
+    if (object.size() != 4
+        || !object.contains(QStringLiteral("schema"))
+        || !object.contains(QStringLiteral("email"))
+        || !object.contains(QStringLiteral("licenseKey"))
+        || !object.contains(QStringLiteral("productId"))) {
+        return false;
+    }
     const QJsonValue schema = object.value(QStringLiteral("schema"));
     const QJsonValue storedEmail = object.value(QStringLiteral("email"));
     const QJsonValue storedLicenseKey = object.value(QStringLiteral("licenseKey"));
@@ -92,10 +101,52 @@ bool parseStoredCredentials(const QByteArray &data, QString *email, QString *lic
         return false;
     }
 
+    // The secure-store payload is application-owned and always written in compact form.
+    // Requiring the canonical representation also rejects duplicate keys and trailing data.
+    if (serializedCredentials(normalizedEmail, normalizedLicenseKey) != data) {
+        return false;
+    }
+
     *email = normalizedEmail;
     *licenseKey = normalizedLicenseKey;
     return true;
 }
+}
+
+StoredLicenseCredentials::StoredLicenseCredentials(QString credentialEmail,
+                                                   QString credentialLicenseKey)
+    : email(std::move(credentialEmail))
+    , licenseKey(std::move(credentialLicenseKey))
+{
+}
+
+StoredLicenseCredentials::StoredLicenseCredentials(StoredLicenseCredentials &&other) noexcept
+    : email(std::move(other.email))
+    , licenseKey(std::move(other.licenseKey))
+{
+}
+
+StoredLicenseCredentials &StoredLicenseCredentials::operator=(StoredLicenseCredentials &&other) noexcept
+{
+    if (this != &other) {
+        clear();
+        email = std::move(other.email);
+        licenseKey = std::move(other.licenseKey);
+    }
+    return *this;
+}
+
+StoredLicenseCredentials::~StoredLicenseCredentials()
+{
+    clear();
+}
+
+void StoredLicenseCredentials::clear()
+{
+    email.fill(QChar{});
+    licenseKey.fill(QChar{});
+    email.clear();
+    licenseKey.clear();
 }
 
 LicenseManager::LicenseManager(QObject *parent)
@@ -209,6 +260,53 @@ void LicenseManager::forgetLicense()
     setLicensed(false);
     setResultCode(QString{});
     clearStoredCredentials();
+}
+
+void LicenseManager::requestStoredCredentials(StoredCredentialCompletion completion)
+{
+    if (!completion) {
+        return;
+    }
+
+    if (!persistenceSupported()) {
+        completion(StoredCredentialStatus::Unavailable, StoredLicenseCredentials{});
+        return;
+    }
+
+    QPointer<LicenseManager> guard(this);
+    m_credentialStore->read(
+        [guard, completion = std::move(completion)](
+            LicenseCredentialStore::ReadStatus status, QByteArray data) mutable {
+            if (!guard) {
+                data.fill('\0');
+                return;
+            }
+
+            if (status == LicenseCredentialStore::ReadStatus::Error) {
+                data.fill('\0');
+                completion(StoredCredentialStatus::Unavailable, StoredLicenseCredentials{});
+                return;
+            }
+            if (status == LicenseCredentialStore::ReadStatus::NotFound) {
+                data.fill('\0');
+                completion(StoredCredentialStatus::NotFound, StoredLicenseCredentials{});
+                return;
+            }
+
+            QString email;
+            QString licenseKey;
+            const bool parsed = parseStoredCredentials(data, &email, &licenseKey);
+            data.fill('\0');
+            if (!parsed) {
+                email.fill(QChar{});
+                licenseKey.fill(QChar{});
+                completion(StoredCredentialStatus::Invalid, StoredLicenseCredentials{});
+                return;
+            }
+
+            completion(StoredCredentialStatus::Available,
+                       StoredLicenseCredentials(std::move(email), std::move(licenseKey)));
+        });
 }
 
 void LicenseManager::restoreStoredLicense()

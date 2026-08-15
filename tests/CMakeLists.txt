@@ -88,6 +88,36 @@ vincent_configure_local_runtime_paths(tests_licensemanager)
 
 add_test(NAME tests_licensemanager COMMAND tests_licensemanager)
 
+add_executable(tests_vincentupdatemanager
+        tst_vincentupdatemanager.cpp
+        ../App/models/license/licensecredentialstore.cpp
+        ../App/models/license/licensecredentialstore.h
+        ../App/models/license/licensemanager.cpp
+        ../App/models/license/licensemanager.h
+        ../App/models/update/vincentupdatecredentialprovider.cpp
+        ../App/models/update/vincentupdatecredentialprovider.h
+        ../App/models/update/vincentupdatemanager.cpp
+        ../App/models/update/vincentupdatemanager.h
+)
+
+target_include_directories(tests_vincentupdatemanager PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/license
+        ${CMAKE_SOURCE_DIR}/App/models/update
+)
+
+target_link_libraries(tests_vincentupdatemanager PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::Test
+        iiUpdateManager::iiUpdateManager
+)
+if(APPLE OR WIN32)
+    target_link_libraries(tests_vincentupdatemanager PRIVATE qt6keychain)
+endif()
+vincent_configure_local_runtime_paths(tests_vincentupdatemanager)
+
+add_test(NAME tests_vincentupdatemanager COMMAND tests_vincentupdatemanager)
+
 add_executable(tests_macosbuildworkflowcontract
         tst_macosbuildworkflowcontract.cpp
 )
@@ -197,6 +227,7 @@ set_tests_properties(
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
         tests_licensemanager
+        tests_vincentupdatemanager
         tests_macosbuildworkflowcontract
         tests_linuxbuildworkflowcontract
         tests_windowsbuildworkflowcontract

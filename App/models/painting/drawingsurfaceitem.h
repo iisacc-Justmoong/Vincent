@@ -41,6 +41,8 @@ public:
     Q_INVOKABLE QVariantMap imageObjectForFile(const QString &fileUrl,
                                                qreal maximumObjectWidth = 0,
                                                qreal maximumObjectHeight = 0) const;
+    Q_INVOKABLE QVariantMap clipboardImageObject(qreal maximumObjectWidth = 0,
+                                                 qreal maximumObjectHeight = 0) const;
     Q_INVOKABLE QVariantMap psdImportDocument(const QString &fileUrl) const;
     Q_INVOKABLE bool saveToFile(const QString &fileUrl);
     Q_INVOKABLE bool saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects);

@@ -21,6 +21,7 @@
 #include "models/license/licensemanager.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "models/brush/paletteutils.h"
+#include "models/update/vincentupdatemanager.h"
 
 void qml_register_types_LVRS();
 
@@ -210,6 +211,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
     auto *licenseManager = new LicenseManager(&engine);
     engine.rootContext()->setContextProperty("VincentLicenseManager", licenseManager);
+    auto *updateManager = new VincentUpdateManager(licenseManager, &engine);
+    engine.rootContext()->setContextProperty("VincentUpdateManager", updateManager);
     registerViewModels(engine, paletteUtils);
 
     QObject::connect(&engine,

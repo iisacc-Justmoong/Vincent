@@ -6,8 +6,26 @@
 #include <QTimer>
 #include <QUrl>
 
+#include <functional>
+
 class QNetworkReply;
 class LicenseCredentialStore;
+
+struct StoredLicenseCredentials final
+{
+    StoredLicenseCredentials() = default;
+    StoredLicenseCredentials(QString credentialEmail, QString credentialLicenseKey);
+    StoredLicenseCredentials(const StoredLicenseCredentials &) = delete;
+    StoredLicenseCredentials &operator=(const StoredLicenseCredentials &) = delete;
+    StoredLicenseCredentials(StoredLicenseCredentials &&other) noexcept;
+    StoredLicenseCredentials &operator=(StoredLicenseCredentials &&other) noexcept;
+    ~StoredLicenseCredentials();
+
+    void clear();
+
+    QString email;
+    QString licenseKey;
+};
 
 class LicenseManager : public QObject
 {
@@ -20,6 +38,17 @@ class LicenseManager : public QObject
     Q_PROPERTY(QString resultCode READ resultCode NOTIFY resultCodeChanged)
 
 public:
+    enum class StoredCredentialStatus
+    {
+        Available,
+        NotFound,
+        Unavailable,
+        Invalid
+    };
+
+    using StoredCredentialCompletion =
+        std::function<void(StoredCredentialStatus, StoredLicenseCredentials)>;
+
     explicit LicenseManager(QObject *parent = nullptr);
     LicenseManager(const QUrl &validationEndpoint,
                    int requestTimeoutMilliseconds,
@@ -39,6 +68,10 @@ public:
     Q_INVOKABLE void validateLicense(const QString &email, const QString &licenseKey);
     Q_INVOKABLE void retryStoredLicense();
     Q_INVOKABLE void forgetLicense();
+
+    // C++-only seam for consumers that must authenticate an explicit user action.
+    // It intentionally does not expose credentials through the Qt meta-object/QML surface.
+    void requestStoredCredentials(StoredCredentialCompletion completion);
 
 signals:
     void licensedChanged();

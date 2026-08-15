@@ -11,6 +11,7 @@ private slots:
     void colorSelectionUsesHslTrianglePicker();
     void leftToolbarMatchesFigmaDesignContract();
     void drawingSurfaceProvidesPaintStyleTextToolEditor();
+    void clipboardPasteCreatesCenteredTransformableImageObject();
     void shapeToolProvidesSplitMenuAndDragInsertion();
     void brushSizeControlsFlowFromDecreaseToSliderToIncrease();
     void toolbarUsesFullWidthRectangularBackground();
@@ -19,6 +20,39 @@ private slots:
     void pressureCurveControlsUseThreePointGraphAtBottom();
     void brushSettingsExposePressureOpacityToggle();
 };
+
+void tst_CanvasToolBarQmlContract::clipboardPasteCreatesCenteredTransformableImageObject()
+{
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+
+    QFile drawingSurfaceQml(drawingSurfaceQmlPath);
+    QFile painterPageQml(painterPageQmlPath);
+    QVERIFY(drawingSurfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString surfaceSource = QString::fromUtf8(drawingSurfaceQml.readAll());
+    const QString pageSource = QString::fromUtf8(painterPageQml.readAll());
+
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property real clipboardImageMaximumCanvasRatio: 0.8")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function pasteClipboardImage()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.clipboardImageObject(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"image\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("name: qsTr(\"Pasted Image\")")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("x: (canvasSurface.width - objectWidth) / 2")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("y: (canvasSurface.height - objectHeight) / 2")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("appendDrawableObject(pastedObject);")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("drawableObject.type === \"image\" || drawableObject.type === \"text\" || "
+                       "drawableObject.type === \"shape\"")));
+
+    QVERIFY(pageSource.contains(QStringLiteral("function pasteClipboardImage()")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("const pasted = drawingSurface.pasteClipboardImage();")));
+    QVERIFY(pageSource.contains(QStringLiteral("painterPage.setToolMode(\"move\");")));
+}
 
 void tst_CanvasToolBarQmlContract::brushReselectionOpensBrushSettingsMenu()
 {

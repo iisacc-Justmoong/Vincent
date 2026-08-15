@@ -9,6 +9,8 @@
 #include <QTcpSocket>
 #include <QtTest>
 
+#include <type_traits>
+
 namespace
 {
 const QString validLicenseKey = QStringLiteral("IIL1_0123456789abcdefghijklmnopqrstuv");
@@ -190,6 +192,11 @@ private slots:
     void authoritativeInvalidStoredLicenseIsDeleted();
     void transientFailureKeepsStoredLicenseForCredentialFreeRetry();
     void malformedStoredCredentialsAreDeletedWithoutNetworkAccess();
+    void updateCredentialsAreMoveOnlyAndReadOnlyOnExplicitRequest();
+    void updateCredentialReadRejectsNonCanonicalStoredJson_data();
+    void updateCredentialReadRejectsNonCanonicalStoredJson();
+    void updateCredentialReadReportsStorageOutcomes_data();
+    void updateCredentialReadReportsStorageOutcomes();
     void forgetStoredLicenseWhileLockedDeletesCredentials();
     void forgetLicenseCannotDiscardLicensedCanvas();
     void invalidLicenseDecisionRemainsLocked();
@@ -200,6 +207,111 @@ private slots:
     void acceptsSupportedKeyVersionsAndRejectsOutOfRangeVersions();
     void connectionFailureAndTimeoutRemainFailClosed();
 };
+
+void tst_LicenseManager::updateCredentialsAreMoveOnlyAndReadOnlyOnExplicitRequest()
+{
+    static_assert(!std::is_copy_constructible_v<StoredLicenseCredentials>);
+    static_assert(!std::is_copy_assignable_v<StoredLicenseCredentials>);
+    static_assert(std::is_move_constructible_v<StoredLicenseCredentials>);
+    static_assert(std::is_move_assignable_v<StoredLicenseCredentials>);
+
+    FakeCredentialStore store;
+    LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")), 1000, &store);
+    QTRY_COMPARE_WITH_TIMEOUT(store.readCount, 1, 1000);
+
+    store.readStatus = LicenseCredentialStore::ReadStatus::Found;
+    store.readData = storedCredentials();
+    bool completed = false;
+    manager.requestStoredCredentials(
+        [&completed](LicenseManager::StoredCredentialStatus status,
+                     StoredLicenseCredentials credentials) {
+            QCOMPARE(status, LicenseManager::StoredCredentialStatus::Available);
+            QCOMPARE(credentials.email, QStringLiteral("verified@example.com"));
+            QCOMPARE(credentials.licenseKey, validLicenseKey);
+            completed = true;
+        });
+
+    QVERIFY(completed);
+    QCOMPARE(store.readCount, 2);
+}
+
+void tst_LicenseManager::updateCredentialReadRejectsNonCanonicalStoredJson_data()
+{
+    QTest::addColumn<QByteArray>("payload");
+
+    QJsonObject extraKeyObject = QJsonDocument::fromJson(storedCredentials()).object();
+    extraKeyObject.insert(QStringLiteral("future"), true);
+    QTest::newRow("extra-key")
+        << QJsonDocument(extraKeyObject).toJson(QJsonDocument::Compact);
+    QTest::newRow("surrounding-whitespace")
+        << QByteArray(" \n") + storedCredentials() + QByteArray("\n");
+    QTest::newRow("duplicate-key")
+        << QByteArrayLiteral(
+               R"({"email":"verified@example.com","email":"attacker@example.com","licenseKey":"IIL1_0123456789abcdefghijklmnopqrstuv","productId":"vincent","schema":1})");
+    QTest::newRow("non-normalized-email")
+        << storedCredentials(QStringLiteral("Verified@Example.com"));
+}
+
+void tst_LicenseManager::updateCredentialReadRejectsNonCanonicalStoredJson()
+{
+    QFETCH(QByteArray, payload);
+
+    FakeCredentialStore store;
+    LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")), 1000, &store);
+    QTRY_COMPARE_WITH_TIMEOUT(store.readCount, 1, 1000);
+    store.readStatus = LicenseCredentialStore::ReadStatus::Found;
+    store.readData = payload;
+
+    bool completed = false;
+    manager.requestStoredCredentials(
+        [&completed](LicenseManager::StoredCredentialStatus status,
+                     StoredLicenseCredentials credentials) {
+            QCOMPARE(status, LicenseManager::StoredCredentialStatus::Invalid);
+            QVERIFY(credentials.email.isEmpty());
+            QVERIFY(credentials.licenseKey.isEmpty());
+            completed = true;
+        });
+
+    QVERIFY(completed);
+    QCOMPARE(store.readCount, 2);
+}
+
+void tst_LicenseManager::updateCredentialReadReportsStorageOutcomes_data()
+{
+    QTest::addColumn<LicenseCredentialStore::ReadStatus>("readStatus");
+    QTest::addColumn<LicenseManager::StoredCredentialStatus>("expectedStatus");
+
+    QTest::newRow("not-found")
+        << LicenseCredentialStore::ReadStatus::NotFound
+        << LicenseManager::StoredCredentialStatus::NotFound;
+    QTest::newRow("error")
+        << LicenseCredentialStore::ReadStatus::Error
+        << LicenseManager::StoredCredentialStatus::Unavailable;
+}
+
+void tst_LicenseManager::updateCredentialReadReportsStorageOutcomes()
+{
+    QFETCH(LicenseCredentialStore::ReadStatus, readStatus);
+    QFETCH(LicenseManager::StoredCredentialStatus, expectedStatus);
+
+    FakeCredentialStore store;
+    LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")), 1000, &store);
+    QTRY_COMPARE_WITH_TIMEOUT(store.readCount, 1, 1000);
+    store.readStatus = readStatus;
+
+    bool completed = false;
+    manager.requestStoredCredentials(
+        [&completed, expectedStatus](LicenseManager::StoredCredentialStatus status,
+                                     StoredLicenseCredentials credentials) {
+            QCOMPARE(status, expectedStatus);
+            QVERIFY(credentials.email.isEmpty());
+            QVERIFY(credentials.licenseKey.isEmpty());
+            completed = true;
+        });
+
+    QVERIFY(completed);
+    QCOMPARE(store.readCount, 2);
+}
 
 void tst_LicenseManager::productIdentityIsApplicationOwned()
 {

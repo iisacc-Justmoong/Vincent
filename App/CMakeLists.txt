@@ -41,6 +41,10 @@ target_sources(Vincent PRIVATE
         models/license/licensecredentialstore.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
+        models/update/vincentupdatecredentialprovider.cpp
+        models/update/vincentupdatecredentialprovider.h
+        models/update/vincentupdatemanager.cpp
+        models/update/vincentupdatemanager.h
         resources.qrc
 )
 
@@ -51,4 +55,5 @@ target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/models/document
         ${CMAKE_CURRENT_SOURCE_DIR}/models/license
         ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/update
 )

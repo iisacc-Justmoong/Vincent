@@ -7,15 +7,18 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QByteArray>
+#include <QClipboard>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QFont>
+#include <QGuiApplication>
 #include <QHash>
 #include <QImage>
 #include <QList>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QObject>
 #include <QPainter>
@@ -283,6 +286,33 @@ QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
 
     const QSize fitted = imageSize.scaled(boundedMaximum, Qt::KeepAspectRatio);
     return QSize(qMax(1, fitted.width()), qMax(1, fitted.height()));
+}
+
+QVariantMap imageObjectForImage(const QImage& image, const QString& source,
+                                qreal maximumObjectWidth, qreal maximumObjectHeight)
+{
+    if (image.isNull() || source.isEmpty())
+    {
+        return {};
+    }
+
+    const bool hasMaximumObjectSize = maximumObjectWidth > 0 || maximumObjectHeight > 0;
+    const QSize maximumSize(maximumObjectWidth > 0 ? qRound(maximumObjectWidth) : image.width(),
+                            maximumObjectHeight > 0 ? qRound(maximumObjectHeight) : image.height());
+    const QSize objectSize =
+        hasMaximumObjectSize ? fittedOpenedRasterSize(image.size(), maximumSize) : image.size();
+    if (objectSize.isEmpty())
+    {
+        return {};
+    }
+
+    QVariantMap object;
+    object.insert(QStringLiteral("source"), source);
+    object.insert(QStringLiteral("width"), objectSize.width());
+    object.insert(QStringLiteral("height"), objectSize.height());
+    object.insert(QStringLiteral("originalWidth"), image.width());
+    object.insert(QStringLiteral("originalHeight"), image.height());
+    return object;
 }
 
 QString normalizedShapeKind(const QString &shapeKind)
@@ -811,37 +841,49 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasW
     return true;
 }
 
-QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString &fileUrl,
-                                                   qreal maximumObjectWidth,
+QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString& fileUrl, qreal maximumObjectWidth,
                                                    qreal maximumObjectHeight) const
 {
     const QImage image = imageFromFileUrl(fileUrl);
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
-    const bool hasMaximumObjectSize = maximumObjectWidth > 0 || maximumObjectHeight > 0;
-    const QSize maximumSize(
-            maximumObjectWidth > 0 ? qRound(maximumObjectWidth) : image.width(),
-            maximumObjectHeight > 0 ? qRound(maximumObjectHeight) : image.height());
-    const QSize objectSize = hasMaximumObjectSize
-            ? fittedOpenedRasterSize(image.size(), maximumSize)
-            : image.size();
-    if (objectSize.isEmpty()) {
-        return {};
-    }
-
-    QVariantMap object;
-    object.insert(QStringLiteral("source"), cachedPsdPreviewSource(fileUrl, image));
-    if (hasPsdSuffix(fileUrl)) {
+    QVariantMap object = imageObjectForImage(image, cachedPsdPreviewSource(fileUrl, image),
+                                             maximumObjectWidth, maximumObjectHeight);
+    if (hasPsdSuffix(fileUrl))
+    {
         object.insert(QStringLiteral("originalSource"), localFileSource(fileUrl));
         object.insert(QStringLiteral("sourceFormat"), QStringLiteral("psd"));
     }
-    object.insert(QStringLiteral("width"), objectSize.width());
-    object.insert(QStringLiteral("height"), objectSize.height());
-    object.insert(QStringLiteral("originalWidth"), image.width());
-    object.insert(QStringLiteral("originalHeight"), image.height());
     return object;
+}
+
+QVariantMap DrawingSurfaceItem::clipboardImageObject(qreal maximumObjectWidth,
+                                                     qreal maximumObjectHeight) const
+{
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (!clipboard)
+    {
+        return {};
+    }
+
+    const QMimeData* mimeData = clipboard->mimeData(QClipboard::Clipboard);
+    if (!mimeData || !mimeData->hasImage())
+    {
+        return {};
+    }
+
+    const QImage image = clipboard->image(QClipboard::Clipboard);
+    if (image.isNull())
+    {
+        return {};
+    }
+
+    return imageObjectForImage(image,
+                               cachedPngSourceForImage(QStringLiteral("clipboard-images"), image),
+                               maximumObjectWidth, maximumObjectHeight);
 }
 
 QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const

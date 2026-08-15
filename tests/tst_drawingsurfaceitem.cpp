@@ -1,7 +1,11 @@
+#include <QClipboard>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QImage>
 #include <QLineF>
+#include <QMap>
+#include <QMimeData>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -33,6 +37,7 @@ private slots:
     void zoomsCanvasWithHorizontalDrag();
     void usesToolAppropriateCanvasCursors();
     void tracksBrushCursorDuringNativePointerInput();
+    void pastesSystemClipboardImageAsTransformableObject();
     void movesAndResizesDrawableObjects();
     void constrainsDrawableObjectTransformWithShiftModifier();
     void deletesSelectedDrawableObject();
@@ -67,6 +72,78 @@ private slots:
 namespace {
 
 constexpr int nativeWindowExposureTimeoutMs = 15000;
+
+class ClipboardContentsGuard
+{
+  public:
+    explicit ClipboardContentsGuard(QClipboard* clipboard) : m_clipboard(clipboard)
+    {
+        if (!m_clipboard)
+        {
+            return;
+        }
+
+        const QMimeData* mimeData = m_clipboard->mimeData(QClipboard::Clipboard);
+        if (!mimeData)
+        {
+            return;
+        }
+
+        for (const QString& format : mimeData->formats())
+        {
+            m_dataByFormat.insert(format, mimeData->data(format));
+        }
+        m_hasImage = mimeData->hasImage();
+        m_image = m_clipboard->image(QClipboard::Clipboard);
+        m_hasText = mimeData->hasText();
+        m_text = mimeData->text();
+        m_hasUrls = mimeData->hasUrls();
+        m_urls = mimeData->urls();
+    }
+
+    ~ClipboardContentsGuard()
+    {
+        if (!m_clipboard)
+        {
+            return;
+        }
+
+        if (m_dataByFormat.isEmpty() && !m_hasImage && !m_hasText && !m_hasUrls)
+        {
+            m_clipboard->clear(QClipboard::Clipboard);
+            return;
+        }
+
+        auto* mimeData = new QMimeData();
+        for (auto it = m_dataByFormat.cbegin(); it != m_dataByFormat.cend(); ++it)
+        {
+            mimeData->setData(it.key(), it.value());
+        }
+        if (m_hasImage && !m_image.isNull())
+        {
+            mimeData->setImageData(m_image);
+        }
+        if (m_hasText)
+        {
+            mimeData->setText(m_text);
+        }
+        if (m_hasUrls)
+        {
+            mimeData->setUrls(m_urls);
+        }
+        m_clipboard->setMimeData(mimeData, QClipboard::Clipboard);
+    }
+
+  private:
+    QClipboard* m_clipboard = nullptr;
+    QMap<QString, QByteArray> m_dataByFormat;
+    QImage m_image;
+    QString m_text;
+    QList<QUrl> m_urls;
+    bool m_hasImage = false;
+    bool m_hasText = false;
+    bool m_hasUrls = false;
+};
 
 QString qmlErrorsToString(const QList<QQmlError> &errors)
 {
@@ -1088,6 +1165,114 @@ void tst_DrawingSurfaceItem::tracksBrushCursorDuringNativePointerInput()
     QTest::mouseMove(&window, dragWindowPoint + QPoint(2, 0));
     QTRY_VERIFY(!brushCursorOutline->isVisible());
     QTRY_COMPARE(window.cursor().shape(), Qt::OpenHandCursor);
+}
+
+void tst_DrawingSurfaceItem::pastesSystemClipboardImageAsTransformableObject()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    QVERIFY(clipboard);
+    ClipboardContentsGuard clipboardGuard(clipboard);
+    clipboard->setText(QStringLiteral("not an image"), QClipboard::Clipboard);
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 500);
+    initialProperties.insert(QStringLiteral("height"), 360);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject*>(&viewModel)));
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("move"));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto* rootItem = qobject_cast<QQuickItem*>(object.data());
+    QVERIFY(rootItem);
+    DrawingSurfaceItem* canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QTRY_VERIFY(canvasItem->width() > 100);
+    QTRY_VERIFY(canvasItem->height() > 100);
+
+    QVERIFY(canvasItem->clipboardImageObject(canvasItem->width(), canvasItem->height()).isEmpty());
+    QQmlExpression pasteTextOnlyClipboard(engine.rootContext(), object.data(),
+                                          QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteTextOnlyClipboard.evaluate().toBool(), false);
+    QVERIFY2(!pasteTextOnlyClipboard.hasError(),
+             qPrintable(pasteTextOnlyClipboard.error().toString()));
+
+    QImage clipboardImage(640, 320, QImage::Format_ARGB32_Premultiplied);
+    clipboardImage.fill(QColor(QStringLiteral("#5e35b1")));
+    clipboard->setImage(clipboardImage, QClipboard::Clipboard);
+
+    const QVariantMap clipboardObject =
+        canvasItem->clipboardImageObject(canvasItem->width() * 0.8, canvasItem->height() * 0.8);
+    QVERIFY(!clipboardObject.isEmpty());
+    QCOMPARE(clipboardObject.value(QStringLiteral("originalWidth")).toInt(),
+             clipboardImage.width());
+    QCOMPARE(clipboardObject.value(QStringLiteral("originalHeight")).toInt(),
+             clipboardImage.height());
+    const QUrl cachedSource(clipboardObject.value(QStringLiteral("source")).toString());
+    QVERIFY(cachedSource.isLocalFile());
+    QVERIFY(QFileInfo::exists(cachedSource.toLocalFile()));
+    const QImage cachedImage(cachedSource.toLocalFile());
+    QCOMPARE(cachedImage.size(), clipboardImage.size());
+    QCOMPARE(cachedImage.pixelColor(0, 0), clipboardImage.pixelColor(0, 0));
+
+    QQmlExpression pasteClipboardImage(engine.rootContext(), object.data(),
+                                       QStringLiteral("pasteClipboardImage();"));
+    QCOMPARE(pasteClipboardImage.evaluate().toBool(), true);
+    QVERIFY2(!pasteClipboardImage.hasError(), qPrintable(pasteClipboardImage.error().toString()));
+
+    const QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 2);
+    const QVariantMap pastedObject = objects.constLast().toMap();
+    QCOMPARE(pastedObject.value(QStringLiteral("type")).toString(), QStringLiteral("image"));
+    QCOMPARE(pastedObject.value(QStringLiteral("name")).toString(), QStringLiteral("Pasted Image"));
+    QCOMPARE(pastedObject.value(QStringLiteral("source")).toString(), cachedSource.toString());
+    QCOMPARE(pastedObject.value(QStringLiteral("originalWidth")).toInt(), clipboardImage.width());
+    QCOMPARE(pastedObject.value(QStringLiteral("originalHeight")).toInt(), clipboardImage.height());
+    QCOMPARE(rootItem->property("selectedDrawableObjectId").toInt(),
+             pastedObject.value(QStringLiteral("id")).toInt());
+
+    const QSize maximumObjectSize(qMax(1, qRound(canvasItem->width() * 0.8)),
+                                  qMax(1, qRound(canvasItem->height() * 0.8)));
+    const QSize expectedObjectSize =
+        clipboardImage.size().scaled(maximumObjectSize, Qt::KeepAspectRatio);
+    QCOMPARE(pastedObject.value(QStringLiteral("width")).toInt(), expectedObjectSize.width());
+    QCOMPARE(pastedObject.value(QStringLiteral("height")).toInt(), expectedObjectSize.height());
+    QCOMPARE(pastedObject.value(QStringLiteral("x")).toReal(),
+             (canvasItem->width() - expectedObjectSize.width()) / 2.0);
+    QCOMPARE(pastedObject.value(QStringLiteral("y")).toReal(),
+             (canvasItem->height() - expectedObjectSize.height()) / 2.0);
+
+    QQmlExpression transformPastedImage(
+        engine.rootContext(), object.data(),
+        QStringLiteral("var pasted = selectedDrawableObject();"
+                       "var centerX = pasted.x + pasted.width / 2;"
+                       "var centerY = pasted.y + pasted.height / 2;"
+                       "var transformable = drawableObjectIsTransformable(pasted);"
+                       "beginDrawableObjectTransform(centerX, centerY);"
+                       "updateDrawableObjectTransform(centerX + 24, centerY + 16);"
+                       "commitDrawableObjectTransform();"
+                       "transformable;"));
+    QCOMPARE(transformPastedImage.evaluate().toBool(), true);
+    QVERIFY2(!transformPastedImage.hasError(), qPrintable(transformPastedImage.error().toString()));
+
+    const QVariantMap movedObject =
+        rootItem->property("drawableObjects").toList().constLast().toMap();
+    QCOMPARE(movedObject.value(QStringLiteral("x")).toReal(),
+             pastedObject.value(QStringLiteral("x")).toReal() + 24.0);
+    QCOMPARE(movedObject.value(QStringLiteral("y")).toReal(),
+             pastedObject.value(QStringLiteral("y")).toReal() + 16.0);
 }
 
 void tst_DrawingSurfaceItem::movesAndResizesDrawableObjects()

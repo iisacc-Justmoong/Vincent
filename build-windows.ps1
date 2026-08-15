@@ -7,6 +7,7 @@ param(
     [string]$QtPrefix = $env:QT_PREFIX,
     [string]$LVRSPrefix = $env:LVRS_PREFIX,
     [string]$IiPaintEnginePrefix = $env:IIPAINTENGINE_PREFIX,
+    [string]$IiUpdateManagerPrefix = $env:IIUPDATEMANAGER_PREFIX,
 
     [ValidateSet("Ninja", "Visual Studio 17 2022")]
     [string]$Generator = "Ninja",
@@ -1049,6 +1050,16 @@ function Get-VincentOwnedStageFiles {
             }
             Get-Item -LiteralPath $path
         }
+
+        $updateManagerCandidates = @(
+            @("iiUpdateManager.dll", "libiiUpdateManager.dll") |
+                ForEach-Object { Join-Path $Directory $_ } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        )
+        if ($updateManagerCandidates.Count -ne 1) {
+            throw "Vincent-owned signing target must contain exactly one iiUpdateManager runtime DLL."
+        }
+        Get-Item -LiteralPath $updateManagerCandidates[0]
     )
 }
 
@@ -2351,7 +2362,13 @@ function Strip-WindowsRuntimeBinaries {
         throw "strip.exe was not found. MinGW release packages require symbol stripping."
     }
 
-    foreach ($runtimeName in @("Vincent.exe", "LVRS.dll", "libiiPaintEngine.dll")) {
+    foreach ($runtimeName in @(
+        "Vincent.exe",
+        "LVRS.dll",
+        "libiiPaintEngine.dll",
+        "iiUpdateManager.dll",
+        "libiiUpdateManager.dll"
+    )) {
         $runtimePath = Join-Path $Directory $runtimeName
         if (Test-Path $runtimePath) {
             Invoke-Native $strip @("--strip-all", $runtimePath)
@@ -2389,6 +2406,15 @@ function Verify-WindowsStage {
     $vincentExe = Join-Path $Directory "Vincent.exe"
     if (-not (Test-Path $vincentExe)) {
         throw "Staged Vincent.exe is missing."
+    }
+
+    $updateManagerRuntime = @(
+        @("iiUpdateManager.dll", "libiiUpdateManager.dll") |
+            ForEach-Object { Join-Path $Directory $_ } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    )
+    if ($updateManagerRuntime.Count -ne 1) {
+        throw "iiUpdateManager runtime deployment must contain exactly one platform DLL."
     }
 
     $peHeader = Get-PeHeader -Binary $vincentExe
@@ -2698,9 +2724,16 @@ $IiPaintEnginePrefix = Resolve-DependencyPrefix `
     -DefaultPrefix (Join-Path $HOME ".local\iiPaintEngine") `
     -ConfigRelativePaths @("lib\cmake\iiPaintEngine\iiPaintEngineConfig.cmake", "iiPaintEngineConfig.cmake")
 
+$IiUpdateManagerPrefix = Resolve-DependencyPrefix `
+    -Name "iiUpdateManager" `
+    -ConfiguredPrefix $IiUpdateManagerPrefix `
+    -DefaultPrefix (Join-Path $HOME ".local\iiUpdateManager") `
+    -ConfigRelativePaths @("lib\cmake\iiUpdateManager\iiUpdateManagerConfig.cmake", "iiUpdateManagerConfig.cmake")
+
 Write-Host "Qt: $QtPrefix"
 Write-Host "LVRS: $LVRSPrefix"
 Write-Host "iiPaintEngine: $IiPaintEnginePrefix"
+Write-Host "iiUpdateManager: $IiUpdateManagerPrefix"
 
 $windowsPackageRequested = (-not $SkipPackage) -or $CreateMsi
 $lvrsLicenseFile = ""
@@ -2773,7 +2806,7 @@ if ($Clean) {
     Remove-Item $StageDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix) -join ";"
+$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix, $IiUpdateManagerPrefix) -join ";"
 $buildTesting = if ($SkipTests) { "OFF" } else { "ON" }
 
 Write-Step "Configuring Vincent"
@@ -2828,6 +2861,7 @@ Invoke-Native $WindeployQt @(
 
 Copy-DependencyRuntimeFiles -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiPaintEngine" -Prefix $IiPaintEnginePrefix -Destination $StageDir
+Copy-DependencyRuntimeFiles -Name "iiUpdateManager" -Prefix $IiUpdateManagerPrefix -Destination $StageDir
 Remove-EmbeddedDependencyQmlImport -ModuleName "LVRS" -Destination $StageDir
 Remove-ReleaseOnlyQtArtifacts -Directory $StageDir -BuildType $BuildType
 if ($windowsPackageRequested) {

@@ -18,8 +18,7 @@ LV.ApplicationWindow {
     visible: false
     windowColor: LV.Theme.window
     solidChrome: true
-    windowDragHandleEnabled: Qt.platform.os === "osx"
-        && visibility !== QtQuickWindow.Window.FullScreen
+    windowDragHandleEnabled: Qt.platform.os === "osx" && visibility !== QtQuickWindow.Window.FullScreen
     navigationEnabled: false
 
     property var canvasPage: null
@@ -37,6 +36,7 @@ LV.ApplicationWindow {
     readonly property string shortcutQuit: menuCommandModifier + "+Q"
     readonly property string shortcutUndo: menuCommandModifier + "+Z"
     readonly property string shortcutRedo: Qt.platform.os === "osx" ? "Meta+Shift+Z" : (Qt.platform.os === "windows" ? "Ctrl+Y" : "Ctrl+Shift+Z")
+    readonly property string shortcutPasteImage: menuCommandModifier + "+V"
     readonly property string shortcutAddLayer: menuCommandModifier + "+Shift+N"
     readonly property string shortcutDeleteCurrentLayer: menuCommandModifier + "+Shift+Delete"
     readonly property string shortcutBrushTool: "B"
@@ -98,6 +98,12 @@ LV.ApplicationWindow {
     function requestRedo() {
         if (window.canvasPage) {
             window.canvasPage.redoActiveRasterSurface();
+        }
+    }
+
+    function requestPasteImage() {
+        if (window.canvasPage) {
+            window.canvasPage.pasteClipboardImage();
         }
     }
 
@@ -199,6 +205,16 @@ LV.ApplicationWindow {
     }
 
     Controls.Action {
+        id: checkForUpdatesAction
+        text: qsTr("Check for Updates…")
+        enabled: VincentUpdateManager.selfUpdateSupported && !VincentUpdateManager.busy
+        onTriggered: {
+            updateModal.open = true;
+            VincentUpdateManager.checkForUpdates();
+        }
+    }
+
+    Controls.Action {
         id: undoAction
         text: qsTr("Undo")
         shortcut: window.shortcutUndo
@@ -212,6 +228,14 @@ LV.ApplicationWindow {
         shortcut: window.shortcutRedo
         enabled: window.canvasEditingCommandsEnabled
         onTriggered: window.requestRedo()
+    }
+
+    Controls.Action {
+        id: pasteImageAction
+        text: qsTr("Paste Image")
+        shortcut: window.shortcutPasteImage
+        enabled: window.canvasEditingCommandsEnabled
+        onTriggered: window.requestPasteImage()
     }
 
     Controls.Action {
@@ -454,9 +478,7 @@ LV.ApplicationWindow {
 
             background: Rectangle {
                 implicitHeight: applicationMenuBar.implicitHeight
-                color: applicationMenuBarItem.down || applicationMenuBarItem.highlighted
-                    ? LV.Theme.surfaceAlt
-                    : "transparent"
+                color: applicationMenuBarItem.down || applicationMenuBarItem.highlighted ? LV.Theme.surfaceAlt : "transparent"
             }
         }
 
@@ -500,6 +522,10 @@ LV.ApplicationWindow {
 
             Controls.MenuItem {
                 action: redoAction
+            }
+
+            Controls.MenuItem {
+                action: pasteImageAction
             }
 
             Controls.MenuSeparator {}
@@ -618,6 +644,15 @@ LV.ApplicationWindow {
         Controls.Menu {
             title: qsTr("Help")
 
+            Controls.MenuItem {
+                action: checkForUpdatesAction
+                visible: VincentUpdateManager.selfUpdateSupported
+            }
+
+            Controls.MenuSeparator {
+                visible: VincentUpdateManager.selfUpdateSupported
+            }
+
             Controls.Menu {
                 title: qsTr("Keyboard Shortcuts")
 
@@ -665,6 +700,11 @@ LV.ApplicationWindow {
 
                 Controls.MenuItem {
                     text: window.shortcutReference(qsTr("Redo"), window.shortcutRedo)
+                    enabled: false
+                }
+
+                Controls.MenuItem {
+                    text: window.shortcutReference(qsTr("Paste Image"), window.shortcutPasteImage)
                     enabled: false
                 }
 
@@ -845,5 +885,34 @@ LV.ApplicationWindow {
         anchors.centerIn: parent
         visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready
         text: qsTr("Loading canvas…")
+    }
+
+    LV.Modal {
+        id: updateModal
+        objectName: "vincentUpdateModal"
+        open: false
+        dismissOnBackground: !VincentUpdateManager.busy
+        showIcon: false
+        title: VincentUpdateManager.title
+        description: VincentUpdateManager.message + (VincentUpdateManager.busy && VincentUpdateManager.progress > 0 ? qsTr("\n\nProgress: %1%").arg(Math.round(VincentUpdateManager.progress * 100)) : "")
+        buttonCount: VincentUpdateManager.canUpdate ? 2 : 1
+        primaryText: VincentUpdateManager.canCancel ? qsTr("Cancel") : VincentUpdateManager.canUpdate ? qsTr("Update now") : qsTr("Close")
+        secondaryText: qsTr("Not now")
+        primaryEnabled: VincentUpdateManager.canUpdate || VincentUpdateManager.canCancel || !VincentUpdateManager.busy
+
+        onPrimaryClicked: {
+            if (VincentUpdateManager.canUpdate) {
+                VincentUpdateManager.updateNow();
+            } else if (VincentUpdateManager.canCancel) {
+                VincentUpdateManager.cancelUpdate();
+            } else {
+                updateModal.open = false;
+            }
+        }
+        onSecondaryClicked: updateModal.open = false
+        onCanceled: {
+            if (VincentUpdateManager.canCancel)
+                VincentUpdateManager.cancelUpdate();
+        }
     }
 }
