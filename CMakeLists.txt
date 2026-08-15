@@ -99,6 +99,17 @@ if(EXISTS "${_vincent_iipaintengine_prefix}/lib/cmake/iiPaintEngine/iiPaintEngin
 endif()
 unset(_vincent_iipaintengine_prefix)
 
+# 로컬 iiSharedCanvas 설치 경로 힌트(.local) 우선 반영
+set(_vincent_iisharedcanvas_prefix "$ENV{HOME}/.local/iiSharedCanvas")
+if(EXISTS "${_vincent_iisharedcanvas_prefix}/lib/cmake/iiSharedCanvas/iiSharedCanvasConfig.cmake")
+    list(FIND CMAKE_PREFIX_PATH "${_vincent_iisharedcanvas_prefix}" _vincent_iisharedcanvas_index)
+    if(_vincent_iisharedcanvas_index EQUAL -1)
+        list(PREPEND CMAKE_PREFIX_PATH "${_vincent_iisharedcanvas_prefix}")
+    endif()
+    unset(_vincent_iisharedcanvas_index)
+endif()
+unset(_vincent_iisharedcanvas_prefix)
+
 # 로컬 iiUpdateManager 설치 경로 힌트(.local) 우선 반영
 set(_vincent_iiupdatemanager_prefix "$ENV{HOME}/.local/iiUpdateManager")
 if(EXISTS "${_vincent_iiupdatemanager_prefix}/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake")
@@ -125,6 +136,7 @@ if(BUILD_TESTING)
 endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
+find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)
 find_package(iiUpdateManager 0.2 CONFIG REQUIRED)
 
 if(APPLE OR WIN32)
@@ -188,17 +200,20 @@ if(APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/platforms/macos/lib"
             "$ENV{HOME}/.local/iiPaintEngine/platforms/macos/lib"
+            "$ENV{HOME}/.local/iiSharedCanvas/lib"
             "$ENV{HOME}/.local/iiUpdateManager/lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/platforms/linux/lib"
             "$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib"
+            "$ENV{HOME}/.local/iiSharedCanvas/lib"
             "$ENV{HOME}/.local/iiUpdateManager/lib")
 endif()
 if(UNIX AND NOT APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/lib"
             "$ENV{HOME}/.local/iiPaintEngine/lib"
+            "$ENV{HOME}/.local/iiSharedCanvas/lib"
             "$ENV{HOME}/.local/iiUpdateManager/lib")
 endif()
 foreach(_vincent_runtime_path IN LISTS _vincent_local_dependency_runtime_candidates)
@@ -288,6 +303,7 @@ endif()
 target_link_libraries(Vincent PRIVATE
         Qt6::Core Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Svg
         iiPaintEngine::iiPaintEngine
+        iiSharedCanvas::iiSharedCanvas
         iiUpdateManager::iiUpdateManager
         vincent_psd_sdk
 )
@@ -333,6 +349,7 @@ if(WIN32)
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                     $<TARGET_FILE:LVRS::LVRS>
                     $<TARGET_FILE:iiPaintEngine::iiPaintEngine>
+                    $<TARGET_FILE:iiSharedCanvas::iiSharedCanvas>
                     $<TARGET_FILE:iiUpdateManager::iiUpdateManager>
                     ${_vincent_windows_runtime_files}
                     $<TARGET_FILE_DIR:Vincent>

@@ -207,6 +207,7 @@ target_link_libraries(tests_drawingsurfaceitem PRIVATE
         Qt6::Network
         Qt6::Test
         iiPaintEngine::iiPaintEngine
+        iiSharedCanvas::iiSharedCanvas
         vincent_psd_sdk
 )
 vincent_configure_local_runtime_paths(tests_drawingsurfaceitem)
@@ -326,7 +327,7 @@ if(WIN32)
             tests_drawingsurfaceitem
             PROPERTIES
             ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
+        "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
     )
 endif()
 

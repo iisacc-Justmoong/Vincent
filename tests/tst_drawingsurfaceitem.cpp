@@ -28,6 +28,8 @@
 #include <QVariantMap>
 #include <QtTest>
 
+#include <iiSharedCanvas.h>
+
 #include "canvasdocumentviewmodel.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "paletteutils.h"
@@ -60,6 +62,8 @@ private slots:
   void renamesLayerRowsAndDrawableObjectMetadata();
   void layersExposeHierarchyRowsAndReorderDrawableObjects();
   void drawsAndSavesStroke();
+  void rendersSharedRasterVectorTimelineDocument();
+  void roundTripsNativeSharedCanvasDocument();
   void pressureSensitiveManualStrokesPreserveInputPressure();
   void erasesCommittedStrokePixels();
   void commitsTextToRasterCanvas();
@@ -2770,6 +2774,106 @@ void tst_DrawingSurfaceItem::drawsAndSavesStroke()
     const QImage saved(outputPath);
     QVERIFY(!saved.isNull());
     QCOMPARE(saved.size(), QSize(128, 96));
+}
+
+void tst_DrawingSurfaceItem::rendersSharedRasterVectorTimelineDocument()
+{
+    using namespace iiSharedCanvas;
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(4);
+    item.setHeight(4);
+    item.setDocumentViewModel(&viewModel);
+
+    Document mixed;
+    mixed.extent = {4, 4};
+    mixed.timeline = {{24, 1}, 2};
+    mixed.assets.emplace_back(RasterAsset{"background", makeRasterLayer(4, 4, 0xff102030U)});
+    mixed.assets.emplace_back(RasterAsset{"motion-0", makeRasterLayer(4, 4, 0x00000000U)});
+    RasterLayer motionFrame = makeRasterLayer(4, 4, 0x00000000U);
+    motionFrame.pixels[0] = 0xffff3366U;
+    mixed.assets.emplace_back(RasterAsset{"motion-1", std::move(motionFrame)});
+
+    VectorPath rectangle;
+    rectangle.commands = {
+        MoveTo{{1.0, 1.0}},
+        LineTo{{3.0, 1.0}},
+        LineTo{{3.0, 3.0}},
+        LineTo{{1.0, 3.0}},
+        ClosePath{},
+    };
+    rectangle.fill = SolidPaint{0xffffcc00U};
+    mixed.assets.emplace_back(VectorAsset{"vector", {4, 4}, {std::move(rectangle)}});
+    mixed.layers.push_back({"background-layer", "Background", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"background"}});
+    mixed.layers.push_back({"motion-layer", "Motion", true, 1.0, {},
+                            RasterBlendMode::SourceOver,
+                            KeyframedSource{ContentKind::Raster,
+                                            {{0, "motion-0"}, {1, "motion-1"}}}});
+    mixed.layers.push_back({"vector-layer", "Vector", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"vector"}});
+
+    QVERIFY(item.document());
+    *item.document() = std::move(mixed);
+    QVERIFY(item.refresh());
+    QVERIFY(item.framePixels());
+    QCOMPARE(item.framePixels()->pixels[0], 0xff102030U);
+    QCOMPARE(item.framePixels()->pixels[5], 0xffffcc00U);
+
+    item.setFrame(1);
+    QCOMPARE(item.frame(), 1U);
+    QVERIFY(item.framePixels());
+    QCOMPARE(item.framePixels()->pixels[0], 0xffff3366U);
+    QCOMPARE(item.framePixels()->pixels[5], 0xffffcc00U);
+}
+
+void tst_DrawingSurfaceItem::roundTripsNativeSharedCanvasDocument()
+{
+    using namespace iiSharedCanvas;
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(32);
+    item.setHeight(24);
+    item.setDocumentViewModel(&viewModel);
+    item.setBrushColor(QColor(QStringLiteral("#26c6da")));
+    item.setBrushSize(6);
+    item.beginStroke(4, 12, 1.0, false);
+    QVERIFY(item.appendStrokePoint(28, 12, 1.0, false));
+    item.endStroke(28, 12, 1.0, false);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nativePath = dir.filePath(QStringLiteral("canvas.iisc"));
+    QVERIFY(item.saveToFile(nativePath));
+
+    QFile nativeFile(nativePath);
+    QVERIFY(nativeFile.open(QIODevice::ReadOnly));
+    const QByteArray bytes = nativeFile.readAll();
+    QVERIFY(bytes.startsWith("IISC\r\n\x1a\n"));
+    const IiscDecodeResult decoded = decodeIisc(std::span<const std::uint8_t>(
+        reinterpret_cast<const std::uint8_t *>(bytes.constData()),
+        static_cast<std::size_t>(bytes.size())));
+    QVERIFY2(decoded.ok(), decoded.error.message.c_str());
+    QCOMPARE(decoded.document.extent.width, 32);
+    QCOMPARE(decoded.document.extent.height, 24);
+
+    DrawingSurfaceItem opened;
+    opened.setWidth(1);
+    opened.setHeight(1);
+    opened.setDocumentViewModel(&viewModel);
+    QVERIFY(opened.openRaster(nativePath));
+    QCOMPARE(opened.width(), 32.0);
+    QCOMPARE(opened.height(), 24.0);
+
+    const QString pngPath = dir.filePath(QStringLiteral("roundtrip.png"));
+    QVERIFY(opened.saveToFile(pngPath));
+    const QImage rendered(pngPath);
+    QVERIFY(!rendered.isNull());
+    QVERIFY(qAlpha(rendered.pixel(16, 12)) > 0);
 }
 
 void tst_DrawingSurfaceItem::pressureSensitiveManualStrokesPreserveInputPressure()

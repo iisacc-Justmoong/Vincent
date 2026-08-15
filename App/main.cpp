@@ -17,6 +17,8 @@
 #include <QtQml>
 #include <qqml.h>
 
+#include <iiSharedCanvas.h>
+
 #include "models/canvas/canvasdocumentviewmodel.h"
 #include "models/license/licensemanager.h"
 #include "models/painting/drawingsurfaceitem.h"
@@ -201,6 +203,7 @@ int main(int argc, char *argv[])
     traceStartup(QStringLiteral("Vincent startup initialized in %1 ms").arg(launchTimer.elapsed()));
 
     qml_register_types_LVRS();
+    iiSharedCanvas::registerIiSharedCanvasQmlTypes();
     traceStartup(QStringLiteral("LVRS QML types registered in %1 ms").arg(launchTimer.elapsed()));
 
     QQmlApplicationEngine engine;

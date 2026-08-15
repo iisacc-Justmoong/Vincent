@@ -255,7 +255,9 @@ void tst_CanvasToolBarQmlContract::leftToolbarMatchesFigmaDesignContract()
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Open image\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openFileDialog()")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("Open Canvas or Image")));
+    QVERIFY(toolbarSource.contains(QStringLiteral(
+        "Canvas and Images (*.iisc *.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"Save image\")")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openSaveDialog()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("function defaultSaveExtension(nameFilter)")));

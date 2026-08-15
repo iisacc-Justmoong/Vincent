@@ -121,6 +121,8 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
     QVERIFY(source.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources/legal/QtKeychain\"")));
     QVERIFY(source.contains(QStringLiteral("find_package(iiUpdateManager 0.2 CONFIG REQUIRED)")));
     QVERIFY(source.contains(QStringLiteral("iiUpdateManager::iiUpdateManager")));
+    QVERIFY(source.contains(QStringLiteral("find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)")));
+    QVERIFY(source.contains(QStringLiteral("iiSharedCanvas::iiSharedCanvas")));
 }
 
 void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()

@@ -720,9 +720,9 @@ Item {
 
     Dialogs.FileDialog {
         id: openDialog
-        title: qsTr("Open Image")
+        title: qsTr("Open Canvas or Image")
         fileMode: Dialogs.FileDialog.OpenFile
-        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")]
+        nameFilters: [qsTr("Canvas and Images (*.iisc *.png *.jpg *.jpeg *.bmp *.gif *.webp *.tif *.tiff *.psd)")]
         onAccepted: {
             const urlString = toolbar.selectedDialogFileUrl(openDialog);
             if (urlString.length) {

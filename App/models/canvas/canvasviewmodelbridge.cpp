@@ -62,27 +62,28 @@ bool CanvasViewModelBridge::canMutateDocument() const
     return !m_documentViewModel.isNull();
 }
 
-void CanvasViewModelBridge::syncToolState(CanvasBrushConfig &brushConfig, QString &toolMode) const
+void CanvasViewModelBridge::syncToolState(CanvasToolState &toolState, QString &toolMode) const
 {
     if (!m_documentViewModel) {
         return;
     }
 
-    readColorProperty(m_documentViewModel, "brushColor", brushConfig.color);
-    readBoundedRealProperty(m_documentViewModel, "brushSize", brushConfig.size, 1.0, 48.0);
-    readBoundedRealProperty(m_documentViewModel, "brushFlow", brushConfig.flow, 0.0, 1.0);
-    readBoundedRealProperty(m_documentViewModel, "brushOpacity", brushConfig.opacity, 0.0, 1.0);
-    readBoundedRealProperty(m_documentViewModel, "brushHardness", brushConfig.hardness, 0.01, 1.0);
-    readMinimumRealProperty(m_documentViewModel, "brushSpacing", brushConfig.spacing, 0.0);
-    readBoundedRealProperty(m_documentViewModel, "brushSpacingRatio", brushConfig.spacingRatio, 0.0, 1.0);
-    readBoundedRealProperty(m_documentViewModel, "pressureCurveMinimum", brushConfig.pressureCurveMinimum, 0.0, 1.0);
-    readBoundedRealProperty(m_documentViewModel, "pressureCurveCenter", brushConfig.pressureCurveCenter, 0.0, 1.0);
-    readBoundedRealProperty(m_documentViewModel, "pressureCurveMaximum", brushConfig.pressureCurveMaximum, 0.0, 1.0);
-    readBoolProperty(m_documentViewModel, "brushPressureControlsOpacity", brushConfig.opacityEnabled);
-    readBoundedRealProperty(m_documentViewModel, "stabilizerStrength", brushConfig.stabilizerStrength, 0.0, 1.0);
-    brushConfig.flowEnabled = true;
-    brushConfig.hardnessEnabled = true;
-    brushConfig.spacingEnabled = true;
+    readColorProperty(m_documentViewModel, "brushColor", toolState.color);
+    readBoundedRealProperty(m_documentViewModel, "brushSize", toolState.size, 1.0, 48.0);
+    readBoundedRealProperty(m_documentViewModel, "brushFlow", toolState.flow, 0.0, 1.0);
+    readBoundedRealProperty(m_documentViewModel, "brushOpacity", toolState.opacity, 0.0, 1.0);
+    readBoundedRealProperty(m_documentViewModel, "brushHardness", toolState.hardness, 0.01, 1.0);
+    readMinimumRealProperty(m_documentViewModel, "brushSpacing", toolState.spacing, 0.0);
+    readBoundedRealProperty(m_documentViewModel, "brushSpacingRatio", toolState.spacingRatio, 0.0, 1.0);
+    readBoundedRealProperty(m_documentViewModel, "pressureCurveMinimum", toolState.pressureCurveMinimum, 0.0, 1.0);
+    readBoundedRealProperty(m_documentViewModel, "pressureCurveCenter", toolState.pressureCurveCenter, 0.0, 1.0);
+    readBoundedRealProperty(m_documentViewModel, "pressureCurveMaximum", toolState.pressureCurveMaximum, 0.0, 1.0);
+    readBoolProperty(m_documentViewModel, "brushPressureControlsOpacity", toolState.opacityEnabled);
+    toolState.pressureToOpacityEnabled = toolState.opacityEnabled;
+    readBoundedRealProperty(m_documentViewModel, "stabilizerStrength", toolState.stabilizerStrength, 0.0, 1.0);
+    toolState.flowEnabled = true;
+    toolState.hardnessEnabled = true;
+    toolState.spacingEnabled = true;
 
     const QVariant toolModeValue = m_documentViewModel->property("toolMode");
     if (toolModeValue.isValid()) {

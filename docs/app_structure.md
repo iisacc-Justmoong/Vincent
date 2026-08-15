@@ -1,10 +1,10 @@
 # Vincent 4.0.5 Application Structure
 
-This document captures the flat-raster architecture of Vincent 4.0.5 after replacing the local painting implementation with iiPaintEngine.
+This document captures Vincent 4.0.5 after moving its native painting surface to iiSharedCanvas while retaining the existing QML session-layer workflow.
 
 ## Top-Level Layout
 
-- `CMakeLists.txt` (root) bootstraps Qt, LVRS, iiPaintEngine, packaging, and the `App/` subdirectory.
+- `CMakeLists.txt` (root) bootstraps Qt, LVRS, iiPaintEngine, iiSharedCanvas, packaging, and the `App/` subdirectory.
 - `App/` contains the application bundle sources.
 - `App/models/canvas/canvasdocumentviewmodel.*` stores LVRS-facing document state for brush color, brush size, active tool, and canvas dimensions.
 - `App/models/canvas/canvasviewmodelbridge.*` gates drawing mutations through the LVRS document view model and synchronizes canvas metadata.
@@ -14,18 +14,18 @@ This document captures the flat-raster architecture of Vincent 4.0.5 after repla
 - `App/models/document/psdimagewriter.*` wraps `psd_sdk` so Vincent can write layered PSD files with XMP metadata.
 - `App/models/license/licensemanager.*` owns the online Vincent product-license request, fail-closed runtime decision, and credential lifecycle.
 - `App/models/license/licensecredentialstore.*` isolates secure credential persistence so the QtKeychain production adapter and in-memory test fake can be exchanged without changing validation policy.
-- `App/models/painting/drawingsurfaceitem.*` adapts Vincent's QML surface contract to `CanvasAdapter` from iiPaintEngine and re-emits the raster/input signals Vincent consumes across the DLL boundary.
+- `App/models/painting/drawingsurfaceitem.*` adapts Vincent's QML surface contract to `iiSharedCanvas::CanvasItem`, whose raster editing delegates to iiPaintEngine.
 - `App/qml/` contains the LVRS UI for the main window, toolbar, and drawing surface.
 - `tests/` contains Qt Test targets for the document view model, iiPaintEngine drawing surface integration, and Windows, macOS, and Linux build/package contracts.
 
 ## Build System Overview
 
-1. The root `CMakeLists.txt` sets up Qt 6, LVRS, iiPaintEngine, `psd_sdk`, install paths, packaging metadata, and the `Vincent` executable target.
+1. The root `CMakeLists.txt` sets up Qt 6, LVRS, iiPaintEngine, iiSharedCanvas, `psd_sdk`, install paths, packaging metadata, and the `Vincent` executable target.
 2. `App/CMakeLists.txt` attaches the C++ sources and headers to the `Vincent` target.
 3. `qt_add_qml_module` registers the `Vincent` QML module and exposes `Main.qml`, `PainterCanvasPage.qml`, `CanvasToolBar.qml`, `HslTriangleColorPicker.qml`, and `DrawingSurface.qml`.
-4. The executable links against Qt Core, Network, QML, Quick, Quick Controls 2, SVG, `iiPaintEngine::iiPaintEngine`, and a static QtKeychain 0.17.0 on macOS/Windows, then LVRS configures runtime QML import handling. QtKeychain is pinned to commit `875f77d9f61bd97fd84cca47ce3bc71186dfbd09`, built without translations or its own tests, and uses no insecure fallback.
+4. The executable links against Qt Core, Network, QML, Quick, Quick Controls 2, SVG, `iiSharedCanvas::iiSharedCanvas`, its iiPaintEngine dependency, and a static QtKeychain 0.17.0 on macOS/Windows, then LVRS configures runtime QML import handling. QtKeychain is pinned to commit `875f77d9f61bd97fd84cca47ce3bc71186dfbd09`, built without translations or its own tests, and uses no insecure fallback.
 5. On Windows, the `Vincent` target uses the GUI subsystem so it starts without a console window; its lifetime remains owned by the `QGuiApplication` event loop and top-level window. Its compiled resources provide the icon, file/product version, `asInvoker` manifest, Windows 10/11 compatibility, Per-Monitor V2 DPI awareness, and long-path awareness.
-6. A Windows post-build step copies LVRS, iiPaintEngine, and the runtime DLLs next to the selected MinGW compiler into `build/` so direct build-tree launches resolve a consistent toolchain. Release packaging keeps LVRS QML embedded in the LVRS binary and removes any duplicate loose `qml/LVRS` deployment tree.
+6. A Windows post-build step copies LVRS, iiPaintEngine, iiSharedCanvas, and the runtime DLLs next to the selected MinGW compiler into `build/` so direct build-tree launches resolve a consistent toolchain. Release packaging keeps LVRS QML embedded in the LVRS binary and removes any duplicate loose `qml/LVRS` deployment tree.
 7. Linux installs use the GNU `bin/lib/qml/plugins/share` layout, a `Terminal=false` desktop entry, relative ELF RPATH, and Qt's generated QML deployment script; macOS remains an app bundle and Windows remains a GUI-subsystem executable with a flat staged runtime.
 8. When `BUILD_TESTING=ON`, `tests/CMakeLists.txt` registers the active unit test targets, including Windows executable resource and PE contract checks on Windows plus static macOS and Linux packaging contracts on every host.
 
@@ -155,8 +155,14 @@ This document captures the flat-raster architecture of Vincent 4.0.5 after repla
 
 ### `DrawingSurfaceItem`
 
-- Inherits `CanvasAdapter` from iiPaintEngine.
+- Inherits `iiSharedCanvas::CanvasItem`; one item can render static raster,
+  static vector, and hold-keyframed raster/vector layers from the same native
+  document while iiPaintEngine remains responsible for bitmap stroke rasterization.
 - Preserves Vincent's previous QML-facing commands such as `newCanvas`, `openRaster`, `saveToFile`, `undo`, `redo`, and compatibility stroke methods.
+- Opens canonical `.iisc` documents through the validated iiSharedCanvas codec,
+  exposes them in Vincent's Open dialog, and supports direct native save through
+  the C++ API. Save As does not expose `.iisc` while QML session layers remain
+  outside the native document.
 - Exposes `imageObjectForFile` for PSD preview/object compatibility, `clipboardImageObject` for raw clipboard pixels or copied local files, and `canImportDroppedImage`/`importDroppedImage` for Qt Quick drop events, while the primary `openRaster` path keeps each flat image at its source pixel dimensions when replacing the base raster canvas. Insert results carry stable status codes (`ready`, `clipboard-unavailable`, `no-image`, `decode-failed`, `image-too-large`, `cache-write-failed`, `download-failed`, or `download-too-large`) and reject dimensions above 32,768 pixels per side or 64 megapixels before hashing pixel bytes. The implementation reuses Qt's existing `QClipboard`, `QMimeData`, `QImageReader`, `QSaveFile`, and `QNetworkAccessManager` APIs rather than adding a dependency. SHA-256-addressed PNG cache hits are checked for a readable matching image size and replacements commit atomically. Remote fallback accepts HTTP(S), permits only no-less-safe redirects, times out after 30 seconds, caps encoded transfers at 64 MB, and strips credentials, query parameters, fragments, and data URLs from persisted source metadata.
 - Exposes `commitText` so QML can pass text bounds, content, text size, and text color into Qt text layout and commit the result back through iiPaintEngine's raster replacement path.
 - Exposes `commitShape` so QML can pass shape bounds, selected shape kind, and fill color into Qt painter paths and commit the solid-color result back through iiPaintEngine's raster replacement path.
@@ -201,7 +207,7 @@ This document captures the flat-raster architecture of Vincent 4.0.5 after repla
 
 - Resolves the active LVRS document view model.
 - Blocks canvas mutation until the expected document/view binding is available.
-- Keeps the model's canvas size, tool state, and iiPaintEngine brush config aligned with the rendered surface.
+- Keeps the model's canvas size, tool state, and iiSharedCanvas bitmap-brush properties aligned with the rendered surface.
 
 ## Data Flow Summary
 
@@ -209,9 +215,9 @@ This document captures the flat-raster architecture of Vincent 4.0.5 after repla
 2. `LicenseActivationPage` submits the verified email and key; only an authoritative `valid: true` for application-owned product `vincent` constructs `PainterCanvasPage`.
 3. `PainterCanvasPage` binds to `CanvasDocumentViewModel` and passes brush state into `DrawingSurface`.
 3. `CanvasToolBar` emits user actions for file flow, tool selection, shape selection, HSL color picker changes, brush size updates, and brush reselection settings.
-4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item delegates raster operations to iiPaintEngine's `CanvasAdapter`.
+4. `DrawingSurface` hosts `DrawingSurfaceItem`; the item uses iiSharedCanvas for mixed-document composition and delegates bitmap strokes to iiPaintEngine.
 5. `PainterCanvasPage` hosts `LV.Hierarchy` on the left and binds it to `DrawingSurface.layerHierarchyRows`; rows use cached layer bitmap thumbnails via `iconSource`, blank documents begin with a selected transparent `Layer 1`, activation selects the matching session object, repeated activation/double-click opens an inline `TextInput` for renaming, footer add creates another transparent raster layer, row drag rewrites `drawableObjects` order, and footer delete removes the selected layer, including `Background`.
-6. iiPaintEngine owns stroke rasterization, live preview, commit, eraser compositing, undo/redo snapshots, raster open, and raster save for each `DrawingSurfaceItem`; Vincent keeps the base raster canvas plus added raster layers as separate surfaces, converts pasted and dropped images into cached session image objects, renders session image/text/shape objects as overlays, routes fill replacements to the selected raster surface, and composites the stack during save.
+6. iiSharedCanvas owns the native document, frame composition, selected-raster editing history, and `.iisc` codec boundary; iiPaintEngine performs stroke rasterization and compositing. Vincent still keeps added raster layers and image/text/shape objects as QML session overlays, routes fill replacements to the selected raster surface, and composites that legacy session stack for raster/PSD save.
 7. When PSD work needs document structure, `PsdCompatibilityDocument` converts the same optional base raster canvas and session objects into a PSD-style layer manifest; `.psd` save passes the base raster composited over Vincent's white canvas paper while `Background` exists, rasterized layer/object images, and that manifest metadata to `PsdImageWriter`.
 8. When opening PSD, `PsdImageReader` reads XMP metadata, merged image data, and importable 8-bit RGB/RGBA raster layers through `psd_sdk`; QML restores layered PSDs as Vincent raster layers and falls back to a cached merged PNG preview for flat PSD image objects.
 
@@ -224,5 +230,5 @@ This document captures the flat-raster architecture of Vincent 4.0.5 after repla
 - `tests/tst_licensemanager.cpp` exercises the exact POST body and headers, normalized verified email, application-owned product ID, strict Boolean response parsing, invalid-license decision, redirects, malformed responses, 5xx, connection failures, and timeouts without using the production endpoint.
 - `tests/tst_linuxbuildworkflowcontract.cpp` validates Linux relative RPATH, generated Qt/QML runtime deployment, root-relative TGZ layout, desktop entry, and documentation contracts.
 - `tests/tst_windowsbinarycontract.cpp` launches the real executable and samples its native outer and client sizes for three seconds, ensuring asynchronous startup produces no visible size transition.
-- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiPaintEngine adapter path for drawing, erasing, fill, text and shape raster commit, system-clipboard image caching/centering/selection and subsequent object movement, local copied-image-file fallback, clipboard ownership loss, dragged encoded MIME images, Finder-style local-file drops, browser HTML/HTTP image drops through an isolated local test server, drop-point placement, malformed and oversized input, obstructed-cache recovery, no-mutation failure behavior, effective-tool cursor mapping, native-window brush/eraser cursor diameter and hotspot tracking during pressed movement, context-sensitive move/body/handle cursors, stale resize-hover cleanup, transformable image/text/shape object movement/resizing/deletion including enlarged handle hit targets, Shift-constrained straight movement and aspect-locked resizing, clipped visual scope, and bounds that can exceed the canvas, shape/text tool creation as separate layer rows, initial blank-layer creation, hierarchy raster-layer creation without transform hit testing, raster-layer deletion removing its pixels from composite output, background-layer deletion, transparency-grid visibility, Background omission from PSD output, many-layer creation without snapshot churn, hierarchy-layer renaming, hierarchy-layer row projection and reordering, hand-tool canvas panning, viewport-wide horizontal-drag canvas zooming, composite object saving including layered PSD output with metadata, PSD merged-preview and layer import through `psd_sdk`, undo/redo, saving, repeated flat-image canvas replacement at source resolution, explicit-size new canvas creation, and workspace-inset canvas creation. Its native-pointer case requires a genuinely exposed window for synthesized mouse input and frame capture, and allows the macOS compositor up to 15 seconds to expose that fixture after a build.
+- `tests/tst_drawingsurfaceitem.cpp` validates the Vincent-to-iiSharedCanvas path, including mixed raster/vector/keyframe composition and `.iisc` round-trip, plus drawing, erasing, fill, text and shape raster commit, system-clipboard image caching/centering/selection and subsequent object movement, local copied-image-file fallback, clipboard ownership loss, dragged encoded MIME images, Finder-style local-file drops, browser HTML/HTTP image drops through an isolated local test server, drop-point placement, malformed and oversized input, obstructed-cache recovery, no-mutation failure behavior, effective-tool cursor mapping, native-window brush/eraser cursor diameter and hotspot tracking during pressed movement, context-sensitive move/body/handle cursors, stale resize-hover cleanup, transformable image/text/shape object movement/resizing/deletion including enlarged handle hit targets, Shift-constrained straight movement and aspect-locked resizing, clipped visual scope, and bounds that can exceed the canvas, shape/text tool creation as separate layer rows, initial blank-layer creation, hierarchy raster-layer creation without transform hit testing, raster-layer deletion removing its pixels from composite output, background-layer deletion, transparency-grid visibility, Background omission from PSD output, many-layer creation without snapshot churn, hierarchy-layer renaming, hierarchy-layer row projection and reordering, hand-tool canvas panning, viewport-wide horizontal-drag canvas zooming, composite object saving including layered PSD output with metadata, PSD merged-preview and layer import through `psd_sdk`, undo/redo, saving, repeated flat-image canvas replacement at source resolution, explicit-size new canvas creation, and workspace-inset canvas creation. Its native-pointer case requires a genuinely exposed window for synthesized mouse input and frame capture, and allows the macOS compositor up to 15 seconds to expose that fixture after a build.
 - Run the suite with `ctest --test-dir build --output-on-failure` after configuring with `-DBUILD_TESTING=ON`.

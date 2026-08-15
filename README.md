@@ -7,6 +7,11 @@ license is verified online with the account email and receipt/dashboard key;
 documents remain local and Vincent contains no telemetry, analytics, ads, or
 automatic/background update checks. Updates run only after explicit user actions.
 
+The painting surface is backed by the installed iiSharedCanvas mixed-document
+canvas. See [docs/SHARED_CANVAS.md](docs/SHARED_CANVAS.md) for the native
+raster/vector/timeline contract, `.iisc` persistence boundary, verification
+gates, and remaining session-object migration scope.
+
 ![Vincent 4.0 running on Windows with a sample raster artwork](docs/marketing/vincent-windows-editor.png)
 
 _Vincent 4.0 on Windows editing a sample raster artwork. The artwork is a
@@ -64,7 +69,7 @@ owned by the App Store or Microsoft Store.
 3. Open Vincent 4.0 from Launchpad or the Applications folder.
 
 ## Build from source (Linux)
-Vincent supports Linux source builds, but no public Linux binary archive is currently offered. Configure and build the tagged source with the required Qt, LVRS, and iiPaintEngine dependencies; the packaging target collects the Qt, LVRS, and iiPaintEngine shared runtimes, and an installed tree provides `bin/Vincent` plus a `Terminal=false` desktop entry for launching only the GUI on X11 and Wayland.
+Vincent supports Linux source builds, but no public Linux binary archive is currently offered. Configure and build the tagged source with the required Qt, LVRS, iiPaintEngine, and iiSharedCanvas dependencies; the packaging target collects the Qt, LVRS, iiPaintEngine, and iiSharedCanvas shared runtimes, and an installed tree provides `bin/Vincent` plus a `Terminal=false` desktop entry for launching only the GUI on X11 and Wayland.
 
 ## Install (Windows)
 Vincent 4.0.5 is distributed from iisacc.com as an unsigned x64 MSI through December 31, 2026. It contains the same online license manager as the notarized macOS build, but it has no Authenticode publisher identity. Windows may therefore display **Unknown publisher** or a Microsoft Defender SmartScreen warning. Download it only through the authenticated Vincent account page and compare the SHA-256 shown there before opening it.

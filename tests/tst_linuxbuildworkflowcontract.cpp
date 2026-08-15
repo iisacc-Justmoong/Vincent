@@ -36,6 +36,7 @@ void tst_LinuxBuildWorkflowContract::cmakeBuildsDeployableLinuxArchive()
                                             "    list(APPEND _vincent_local_dependency_runtime_candidates")));
     QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/LVRS/platforms/linux/lib")));
     QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiSharedCanvas/lib")));
     QVERIFY(!source.contains(QStringLiteral("$ENV{HOME}/.local/LVRS/platforms/macos\"\n"
                                              "        \"$ENV{HOME}/.local/LVRS")));
 
@@ -89,7 +90,7 @@ void tst_LinuxBuildWorkflowContract::documentationMatchesTheInstalledLinuxLayout
     const QString buildGuide = readTextFile(buildGuidePath);
 
     QVERIFY(readme.contains(QStringLiteral("`bin/Vincent`")));
-    QVERIFY(readme.contains(QStringLiteral("Qt, LVRS, and iiPaintEngine shared runtimes")));
+    QVERIFY(readme.contains(QStringLiteral("Qt, LVRS, iiPaintEngine, and iiSharedCanvas shared runtimes")));
     QVERIFY(readme.contains(QStringLiteral("native macOS global menu bar")));
     QVERIFY(readme.contains(QStringLiteral("Windows and Linux use a compact dark in-window menu bar")));
     QVERIFY(buildGuide.contains(QStringLiteral("qt_generate_deploy_qml_app_script")));

@@ -53,7 +53,10 @@
 #include <QtMath>
 #include <QtGlobal>
 
+#include <algorithm>
+#include <limits>
 #include <memory>
+#include <span>
 
 namespace {
 
@@ -96,6 +99,11 @@ QString localFilePath(const QString &fileUrl)
 bool hasPsdSuffix(const QString &fileUrl)
 {
     return localFilePath(fileUrl).endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
+}
+
+bool hasIiscSuffix(const QString &fileUrl)
+{
+    return localFilePath(fileUrl).endsWith(QStringLiteral(".iisc"), Qt::CaseInsensitive);
 }
 
 QImage imageFromFileUrl(const QString &fileUrl)
@@ -1093,11 +1101,17 @@ bool writeLayeredPsdFile(const QString &filePath,
 } // namespace
 
 DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
-    : CanvasAdapter(parent)
+    : iiSharedCanvas::CanvasItem(parent)
     , m_viewModelBridge(new CanvasViewModelBridge())
 {
-    connect(this, &CanvasAdapter::undoRedoChanged, this, &DrawingSurfaceItem::emitUndoRedoSignals);
-    connect(this, &PaintCanvasItem::strokeCountChanged, this, &DrawingSurfaceItem::rasterContentChanged);
+    connect(this,
+            &iiSharedCanvas::CanvasItem::undoRedoChanged,
+            this,
+            &DrawingSurfaceItem::emitUndoRedoSignals);
+    connect(this,
+            &iiSharedCanvas::CanvasItem::strokeCountChanged,
+            this,
+            &DrawingSurfaceItem::rasterContentChanged);
 }
 
 DrawingSurfaceItem::~DrawingSurfaceItem()
@@ -1132,12 +1146,46 @@ void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
     }
 
     m_viewModelBridge->setDocumentViewModel(documentViewModel);
-    CanvasBrushConfig nextBrushConfig = brushConfig();
+    CanvasToolState nextToolState;
+    nextToolState.color = brushColor();
+    nextToolState.size = brushSize();
+    nextToolState.flow = brushFlow();
+    nextToolState.opacity = brushOpacity();
+    nextToolState.hardness = brushHardness();
+    nextToolState.spacing = brushSpacing();
+    nextToolState.spacingRatio = brushSpacingRatio();
+    nextToolState.flowEnabled = brushFlowEnabled();
+    nextToolState.opacityEnabled = brushOpacityEnabled();
+    nextToolState.hardnessEnabled = brushHardnessEnabled();
+    nextToolState.spacingEnabled = brushSpacingEnabled();
+    nextToolState.pressureCurveMinimum = pressureCurveMinimum();
+    nextToolState.pressureCurveCenter = pressureCurveCenter();
+    nextToolState.pressureCurveMaximum = pressureCurveMaximum();
+    nextToolState.pressureToOpacityEnabled = pressureToOpacityEnabled();
+    nextToolState.stabilizerStrength = stabilizerStrength();
     QString nextToolMode = toolMode();
-    m_viewModelBridge->syncToolState(nextBrushConfig, nextToolMode);
-    setBrushConfig(nextBrushConfig);
+    m_viewModelBridge->syncToolState(nextToolState, nextToolMode);
+    setBrushColor(nextToolState.color);
+    setBrushSize(nextToolState.size);
+    setBrushFlow(nextToolState.flow);
+    setBrushOpacity(nextToolState.opacity);
+    setBrushHardness(nextToolState.hardness);
+    setBrushSpacing(nextToolState.spacing);
+    setBrushSpacingRatio(nextToolState.spacingRatio);
+    setBrushFlowEnabled(nextToolState.flowEnabled);
+    setBrushOpacityEnabled(nextToolState.opacityEnabled);
+    setBrushHardnessEnabled(nextToolState.hardnessEnabled);
+    setBrushSpacingEnabled(nextToolState.spacingEnabled);
+    setPressureCurveMinimum(nextToolState.pressureCurveMinimum);
+    setPressureCurveMaximum(nextToolState.pressureCurveMaximum);
+    setPressureCurveCenter(nextToolState.pressureCurveCenter);
+    setPressureToOpacityEnabled(nextToolState.pressureToOpacityEnabled);
+    setStabilizerStrength(nextToolState.stabilizerStrength);
     setToolMode(nextToolMode);
     syncCanvasSize();
+    if (!documentReady()) {
+        createRasterDocument(canvasSize().width(), canvasSize().height());
+    }
     emit documentViewModelChanged();
 }
 
@@ -1157,7 +1205,7 @@ void DrawingSurfaceItem::newCanvas()
     }
 
     syncCanvasSize();
-    const bool created = CanvasAdapter::newCanvas(canvasSize().width(), canvasSize().height());
+    const bool created = createRasterDocument(canvasSize().width(), canvasSize().height());
     if (created && m_hasBackground) {
         m_hasBackground = false;
         m_backgroundSource.clear();
@@ -1177,6 +1225,10 @@ bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasW
 {
     if (!canMutateDocument()) {
         return false;
+    }
+
+    if (hasIiscSuffix(fileUrl)) {
+        return openSharedCanvasDocument(fileUrl);
     }
 
     QImage image = imageFromFileUrl(fileUrl);
@@ -1560,12 +1612,17 @@ QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const
 
 bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
 {
+    if (hasIiscSuffix(fileUrl)) {
+        return saveSharedCanvasDocument(fileUrl);
+    }
     if (hasPsdSuffix(fileUrl)) {
         syncCanvasSize();
         return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()), {}, {}, true);
     }
 
-    return CanvasAdapter::saveToFile(fileUrl);
+    syncCanvasSize();
+    const QImage image = currentRasterCanvasImage(canvasSize());
+    return !image.isNull() && image.save(localFilePath(fileUrl));
 }
 
 bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects)
@@ -1578,6 +1635,13 @@ bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fil
                                                               const QVariantList &rasterLayers,
                                                               bool includeBackgroundLayer)
 {
+    if (hasIiscSuffix(fileUrl)) {
+        if (!objects.isEmpty() || !rasterLayers.isEmpty()) {
+            return false;
+        }
+        return saveSharedCanvasDocument(fileUrl);
+    }
+
     syncCanvasSize();
     const QImage rasterImage = currentRasterCanvasImage(canvasSize());
     if (rasterImage.isNull()) {
@@ -1739,7 +1803,7 @@ QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &obj
 
 void DrawingSurfaceItem::undo()
 {
-    const bool applied = CanvasAdapter::undo();
+    const bool applied = iiSharedCanvas::CanvasItem::undo();
     if (applied) {
         emit rasterContentChanged();
     }
@@ -1747,7 +1811,7 @@ void DrawingSurfaceItem::undo()
 
 void DrawingSurfaceItem::redo()
 {
-    const bool applied = CanvasAdapter::redo();
+    const bool applied = iiSharedCanvas::CanvasItem::redo();
     if (applied) {
         emit rasterContentChanged();
     }
@@ -1784,8 +1848,7 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
                                                             rawPressure,
                                                             Qt::LeftButton,
                                                             Qt::LeftButton);
-        CanvasAdapter::event(&event);
-        emit inputStateChanged();
+        iiSharedCanvas::CanvasItem::event(&event);
         return;
     }
 
@@ -1794,8 +1857,7 @@ void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressu
                                        pointY,
                                        Qt::LeftButton,
                                        Qt::LeftButton);
-    CanvasAdapter::mousePressEvent(&event);
-    emit inputStateChanged();
+    iiSharedCanvas::CanvasItem::mousePressEvent(&event);
 }
 
 bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
@@ -1811,8 +1873,7 @@ bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal raw
                                                             rawPressure,
                                                             Qt::NoButton,
                                                             Qt::LeftButton);
-        CanvasAdapter::event(&event);
-        emit inputStateChanged();
+        iiSharedCanvas::CanvasItem::event(&event);
         return true;
     }
 
@@ -1821,8 +1882,7 @@ bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal raw
                                        pointY,
                                        Qt::NoButton,
                                        Qt::LeftButton);
-    CanvasAdapter::mouseMoveEvent(&event);
-    emit inputStateChanged();
+    iiSharedCanvas::CanvasItem::mouseMoveEvent(&event);
     return true;
 }
 
@@ -1839,8 +1899,7 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
                                                             rawPressure,
                                                             Qt::LeftButton,
                                                             Qt::NoButton);
-        CanvasAdapter::event(&event);
-        emit inputStateChanged();
+        iiSharedCanvas::CanvasItem::event(&event);
         emit rasterContentChanged();
         return;
     }
@@ -1850,8 +1909,7 @@ void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure
                                        pointY,
                                        Qt::LeftButton,
                                        Qt::NoButton);
-    CanvasAdapter::mouseReleaseEvent(&event);
-    emit inputStateChanged();
+    iiSharedCanvas::CanvasItem::mouseReleaseEvent(&event);
     emit rasterContentChanged();
 }
 
@@ -2021,7 +2079,7 @@ bool DrawingSurfaceItem::event(QEvent *event)
         event->accept();
         return true;
     }
-    return CanvasAdapter::event(event);
+    return iiSharedCanvas::CanvasItem::event(event);
 }
 
 void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
@@ -2034,7 +2092,7 @@ void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
         event->accept();
         return;
     }
-    CanvasAdapter::mousePressEvent(event);
+    iiSharedCanvas::CanvasItem::mousePressEvent(event);
 }
 
 void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
@@ -2047,7 +2105,7 @@ void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
         event->accept();
         return;
     }
-    CanvasAdapter::mouseMoveEvent(event);
+    iiSharedCanvas::CanvasItem::mouseMoveEvent(event);
 }
 
 void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
@@ -2060,12 +2118,12 @@ void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
         event->accept();
         return;
     }
-    CanvasAdapter::mouseReleaseEvent(event);
+    iiSharedCanvas::CanvasItem::mouseReleaseEvent(event);
 }
 
 void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
-    CanvasAdapter::geometryChange(newGeometry, oldGeometry);
+    iiSharedCanvas::CanvasItem::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() == oldGeometry.size()) {
         return;
     }
@@ -2123,23 +2181,133 @@ bool DrawingSurfaceItem::isOverlayToolActive() const
 QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
 {
     QImage image;
-    QTemporaryFile snapshotFile(QDir::tempPath() + QStringLiteral("/vincent-canvas-XXXXXX.png"));
-    snapshotFile.setAutoRemove(true);
-    if (snapshotFile.open()) {
-        const QString snapshotPath = snapshotFile.fileName();
-        snapshotFile.close();
-        if (saveRasterCanvasToFile(snapshotPath)) {
-            image.load(snapshotPath);
-        }
+    const RasterLayer *pixels = framePixels();
+    if (pixels && pixels->width > 0 && pixels->height > 0
+        && pixels->width <= std::numeric_limits<int>::max() / 4) {
+        const QImage view(reinterpret_cast<const uchar *>(pixels->pixels.data()),
+                          pixels->width,
+                          pixels->height,
+                          pixels->width * 4,
+                          QImage::Format_ARGB32);
+        image = view.copy();
     }
-
     if (image.isNull()) {
         image = transparentCanvasImage(targetSize);
+    } else if (image.size() != targetSize) {
+        QImage resized = transparentCanvasImage(targetSize);
+        QPainter painter(&resized);
+        painter.drawImage(QPointF(0.0, 0.0), image);
+        painter.end();
+        image = resized;
     }
     if (image.format() != QImage::Format_ARGB32_Premultiplied) {
         image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     }
     return image;
+}
+
+bool DrawingSurfaceItem::replaceRasterCanvas(const QImage &source)
+{
+    if (source.isNull() || source.width() <= 0 || source.height() <= 0) {
+        return false;
+    }
+
+    QImage image = source.convertToFormat(QImage::Format_ARGB32);
+    if (canvasWidth() != image.width() || canvasHeight() != image.height()
+        || !rasterLayerSelected()) {
+        m_isApplyingCanvasSurfaceSize = true;
+        setWidth(image.width());
+        setHeight(image.height());
+        m_isApplyingCanvasSurfaceSize = false;
+        if (!createRasterDocument(image.width(), image.height())) {
+            return false;
+        }
+    }
+
+    RasterLayer pixels = makeRasterLayer(image.width(), image.height());
+    for (int y = 0; y < image.height(); ++y) {
+        const auto *row = reinterpret_cast<const std::uint32_t *>(image.constScanLine(y));
+        std::copy_n(row,
+                    static_cast<std::size_t>(image.width()),
+                    pixels.pixels.begin()
+                        + static_cast<std::ptrdiff_t>(y) * image.width());
+    }
+    return replaceSelectedPixels(pixels);
+}
+
+bool DrawingSurfaceItem::openSharedCanvasDocument(const QString &fileUrl)
+{
+    const QString filePath = localFilePath(fileUrl);
+    QFile file(filePath);
+    const iiSharedCanvas::SerializationLimits limits;
+    if (!file.open(QIODevice::ReadOnly)
+        || file.size() < static_cast<qint64>(iiSharedCanvas::IiscHeaderSize)
+        || static_cast<std::uint64_t>(file.size()) > limits.maximumContainerBytes) {
+        return false;
+    }
+
+    const QByteArray bytes = file.readAll();
+    if (bytes.size() != file.size()) {
+        return false;
+    }
+    iiSharedCanvas::IiscDecodeResult decoded = iiSharedCanvas::decodeIisc(
+        std::span<const std::uint8_t>(
+            reinterpret_cast<const std::uint8_t *>(bytes.constData()),
+            static_cast<std::size_t>(bytes.size())),
+        limits);
+    if (!decoded.ok()) {
+        return false;
+    }
+
+    if (!document()
+        && !createDocument(decoded.document.extent.width,
+                           decoded.document.extent.height,
+                           decoded.document.timeline.frameCount)) {
+        return false;
+    }
+    iiSharedCanvas::Document *target = document();
+    *target = std::move(decoded.document);
+    if (!bind(*target)) {
+        return false;
+    }
+    for (const iiSharedCanvas::Layer &layer : target->layers) {
+        const iiSharedCanvas::Asset *asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
+        if (asset && std::holds_alternative<iiSharedCanvas::RasterAsset>(*asset)) {
+            selectLayer(QString::fromUtf8(layer.id.data(),
+                                          static_cast<qsizetype>(layer.id.size())));
+            break;
+        }
+    }
+
+    resizeCanvasSurface(target->extent.width, target->extent.height);
+    m_backgroundSource = localFileSource(fileUrl);
+    m_hasBackground = true;
+    emit backgroundChanged();
+    emit rasterContentChanged();
+    return true;
+}
+
+bool DrawingSurfaceItem::saveSharedCanvasDocument(const QString &fileUrl)
+{
+    if (!document()) {
+        return false;
+    }
+    const iiSharedCanvas::IiscEncodeResult encoded = iiSharedCanvas::encodeIisc(*document());
+    if (!encoded.ok()
+        || encoded.bytes.size() > static_cast<std::size_t>(std::numeric_limits<qint64>::max())) {
+        return false;
+    }
+
+    QSaveFile file(localFilePath(fileUrl));
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    const qint64 byteCount = static_cast<qint64>(encoded.bytes.size());
+    if (file.write(reinterpret_cast<const char *>(encoded.bytes.data()), byteCount) != byteCount) {
+        file.cancelWriting();
+        return false;
+    }
+    return file.commit();
 }
 
 void DrawingSurfaceItem::syncCanvasSize()

@@ -553,6 +553,7 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(source.contains(QStringLiteral("libwinpthread-1.dll")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:LVRS::LVRS>")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiPaintEngine::iiPaintEngine>")));
+    QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiSharedCanvas::iiSharedCanvas>")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE_DIR:Vincent>")));
     QVERIFY(source.contains(QStringLiteral("Copying Windows runtime DLLs next to Vincent.exe")));
     QVERIFY(source.contains(QStringLiteral("if(APPLE)\n    # productbuild")));
@@ -580,6 +581,7 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     const QString testsSource = readTextFile(testsCmakePath);
     QVERIFY(testsSource.contains(QStringLiteral("ENVIRONMENT_MODIFICATION")));
     QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>")));
+    QVERIFY(testsSource.contains(QStringLiteral("PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>")));
     QVERIFY(testsSource.contains(QStringLiteral("QT_QPA_PLATFORM=set:offscreen")));
     QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy")));
     QVERIFY(testsSource.contains(QStringLiteral("tst_windowsauthenticodepolicy.ps1")));

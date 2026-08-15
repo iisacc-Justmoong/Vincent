@@ -6,7 +6,7 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
-#include <QtAdapter/CanvasAdapter.h>
+#include <iiSharedCanvas.h>
 
 class CanvasViewModelBridge;
 class QEvent;
@@ -15,7 +15,7 @@ class QNetworkAccessManager;
 class QObject;
 class QUrl;
 
-class DrawingSurfaceItem : public CanvasAdapter
+class DrawingSurfaceItem : public iiSharedCanvas::CanvasItem
 {
     Q_OBJECT
     Q_PROPERTY(QObject *documentViewModel READ documentViewModel WRITE setDocumentViewModel NOTIFY documentViewModelChanged)
@@ -91,7 +91,6 @@ signals:
     void canUndoChanged();
     void canRedoChanged();
     void rasterContentChanged();
-    void inputStateChanged();
     void droppedImageReady(const QVariantMap& imageObject, qreal dropX, qreal dropY);
     void droppedImageFailed(const QString& errorCode);
 
@@ -113,6 +112,9 @@ private:
     [[nodiscard]] bool isZoomToolActive() const;
     [[nodiscard]] bool isOverlayToolActive() const;
     [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
+    bool replaceRasterCanvas(const QImage &image);
+    bool openSharedCanvasDocument(const QString &fileUrl);
+    bool saveSharedCanvasDocument(const QString &fileUrl);
     void syncCanvasSize();
     void emitUndoRedoSignals();
     void requestRemoteDroppedImage(const QUrl& url, qreal maximumObjectWidth,
