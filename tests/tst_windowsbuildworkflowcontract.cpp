@@ -627,7 +627,15 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY2(!buildScriptPath.isEmpty(), "build-windows.ps1 test data was not found");
     const QString buildScriptSource = readTextFile(buildScriptPath);
     QVERIFY(buildScriptSource.contains(QStringLiteral(
-        "Assert-MsiDatabaseContract -MsiFile $MsiPartialPath")));
+        "function Assert-MsiDatabaseContract {\n"
+        "    param(\n"
+        "        [string]$MsiFile,\n"
+        "        [string]$ProductVersion\n"
+        "    )")));
+    QVERIFY(buildScriptSource.contains(QStringLiteral(
+        "\"-Version\", $ProductVersion")));
+    QVERIFY(buildScriptSource.contains(QStringLiteral(
+        "Assert-MsiDatabaseContract -MsiFile $MsiPartialPath -ProductVersion $msiVersion")));
     QVERIFY(buildScriptSource.contains(QStringLiteral("\"-MsiPath\", $MsiFile")));
 }
 

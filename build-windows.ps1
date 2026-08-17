@@ -2211,7 +2211,10 @@ function New-MsiInstaller {
 }
 
 function Assert-MsiDatabaseContract {
-    param([string]$MsiFile)
+    param(
+        [string]$MsiFile,
+        [string]$ProductVersion
+    )
 
     $contractScript = Join-Path $RepositoryRoot "tests\tst_windowsmsidatabasecontract.ps1"
     if (-not (Test-Path -LiteralPath $contractScript -PathType Leaf)) {
@@ -2224,7 +2227,7 @@ function Assert-MsiDatabaseContract {
         "-ExecutionPolicy", "Bypass",
         "-File", $contractScript,
         "-BuildDirectory", $BuildDir,
-        "-Version", $Version,
+        "-Version", $ProductVersion,
         "-MsiPath", $MsiFile
     )
 }
@@ -2974,7 +2977,7 @@ try {
         } else {
             Write-Warning "The MSI is an unsigned public release under the temporary 2026 policy. Publish its authenticated SHA-256 with the download."
         }
-        Assert-MsiDatabaseContract -MsiFile $MsiPartialPath
+        Assert-MsiDatabaseContract -MsiFile $MsiPartialPath -ProductVersion $msiVersion
         Write-Sha256File `
             -File $MsiPartialPath `
             -OutputPath $MsiChecksumPartialPath `
