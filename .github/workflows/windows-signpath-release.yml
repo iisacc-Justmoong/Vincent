@@ -130,6 +130,36 @@ jobs:
               throw "iiUpdateManager checkout does not match the pinned commit."
           }
 
+      - name: Build, test, and install pinned iiUpdateManager
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
+          $build = Join-Path $source "build"
+          $prefix = Join-Path $env:USERPROFILE ".local\iiUpdateManager"
+          cmake -S $source -B $build -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DBUILD_TESTING=ON `
+              "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager configure failed." }
+          cmake --build $build --parallel
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager build failed." }
+          $testRuntimePaths = @($build, (Join-Path $env:QT_ROOT_DIR "bin"))
+          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
+          ctest --test-dir $build --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+              $diagnosticFile = Join-Path $env:RUNNER_TEMP "iiUpdateManagerUpdateFlowTests.txt"
+              $updateFlowExecutable = Join-Path $build "iiUpdateManagerUpdateFlowTests.exe"
+              & $updateFlowExecutable -v1 -o "$diagnosticFile,txt"
+              $diagnosticExitCode = $LASTEXITCODE
+              if (Test-Path -LiteralPath $diagnosticFile -PathType Leaf) {
+                  Get-Content -LiteralPath $diagnosticFile
+              }
+              throw "iiUpdateManager tests failed; diagnostic exit code: $diagnosticExitCode"
+          }
+          cmake --install $build --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager installation failed." }
+          "IIUPDATEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build and install pinned LVRS
         shell: pwsh
         run: |
@@ -199,25 +229,6 @@ jobs:
           cmake --install $build --prefix $prefix
           if ($LASTEXITCODE -ne 0) { throw "iiSharedCanvas installation failed." }
           "IISHAREDCANVAS_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Build, test, and install pinned iiUpdateManager
-        shell: pwsh
-        run: |
-          $source = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
-          $build = Join-Path $source "build"
-          $prefix = Join-Path $env:USERPROFILE ".local\iiUpdateManager"
-          cmake -S $source -B $build -G Ninja `
-              -DCMAKE_BUILD_TYPE=Release `
-              -DBUILD_TESTING=ON `
-              "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager configure failed." }
-          cmake --build $build --parallel
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager build failed." }
-          ctest --test-dir $build --output-on-failure
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager tests failed." }
-          cmake --install $build --prefix $prefix
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager installation failed." }
-          "IIUPDATEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build verified Windows MSI
         shell: pwsh

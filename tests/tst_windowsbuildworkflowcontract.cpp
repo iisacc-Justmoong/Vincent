@@ -823,6 +823,16 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("persist-credentials: false")));
     QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiUpdateManager")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
+    const qsizetype updateManagerBuildIndex = workflow.indexOf(
+        QStringLiteral("Build, test, and install pinned iiUpdateManager"));
+    const qsizetype lvrsBuildIndex = workflow.indexOf(
+        QStringLiteral("Build and install pinned LVRS"));
+    QVERIFY(updateManagerBuildIndex >= 0);
+    QVERIFY(lvrsBuildIndex >= 0);
+    QVERIFY(updateManagerBuildIndex < lvrsBuildIndex);
+    QVERIFY(workflow.contains(QStringLiteral("iiUpdateManagerUpdateFlowTests.exe")));
+    QVERIFY(workflow.contains(QStringLiteral("$diagnosticFile")));
+    QVERIFY(workflow.contains(QStringLiteral("Get-Content -LiteralPath $diagnosticFile")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiSharedCanvas")));
     QVERIFY(workflow.contains(QStringLiteral("$testRuntimePaths = @(")));

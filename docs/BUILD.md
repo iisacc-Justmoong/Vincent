@@ -165,6 +165,8 @@ After creating and checking out the immutable release tag, generate that archive
 
 The website-release runner prepends the iiSharedCanvas build directory and the pinned iiPaintEngine, LVRS, and Qt runtime directories before running iiSharedCanvas CTest. On Windows, omitting those locations produces loader status `0xc0000135` before a test body starts even when the DLL compiled and linked successfully.
 
+The independent iiUpdateManager build and test gate runs before the longer LVRS build so a private updater regression fails fast. Its freshly built DLL and Qt runtime directories are prepended to `PATH`; if CTest fails, the runner repeats the update-flow executable with per-test text output and prints that diagnostic before stopping.
+
 The temporary public unsigned MSI receives the `-unsigned` filename suffix so it cannot be confused with a signed release. It is restricted to Release or MinSizeRel, requires the full test suite and public source evidence, and expires automatically at the beginning of 2027:
 
 ```powershell
