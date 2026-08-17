@@ -25,8 +25,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.5"
-$PackageVersion = "$Version.0"
+$Version = "5.1"
+$packageVersionParts = @($Version -split '\.')
+while ($packageVersionParts.Count -lt 4) {
+    $packageVersionParts += "0"
+}
+$PackageVersion = $packageVersionParts[0..3] -join "."
 $RepositoryRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $BuildDirectory = Join-Path $RepositoryRoot "build"
 $DistDirectory = Join-Path $RepositoryRoot "dist"
@@ -198,6 +202,12 @@ function Assert-StorePackageContent {
     if (-not (Test-Path -LiteralPath $iiPaintEngineLicense -PathType Leaf) -or
         (Get-Item -LiteralPath $iiPaintEngineLicense -ErrorAction SilentlyContinue).Length -le 0) {
         throw "A public Store submission requires the copyright holder's explicit iiPaintEngine LICENSE."
+    }
+
+    $iiSharedCanvasLicense = Join-Path $Directory "legal\iiSharedCanvas\LICENSE.txt"
+    if (-not (Test-Path -LiteralPath $iiSharedCanvasLicense -PathType Leaf) -or
+        (Get-Item -LiteralPath $iiSharedCanvasLicense -ErrorAction SilentlyContinue).Length -le 0) {
+        throw "A public Store submission requires the iiSharedCanvas LICENSE."
     }
 
     $sourceOffer = Get-Content -LiteralPath (Join-Path $Directory "SOURCE_OFFER.txt") -Raw

@@ -7,16 +7,7 @@ import "./license" as LicenseViews
 
 LV.ApplicationWindow {
     id: window
-    readonly property int initialWidth: 1400
-    readonly property int initialHeight: 880
-    readonly property int minimumWindowWidth: 640
-    readonly property int minimumWindowHeight: 400
-    width: initialWidth
-    height: initialHeight
-    minimumWidth: minimumWindowWidth
-    minimumHeight: minimumWindowHeight
     visible: false
-    windowColor: LV.Theme.window
     solidChrome: true
     windowDragHandleEnabled: Qt.platform.os === "osx" && visibility !== QtQuickWindow.Window.FullScreen
     navigationEnabled: false
@@ -24,7 +15,7 @@ LV.ApplicationWindow {
     property var canvasPage: null
     property bool canvasIncubationRequested: false
     property string clipboardPasteFailureMessage: ""
-    readonly property bool licenseGranted: VincentLicenseManager.licensed
+    readonly property bool licenseGranted: !VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
     readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
     readonly property string currentToolMode: canvasPage && canvasPage.vm ? canvasPage.vm.toolMode : ""
@@ -907,7 +898,7 @@ LV.ApplicationWindow {
 
     LicenseViews.LicenseActivationPage {
         anchors.fill: parent
-        visible: !window.licenseGranted
+        visible: VincentLicenseManager.enforcementEnabled && !window.licenseGranted
     }
 
     LV.AppCard {
@@ -915,9 +906,8 @@ LV.ApplicationWindow {
         anchors.top: parent.top
         anchors.topMargin: LV.Theme.gap24
         anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(560, Math.max(320, parent.width - LV.Theme.gap24 * 2))
         z: 1000
-        visible: window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
+        visible: VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
         title: qsTr("Vincent could not remember this license")
         subtitle: qsTr("The canvas is unlocked for this session. Enter the license again the next time Vincent starts.")
     }
@@ -928,7 +918,6 @@ LV.ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: LV.Theme.gap24
-        width: Math.min(620, Math.max(320, parent.width - LV.Theme.gap24 * 2))
         z: 1100
         visible: window.clipboardPasteFailureMessage.length > 0
         title: qsTr("Image not pasted")

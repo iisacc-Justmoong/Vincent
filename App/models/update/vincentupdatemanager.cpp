@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QVersionNumber>
 #include <QXmlStreamReader>
 
 #include <algorithm>
@@ -31,6 +32,19 @@ struct DistributionChannelMarker
     bool present = false;
     QString value;
 };
+
+QString canonicalUpdateProtocolVersion(QString version)
+{
+    qsizetype suffixIndex = 0;
+    const QVersionNumber parsed = QVersionNumber::fromString(version, &suffixIndex);
+    if (!parsed.isNull()
+        && suffixIndex == version.size()
+        && parsed.segmentCount() == 2
+        && parsed.toString() == version) {
+        version.append(QStringLiteral(".0"));
+    }
+    return version;
+}
 
 DistributionChannelMarker readDistributionChannelMarker(const QString &infoPlistPath)
 {
@@ -146,7 +160,7 @@ VincentUpdateManager::VincentUpdateManager(LicenseManager *licenseManager, QObje
     , m_credentialProvider(std::make_unique<VincentUpdateCredentialProvider>(licenseManager))
     , m_backend(std::make_unique<UpdateManager>(
           QStringLiteral("vincent"),
-          QCoreApplication::applicationVersion()))
+          canonicalUpdateProtocolVersion(QCoreApplication::applicationVersion())))
 {
     m_backend->setCredentialProvider(m_credentialProvider.get());
     connectBackend();
@@ -163,7 +177,7 @@ VincentUpdateManager::VincentUpdateManager(LicenseManager *licenseManager,
     , m_credentialProvider(std::make_unique<VincentUpdateCredentialProvider>(licenseManager))
     , m_backend(std::make_unique<UpdateManager>(
           QStringLiteral("vincent"),
-          std::move(currentVersion),
+          canonicalUpdateProtocolVersion(std::move(currentVersion)),
           std::move(manifestUrl),
           std::move(grantUrl)))
 {

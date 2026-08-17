@@ -388,6 +388,7 @@ need_cmd /usr/libexec/PlistBuddy
 need_cmd /usr/bin/file
 need_cmd /usr/bin/lipo
 need_cmd /usr/bin/otool
+need_cmd /usr/bin/install_name_tool
 if [[ "$RUN_TESTS" == "1" ]]; then
   need_cmd ctest
 fi
@@ -620,6 +621,31 @@ remove_unused_qt_sql_plugins() {
   fi
 }
 
+remove_absolute_macho_rpaths() {
+  local app="$1"
+
+  while IFS= read -r -d '' binary; do
+    if ! /usr/bin/file -b "$binary" 2>/dev/null | grep -q 'Mach-O'; then
+      continue
+    fi
+
+    local runtime_paths
+    runtime_paths="$(/usr/bin/otool -l "$binary" 2>/dev/null \
+      | awk '$1 == "cmd" && $2 == "LC_RPATH" { want_path = 1; next }
+             want_path && $1 == "path" { print $2; want_path = 0 }' \
+      | awk '/^\// && !seen[$0]++' || true)"
+
+    if [[ -z "$runtime_paths" ]]; then
+      continue
+    fi
+
+    while IFS= read -r runtime_path; do
+      say "removing non-portable LC_RPATH from ${binary#${app}/}: $runtime_path"
+      run /usr/bin/install_name_tool -delete_rpath "$runtime_path" "$binary"
+    done <<< "$runtime_paths"
+  done < <(find "${app}/Contents" -type f -print0)
+}
+
 assert_portable_macho_links() {
   local app="$1"
   local violations="${WORKDIR}/macho_path_violations_$(basename "$app")_$$.txt"
@@ -796,6 +822,7 @@ prepare_app() {
   say "macdeployqt begins: mode=$mode"
   macdeployqt_run "$out_app" "$mode"
   remove_unused_qt_sql_plugins "$out_app"
+  remove_absolute_macho_rpaths "$out_app"
   assert_update_manager_runtime "$out_app"
   assert_portable_macho_links "$out_app"
   assert_macos_deployment_targets "$out_app"

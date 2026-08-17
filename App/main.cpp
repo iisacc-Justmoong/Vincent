@@ -20,6 +20,7 @@
 #include <iiSharedCanvas.h>
 
 #include "models/canvas/canvasdocumentviewmodel.h"
+#include "models/input/temporarycamerainput.h"
 #include "models/license/licensemanager.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "models/brush/paletteutils.h"
@@ -28,6 +29,8 @@
 void qml_register_types_LVRS();
 
 namespace {
+
+constexpr int initialLaunchWindowWidth = 1280;
 
 QString startupLogPath()
 {
@@ -152,21 +155,41 @@ void registerViewModels(QQmlApplicationEngine &engine, PaletteUtils *paletteUtil
                               Q_ARG(QObject *, documentViewModel));
 }
 
+QSize initialLaunchWindowSize(const QSize &frameworkSize)
+{
+    if (!frameworkSize.isValid()) {
+        return frameworkSize;
+    }
+
+    const int initialHeight =
+        qRound(qreal(initialLaunchWindowWidth) * frameworkSize.height() / frameworkSize.width());
+    return QSize(initialLaunchWindowWidth, initialHeight);
+}
+
 QSize finalLaunchWindowSize(const QWindow &window)
 {
+    const QSize requestedSize = initialLaunchWindowSize(window.size());
+    if (!requestedSize.isValid()) {
+        return requestedSize;
+    }
+
     QScreen *screen = window.screen();
     if (!screen) {
         screen = QGuiApplication::primaryScreen();
     }
     if (!screen) {
-        return window.size();
+        return requestedSize;
     }
 
     const QSize availableSize = screen->availableGeometry().size();
     if (!availableSize.isValid()) {
-        return window.size();
+        return requestedSize;
     }
-    return window.size().boundedTo(availableSize);
+    if (requestedSize.width() <= availableSize.width()
+        && requestedSize.height() <= availableSize.height()) {
+        return requestedSize;
+    }
+    return requestedSize.scaled(availableSize, Qt::KeepAspectRatio);
 }
 
 void showLaunchWindow(QQmlApplicationEngine &engine)
@@ -210,9 +233,13 @@ int main(int argc, char *argv[])
     configureEngineImports(engine);
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
 
+    auto *temporaryCameraInput = new TemporaryCameraInput(&app);
+    app.installEventFilter(temporaryCameraInput);
+    engine.rootContext()->setContextProperty("VincentTemporaryCameraInput", temporaryCameraInput);
     auto *paletteUtils = new PaletteUtils(&engine);
     engine.rootContext()->setContextProperty("PaletteUtils", paletteUtils);
-    auto *licenseManager = new LicenseManager(&engine);
+    auto *licenseManager =
+        new LicenseManager(LicenseManager::EnforcementMode::Disabled, &engine);
     engine.rootContext()->setContextProperty("VincentLicenseManager", licenseManager);
     auto *updateManager = new VincentUpdateManager(licenseManager, &engine);
     engine.rootContext()->setContextProperty("VincentUpdateManager", updateManager);

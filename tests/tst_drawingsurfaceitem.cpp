@@ -46,6 +46,7 @@ private slots:
   void constrainsShapeDragWithShiftModifier();
   void pansCanvasWithHandToolDrag();
   void zoomsCanvasWithHorizontalDrag();
+  void zoomsCanvasWithNativeTemporaryCameraDrag();
   void usesToolAppropriateCanvasCursors();
   void tracksBrushCursorDuringNativePointerInput();
   void pastesSystemClipboardImageAsTransformableObject();
@@ -63,6 +64,9 @@ private slots:
   void layersExposeHierarchyRowsAndReorderDrawableObjects();
   void drawsAndSavesStroke();
   void rendersSharedRasterVectorTimelineDocument();
+  void rasterToolsPreserveMixedSharedCanvasLayers();
+  void rasterToolsRespectSelectedLayerTransform();
+  void openingRasterReplacesMixedSharedCanvasDocument();
   void roundTripsNativeSharedCanvasDocument();
   void pressureSensitiveManualStrokesPreserveInputPressure();
   void erasesCommittedStrokePixels();
@@ -849,15 +853,63 @@ void tst_DrawingSurfaceItem::pansCanvasWithHandToolDrag()
     QVERIFY2(!releaseTemporaryPan.hasError(), qPrintable(releaseTemporaryPan.error().toString()));
     QCOMPARE(releaseTemporaryPanResult.toString(), QStringLiteral("brush,brush,35,24"));
 
+    QQmlExpression temporaryZoom(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("const zoomBefore = canvasZoomScale;"
+                       "beginSpaceZoomMode();"
+                       "beginZoomDrag(100);"
+                       "updateZoomDrag(220);"
+                       "commitZoomDrag();"
+                       "[effectiveToolMode(), toolMode, canvasZoomScale > zoomBefore, "
+                       "temporaryCameraMode].join(\",\");"));
+    const QVariant temporaryZoomResult = temporaryZoom.evaluate();
+    QVERIFY2(!temporaryZoom.hasError(), qPrintable(temporaryZoom.error().toString()));
+    QCOMPARE(temporaryZoomResult.toString(), QStringLiteral("zoom,brush,true,zoom"));
+
+    QQmlExpression modifierReleaseToPan(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("beginSpacePanMode();"
+                       "[effectiveToolMode(), toolMode, temporaryCameraMode, "
+                       "zoomDraggingActive].join(\",\");"));
+    const QVariant modifierReleaseToPanResult = modifierReleaseToPan.evaluate();
+    QVERIFY2(!modifierReleaseToPan.hasError(),
+             qPrintable(modifierReleaseToPan.error().toString()));
+    QCOMPARE(modifierReleaseToPanResult.toString(), QStringLiteral("pan,brush,pan,false"));
+
+    QQmlExpression releaseTemporaryCamera(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("endTemporaryCameraMode();"
+                       "[effectiveToolMode(), toolMode, temporaryCameraMode].join(\",\");"));
+    const QVariant releaseTemporaryCameraResult = releaseTemporaryCamera.evaluate();
+    QVERIFY2(!releaseTemporaryCamera.hasError(),
+             qPrintable(releaseTemporaryCamera.error().toString()));
+    QCOMPARE(releaseTemporaryCameraResult.toString(), QStringLiteral("brush,brush,"));
+
+    QQmlExpression disabledShortcutPan(
+        engine.rootContext(),
+        object.data(),
+        QStringLiteral("toolShortcutsEnabled = false;"
+                       "[beginSpacePanMode(), beginSpaceZoomMode(), effectiveToolMode(), "
+                       "temporaryCameraMode].join(\",\");"));
+    const QVariant disabledShortcutPanResult = disabledShortcutPan.evaluate();
+    QVERIFY2(!disabledShortcutPan.hasError(),
+             qPrintable(disabledShortcutPan.error().toString()));
+    QCOMPARE(disabledShortcutPanResult.toString(), QStringLiteral("false,false,brush,"));
+
     QQmlExpression textEditingSpace(
         engine.rootContext(), object.data(),
-        QStringLiteral("toolMode = \"text\";"
+        QStringLiteral("toolShortcutsEnabled = true;"
+                       "toolMode = \"text\";"
                        "beginTextPlacement(20, 24);"
-                       "[beginSpacePanMode(), effectiveToolMode(), spacePanActive, "
+                       "[beginSpacePanMode(), beginSpaceZoomMode(), effectiveToolMode(), "
+                       "temporaryCameraMode, "
                        "textEditingActive].join(\",\");"));
     const QVariant textEditingSpaceResult = textEditingSpace.evaluate();
     QVERIFY2(!textEditingSpace.hasError(), qPrintable(textEditingSpace.error().toString()));
-    QCOMPARE(textEditingSpaceResult.toString(), QStringLiteral("false,text,false,true"));
+    QCOMPARE(textEditingSpaceResult.toString(), QStringLiteral("false,false,text,,true"));
 
     QQmlExpression cancelTextEditing(engine.rootContext(),
                                      object.data(),
@@ -959,6 +1011,97 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
     QCOMPARE(canvasPaper->scale(), emptyWorkspaceZoomedScale);
 }
 
+void tst_DrawingSurfaceItem::zoomsCanvasWithNativeTemporaryCameraDrag()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQuickWindow window;
+    window.setGeometry(100, 100, 720, 480);
+    rootItem->setParentItem(window.contentItem());
+    window.show();
+    QVERIFY2(QTest::qWaitForWindowExposed(&window, nativeWindowExposureTimeoutMs),
+             "The native temporary-camera test window was not exposed before the compositor timeout");
+
+    QQuickItem *canvasViewport =
+        findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    QQuickItem *canvasZoomMouseArea =
+        findItemByObjectName(rootItem, QStringLiteral("canvasZoomMouseArea"));
+    QVERIFY(canvasZoomMouseArea);
+    QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
+    QCOMPARE(rootItem->property("temporaryCameraMode").toString(), QString{});
+    QCOMPARE(canvasZoomMouseArea->property("enabled").toBool(), false);
+    QTRY_COMPARE(rootItem->property("canvasZoomScale").toReal(), 1.0);
+
+    QQmlExpression beginTemporaryZoom(engine.rootContext(),
+                                      object.data(),
+                                      QStringLiteral("beginSpaceZoomMode();"));
+    beginTemporaryZoom.evaluate();
+    QVERIFY2(!beginTemporaryZoom.hasError(),
+             qPrintable(beginTemporaryZoom.error().toString()));
+    QTRY_COMPARE(canvasZoomMouseArea->property("enabled").toBool(), true);
+    QCOMPARE(rootItem->property("temporaryCameraMode").toString(), QStringLiteral("zoom"));
+    QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
+
+    const QPoint startPoint = canvasViewport->mapToScene(
+        QPointF(canvasViewport->width() / 2, canvasViewport->height() / 2)).toPoint();
+    const QPoint finishPoint = startPoint + QPoint(120, 0);
+    QTest::mouseMove(&window, startPoint);
+    QTRY_COMPARE(window.cursor().shape(), Qt::CrossCursor);
+    QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, startPoint);
+    QTRY_VERIFY(rootItem->property("zoomDraggingActive").toBool());
+    QTest::mouseMove(&window, finishPoint, 10);
+    QTRY_VERIFY(rootItem->property("canvasZoomScale").toReal() > 1.0);
+    QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, finishPoint);
+    QTRY_VERIFY(!rootItem->property("zoomDraggingActive").toBool());
+
+    const qreal zoomedInScale = rootItem->property("canvasZoomScale").toReal();
+    QVERIFY(zoomedInScale > 1.0);
+
+    QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, finishPoint);
+    QTRY_VERIFY(rootItem->property("zoomDraggingActive").toBool());
+    QTest::mouseMove(&window, startPoint, 10);
+    QTRY_VERIFY(rootItem->property("canvasZoomScale").toReal() < zoomedInScale);
+    QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, startPoint);
+    QTRY_VERIFY(!rootItem->property("zoomDraggingActive").toBool());
+
+    const qreal zoomedOutScale = rootItem->property("canvasZoomScale").toReal();
+    QVERIFY(zoomedOutScale < zoomedInScale);
+
+    QQmlExpression endTemporaryCamera(engine.rootContext(),
+                                      object.data(),
+                                      QStringLiteral("endTemporaryCameraMode();"));
+    endTemporaryCamera.evaluate();
+    QVERIFY2(!endTemporaryCamera.hasError(),
+             qPrintable(endTemporaryCamera.error().toString()));
+    QTRY_COMPARE(canvasZoomMouseArea->property("enabled").toBool(), false);
+    QCOMPARE(rootItem->property("temporaryCameraMode").toString(), QString{});
+    QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
+    QCOMPARE(rootItem->property("canvasZoomScale").toReal(), zoomedOutScale);
+}
+
 void tst_DrawingSurfaceItem::usesToolAppropriateCanvasCursors()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
@@ -1018,12 +1161,20 @@ void tst_DrawingSurfaceItem::usesToolAppropriateCanvasCursors()
                        "matches.push(drawableObjectHoverHandleMode === \"\");"
                        "toolMode = \"brush\"; beginSpacePanMode();"
                        "matches.push(canvasCursorShape(20, 20) === Qt.OpenHandCursor);"
+                       "panDraggingActive = true;"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.ClosedHandCursor);"
+                       "panDraggingActive = false;"
                        "endSpacePanMode();"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.BlankCursor);"
+                       "beginSpaceZoomMode();"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.CrossCursor);"
+                       "endTemporaryCameraMode();"
+                       "matches.push(canvasCursorShape(20, 20) === Qt.BlankCursor);"
                        "matches.join(\",\");"));
     const QVariant cursorContractResult = cursorContract.evaluate();
     QVERIFY2(!cursorContract.hasError(), qPrintable(cursorContract.error().toString()));
     QCOMPARE(cursorContractResult.toString(),
-             QStringLiteral("true,true,true,true,true,true,true,true,true,true,true,true,true,true,true"));
+             QStringLiteral("true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true"));
 
     DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
     QVERIFY(canvasItem);
@@ -2827,6 +2978,142 @@ void tst_DrawingSurfaceItem::rendersSharedRasterVectorTimelineDocument()
     QVERIFY(item.framePixels());
     QCOMPARE(item.framePixels()->pixels[0], 0xffff3366U);
     QCOMPARE(item.framePixels()->pixels[5], 0xffffcc00U);
+}
+
+void tst_DrawingSurfaceItem::rasterToolsPreserveMixedSharedCanvasLayers()
+{
+    using namespace iiSharedCanvas;
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(32);
+    item.setHeight(32);
+    item.setDocumentViewModel(&viewModel);
+
+    Document mixed;
+    mixed.extent = {32, 32};
+    mixed.timeline = {{24, 1}, 1};
+    mixed.assets.emplace_back(RasterAsset{"paint", makeRasterLayer(32, 32, 0x00000000U)});
+
+    VectorPath rectangle;
+    rectangle.commands = {
+        MoveTo{{2.0, 2.0}},
+        LineTo{{10.0, 2.0}},
+        LineTo{{10.0, 10.0}},
+        LineTo{{2.0, 10.0}},
+        ClosePath{},
+    };
+    rectangle.fill = SolidPaint{0xffff3366U};
+    mixed.assets.emplace_back(VectorAsset{"vector", {32, 32}, {std::move(rectangle)}});
+    mixed.layers.push_back({"paint-layer", "Paint", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"paint"}});
+    mixed.layers.push_back({"vector-layer", "Vector", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"vector"}});
+
+    QVERIFY(item.document());
+    *item.document() = std::move(mixed);
+    QVERIFY(item.refresh());
+    QVERIFY(item.selectLayer(QStringLiteral("paint-layer")));
+    QCOMPARE(item.framePixels()->pixels[4 * 32 + 4], 0xffff3366U);
+
+    const QColor shapeColor(QStringLiteral("#1976d2"));
+    QVERIFY(item.commitShape(20, 20, 6, 6, QStringLiteral("rectangle"), shapeColor));
+
+    const RasterAsset *paint = findRasterAsset(*item.document(), "paint");
+    QVERIFY(paint);
+    QCOMPARE(paint->pixels.pixels[4 * 32 + 4], 0x00000000U);
+    QCOMPARE(paint->pixels.pixels[22 * 32 + 22], shapeColor.rgba());
+    QCOMPARE(item.framePixels()->pixels[4 * 32 + 4], 0xffff3366U);
+    QCOMPARE(item.framePixels()->pixels[22 * 32 + 22], shapeColor.rgba());
+}
+
+void tst_DrawingSurfaceItem::rasterToolsRespectSelectedLayerTransform()
+{
+    using namespace iiSharedCanvas;
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(32);
+    item.setHeight(32);
+    item.setDocumentViewModel(&viewModel);
+
+    Document transformed;
+    transformed.extent = {32, 32};
+    transformed.timeline = {{24, 1}, 1};
+    transformed.assets.emplace_back(RasterAsset{"paint", makeRasterLayer(8, 8, 0x00000000U)});
+    AffineTransform layerTransform;
+    layerTransform.translationX = 10.0;
+    layerTransform.translationY = 5.0;
+    transformed.layers.push_back({"paint-layer", "Paint", true, 1.0, layerTransform,
+                                  RasterBlendMode::SourceOver, StaticSource{"paint"}});
+
+    QVERIFY(item.document());
+    *item.document() = std::move(transformed);
+    QVERIFY(item.refresh());
+    QVERIFY(item.selectLayer(QStringLiteral("paint-layer")));
+
+    const QColor shapeColor(QStringLiteral("#43a047"));
+    QVERIFY(item.commitShape(12, 7, 4, 4, QStringLiteral("rectangle"), shapeColor));
+
+    const RasterAsset *paint = findRasterAsset(*item.document(), "paint");
+    QVERIFY(paint);
+    QCOMPARE(paint->pixels.width, 8);
+    QCOMPARE(paint->pixels.height, 8);
+    QCOMPARE(paint->pixels.pixels[3 * 8 + 3], shapeColor.rgba());
+    QCOMPARE(item.framePixels()->pixels[8 * 32 + 13], shapeColor.rgba());
+}
+
+void tst_DrawingSurfaceItem::openingRasterReplacesMixedSharedCanvasDocument()
+{
+    using namespace iiSharedCanvas;
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(16);
+    item.setHeight(16);
+    item.setDocumentViewModel(&viewModel);
+
+    Document mixed;
+    mixed.extent = {16, 16};
+    mixed.timeline = {{24, 1}, 1};
+    mixed.assets.emplace_back(RasterAsset{"paint", makeRasterLayer(16, 16, 0x00000000U)});
+    VectorPath rectangle;
+    rectangle.commands = {
+        MoveTo{{2.0, 2.0}},
+        LineTo{{14.0, 2.0}},
+        LineTo{{14.0, 14.0}},
+        LineTo{{2.0, 14.0}},
+        ClosePath{},
+    };
+    rectangle.fill = SolidPaint{0xffff3366U};
+    mixed.assets.emplace_back(VectorAsset{"vector", {16, 16}, {std::move(rectangle)}});
+    mixed.layers.push_back({"paint-layer", "Paint", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"paint"}});
+    mixed.layers.push_back({"vector-layer", "Vector", true, 1.0, {},
+                            RasterBlendMode::SourceOver, StaticSource{"vector"}});
+    QVERIFY(item.document());
+    *item.document() = std::move(mixed);
+    QVERIFY(item.refresh());
+    QVERIFY(item.selectLayer(QStringLiteral("paint-layer")));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString rasterPath = dir.filePath(QStringLiteral("replacement.png"));
+    QImage replacement(16, 16, QImage::Format_ARGB32);
+    replacement.fill(QColor(QStringLiteral("#26c6da")));
+    QVERIFY(replacement.save(rasterPath));
+
+    QVERIFY(item.openRaster(rasterPath));
+    QVERIFY(item.document());
+    QCOMPARE(item.document()->assets.size(), std::size_t{1});
+    QCOMPARE(item.document()->layers.size(), std::size_t{1});
+    const RasterAsset *opened = findRasterAsset(*item.document(), "canvas.raster.0");
+    QVERIFY(opened);
+    QCOMPARE(opened->pixels.pixels[8 * 16 + 8], QColor(QStringLiteral("#26c6da")).rgba());
+    QCOMPARE(item.framePixels()->pixels[8 * 16 + 8], QColor(QStringLiteral("#26c6da")).rgba());
 }
 
 void tst_DrawingSurfaceItem::roundTripsNativeSharedCanvasDocument()

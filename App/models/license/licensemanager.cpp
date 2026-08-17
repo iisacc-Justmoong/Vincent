@@ -150,10 +150,17 @@ void StoredLicenseCredentials::clear()
 }
 
 LicenseManager::LicenseManager(QObject *parent)
-    : LicenseManager(productionValidationEndpoint, 10000, nullptr, parent)
+    : LicenseManager(EnforcementMode::Enabled, parent)
+{
+}
+
+LicenseManager::LicenseManager(EnforcementMode enforcementMode, QObject *parent)
+    : LicenseManager(productionValidationEndpoint, 10000, nullptr, enforcementMode, parent)
 {
     m_credentialStore = createPlatformLicenseCredentialStore(this);
-    QTimer::singleShot(0, this, &LicenseManager::restoreStoredLicense);
+    if (m_enforcementEnabled) {
+        QTimer::singleShot(0, this, &LicenseManager::restoreStoredLicense);
+    }
 }
 
 LicenseManager::LicenseManager(const QUrl &validationEndpoint,
@@ -175,10 +182,25 @@ LicenseManager::LicenseManager(const QUrl &validationEndpoint,
                                int requestTimeoutMilliseconds,
                                LicenseCredentialStore *credentialStore,
                                QObject *parent)
+    : LicenseManager(validationEndpoint,
+                     requestTimeoutMilliseconds,
+                     credentialStore,
+                     EnforcementMode::Enabled,
+                     parent)
+{
+}
+
+LicenseManager::LicenseManager(const QUrl &validationEndpoint,
+                               int requestTimeoutMilliseconds,
+                               LicenseCredentialStore *credentialStore,
+                               EnforcementMode enforcementMode,
+                               QObject *parent)
     : LicenseManager(validationEndpoint, requestTimeoutMilliseconds, parent)
 {
     m_credentialStore = credentialStore;
-    if (m_credentialStore) {
+    m_enforcementEnabled = enforcementMode == EnforcementMode::Enabled;
+    m_licensed = !m_enforcementEnabled;
+    if (m_enforcementEnabled && m_credentialStore) {
         QTimer::singleShot(0, this, &LicenseManager::restoreStoredLicense);
     }
 }
@@ -186,6 +208,11 @@ LicenseManager::LicenseManager(const QUrl &validationEndpoint,
 QString LicenseManager::productId() const
 {
     return vincentProductId;
+}
+
+bool LicenseManager::enforcementEnabled() const
+{
+    return m_enforcementEnabled;
 }
 
 bool LicenseManager::licensed() const
@@ -215,7 +242,7 @@ QString LicenseManager::resultCode() const
 
 void LicenseManager::validateLicense(const QString &email, const QString &licenseKey)
 {
-    if (m_licensed || m_verifying) {
+    if (!m_enforcementEnabled || m_licensed || m_verifying) {
         return;
     }
 
@@ -233,7 +260,7 @@ void LicenseManager::validateLicense(const QString &email, const QString &licens
 
 void LicenseManager::retryStoredLicense()
 {
-    if (m_licensed || m_verifying || !m_hasStoredLicense
+    if (!m_enforcementEnabled || m_licensed || m_verifying || !m_hasStoredLicense
         || !isValidEmail(m_storedEmail) || !isValidLicenseKey(m_storedLicenseKey)) {
         return;
     }
@@ -243,7 +270,7 @@ void LicenseManager::retryStoredLicense()
 
 void LicenseManager::forgetLicense()
 {
-    if (m_licensed) {
+    if (!m_enforcementEnabled || m_licensed) {
         return;
     }
 
@@ -311,7 +338,7 @@ void LicenseManager::requestStoredCredentials(StoredCredentialCompletion complet
 
 void LicenseManager::restoreStoredLicense()
 {
-    if (!persistenceSupported() || m_verifying || m_licensed) {
+    if (!m_enforcementEnabled || !persistenceSupported() || m_verifying || m_licensed) {
         return;
     }
 

@@ -17,7 +17,6 @@ Item {
     readonly property int toolbarTopMargin: topChromeReservedHeight
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
-    readonly property int layerPanelWidth: Math.min(260, Math.max(220, Math.round(width * 0.22)))
     readonly property int layerPanelTopMargin: toolbarTopMargin + canvasToolBar.height
     readonly property int layerRenameActivationWindowMs: 500
     readonly property int layerRenameRepeatActivationThreshold: 3
@@ -75,6 +74,21 @@ Item {
 
         function onBindingsChanged() {
             painterPage.refreshViewModel();
+        }
+    }
+
+    Binding {
+        target: VincentTemporaryCameraInput
+        property: "enabled"
+        value: drawingSurface.toolShortcutsEnabled && !drawingSurface.textEditingActive
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Connections {
+        target: VincentTemporaryCameraInput
+
+        function onModeChanged() {
+            drawingSurface.setTemporaryCameraMode(VincentTemporaryCameraInput.mode);
         }
     }
 
@@ -282,11 +296,7 @@ Item {
                 anchors.topMargin: painterPage.layerPanelTopMargin
                 anchors.leftMargin: 0
                 anchors.bottomMargin: 0
-                width: painterPage.layerPanelWidth
                 z: 4
-                minimumPanelWidth: painterPage.layerPanelWidth
-                minimumPanelHeight: 160
-                panelColor: LV.Theme.panelBackground05
                 editable: true
                 model: drawingSurface.layerHierarchyRows
                 footerVisible: true

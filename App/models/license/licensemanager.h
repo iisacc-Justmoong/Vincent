@@ -31,6 +31,7 @@ class LicenseManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString productId READ productId CONSTANT)
+    Q_PROPERTY(bool enforcementEnabled READ enforcementEnabled CONSTANT)
     Q_PROPERTY(bool licensed READ licensed NOTIFY licensedChanged)
     Q_PROPERTY(bool verifying READ verifying NOTIFY verifyingChanged)
     Q_PROPERTY(bool persistenceSupported READ persistenceSupported CONSTANT)
@@ -38,6 +39,13 @@ class LicenseManager : public QObject
     Q_PROPERTY(QString resultCode READ resultCode NOTIFY resultCodeChanged)
 
 public:
+    enum class EnforcementMode
+    {
+        Enabled,
+        Disabled
+    };
+    Q_ENUM(EnforcementMode)
+
     enum class StoredCredentialStatus
     {
         Available,
@@ -50,6 +58,7 @@ public:
         std::function<void(StoredCredentialStatus, StoredLicenseCredentials)>;
 
     explicit LicenseManager(QObject *parent = nullptr);
+    explicit LicenseManager(EnforcementMode enforcementMode, QObject *parent = nullptr);
     LicenseManager(const QUrl &validationEndpoint,
                    int requestTimeoutMilliseconds,
                    QObject *parent = nullptr);
@@ -57,8 +66,14 @@ public:
                    int requestTimeoutMilliseconds,
                    LicenseCredentialStore *credentialStore,
                    QObject *parent = nullptr);
+    LicenseManager(const QUrl &validationEndpoint,
+                   int requestTimeoutMilliseconds,
+                   LicenseCredentialStore *credentialStore,
+                   EnforcementMode enforcementMode,
+                   QObject *parent = nullptr);
 
     [[nodiscard]] QString productId() const;
+    [[nodiscard]] bool enforcementEnabled() const;
     [[nodiscard]] bool licensed() const;
     [[nodiscard]] bool verifying() const;
     [[nodiscard]] bool persistenceSupported() const;
@@ -100,6 +115,7 @@ private:
     QPointer<QNetworkReply> m_activeReply;
     QTimer m_requestTimeout;
     bool m_responseTooLarge = false;
+    bool m_enforcementEnabled = true;
     bool m_licensed = false;
     bool m_verifying = false;
     bool m_hasStoredLicense = false;

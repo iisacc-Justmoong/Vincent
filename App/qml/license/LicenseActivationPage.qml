@@ -39,7 +39,6 @@ Item {
         id: activationCard
         objectName: "licenseActivationCard"
         anchors.centerIn: parent
-        width: Math.min(520, Math.max(320, parent.width - LV.Theme.gap24 * 2))
         title: VincentLicenseManager.hasStoredLicense ? qsTr("Verify saved license") : qsTr("Activate Vincent")
         subtitle: VincentLicenseManager.hasStoredLicense ? qsTr("Reconnect to verify the license already saved on this device.") : qsTr("Verify this copy before opening the canvas.")
 
@@ -126,23 +125,21 @@ Item {
                 wrapMode: Text.WordWrap
             }
 
-            LV.AbstractButton {
+            LV.LabelButton {
                 objectName: "activateLicenseButton"
                 Layout.fillWidth: true
                 visible: !VincentLicenseManager.hasStoredLicense
                 text: VincentLicenseManager.verifying ? qsTr("Verifying…") : qsTr("Activate Vincent")
-                tone: LV.AbstractButton.Primary
                 enabled: !VincentLicenseManager.verifying && emailInput.text.trim().length > 0 && licenseKeyInput.text.trim().length > 0
                 Accessible.name: qsTr("Activate Vincent")
                 onClicked: activationPage.submitLicense()
             }
 
-            LV.AbstractButton {
+            LV.LabelButton {
                 objectName: "retryStoredLicenseButton"
                 Layout.fillWidth: true
                 visible: VincentLicenseManager.hasStoredLicense
                 text: VincentLicenseManager.verifying ? qsTr("Verifying…") : qsTr("Retry saved license")
-                tone: LV.AbstractButton.Primary
                 enabled: !VincentLicenseManager.verifying
                 Accessible.name: qsTr("Retry saved Vincent license")
                 onClicked: VincentLicenseManager.retryStoredLicense()

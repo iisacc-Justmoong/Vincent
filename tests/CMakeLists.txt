@@ -64,6 +64,25 @@ vincent_configure_local_runtime_paths(tests_mainqmlcontract)
 
 add_test(NAME tests_mainqmlcontract COMMAND tests_mainqmlcontract)
 
+add_executable(tests_temporarycamerainput
+        tst_temporarycamerainput.cpp
+        ../App/models/input/temporarycamerainput.cpp
+        ../App/models/input/temporarycamerainput.h
+)
+
+target_include_directories(tests_temporarycamerainput PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/input
+)
+
+target_link_libraries(tests_temporarycamerainput PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_temporarycamerainput)
+
+add_test(NAME tests_temporarycamerainput COMMAND tests_temporarycamerainput)
+
 add_executable(tests_licensemanager
         tst_licensemanager.cpp
         ../App/models/license/licensecredentialstore.cpp
@@ -228,6 +247,7 @@ set_tests_properties(
         tests_psdcompatibilitydocument
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
+        tests_temporarycamerainput
         tests_licensemanager
         tests_vincentupdatemanager
         tests_macosbuildworkflowcontract

@@ -45,7 +45,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
     Q_OBJECT
 
 private slots:
-    void cmakeFixesApplicationVersionAt405();
+    void cmakeFixesApplicationVersionAt51();
     void cmakeRequiresRepositoryBuildDirectory();
     void cmakeAvoidsRedundantMacOSRuntimeRpaths();
     void repositoryGuidelinesUseOnlyBuildDirectory();
@@ -56,7 +56,7 @@ private slots:
     void buildScriptFailsClosedOnMissingNotaryProfileBeforeBuild();
 };
 
-void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt405()
+void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt51()
 {
     const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
     QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
@@ -72,10 +72,10 @@ void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt405()
     QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
-    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 4.0.5 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 5.1 LANGUAGES C CXX)")));
     QVERIFY(cmakeSource.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
     const qsizetype deploymentTargetIndex = cmakeSource.indexOf(QStringLiteral("set(CMAKE_OSX_DEPLOYMENT_TARGET"));
-    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 4.0.5 LANGUAGES C CXX)"));
+    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 5.1 LANGUAGES C CXX)"));
     QVERIFY(deploymentTargetIndex >= 0);
     QVERIFY(projectIndex > deploymentTargetIndex);
     QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"${PROJECT_VERSION}\")")));
@@ -251,6 +251,9 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     QVERIFY(source.contains(QStringLiteral("MACDEPLOYQT_NO_STRIP=\"0\"")));
     QVERIFY(source.contains(QStringLiteral("if [[ \"$MACDEPLOYQT_NO_STRIP\" == \"1\" ]]; then cmd+=(\"-no-strip\"); fi")));
     QVERIFY(source.contains(QStringLiteral("need_cmd /usr/bin/otool")));
+    QVERIFY(source.contains(QStringLiteral("need_cmd /usr/bin/install_name_tool")));
+    QVERIFY(source.contains(QStringLiteral("remove_absolute_macho_rpaths()")));
+    QVERIFY(source.contains(QStringLiteral("/usr/bin/install_name_tool -delete_rpath")));
     QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links()")));
     QVERIFY(source.contains(QStringLiteral("assert_update_manager_runtime()")));
     QVERIFY(source.contains(QStringLiteral("libiiUpdateManager*.dylib")));
@@ -271,6 +274,12 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     QVERIFY(source.contains(QStringLiteral("remove_unused_qt_sql_plugins()")));
     QVERIFY(source.contains(QStringLiteral("rm -rf \"$app/Contents/PlugIns/sqldrivers\"")));
     QVERIFY(source.contains(QStringLiteral("remove_unused_qt_sql_plugins \"$out_app\"")));
+    const qsizetype normalizeRpathIndex = source.indexOf(
+            QStringLiteral("remove_absolute_macho_rpaths \"$out_app\""));
+    const qsizetype assertPortableIndex = source.indexOf(
+            QStringLiteral("assert_portable_macho_links \"$out_app\""));
+    QVERIFY(normalizeRpathIndex >= 0);
+    QVERIFY(assertPortableIndex > normalizeRpathIndex);
     QVERIFY(source.contains(QStringLiteral("assert_portable_macho_links \"$out_app\"")));
 }
 
@@ -360,9 +369,9 @@ cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>4.0.5</string>
+    <string>5.1</string>
     <key>CFBundleVersion</key>
-    <string>4.0.5</string>
+    <string>5.1</string>
 </dict>
 </plist>
 PLIST
@@ -428,9 +437,9 @@ case "${1:-}" in
         cat > "${3:-}/Distribution" <<DISTRIBUTION
 <installer-gui-script minSpecVersion="2" hostArchitectures="arm64">
 <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
-<bundle path="Vincent.app" CFBundleShortVersionString="4.0.5" CFBundleVersion="4.0.5"/>
-<product id="$product_id" version="4.0.5"/>
-<pkg-ref id="com.iisacc.vincent.painter" version="4.0.5"/>
+<bundle path="Vincent.app" CFBundleShortVersionString="5.1" CFBundleVersion="5.1"/>
+<product id="$product_id" version="5.1"/>
+<pkg-ref id="com.iisacc.vincent.painter" version="5.1"/>
 </installer-gui-script>
 DISTRIBUTION
         ;;

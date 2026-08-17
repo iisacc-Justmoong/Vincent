@@ -17,6 +17,11 @@ The integration test exercises these application-level gates:
   thumbnail, input-pressure, and undo/redo workflows;
 - one `DrawingSurfaceItem` rendering static raster, static native vector, and a
   hold-keyframed raster layer together;
+- raster text, shape, and fill operations mutating only the selected raster
+  asset, including inverse mapping through its affine layer transform, without
+  flattening visible vector or sibling layers into that asset;
+- ordinary raster open replacing the prior mixed document even when both
+  documents have the same extent;
 - canonical `.iisc` save, validated decode, reopen, and raster export;
 - a fresh CMake configure selecting the installed iiPaintEngine and
   iiSharedCanvas packages rather than the former build-local legacy prefix.
@@ -25,6 +30,14 @@ The integration test exercises these application-level gates:
 native document owned by the item. Writes use `QSaveFile`; reads pass through
 the iiSharedCanvas checksum, allocation-limit, canonical-form, and document
 validation gates before replacing the current document.
+
+The rendered mixed frame is the display and flat-export boundary only. Raster
+authoring starts from `CanvasItem::selectedRasterPixels()`, maps document-space
+coordinates through the selected layer's inverse affine transform, and commits
+with `replaceSelectedPixels()`. This keeps native vector, sibling raster, and
+other-frame content separate while editing. Opening an ordinary bitmap is an
+explicit new-document operation and therefore replaces, rather than partially
+mutates, any previously opened mixed document.
 
 The application open dialog includes `.iisc`, so a mixed raster/vector/timeline
 document can be selected and displayed by the Vincent canvas. The Save As

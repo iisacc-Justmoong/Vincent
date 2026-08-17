@@ -33,7 +33,7 @@ Rectangle {
     property bool canvasItemReady: false
     property bool canvasSizeCreated: false
     property string clipboardImagePasteErrorCode: ""
-    property bool spacePanActive: false
+    property string temporaryCameraMode: ""
     property bool textEditingActive: false
     property bool toolShortcutsEnabled: true
     property string shapeKind: "rectangle"
@@ -179,25 +179,47 @@ Rectangle {
     }
 
     function effectiveToolMode() {
-        return surface.spacePanActive && !surface.textEditingActive ? "pan" : surface.toolMode;
+        return surface.temporaryCameraMode !== "" && !surface.textEditingActive ? surface.temporaryCameraMode : surface.toolMode;
+    }
+
+    function setTemporaryCameraMode(mode) {
+        let nextMode = mode === "pan" || mode === "zoom" ? mode : "";
+        if (surface.textEditingActive || !surface.toolShortcutsEnabled) {
+            nextMode = "";
+        }
+        if (surface.temporaryCameraMode === nextMode) {
+            return nextMode !== "";
+        }
+
+        surface.drawableObjectHoverHandleMode = "";
+        surface.commitPanDrag();
+        surface.commitZoomDrag();
+        surface.temporaryCameraMode = nextMode;
+        return nextMode !== "";
     }
 
     function beginSpacePanMode() {
-        if (surface.textEditingActive) {
+        return surface.setTemporaryCameraMode("pan");
+    }
+
+    function beginSpaceZoomMode() {
+        return surface.setTemporaryCameraMode("zoom");
+    }
+
+    function endTemporaryCameraMode() {
+        if (surface.temporaryCameraMode === "") {
             return false;
         }
-        surface.drawableObjectHoverHandleMode = "";
-        surface.spacePanActive = true;
+        surface.setTemporaryCameraMode("");
         return true;
     }
 
     function endSpacePanMode() {
-        if (!surface.spacePanActive) {
-            return false;
-        }
-        surface.spacePanActive = false;
-        surface.commitPanDrag();
-        return true;
+        return surface.endTemporaryCameraMode();
+    }
+
+    function temporaryCameraModeForModifiers(modifiers) {
+        return (modifiers & (Qt.ControlModifier | Qt.MetaModifier)) !== 0 ? "zoom" : "pan";
     }
 
     function syncCanvasItemSizeToWorkspace() {
@@ -1710,7 +1732,7 @@ Rectangle {
     }
 
     function beginZoomDrag(pointX) {
-        if (surface.toolMode !== "zoom") {
+        if (surface.effectiveToolMode() !== "zoom") {
             return;
         }
 
@@ -1966,24 +1988,44 @@ Rectangle {
 
     onTextEditingActiveChanged: {
         if (textEditingActive) {
-            endSpacePanMode();
+            endTemporaryCameraMode();
+        }
+    }
+
+    onToolShortcutsEnabledChanged: {
+        if (!toolShortcutsEnabled) {
+            endTemporaryCameraMode();
         }
     }
 
     onActiveFocusChanged: {
         if (!activeFocus) {
-            endSpacePanMode();
+            endTemporaryCameraMode();
         }
     }
 
     Keys.onPressed: function (event) {
-        if (event.key === Qt.Key_Space && !event.isAutoRepeat && surface.beginSpacePanMode()) {
+        if (event.isAutoRepeat) {
+            return;
+        }
+        if (event.key === Qt.Key_Space && surface.setTemporaryCameraMode(surface.temporaryCameraModeForModifiers(event.modifiers))) {
+            event.accepted = true;
+            return;
+        }
+        if (surface.temporaryCameraMode !== "" && (event.key === Qt.Key_Control || event.key === Qt.Key_Meta) && surface.beginSpaceZoomMode()) {
             event.accepted = true;
         }
     }
 
     Keys.onReleased: function (event) {
-        if (event.key === Qt.Key_Space && !event.isAutoRepeat && surface.endSpacePanMode()) {
+        if (event.isAutoRepeat) {
+            return;
+        }
+        if (event.key === Qt.Key_Space && surface.endTemporaryCameraMode()) {
+            event.accepted = true;
+            return;
+        }
+        if (surface.temporaryCameraMode !== "" && (event.key === Qt.Key_Control || event.key === Qt.Key_Meta) && surface.setTemporaryCameraMode(surface.temporaryCameraModeForModifiers(event.modifiers))) {
             event.accepted = true;
         }
     }

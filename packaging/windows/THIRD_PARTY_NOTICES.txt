@@ -1,4 +1,4 @@
-Vincent 4.0.5 - Third-Party Notices
+Vincent 5.1 - Third-Party Notices
 ====================================
 
 This distribution includes or links the components listed below. The complete
@@ -17,6 +17,11 @@ iiPaintEngine
   License: GNU Affero General Public License v3.0 only (AGPL-3.0-only)
   Source: https://github.com/iisacc-Justmoong/iiPaintEngine
   Full text: legal/iiPaintEngine/LICENSE.txt
+
+iiSharedCanvas
+  License: GNU Affero General Public License v3.0 only (AGPL-3.0-only)
+  Source: https://github.com/iisacc-Justmoong/iiSharedCanvas
+  Full text: legal/iiSharedCanvas/LICENSE.txt
 
 psd_sdk (pinned commit f51449543273cbf12058ae92b230e0c4209f5066)
   License: BSD 2-Clause

@@ -7,6 +7,7 @@ param(
     [string]$QtPrefix = $env:QT_PREFIX,
     [string]$LVRSPrefix = $env:LVRS_PREFIX,
     [string]$IiPaintEnginePrefix = $env:IIPAINTENGINE_PREFIX,
+    [string]$IiSharedCanvasPrefix = $env:IISHAREDCANVAS_PREFIX,
     [string]$IiUpdateManagerPrefix = $env:IIUPDATEMANAGER_PREFIX,
 
     [ValidateSet("Ninja", "Visual Studio 17 2022")]
@@ -34,7 +35,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "4.0.5"
+$Version = "5.1"
 $UnsignedPublicReleaseExpiresAtUtc = [DateTimeOffset]::Parse("2027-01-01T00:00:00Z")
 $windowsVersionParts = @($Version -split '\.')
 while ($windowsVersionParts.Count -lt 4) {
@@ -1051,6 +1052,16 @@ function Get-VincentOwnedStageFiles {
             Get-Item -LiteralPath $path
         }
 
+        $sharedCanvasCandidates = @(
+            @("iiSharedCanvas.dll", "libiiSharedCanvas.dll") |
+                ForEach-Object { Join-Path $Directory $_ } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        )
+        if ($sharedCanvasCandidates.Count -ne 1) {
+            throw "Vincent-owned signing target must contain exactly one iiSharedCanvas runtime DLL."
+        }
+        Get-Item -LiteralPath $sharedCanvasCandidates[0]
+
         $updateManagerCandidates = @(
             @("iiUpdateManager.dll", "libiiUpdateManager.dll") |
                 ForEach-Object { Join-Path $Directory $_ } |
@@ -1253,6 +1264,7 @@ function Assert-PublicDistributionEvidence {
     param(
         [bool]$PublicRelease,
         [string]$IiPaintEngineLicenseFile,
+        [string]$IiSharedCanvasLicenseFile,
         [string]$SourceUrl,
         [string]$SourceSha256
     )
@@ -1265,6 +1277,12 @@ function Assert-PublicDistributionEvidence {
     }
     if ((Get-Item -LiteralPath $IiPaintEngineLicenseFile).Length -le 0) {
         throw "Public Windows packaging rejects an empty iiPaintEngine LICENSE."
+    }
+    if (-not $IiSharedCanvasLicenseFile -or (-not (Test-Path -LiteralPath $IiSharedCanvasLicenseFile -PathType Leaf))) {
+        throw "Public Windows packaging requires the iiSharedCanvas LICENSE."
+    }
+    if ((Get-Item -LiteralPath $IiSharedCanvasLicenseFile).Length -le 0) {
+        throw "Public Windows packaging rejects an empty iiSharedCanvas LICENSE."
     }
 
     $sourceUri = $null
@@ -1411,6 +1429,7 @@ function Assert-WindowsLegalMaterials {
         "THIRD_PARTY_NOTICES.txt",
         "SOURCE_OFFER.txt",
         "legal\LVRS\LICENSE.txt",
+        "legal\iiSharedCanvas\LICENSE.txt",
         "legal\QtKeychain\COPYING.txt",
         "legal\psd_sdk\BSD-2-Clause.txt",
         "legal\psd_sdk\miniz-Unlicense.txt",
@@ -1456,6 +1475,7 @@ function Copy-WindowsLegalMaterials {
         [string]$ResolvedQtPrefix,
         [string]$LvrsLicenseFile,
         [string]$IiPaintEngineLicenseFile,
+        [string]$IiSharedCanvasLicenseFile,
         [bool]$PublicRelease,
         [string]$SourceUrl,
         [string]$SourceSha256
@@ -1468,6 +1488,7 @@ function Copy-WindowsLegalMaterials {
     Copy-LegalFile -Source (Join-Path $RepositoryRoot "LICENSE") -Destination (Join-Path $Directory "LICENSE.txt")
     Copy-LegalFile -Source (Join-Path $packagingRoot "THIRD_PARTY_NOTICES.txt") -Destination (Join-Path $Directory "THIRD_PARTY_NOTICES.txt")
     Copy-LegalFile -Source $LvrsLicenseFile -Destination (Join-Path $legalRoot "LVRS\LICENSE.txt")
+    Copy-LegalFile -Source $IiSharedCanvasLicenseFile -Destination (Join-Path $legalRoot "iiSharedCanvas\LICENSE.txt")
     Copy-LegalFile `
         -Source (Join-Path $RepositoryRoot "packaging\common\licenses\QtKeychain-BSD-3-Clause.txt") `
         -Destination (Join-Path $legalRoot "QtKeychain\COPYING.txt")
@@ -2366,6 +2387,8 @@ function Strip-WindowsRuntimeBinaries {
         "Vincent.exe",
         "LVRS.dll",
         "libiiPaintEngine.dll",
+        "iiSharedCanvas.dll",
+        "libiiSharedCanvas.dll",
         "iiUpdateManager.dll",
         "libiiUpdateManager.dll"
     )) {
@@ -2406,6 +2429,15 @@ function Verify-WindowsStage {
     $vincentExe = Join-Path $Directory "Vincent.exe"
     if (-not (Test-Path $vincentExe)) {
         throw "Staged Vincent.exe is missing."
+    }
+
+    $sharedCanvasRuntime = @(
+        @("iiSharedCanvas.dll", "libiiSharedCanvas.dll") |
+            ForEach-Object { Join-Path $Directory $_ } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    )
+    if ($sharedCanvasRuntime.Count -ne 1) {
+        throw "iiSharedCanvas runtime deployment must contain exactly one platform DLL."
     }
 
     $updateManagerRuntime = @(
@@ -2724,6 +2756,12 @@ $IiPaintEnginePrefix = Resolve-DependencyPrefix `
     -DefaultPrefix (Join-Path $HOME ".local\iiPaintEngine") `
     -ConfigRelativePaths @("lib\cmake\iiPaintEngine\iiPaintEngineConfig.cmake", "iiPaintEngineConfig.cmake")
 
+$IiSharedCanvasPrefix = Resolve-DependencyPrefix `
+    -Name "iiSharedCanvas" `
+    -ConfiguredPrefix $IiSharedCanvasPrefix `
+    -DefaultPrefix (Join-Path $HOME ".local\iiSharedCanvas") `
+    -ConfigRelativePaths @("lib\cmake\iiSharedCanvas\iiSharedCanvasConfig.cmake", "iiSharedCanvasConfig.cmake")
+
 $IiUpdateManagerPrefix = Resolve-DependencyPrefix `
     -Name "iiUpdateManager" `
     -ConfiguredPrefix $IiUpdateManagerPrefix `
@@ -2733,11 +2771,13 @@ $IiUpdateManagerPrefix = Resolve-DependencyPrefix `
 Write-Host "Qt: $QtPrefix"
 Write-Host "LVRS: $LVRSPrefix"
 Write-Host "iiPaintEngine: $IiPaintEnginePrefix"
+Write-Host "iiSharedCanvas: $IiSharedCanvasPrefix"
 Write-Host "iiUpdateManager: $IiUpdateManagerPrefix"
 
 $windowsPackageRequested = (-not $SkipPackage) -or $CreateMsi
 $lvrsLicenseFile = ""
 $iiPaintEngineLicenseFile = ""
+$iiSharedCanvasLicenseFile = ""
 if ($windowsPackageRequested) {
     $dependencySourceRoot = Split-Path -Parent $RepositoryRoot
     $lvrsLicenseFile = Resolve-DependencyLicenseFile `
@@ -2762,9 +2802,22 @@ if ($windowsPackageRequested) {
             "LICENSE"
         ) `
         -AdditionalCandidates @((Join-Path $dependencySourceRoot "iiPaintEngine\LICENSE"))
+    $iiSharedCanvasLicenseFile = Resolve-DependencyLicenseFile `
+        -Name "iiSharedCanvas" `
+        -Prefix $IiSharedCanvasPrefix `
+        -RelativeCandidates @(
+            "share\licenses\iiSharedCanvas\LICENSE",
+            "share\licenses\iiSharedCanvas\LICENSE.txt",
+            "LICENSE"
+        ) `
+        -AdditionalCandidates @((Join-Path $dependencySourceRoot "iiSharedCanvas\LICENSE"))
+    if (-not $iiSharedCanvasLicenseFile) {
+        throw "Windows packaging requires the iiSharedCanvas AGPL license file."
+    }
     Assert-PublicDistributionEvidence `
         -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
+        -IiSharedCanvasLicenseFile $iiSharedCanvasLicenseFile `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
 }
@@ -2806,7 +2859,7 @@ if ($Clean) {
     Remove-Item $StageDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix, $IiUpdateManagerPrefix) -join ";"
+$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix, $IiSharedCanvasPrefix, $IiUpdateManagerPrefix) -join ";"
 $buildTesting = if ($SkipTests) { "OFF" } else { "ON" }
 
 Write-Step "Configuring Vincent"
@@ -2861,6 +2914,7 @@ Invoke-Native $WindeployQt @(
 
 Copy-DependencyRuntimeFiles -Name "LVRS" -Prefix $LVRSPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiPaintEngine" -Prefix $IiPaintEnginePrefix -Destination $StageDir
+Copy-DependencyRuntimeFiles -Name "iiSharedCanvas" -Prefix $IiSharedCanvasPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiUpdateManager" -Prefix $IiUpdateManagerPrefix -Destination $StageDir
 Remove-EmbeddedDependencyQmlImport -ModuleName "LVRS" -Destination $StageDir
 Remove-ReleaseOnlyQtArtifacts -Directory $StageDir -BuildType $BuildType
@@ -2870,6 +2924,7 @@ if ($windowsPackageRequested) {
         -ResolvedQtPrefix $QtPrefix `
         -LvrsLicenseFile $lvrsLicenseFile `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
+        -IiSharedCanvasLicenseFile $iiSharedCanvasLicenseFile `
         -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256

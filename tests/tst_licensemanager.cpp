@@ -183,6 +183,7 @@ class tst_LicenseManager : public QObject
     Q_OBJECT
 
 private slots:
+    void disabledEnforcementStartsUnlockedWithoutAutomaticCredentialOrNetworkAccess();
     void productIdentityIsApplicationOwned();
     void successfulValidationPostsPrivateFixedContractAndUnlocks();
     void successfulValidationStoresOnlyNormalizedVerifiedCredentials();
@@ -207,6 +208,42 @@ private slots:
     void acceptsSupportedKeyVersionsAndRejectsOutOfRangeVersions();
     void connectionFailureAndTimeoutRemainFailClosed();
 };
+
+void tst_LicenseManager::disabledEnforcementStartsUnlockedWithoutAutomaticCredentialOrNetworkAccess()
+{
+    SingleResponseServer server(httpResponse(
+        200,
+        QByteArrayLiteral("{\"valid\":true,\"productId\":\"vincent\"}")));
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    FakeCredentialStore store;
+    store.readStatus = LicenseCredentialStore::ReadStatus::Found;
+    store.readData = storedCredentials();
+
+    LicenseManager manager(server.endpoint(),
+                           1000,
+                           &store,
+                           LicenseManager::EnforcementMode::Disabled);
+
+    QVERIFY(!manager.enforcementEnabled());
+    QVERIFY(manager.licensed());
+    QVERIFY(!manager.verifying());
+    QCOMPARE(manager.resultCode(), QString{});
+
+    QCoreApplication::processEvents();
+    QCOMPARE(store.readCount, 0);
+    QCOMPARE(server.connectionCount(), 0);
+
+    manager.validateLicense(QStringLiteral("verified@example.com"), validLicenseKey);
+    manager.retryStoredLicense();
+    manager.forgetLicense();
+    QCoreApplication::processEvents();
+
+    QVERIFY(manager.licensed());
+    QCOMPARE(store.readCount, 0);
+    QCOMPARE(store.removeCount, 0);
+    QCOMPARE(server.connectionCount(), 0);
+}
 
 void tst_LicenseManager::updateCredentialsAreMoveOnlyAndReadOnlyOnExplicitRequest()
 {
@@ -317,6 +354,7 @@ void tst_LicenseManager::productIdentityIsApplicationOwned()
 {
     LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")), 1000);
     QCOMPARE(manager.productId(), QStringLiteral("vincent"));
+    QVERIFY(manager.enforcementEnabled());
     QVERIFY(!manager.licensed());
     QVERIFY(!manager.verifying());
 }
