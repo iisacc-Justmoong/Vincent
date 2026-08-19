@@ -14,8 +14,9 @@ permissions:
   contents: read
 
 env:
-  LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53
-  IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e
+  LVRS_COMMIT: 8132a48e4c0788f0548bff20fd7089878a09c760
+  IIPAINTENGINE_COMMIT: 9979eae5f7925576ec2fb9f780ddbb0fcecf64dc
+  IISHAREDCANVAS_COMMIT: 2ceeb8c0cf81d01e9740df1635badc08d5a12ebe
   IIUPDATEMANAGER_REPOSITORY: ${{ vars.IIUPDATEMANAGER_REPOSITORY }}
   IIUPDATEMANAGER_COMMIT: ${{ vars.IIUPDATEMANAGER_COMMIT }}
 
@@ -30,6 +31,8 @@ jobs:
 
       - name: Require pinned iiUpdateManager provenance
         shell: pwsh
+        env:
+          IIUPDATEMANAGER_READ_TOKEN: ${{ secrets.IIUPDATEMANAGER_READ_TOKEN }}
         run: |
           $repositoryUri = $null
           if (-not [System.Uri]::TryCreate($env:IIUPDATEMANAGER_REPOSITORY, [System.UriKind]::Absolute, [ref]$repositoryUri) -or
@@ -41,6 +44,18 @@ jobs:
           if ($env:IIUPDATEMANAGER_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
               throw "Configure IIUPDATEMANAGER_COMMIT as the reviewed 40-hex commit."
           }
+          if ([string]::IsNullOrWhiteSpace($env:IIUPDATEMANAGER_READ_TOKEN)) {
+              throw "Configure IIUPDATEMANAGER_READ_TOKEN for the private pinned dependency checkout."
+          }
+
+      - name: Check out pinned iiUpdateManager
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: iisacc-Justmoong/iiUpdateManager
+          ref: ${{ vars.IIUPDATEMANAGER_COMMIT }}
+          token: ${{ secrets.IIUPDATEMANAGER_READ_TOKEN }}
+          path: _private/iiUpdateManager
+          persist-credentials: false
 
       - name: Require a tag for a signing request
         if: ${{ inputs.submit-for-signing }}
@@ -102,17 +117,48 @@ jobs:
         run: |
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
-          $updateManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiUpdateManager"
+          $sharedCanvasSource = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
+          $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/LVRS.git $lvrsSource
           git -C $lvrsSource checkout --detach $env:LVRS_COMMIT
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiPaintEngine.git $engineSource
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
-          git clone --filter=blob:none -- $env:IIUPDATEMANAGER_REPOSITORY $updateManagerSource
-          git -C $updateManagerSource checkout --detach $env:IIUPDATEMANAGER_COMMIT
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiSharedCanvas.git $sharedCanvasSource
+          git -C $sharedCanvasSource checkout --detach $env:IISHAREDCANVAS_COMMIT
           $resolvedUpdateManagerCommit = (git -C $updateManagerSource rev-parse HEAD).Trim()
           if ($resolvedUpdateManagerCommit -cne $env:IIUPDATEMANAGER_COMMIT.ToLowerInvariant()) {
               throw "iiUpdateManager checkout does not match the pinned commit."
           }
+
+      - name: Build, test, and install pinned iiUpdateManager
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
+          $build = Join-Path $source "build"
+          $prefix = Join-Path $env:USERPROFILE ".local\iiUpdateManager"
+          cmake -S $source -B $build -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DBUILD_TESTING=ON `
+              "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager configure failed." }
+          cmake --build $build --parallel
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager build failed." }
+          $testRuntimePaths = @($build, (Join-Path $env:QT_ROOT_DIR "bin"))
+          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
+          ctest --test-dir $build --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+              $diagnosticFile = Join-Path $env:RUNNER_TEMP "iiUpdateManagerUpdateFlowTests.txt"
+              $updateFlowExecutable = Join-Path $build "iiUpdateManagerUpdateFlowTests.exe"
+              & $updateFlowExecutable -v1 -o "$diagnosticFile,txt"
+              $diagnosticExitCode = $LASTEXITCODE
+              if (Test-Path -LiteralPath $diagnosticFile -PathType Leaf) {
+                  Get-Content -LiteralPath $diagnosticFile
+              }
+              throw "iiUpdateManager tests failed; diagnostic exit code: $diagnosticExitCode"
+          }
+          cmake --install $build --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager installation failed." }
+          "IIUPDATEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build and install pinned LVRS
         shell: pwsh
@@ -151,24 +197,38 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "iiPaintEngine installation failed." }
           "IIPAINTENGINE_PREFIX=$enginePrefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build, test, and install pinned iiUpdateManager
+      - name: Build, test, and install pinned iiSharedCanvas
         shell: pwsh
         run: |
-          $source = Join-Path $env:RUNNER_WORKSPACE "iiUpdateManager"
+          $source = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
           $build = Join-Path $source "build"
-          $prefix = Join-Path $env:USERPROFILE ".local\iiUpdateManager"
+          $prefix = Join-Path $env:USERPROFILE ".local\iiSharedCanvas"
+          $prefixPath = @($env:QT_ROOT_DIR, $env:LVRS_PREFIX, $env:IIPAINTENGINE_PREFIX) -join ";"
           cmake -S $source -B $build -G Ninja `
               -DCMAKE_BUILD_TYPE=Release `
               -DBUILD_TESTING=ON `
-              "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager configure failed." }
+              "-DCMAKE_PREFIX_PATH=$prefixPath"
+          if ($LASTEXITCODE -ne 0) { throw "iiSharedCanvas configure failed." }
           cmake --build $build --parallel
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager build failed." }
+          if ($LASTEXITCODE -ne 0) { throw "iiSharedCanvas build failed." }
+          $testRuntimePaths = @(
+              $build,
+              (Join-Path $env:IIPAINTENGINE_PREFIX "bin"),
+              (Join-Path $env:IIPAINTENGINE_PREFIX "platforms\windows\bin"),
+              (Join-Path $env:LVRS_PREFIX "platforms\windows\bin"),
+              (Join-Path $env:QT_ROOT_DIR "bin")
+          )
+          foreach ($runtimePath in $testRuntimePaths) {
+              if (-not (Test-Path -LiteralPath $runtimePath -PathType Container)) {
+                  throw "Required iiSharedCanvas test runtime directory was not found: $runtimePath"
+              }
+          }
+          $env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join ";"
           ctest --test-dir $build --output-on-failure
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager tests failed." }
+          if ($LASTEXITCODE -ne 0) { throw "iiSharedCanvas tests failed." }
           cmake --install $build --prefix $prefix
-          if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager installation failed." }
-          "IIUPDATEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          if ($LASTEXITCODE -ne 0) { throw "iiSharedCanvas installation failed." }
+          "IISHAREDCANVAS_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build verified Windows MSI
         shell: pwsh
@@ -197,7 +257,7 @@ jobs:
               throw "The configured Vincent project version was not found exactly once in CMakeCache.txt."
           }
           $expectedVersion = ($versionEntries[0] -split '=', 2)[1]
-          if ($expectedVersion -notmatch '^\d+\.\d+\.\d+$') {
+          if ($expectedVersion -notmatch '^\d+\.\d+(?:\.\d+)?$') {
               throw "The configured Vincent project version is invalid: $expectedVersion"
           }
           $expectedTag = "v$expectedVersion"
@@ -274,10 +334,11 @@ jobs:
               throw "The configured Vincent project version was not found exactly once in CMakeCache.txt."
           }
           $expectedVersion = ($versionEntries[0] -split '=', 2)[1]
-          if ($expectedVersion -notmatch '^\d+\.\d+\.\d+$') {
+          if ($expectedVersion -notmatch '^\d+\.\d+(?:\.\d+)?$') {
               throw "The configured Vincent project version is invalid: $expectedVersion"
           }
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -BuildDirectory .\build -Version $expectedVersion -MsiPath $msi
+          $msiVersion = if ($expectedVersion -match '^\d+\.\d+$') { "$expectedVersion.0" } else { $expectedVersion }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\tst_windowsmsidatabasecontract.ps1 -BuildDirectory .\build -Version $msiVersion -MsiPath $msi
           if ($LASTEXITCODE -ne 0) {
               throw "MSI database contract rejected the signed MSI."
           }

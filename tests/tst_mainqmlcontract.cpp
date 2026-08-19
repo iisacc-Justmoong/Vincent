@@ -11,12 +11,13 @@ private slots:
     void applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome();
     void applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragRegion();
     void applicationWindowPassesOnlyTheActiveMacOsDragHeightToCanvasPage();
-    void applicationWindowCreatesAtFixedLaunchGeometry();
+    void applicationWindowUsesStockLvrsGeometry();
     void applicationWindowUsesDeferredCanvasIncubation();
-    void applicationWindowRequiresOnlineLicenseBeforeCanvasIncubation();
+    void applicationWindowTemporarilyDisablesLicenseEnforcement();
     void applicationWindowProvidesApplicationMenuBar();
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
+    void applicationProvidesProfilePreferencesWindow();
     void applicationActionsAreTheOnlyOwnersOfPortableShortcuts();
     void clipboardPasteFailuresAreExplainedWithoutBlockingCanvas();
     void manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque();
@@ -167,7 +168,7 @@ void tst_MainQmlContract::applicationWindowPassesOnlyTheActiveMacOsDragHeightToC
                        "window.windowDragHandleHeight : 0")));
 }
 
-void tst_MainQmlContract::applicationWindowCreatesAtFixedLaunchGeometry()
+void tst_MainQmlContract::applicationWindowUsesStockLvrsGeometry()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -176,10 +177,15 @@ void tst_MainQmlContract::applicationWindowCreatesAtFixedLaunchGeometry()
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property int initialWidth: 1400")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property int initialHeight: 880")));
-    QVERIFY(mainSource.contains(QStringLiteral("width: initialWidth")));
-    QVERIFY(mainSource.contains(QStringLiteral("height: initialHeight")));
+    QVERIFY(mainSource.contains(QStringLiteral("LV.ApplicationWindow")));
+    QVERIFY(!mainSource.contains(QStringLiteral("readonly property int initialWidth")));
+    QVERIFY(!mainSource.contains(QStringLiteral("readonly property int initialHeight")));
+    QVERIFY(!mainSource.contains(QStringLiteral("width: initialWidth")));
+    QVERIFY(!mainSource.contains(QStringLiteral("height: initialHeight")));
+    QVERIFY(!mainSource.contains(QStringLiteral("readonly property int minimumWindowWidth")));
+    QVERIFY(!mainSource.contains(QStringLiteral("readonly property int minimumWindowHeight")));
+    QVERIFY(!mainSource.contains(QStringLiteral("minimumWidth: minimumWindowWidth")));
+    QVERIFY(!mainSource.contains(QStringLiteral("minimumHeight: minimumWindowHeight")));
     QVERIFY(mainSource.contains(QStringLiteral("visible: false")));
     QVERIFY(!mainSource.contains(QStringLiteral("visible: true")));
 }
@@ -193,10 +199,6 @@ void tst_MainQmlContract::applicationWindowUsesDeferredCanvasIncubation()
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property int minimumWindowWidth: 640")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property int minimumWindowHeight: 400")));
-    QVERIFY(mainSource.contains(QStringLiteral("minimumWidth: minimumWindowWidth")));
-    QVERIFY(mainSource.contains(QStringLiteral("minimumHeight: minimumWindowHeight")));
     QVERIFY(mainSource.contains(QStringLiteral("Loader {")));
     QVERIFY(mainSource.contains(QStringLiteral("id: painterPageLoader")));
     QVERIFY(mainSource.contains(QStringLiteral("property bool canvasIncubationRequested: false")));
@@ -207,7 +209,7 @@ void tst_MainQmlContract::applicationWindowUsesDeferredCanvasIncubation()
     QVERIFY(mainSource.contains(QStringLiteral("LV.Label {")));
 }
 
-void tst_MainQmlContract::applicationWindowRequiresOnlineLicenseBeforeCanvasIncubation()
+void tst_MainQmlContract::applicationWindowTemporarilyDisablesLicenseEnforcement()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     const QString activationPagePath = QFINDTESTDATA("../App/qml/license/LicenseActivationPage.qml");
@@ -231,17 +233,25 @@ void tst_MainQmlContract::applicationWindowRequiresOnlineLicenseBeforeCanvasIncu
     QVERIFY(!activationSource.isEmpty());
     QVERIFY(!appEntrySource.isEmpty());
 
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property bool licenseGranted: VincentLicenseManager.licensed")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("!VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed")));
     QVERIFY(mainSource.contains(QStringLiteral("active: window.canvasIncubationRequested && window.licenseGranted")));
     QVERIFY(mainSource.contains(QStringLiteral("LicenseViews.LicenseActivationPage")));
-    QVERIFY(mainSource.contains(QStringLiteral("visible: !window.licenseGranted")));
-    QVERIFY(mainSource.contains(QStringLiteral("objectName: \"licensePersistenceWarning\"")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("window.licenseGranted && VincentLicenseManager.resultCode === "
+        QStringLiteral("visible: VincentLicenseManager.enforcementEnabled && !window.licenseGranted")));
+    QVERIFY(mainSource.contains(QStringLiteral("objectName: \"licensePersistenceWarning\"")));
+    QVERIFY(!mainSource.contains(
+        QStringLiteral("width: Math.min(560, Math.max(320, parent.width")));
+    QVERIFY(!mainSource.contains(
+        QStringLiteral("width: Math.min(620, Math.max(320, parent.width")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "
                        "\"secure_storage_unavailable\"")));
     QVERIFY(mainSource.contains(QStringLiteral("visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready")));
 
     QVERIFY(activationSource.contains(QStringLiteral("LV.AppCard")));
+    QVERIFY(!activationSource.contains(
+        QStringLiteral("width: Math.min(520, Math.max(320, parent.width")));
     QCOMPARE(activationSource.count(QStringLiteral("LV.InputField")), 2);
     QVERIFY(activationSource.contains(QStringLiteral("objectName: \"licenseEmailInput\"")));
     QVERIFY(activationSource.contains(QStringLiteral("objectName: \"licenseKeyInput\"")));
@@ -262,7 +272,8 @@ void tst_MainQmlContract::applicationWindowRequiresOnlineLicenseBeforeCanvasIncu
     QVERIFY(!activationSource.contains(QStringLiteral("productIdInput")));
     QVERIFY(!activationSource.contains(QStringLiteral("productIdField")));
 
-    QVERIFY(appEntrySource.contains(QStringLiteral("new LicenseManager(&engine)")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("new LicenseManager(LicenseManager::EnforcementMode::Disabled, &engine)")));
     QVERIFY(appEntrySource.contains(QStringLiteral("setContextProperty(\"VincentLicenseManager\", licenseManager)")));
 }
 
@@ -354,17 +365,26 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(
-        mainSource.contains(QStringLiteral("readonly property string menuCommandModifier: "
-                                           "Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("readonly property string menuCommandModifier: \"Ctrl\"")));
+    QVERIFY(!mainSource.contains(QStringLiteral(
+        "Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutSaveImageAs: menuCommandModifier + \"+S\"")));
     QVERIFY(mainSource.contains(QStringLiteral(
-        "readonly property string shortcutRedo: Qt.platform.os === \"osx\" ? \"Meta+Shift+Z\" : "
-        "(Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\")")));
+        "readonly property string shortcutRedo: Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\"")));
     QVERIFY(mainSource.contains(
         QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === "
-                       "\"osx\" ? \"Ctrl+Meta+F\" : \"F11\"")));
+                       "\"osx\" ? \"Meta+Ctrl+F\" : \"F11\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("function nativeShortcutText(shortcutText)")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"Ctrl\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("return \"Command\";")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"Meta\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("return \"Control\";")));
+    QVERIFY(mainSource.contains(QStringLiteral("case \"Alt\":")));
+    QVERIFY(mainSource.contains(QStringLiteral("return \"Option\";")));
     QVERIFY(mainSource.contains(QStringLiteral("function shortcutReference(commandName, shortcutText)")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "return commandName + \" - \" + window.nativeShortcutText(shortcutText);")));
 
     const QStringList actionShortcutContracts = {
             QStringLiteral("shortcutNewCanvas|newCanvasAction"),
@@ -420,6 +440,117 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
         QVERIFY2(mainSource.contains(QStringLiteral(", window.") + shortcutContract + QStringLiteral(")")),
                  qPrintable(shortcutContract + QStringLiteral(" help reference is missing")));
     }
+}
+
+void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString preferencesQmlPath =
+        QFINDTESTDATA("../App/qml/preferences/PreferencesWindow.qml");
+    const QString rootCMakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!preferencesQmlPath.isEmpty(), "PreferencesWindow.qml test data was not found");
+    QVERIFY2(!rootCMakePath.isEmpty(), "CMakeLists.txt test data was not found");
+
+    auto readSource = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString mainSource = readSource(mainQmlPath);
+    const QString preferencesSource = readSource(preferencesQmlPath);
+    const QString cmakeSource = readSource(rootCMakePath);
+    QVERIFY(!mainSource.isEmpty());
+    QVERIFY(!preferencesSource.isEmpty());
+    QVERIFY(!cmakeSource.isEmpty());
+
+    QVERIFY(mainSource.contains(
+        QStringLiteral("import \"./preferences\" as PreferencesViews")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("readonly property string shortcutPreferences: menuCommandModifier + \"+,\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("function requestPreferences()")));
+    QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.showNormal();")));
+    QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.raise();")));
+    QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.requestActivate();")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: preferencesAction")));
+    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Preferences...\")")));
+    QVERIFY(mainSource.contains(QStringLiteral("shortcut: StandardKey.Preferences")));
+    QVERIFY(mainSource.contains(QStringLiteral("onTriggered: window.requestPreferences()")));
+    QVERIFY(mainSource.contains(QStringLiteral("action: preferencesAction")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "window.shortcutReference(qsTr(\"Preferences\"), window.shortcutPreferences)")));
+    QVERIFY(mainSource.contains(QStringLiteral("PreferencesViews.PreferencesWindow {")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: preferencesWindow")));
+    QVERIFY(mainSource.contains(QStringLiteral("transientParent: window")));
+
+    QVERIFY(preferencesSource.contains(QStringLiteral("LV.Window {")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"preferencesWindow\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("visible: false")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("title: qsTr(\"Preferences\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "readonly property url profileImageSource: VincentProfileImageProcessor.imageSource")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property alias profileName: profileNameField.text")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "property alias canInviteOtherUsers: inviteOtherUsersCheckBox.checked")));
+
+    QVERIFY(preferencesSource.contains(QStringLiteral("Dialogs.FileDialog {")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageDialog")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("title: qsTr(\"Choose profile image\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "onAccepted: VincentProfileImageProcessor.processProfileImage(selectedFile)")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral(
+        "preferencesWindow.profileImageSource = selectedFile")));
+
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSectionHeader")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("source: LV.Theme.iconPath(\"user\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Profile\")")));
+
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("tone: LV.AbstractButton.Borderless")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("shapeStyle: profileImageButton.shapeCylinder")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "readonly property int avatarInset: Math.max(0, Math.round((avatarSize - iconSize) / 2))")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("horizontalPadding: avatarInset")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("verticalPadding: avatarInset")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconSource: preferencesWindow.profileImageSource")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("LV.ContextMenu {")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageMenuItemDelegate")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageMenu")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("itemDelegate: profileImageMenuItemDelegate")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("showIconSlot: false")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("Accessible.name: label")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("label: qsTr(\"Select profile image\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("action: \"select\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("label: qsTr(\"Delete profile image\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("action: \"delete\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "enabled: preferencesWindow.profileImageSource.toString().length > 0")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("onItemTriggered: function (index, item)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("Qt.callLater(function ()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("profileImageDialog.open();")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "VincentProfileImageProcessor.clearProfileImage();")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "onClicked: profileImageMenu.openFor(profileImageButton, 0, profileImageButton.height)")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("onClicked: profileImageDialog.open()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "Accessible.name: qsTr(\"Profile image options\")")));
+
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.InputField {")), 1);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileNameField")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("placeholder: qsTr(\"Profile name\")")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.CheckBox {")), 1);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: inviteOtherUsersCheckBox")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "text: qsTr(\"Allow inviting other users\")")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("preferencesPlaceholderButton")));
+    QVERIFY(cmakeSource.contains(
+        QStringLiteral("App/qml/preferences/PreferencesWindow.qml")));
 }
 
 void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts()

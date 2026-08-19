@@ -85,7 +85,7 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(!source.isEmpty());
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
-    QVERIFY(source.contains(QStringLiteral("[ValidatePattern(\"^\\d+\\.\\d+\\.\\d+$\")]")));
+    QVERIFY(source.contains(QStringLiteral("[ValidatePattern(\"^\\d+\\.\\d+(?:\\.\\d+)?$\")]")));
     QVERIFY(source.contains(QStringLiteral("Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("Join-Path $buildRoot \"release-source\"")));
     QVERIFY(source.contains(QStringLiteral("Assert-PathWithinRoot")));
@@ -93,8 +93,13 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(source.contains(QStringLiteral("git archive --format=zip")));
     QVERIFY(source.contains(QStringLiteral(
         "throw \"Vincent release revision does not declare version $Version.\"")));
-    QVERIFY(source.contains(QStringLiteral("07efeb4490304b08454d645001c186e89735bb53")));
-    QVERIFY(source.contains(QStringLiteral("83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(source.contains(QStringLiteral("8132a48e4c0788f0548bff20fd7089878a09c760")));
+    QVERIFY(source.contains(QStringLiteral("9979eae5f7925576ec2fb9f780ddbb0fcecf64dc")));
+    QVERIFY(source.contains(QStringLiteral("2ceeb8c0cf81d01e9740df1635badc08d5a12ebe")));
+    QVERIFY(source.contains(QStringLiteral("IiSharedCanvasRevision")));
+    QVERIFY(source.contains(QStringLiteral("IiSharedCanvasSource")));
+    QVERIFY(source.contains(QStringLiteral("-Label \"iiSharedCanvas\"")));
+    QVERIFY(source.contains(QStringLiteral("/iiSharedCanvas/CMakeLists.txt")));
     QVERIFY(source.contains(QStringLiteral("IiUpdateManagerRevision")));
     QVERIFY(source.contains(QStringLiteral("IiUpdateManagerSource")));
     QVERIFY(source.contains(QStringLiteral("-Label \"iiUpdateManager\"")));
@@ -123,7 +128,7 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
-        ".\\tools\\new-corresponding-source.ps1 -Version 4.0.5 -VincentRevision v4.0.5 -IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
+        ".\\tools\\new-corresponding-source.ps1 -Version 5.1 -VincentRevision v5.1 -IiSharedCanvasRevision $env:IISHAREDCANVAS_COMMIT -IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
@@ -142,7 +147,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"4.0.5\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"5.1\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
@@ -150,6 +155,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("$env:QT_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:LVRS_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:IIPAINTENGINE_PREFIX")));
+    QVERIFY(source.contains(QStringLiteral("$env:IISHAREDCANVAS_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:IIUPDATEMANAGER_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("Resolve-QtPrefix")));
     QVERIFY(source.contains(QStringLiteral("Resolve-Objdump")));
@@ -195,7 +201,10 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("\"--qmldir\", (Join-Path $RepositoryRoot \"App\\qml\")")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"LVRS\"")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiPaintEngine\"")));
+    QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiSharedCanvas\"")));
     QVERIFY(source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiUpdateManager\"")));
+    QVERIFY(source.contains(QStringLiteral("iiSharedCanvas.dll")));
+    QVERIFY(source.contains(QStringLiteral("libiiSharedCanvas.dll")));
     QVERIFY(source.contains(QStringLiteral("iiUpdateManager.dll")));
     QVERIFY(source.contains(QStringLiteral("libiiUpdateManager.dll")));
     QVERIFY(!source.contains(QStringLiteral("Copy-DependencyQmlImports -Name \"LVRS\"")));
@@ -247,6 +256,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("COPYING.MinGW-w64-runtime.txt")));
     QVERIFY(source.contains(QStringLiteral("winpthreads\\COPYING")));
     QVERIFY(source.contains(QStringLiteral("legal\\QtKeychain\\COPYING.txt")));
+    QVERIFY(source.contains(QStringLiteral("legal\\iiSharedCanvas\\LICENSE.txt")));
     QVERIFY(source.contains(QStringLiteral("QtKeychain-BSD-3-Clause.txt")));
 
     const QString noticesPath = QFINDTESTDATA("../packaging/windows/THIRD_PARTY_NOTICES.txt");
@@ -255,6 +265,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(notices.contains(QStringLiteral("iiPaintEngine")));
     QVERIFY(notices.contains(QStringLiteral("AGPL-3.0-only")));
     QVERIFY(notices.contains(QStringLiteral("legal/iiPaintEngine/LICENSE.txt")));
+    QVERIFY(notices.contains(QStringLiteral("iiSharedCanvas")));
+    QVERIFY(notices.contains(QStringLiteral("legal/iiSharedCanvas/LICENSE.txt")));
     QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
     QVERIFY(notices.contains(QStringLiteral("QtKeychain 0.17.0")));
     QVERIFY(notices.contains(QStringLiteral("legal/QtKeychain/COPYING.txt")));
@@ -615,7 +627,15 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY2(!buildScriptPath.isEmpty(), "build-windows.ps1 test data was not found");
     const QString buildScriptSource = readTextFile(buildScriptPath);
     QVERIFY(buildScriptSource.contains(QStringLiteral(
-        "Assert-MsiDatabaseContract -MsiFile $MsiPartialPath")));
+        "function Assert-MsiDatabaseContract {\n"
+        "    param(\n"
+        "        [string]$MsiFile,\n"
+        "        [string]$ProductVersion\n"
+        "    )")));
+    QVERIFY(buildScriptSource.contains(QStringLiteral(
+        "\"-Version\", $ProductVersion")));
+    QVERIFY(buildScriptSource.contains(QStringLiteral(
+        "Assert-MsiDatabaseContract -MsiFile $MsiPartialPath -ProductVersion $msiVersion")));
     QVERIFY(buildScriptSource.contains(QStringLiteral("\"-MsiPath\", $MsiFile")));
 }
 
@@ -665,8 +685,18 @@ void tst_WindowsBuildWorkflowContract::appEntryPointShowsFinalGeometryOnlyOnce()
 
     QVERIFY(source.contains(QStringLiteral("void showLaunchWindow(QQmlApplicationEngine &engine)")));
     QVERIFY(source.contains(QStringLiteral("QSize finalLaunchWindowSize(const QWindow &window)")));
+    QVERIFY(source.contains(QStringLiteral("constexpr int initialLaunchWindowWidth = 1280;")));
+    QVERIFY(source.contains(
+        QStringLiteral("QSize initialLaunchWindowSize(const QSize &frameworkSize)")));
+    QVERIFY(source.contains(QStringLiteral(
+        "qRound(qreal(initialLaunchWindowWidth) * frameworkSize.height() / "
+        "frameworkSize.width())")));
+    QVERIFY(source.contains(
+        QStringLiteral("const QSize requestedSize = initialLaunchWindowSize(window.size());")));
     QVERIFY(source.contains(QStringLiteral("screen->availableGeometry().size()")));
-    QVERIFY(source.contains(QStringLiteral("window.size().boundedTo(availableSize)")));
+    QVERIFY(source.contains(
+        QStringLiteral("requestedSize.scaled(availableSize, Qt::KeepAspectRatio)")));
+    QVERIFY(!source.contains(QStringLiteral("window.size().boundedTo(availableSize)")));
     QVERIFY(source.contains(QStringLiteral("if (window->size() != finalSize)")));
     QVERIFY(source.contains(QStringLiteral("window->resize(finalSize);")));
     QVERIFY(source.contains(QStringLiteral("window->showNormal();")));
@@ -710,8 +740,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-4.0.5-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-4.0.5-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-5.1-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-5.1-Windows.msi")));
     QVERIFY(source.contains(QStringLiteral("Program Files")));
     QVERIFY(source.contains(QStringLiteral("requires elevation")));
     QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
@@ -728,7 +758,9 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("maintenance and removal remain available")));
     QVERIFY(source.contains(QStringLiteral("first three ProductVersion fields")));
     QVERIFY(source.contains(QStringLiteral("does not allocate a console window")));
-    QVERIFY(source.contains(QStringLiteral("1400x880 launch geometry")));
+    QVERIFY(source.contains(QStringLiteral("LVRS stock application-window geometry")));
+    QVERIFY(source.contains(QStringLiteral("1,280 logical pixels")));
+    QVERIFY(source.contains(QStringLiteral("aspect ratio")));
     QVERIFY(source.contains(QStringLiteral("does not resize the window after it becomes visible")));
     QVERIFY(source.contains(QStringLiteral("-Sign")));
     QVERIFY(source.contains(QStringLiteral("-AllowUnsignedPackage")));
@@ -755,9 +787,17 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
     QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
     QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
-    QVERIFY(source.contains(QStringLiteral("Vincent-4.0.5-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-5.1-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
+
+    const QString storeScriptPath = QFINDTESTDATA("../build-windows-store.ps1");
+    QVERIFY2(!storeScriptPath.isEmpty(), "build-windows-store.ps1 test data was not found");
+    const QString storeScript = readTextFile(storeScriptPath);
+    QVERIFY(storeScript.contains(QStringLiteral("$Version = \"5.1\"")));
+    QVERIFY(storeScript.contains(QStringLiteral("while ($packageVersionParts.Count -lt 4)")));
+    QVERIFY(storeScript.contains(
+        QStringLiteral("$PackageVersion = $packageVersionParts[0..3] -join \".\"")));
 }
 
 void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteReleaseContract()
@@ -779,14 +819,35 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
         "src-archives: 'qtbase qtdeclarative qtsvg qtimageformats qtshadertools qttranslations'")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
-    QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 07efeb4490304b08454d645001c186e89735bb53")));
-    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 83a199fbdc827b92ce346f42db0e33d85a520a1e")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiSharedCanvas")));
+    QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 8132a48e4c0788f0548bff20fd7089878a09c760")));
+    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 9979eae5f7925576ec2fb9f780ddbb0fcecf64dc")));
+    QVERIFY(workflow.contains(QStringLiteral("IISHAREDCANVAS_COMMIT: 2ceeb8c0cf81d01e9740df1635badc08d5a12ebe")));
     QVERIFY(workflow.contains(QStringLiteral("Require pinned iiUpdateManager provenance")));
     QVERIFY(workflow.contains(QStringLiteral("IIUPDATEMANAGER_REPOSITORY")));
     QVERIFY(workflow.contains(QStringLiteral("IIUPDATEMANAGER_COMMIT")));
+    QVERIFY(workflow.contains(QStringLiteral("IIUPDATEMANAGER_READ_TOKEN")));
+    QVERIFY(workflow.contains(QStringLiteral("repository: iisacc-Justmoong/iiUpdateManager")));
+    QVERIFY(workflow.contains(QStringLiteral("persist-credentials: false")));
     QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiUpdateManager")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
+    const qsizetype updateManagerBuildIndex = workflow.indexOf(
+        QStringLiteral("Build, test, and install pinned iiUpdateManager"));
+    const qsizetype lvrsBuildIndex = workflow.indexOf(
+        QStringLiteral("Build and install pinned LVRS"));
+    QVERIFY(updateManagerBuildIndex >= 0);
+    QVERIFY(lvrsBuildIndex >= 0);
+    QVERIFY(updateManagerBuildIndex < lvrsBuildIndex);
+    QVERIFY(workflow.contains(QStringLiteral("iiUpdateManagerUpdateFlowTests.exe")));
+    QVERIFY(workflow.contains(QStringLiteral("$diagnosticFile")));
+    QVERIFY(workflow.contains(QStringLiteral("Get-Content -LiteralPath $diagnosticFile")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
+    QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiSharedCanvas")));
+    QVERIFY(workflow.contains(QStringLiteral("$testRuntimePaths = @(")));
+    QVERIFY(workflow.contains(QStringLiteral("Join-Path $env:IIPAINTENGINE_PREFIX \"bin\"")));
+    QVERIFY(workflow.contains(QStringLiteral("Join-Path $env:IIPAINTENGINE_PREFIX \"platforms\\windows\\bin\"")));
+    QVERIFY(workflow.contains(QStringLiteral("Join-Path $env:LVRS_PREFIX \"platforms\\windows\\bin\"")));
+    QVERIFY(workflow.contains(QStringLiteral("$env:PATH = (@($testRuntimePaths) + @($env:PATH)) -join \";\"")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_BOOTSTRAP_LVRS_ENABLE_IPO=OFF")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_PLATFORM_BUILD_OPTIMIZATIONS=OFF")));
@@ -818,7 +879,9 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("CMAKE_PROJECT_VERSION:STATIC=")));
     QVERIFY(workflow.contains(QStringLiteral(
         "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\tst_windowsmsidatabasecontract.ps1 "
-        "-BuildDirectory .\\build -Version $expectedVersion -MsiPath $msi")));
+        "-BuildDirectory .\\build -Version $msiVersion -MsiPath $msi")));
+    QVERIFY(workflow.contains(QStringLiteral(
+        "$msiVersion = if ($expectedVersion -match '^\\d+\\.\\d+$') { \"$expectedVersion.0\" } else { $expectedVersion }")));
     QVERIFY(workflow.contains(QStringLiteral(
         "throw \"MSI database contract rejected the signed MSI.\"")));
     QVERIFY(workflow.contains(QStringLiteral("Extract signed MSI payload for nested signature verification")));
@@ -837,8 +900,15 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(sourceWorkflow.contains(QStringLiteral("name: Windows corresponding source")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("fetch-depth: 0")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("-VincentRevision $env:GITHUB_SHA")));
-    QVERIFY(sourceWorkflow.contains(QStringLiteral("Vincent-4.0.5-Corresponding-Source.zip")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("Vincent-5.1-Corresponding-Source.zip")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("IISHAREDCANVAS_COMMIT: 2ceeb8c0cf81d01e9740df1635badc08d5a12ebe")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("iisacc-Justmoong/iiSharedCanvas")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("-IiSharedCanvasRevision $env:IISHAREDCANVAS_COMMIT")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("Require pinned iiUpdateManager provenance")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("IIUPDATEMANAGER_READ_TOKEN")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("repository: iisacc-Justmoong/iiUpdateManager")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("persist-credentials: false")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("-IiUpdateManagerSource $updateManagerSource")));
     QVERIFY(sourceWorkflow.contains(QStringLiteral("-IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
@@ -850,7 +920,11 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(readme.contains(QStringLiteral("Unknown publisher")));
     QVERIFY(readme.contains(QStringLiteral("Committer and reviewer")));
     QVERIFY(readme.contains(QStringLiteral("Approver")));
-    QVERIFY(readme.contains(QStringLiteral("transfers only the purchaser-entered account email, license key")));
+    QVERIFY(readme.contains(QStringLiteral("License enforcement is temporarily disabled")));
+    QVERIFY(readme.contains(
+        QStringLiteral("startup performs no credential read or license-validation request")));
+    QVERIFY(readme.contains(
+        QStringLiteral("Update now** alone may read an existing secure credential")));
     QVERIFY(readme.contains(QStringLiteral("contains no telemetry, analytics, advertising")));
     QVERIFY(readme.contains(QStringLiteral("server-issued download-grant SHA-256")));
     QVERIFY(!readme.contains(QStringLiteral("manifest hash")));
@@ -874,9 +948,9 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(buildGuide.contains(QStringLiteral(
         "preserves the existing nested Authenticode verification")));
     QVERIFY(buildGuide.contains(QStringLiteral(
-        "copies the LVRS, iiPaintEngine, and iiUpdateManager runtime DLLs")));
+        "copies the LVRS, iiPaintEngine, iiSharedCanvas, and iiUpdateManager runtime DLLs")));
     QVERIFY(buildGuide.contains(QStringLiteral(
-        "`Vincent.exe`, `LVRS.dll`, `libiiPaintEngine.dll`, and the updater runtime")));
+        "`LVRS.dll`, `libiiPaintEngine.dll`, `libiiSharedCanvas.dll`, the installed `iiUpdateManager.dll`/`libiiUpdateManager.dll`")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

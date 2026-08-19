@@ -35,12 +35,16 @@ target_sources(Vincent PRIVATE
         models/document/psdimagereader.h
         models/document/psdimagewriter.cpp
         models/document/psdimagewriter.h
+        models/input/temporarycamerainput.cpp
+        models/input/temporarycamerainput.h
         models/license/licensemanager.cpp
         models/license/licensemanager.h
         models/license/licensecredentialstore.cpp
         models/license/licensecredentialstore.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
+        models/profile/profileimageprocessor.cpp
+        models/profile/profileimageprocessor.h
         models/update/vincentupdatecredentialprovider.cpp
         models/update/vincentupdatecredentialprovider.h
         models/update/vincentupdatemanager.cpp
@@ -53,7 +57,9 @@ target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/models/brush
         ${CMAKE_CURRENT_SOURCE_DIR}/models/canvas
         ${CMAKE_CURRENT_SOURCE_DIR}/models/document
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/input
         ${CMAKE_CURRENT_SOURCE_DIR}/models/license
         ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/profile
         ${CMAKE_CURRENT_SOURCE_DIR}/models/update
 )

@@ -112,7 +112,9 @@ private:
     [[nodiscard]] bool isZoomToolActive() const;
     [[nodiscard]] bool isOverlayToolActive() const;
     [[nodiscard]] QImage currentRasterCanvasImage(const QSize &targetSize);
+    [[nodiscard]] QImage selectedRasterCanvasImage() const;
     bool replaceRasterCanvas(const QImage &image);
+    bool replaceSelectedRaster(const QImage &image);
     bool openSharedCanvasDocument(const QString &fileUrl);
     bool saveSharedCanvasDocument(const QString &fileUrl);
     void syncCanvasSize();

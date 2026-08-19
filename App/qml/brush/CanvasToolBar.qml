@@ -42,21 +42,9 @@ Item {
     readonly property int maximumCanvasDimension: 8192
     readonly property int fallbackNewCanvasWidth: 1024
     readonly property int fallbackNewCanvasHeight: 768
-    readonly property real toolbarButtonVerticalPadding: 1
-    readonly property real toolbarButtonHorizontalPadding: toolbarButtonVerticalPadding / 2
-    readonly property int figmaToolbarButtonSize: 18
-    readonly property int figmaToolbarMenuButtonWidth: 30
-    readonly property int figmaToolbarIconSize: 16
-    readonly property int toolbarControlButtonSize: 28
-    readonly property int toolbarControlIconSize: 16
-    readonly property int toolbarColorSwatchSize: 20
-    readonly property int toolbarColorSwatchRingSize: 24
-    readonly property int toolbarVerticalPadding: LV.Theme.gap4
-    readonly property real toolbarHorizontalPadding: toolbarVerticalPadding / 2
-    readonly property real colorPickerRightPadding: toolbarHorizontalPadding * 4
-    readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
+    readonly property int toolbarAuxiliaryControlSize: LV.Theme.controlHeightMd
     readonly property url panHandIconSource: "qrc:/Vincent/resources/icons/panHand.svg"
-    readonly property url typeAliasIconSource: "qrc:/Vincent/resources/icons/typeAlias.svg"
+    readonly property url translateObjectIconSource: "qrc:/Vincent/resources/icons/translateObject.svg"
     readonly property var shapeMenuEntries: [
         {
             shape: "rectangle",
@@ -95,8 +83,8 @@ Item {
         }
     ]
 
-    implicitHeight: toolbarLayout.implicitHeight + toolbarVerticalPadding * 2
-    implicitWidth: toolbarLayout.implicitWidth + toolbarHorizontalPadding * 2
+    implicitHeight: toolbarLayout.implicitHeight
+    implicitWidth: toolbarLayout.implicitWidth
     height: implicitHeight
 
     signal newCanvasRequested(int canvasWidth, int canvasHeight)
@@ -238,102 +226,40 @@ Item {
     }
 
     component ToolbarDivider: Rectangle {
-        width: 1
-        Layout.preferredHeight: 32
+        width: LV.Theme.scaleMetric(1)
+        Layout.preferredHeight: LV.Theme.controlHeightMd
         Layout.alignment: Qt.AlignVCenter
         color: Qt.rgba(255, 255, 255, 0.12)
     }
 
-    component FigmaToolbarButton: LV.IconButton {
-        iconSize: toolbar.figmaToolbarIconSize
+    component ToolbarCircleButton: LV.IconButton {
+        id: circleButton
+
+        property color circleColor: "transparent"
+        property real circleBorderWidth: LV.Theme.scaleMetric(2)
+        property string circleIconName: ""
+        readonly property url circleIconSource: circleIconName.length > 0 ? LV.Theme.iconPath(circleIconName) : ""
+
         tone: LV.AbstractButton.Borderless
-        horizontalPadding: toolbar.toolbarButtonHorizontalPadding
-        verticalPadding: toolbar.toolbarButtonVerticalPadding
-        cornerRadius: LV.Theme.radiusSm
-        implicitWidth: toolbar.figmaToolbarButtonSize
-        implicitHeight: toolbar.figmaToolbarButtonSize
-        width: toolbar.figmaToolbarButtonSize
-        height: toolbar.figmaToolbarButtonSize
-        Layout.preferredWidth: toolbar.figmaToolbarButtonSize
-        Layout.preferredHeight: toolbar.figmaToolbarButtonSize
-        Layout.alignment: Qt.AlignVCenter
-    }
 
-    component FigmaToolbarMenuButton: Item {
-        id: menuButton
+        contentItem: Rectangle {
+            radius: Math.min(width, height) / 2
+            color: circleButton.circleColor
+            border.width: circleButton.circleBorderWidth
+            border.color: "#ffffff"
+            antialiasing: true
 
-        property string iconName: ""
-        property int tone: LV.AbstractButton.Borderless
-        property string accessibleName: ""
-        property string menuAccessibleName: ""
-        readonly property url iconSource: LV.Theme.iconPath(iconName)
-        readonly property url indicatorSource: LV.Theme.iconPath("generalchevronDownBorderless")
-
-        signal bodyClicked
-        signal menuClicked
-
-        implicitWidth: toolbar.figmaToolbarMenuButtonWidth
-        implicitHeight: toolbar.figmaToolbarButtonSize
-        width: toolbar.figmaToolbarMenuButtonWidth
-        height: toolbar.figmaToolbarButtonSize
-        clip: true
-        Layout.preferredWidth: toolbar.figmaToolbarMenuButtonWidth
-        Layout.preferredHeight: toolbar.figmaToolbarButtonSize
-        Layout.alignment: Qt.AlignVCenter
-
-        LV.AbstractButton {
-            id: menuButtonBody
-
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: toolbar.figmaToolbarButtonSize
-            tone: menuButton.tone
-            horizontalPadding: toolbar.toolbarButtonHorizontalPadding
-            verticalPadding: toolbar.toolbarButtonVerticalPadding
-            cornerRadius: LV.Theme.radiusSm
-            Accessible.name: menuButton.accessibleName
-            onClicked: menuButton.bodyClicked()
-
-            contentItem: Item {
-                Image {
-                    anchors.centerIn: parent
-                    source: menuButton.iconSource
-                    sourceSize.width: toolbar.figmaToolbarIconSize
-                    sourceSize.height: toolbar.figmaToolbarIconSize
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    mipmap: true
-                    width: toolbar.figmaToolbarIconSize
-                    height: toolbar.figmaToolbarIconSize
-                }
-            }
-        }
-
-        LV.AbstractButton {
-            anchors.left: menuButtonBody.right
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            tone: menuButton.tone
-            horizontalPadding: 0
-            verticalPadding: 2
-            cornerRadius: LV.Theme.radiusSm
-            Accessible.name: menuButton.menuAccessibleName
-            onClicked: menuButton.menuClicked()
-
-            contentItem: Item {
-                Image {
-                    anchors.centerIn: parent
-                    source: menuButton.indicatorSource
-                    sourceSize.width: 12
-                    sourceSize.height: 12
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    mipmap: true
-                    width: 12
-                    height: 12
-                }
+            Image {
+                anchors.centerIn: parent
+                width: Math.max(0, parent.width - LV.Theme.gap4)
+                height: Math.max(0, parent.height - LV.Theme.gap4)
+                visible: circleButton.circleIconSource.toString().length > 0
+                source: circleButton.circleIconSource
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
             }
         }
     }
@@ -476,8 +402,6 @@ Item {
             LV.ToggleSwitch {
                 objectName: "brushPressureControlsOpacityToggle"
                 checked: brushPropertyToggle.checked
-                Layout.preferredWidth: 42
-                Layout.preferredHeight: 22
                 onCheckedChanged: toolbar.brushPressureControlsOpacityChangeRequested(checked)
             }
         }
@@ -877,8 +801,6 @@ Item {
 
     LV.ContextMenu {
         id: shapeMenu
-        itemWidth: 196
-        showIconSlot: true
         selectedIndex: toolbar.shapeMenuEntries.findIndex(entry => entry.shape === toolbar.currentShape)
         items: toolbar.shapeMenuEntries
         onItemTriggered: function (index, item) {
@@ -1002,7 +924,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 1
+        height: LV.Theme.scaleMetric(1)
         color: Qt.rgba(255, 255, 255, 0.12)
     }
 
@@ -1030,37 +952,31 @@ Item {
         id: toolbarLayout
         z: 1
         anchors.fill: toolbarBackground
-        anchors.leftMargin: toolbar.toolbarHorizontalPadding
-        anchors.rightMargin: toolbar.toolbarHorizontalPadding
-        anchors.topMargin: toolbar.toolbarVerticalPadding
-        anchors.bottomMargin: toolbar.toolbarVerticalPadding
-        spacing: toolbar.spacingMedium
-        alignmentName: "center"
+        anchors.leftMargin: toolbar.spacingLarge
+        anchors.rightMargin: toolbar.spacingLarge
 
         LV.HStack {
             id: leftToolbarActions
-            spacing: toolbar.spacingSmall
-            Layout.alignment: Qt.AlignVCenter
-            alignmentName: "center"
 
             LV.HStack {
-                id: figmaFileActionsRow
-                spacing: 0
-                Layout.alignment: Qt.AlignVCenter
+                id: fileActionsRow
 
-                FigmaToolbarButton {
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "addFile"
                     Accessible.name: qsTr("New canvas")
                     onClicked: toolbar.openNewCanvasDialog()
                 }
 
-                FigmaToolbarButton {
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "generalopen"
                     Accessible.name: qsTr("Open image")
                     onClicked: toolbar.openFileDialog()
                 }
 
-                FigmaToolbarButton {
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "generalsave"
                     Accessible.name: qsTr("Save image")
                     onClicked: toolbar.openSaveDialog()
@@ -1068,69 +984,66 @@ Item {
             }
 
             LV.HStack {
-                id: figmaToolActionsRow
-                spacing: 0
-                Layout.alignment: Qt.AlignVCenter
+                id: toolActionsRow
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "pan" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
-                    iconName: "panHand"
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconSource: toolbar.panHandIconSource
                     Accessible.name: qsTr("Pan tool")
                     onClicked: toolbar.toolSelected("pan")
                 }
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "move" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "translateObject"
                     iconSource: toolbar.translateObjectIconSource
                     Accessible.name: qsTr("Move tool")
                     onClicked: toolbar.toolSelected("move")
                 }
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "zoom" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "generalsearch"
                     Accessible.name: qsTr("Zoom tool")
                     onClicked: toolbar.toolSelected("zoom")
                 }
 
-                FigmaToolbarButton {
+                LV.IconButton {
                     id: brushToolButton
-                    tone: toolbar.currentTool === "brush" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    tone: LV.AbstractButton.Borderless
                     iconName: "showCode"
                     Accessible.name: qsTr("Brush tool")
                     onClicked: toolbar.activateBrushTool(brushToolButton)
                 }
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "eraser" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "eraser"
                     Accessible.name: qsTr("Eraser tool")
                     onClicked: toolbar.toolSelected("eraser")
                 }
 
-                FigmaToolbarMenuButton {
+                LV.IconMenuButton {
                     id: shapeToolButton
-                    tone: toolbar.currentTool === "shape" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                    tone: LV.AbstractButton.Borderless
                     iconName: toolbar.selectedShapeIconName(toolbar.currentShape)
-                    accessibleName: qsTr("Shape tool")
-                    menuAccessibleName: qsTr("Open shape menu")
-                    onBodyClicked: toolbar.toolSelected("shape")
-                    onMenuClicked: toolbar.openShapeMenu(shapeToolButton)
+                    Accessible.name: qsTr("Shape tool")
+                    onClicked: {
+                        toolbar.toolSelected("shape");
+                        toolbar.openShapeMenu(shapeToolButton);
+                    }
                 }
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "fill" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "fillbucket"
                     Accessible.name: qsTr("Fill tool")
                     onClicked: toolbar.toolSelected("fill")
                 }
 
-                FigmaToolbarButton {
-                    tone: toolbar.currentTool === "text" ? LV.AbstractButton.Default : LV.AbstractButton.Borderless
+                LV.IconButton {
+                    tone: LV.AbstractButton.Borderless
                     iconName: "typeAlias"
-                    iconSource: toolbar.typeAliasIconSource
                     Accessible.name: qsTr("Type tool")
                     onClicked: toolbar.toolSelected("text")
                 }
@@ -1141,13 +1054,11 @@ Item {
 
         LV.HStack {
             id: brushControlsRow
-            spacing: toolbar.spacingSmall
-            Layout.alignment: Qt.AlignVCenter
 
             Rectangle {
                 id: brushPreview
-                implicitWidth: toolbar.toolbarControlButtonSize
-                implicitHeight: toolbar.toolbarControlButtonSize
+                implicitWidth: toolbar.toolbarAuxiliaryControlSize
+                implicitHeight: toolbar.toolbarAuxiliaryControlSize
                 Layout.preferredWidth: implicitWidth
                 Layout.preferredHeight: implicitHeight
                 radius: width / 2
@@ -1169,14 +1080,7 @@ Item {
             }
 
             LV.IconButton {
-                iconSize: toolbar.toolbarControlIconSize
                 tone: LV.AbstractButton.Borderless
-                implicitWidth: toolbar.toolbarControlButtonSize
-                implicitHeight: toolbar.toolbarControlButtonSize
-                width: toolbar.toolbarControlButtonSize
-                height: toolbar.toolbarControlButtonSize
-                Layout.preferredWidth: toolbar.toolbarControlButtonSize
-                Layout.preferredHeight: toolbar.toolbarControlButtonSize
                 iconName: "imagezoomOut"
                 Accessible.name: qsTr("Decrease brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.max(1, toolbar.brushSize - 1))
@@ -1231,67 +1135,34 @@ Item {
             }
 
             LV.IconButton {
-                iconSize: toolbar.toolbarControlIconSize
                 tone: LV.AbstractButton.Borderless
-                implicitWidth: toolbar.toolbarControlButtonSize
-                implicitHeight: toolbar.toolbarControlButtonSize
-                width: toolbar.toolbarControlButtonSize
-                height: toolbar.toolbarControlButtonSize
-                Layout.preferredWidth: toolbar.toolbarControlButtonSize
-                Layout.preferredHeight: toolbar.toolbarControlButtonSize
                 iconName: "imagezoomIn"
                 Accessible.name: qsTr("Increase brush size")
                 onClicked: toolbar.brushSizeChangeRequested(Math.min(48, toolbar.brushSize + 1))
             }
         }
 
+        ToolbarCircleButton {
+            id: currentColorButton
+            circleColor: toolbar.currentColor
+            Accessible.name: qsTr("Brush color")
+            onClicked: toolbar.openColorPickerMenu(currentColorButton)
+
+            Controls.ToolTip.visible: hovered
+            Controls.ToolTip.text: qsTr("Brush color")
+        }
+
         LV.Spacer {}
 
-        Rectangle {
-            id: currentColorButton
-            implicitWidth: toolbar.toolbarControlButtonSize
-            implicitHeight: toolbar.toolbarControlButtonSize
-            Layout.preferredWidth: implicitWidth
-            Layout.preferredHeight: implicitHeight
-            Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-            Layout.rightMargin: toolbar.colorPickerRightPadding
-            radius: width / 2
-            color: colorButtonMouseArea.containsMouse || colorPickerMenu.opened ? LV.Theme.panelBackground10 : Qt.rgba(255, 255, 255, 0.04)
-            border.width: colorPickerMenu.opened ? 2 : 1
-            border.color: colorPickerMenu.opened ? toolbar.accentColor : Qt.rgba(255, 255, 255, 0.15)
+        ToolbarCircleButton {
+            id: profileButton
+            circleColor: LV.Theme.panelBackground12
+            circleBorderWidth: 0
+            circleIconName: "user"
+            Accessible.name: qsTr("Profile")
 
-            Rectangle {
-                id: colorPickerBall
-                anchors.centerIn: parent
-                width: toolbar.toolbarColorSwatchSize
-                height: toolbar.toolbarColorSwatchSize
-                radius: width / 2
-                color: toolbar.currentColor
-                border.width: 1
-                border.color: Qt.rgba(0, 0, 0, 0.32)
-            }
-
-            Rectangle {
-                anchors.centerIn: parent
-                width: toolbar.toolbarColorSwatchRingSize
-                height: toolbar.toolbarColorSwatchRingSize
-                radius: width / 2
-                color: "transparent"
-                border.width: 1
-                border.color: Qt.rgba(255, 255, 255, 0.22)
-            }
-
-            MouseArea {
-                id: colorButtonMouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: toolbar.openColorPickerMenu(currentColorButton)
-                Accessible.name: qsTr("Brush color")
-            }
-
-            Controls.ToolTip.visible: colorButtonMouseArea.containsMouse
-            Controls.ToolTip.text: qsTr("Brush color")
+            Controls.ToolTip.visible: hovered
+            Controls.ToolTip.text: qsTr("Profile")
         }
     }
 }

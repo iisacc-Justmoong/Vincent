@@ -47,6 +47,7 @@
 #include <QTextFragment>
 #include <QTextImageFormat>
 #include <QTextOption>
+#include <QTransform>
 #include <QUrl>
 #include <QVariantMap>
 #include <QVector>
@@ -56,6 +57,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 
 namespace {
@@ -104,6 +106,34 @@ bool hasPsdSuffix(const QString &fileUrl)
 bool hasIiscSuffix(const QString &fileUrl)
 {
     return localFilePath(fileUrl).endsWith(QStringLiteral(".iisc"), Qt::CaseInsensitive);
+}
+
+std::optional<QTransform> documentToSelectedRasterTransform(
+    const iiSharedCanvas::CanvasItem &item)
+{
+    const iiSharedCanvas::Document *document = item.document();
+    const QByteArray selectedLayerId = item.selectedLayerId().toUtf8();
+    if (!document || selectedLayerId.isEmpty()) {
+        return std::nullopt;
+    }
+
+    const iiSharedCanvas::Layer *layer = iiSharedCanvas::findLayer(
+        *document,
+        std::string(selectedLayerId.constData(), static_cast<std::size_t>(selectedLayerId.size())));
+    if (!layer) {
+        return std::nullopt;
+    }
+
+    const AffineTransform &transform = layer->transform;
+    const QTransform rasterToDocument(transform.m11,
+                                      transform.m12,
+                                      transform.m21,
+                                      transform.m22,
+                                      transform.translationX,
+                                      transform.translationY);
+    bool invertible = false;
+    const QTransform documentToRaster = rasterToDocument.inverted(&invertible);
+    return invertible ? std::optional<QTransform>{documentToRaster} : std::nullopt;
 }
 
 QImage imageFromFileUrl(const QString &fileUrl)
@@ -1930,13 +1960,18 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
         return false;
     }
 
-    QImage image = currentRasterCanvasImage(targetSize);
+    QImage image = selectedRasterCanvasImage();
+    const std::optional<QTransform> documentToRaster =
+        documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster) {
+        return false;
+    }
 
-    const qreal maxX = qMax<qreal>(0.0, image.width() - 1.0);
-    const qreal maxY = qMax<qreal>(0.0, image.height() - 1.0);
+    const qreal maxX = qMax<qreal>(0.0, targetSize.width() - 1.0);
+    const qreal maxY = qMax<qreal>(0.0, targetSize.height() - 1.0);
     const qreal boundedX = qBound<qreal>(0.0, pointX, maxX);
     const qreal boundedY = qBound<qreal>(0.0, pointY, maxY);
-    const qreal availableWidth = qMax<qreal>(1.0, image.width() - boundedX);
+    const qreal availableWidth = qMax<qreal>(1.0, targetSize.width() - boundedX);
     const qreal textWidth = qBound<qreal>(minimumTextBoxWidth, boxWidth, availableWidth);
     const int boundedFontPixelSize = qRound(qBound<qreal>(minimumTextFontPixelSize,
                                                           fontPixelSize,
@@ -1958,6 +1993,7 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setWorldTransform(*documentToRaster);
     painter.translate(QPointF(boundedX, boundedY));
 
     QAbstractTextDocumentLayout::PaintContext paintContext;
@@ -1965,7 +2001,7 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
     textDocument.documentLayout()->draw(&painter, paintContext);
     painter.end();
 
-    const bool committed = replaceRasterCanvas(image);
+    const bool committed = replaceSelectedRaster(image);
     if (committed) {
         emitUndoRedoSignals();
         emit rasterContentChanged();
@@ -1990,9 +2026,15 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
         return false;
     }
 
-    QImage image = currentRasterCanvasImage(targetSize);
+    QImage image = selectedRasterCanvasImage();
+    const std::optional<QTransform> documentToRaster =
+        documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster) {
+        return false;
+    }
     QRectF shapeRect(QPointF(pointX, pointY), QSizeF(boxWidth, boxHeight));
-    shapeRect = shapeRect.normalized().intersected(QRectF(0.0, 0.0, image.width(), image.height()));
+    shapeRect = shapeRect.normalized().intersected(
+        QRectF(0.0, 0.0, targetSize.width(), targetSize.height()));
     if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension) {
         return false;
     }
@@ -2000,12 +2042,13 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
     const QColor fillColor = color.isValid() ? color : brushColor();
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setWorldTransform(*documentToRaster);
     painter.setPen(Qt::NoPen);
     painter.setBrush(fillColor);
     painter.drawPath(shapePath(shapeRect, shapeKind));
     painter.end();
 
-    const bool committed = replaceRasterCanvas(image);
+    const bool committed = replaceSelectedRaster(image);
     if (committed) {
         emitUndoRedoSignals();
         emit rasterContentChanged();
@@ -2025,13 +2068,21 @@ bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
         return false;
     }
 
-    QImage image = currentRasterCanvasImage(targetSize);
-    if (image.isNull()) {
+    QImage image = selectedRasterCanvasImage();
+    const std::optional<QTransform> documentToRaster =
+        documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster) {
         return false;
     }
 
-    const int seedX = qBound(0, static_cast<int>(qFloor(pointX)), image.width() - 1);
-    const int seedY = qBound(0, static_cast<int>(qFloor(pointY)), image.height() - 1);
+    const QPointF rasterPoint = documentToRaster->map(QPointF(pointX, pointY));
+    if (!qIsFinite(rasterPoint.x()) || !qIsFinite(rasterPoint.y())
+        || rasterPoint.x() < 0.0 || rasterPoint.x() >= image.width()
+        || rasterPoint.y() < 0.0 || rasterPoint.y() >= image.height()) {
+        return false;
+    }
+    const int seedX = static_cast<int>(qFloor(rasterPoint.x()));
+    const int seedY = static_cast<int>(qFloor(rasterPoint.y()));
     const QColor targetColor = image.pixelColor(seedX, seedY);
     QColor replacementColor = color.isValid() ? color : brushColor();
     if (!replacementColor.isValid()) {
@@ -2061,7 +2112,7 @@ bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
         pending.append(QPoint(point.x(), point.y() - 1));
     }
 
-    const bool committed = replaceRasterCanvas(image);
+    const bool committed = replaceSelectedRaster(image);
     if (committed) {
         emitUndoRedoSignals();
         emit rasterContentChanged();
@@ -2206,23 +2257,56 @@ QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
     return image;
 }
 
+QImage DrawingSurfaceItem::selectedRasterCanvasImage() const
+{
+    const RasterLayer *pixels = selectedRasterPixels();
+    if (!pixels || pixels->width <= 0 || pixels->height <= 0
+        || pixels->width > std::numeric_limits<int>::max() / 4) {
+        return {};
+    }
+
+    const std::size_t width = static_cast<std::size_t>(pixels->width);
+    const std::size_t height = static_cast<std::size_t>(pixels->height);
+    if (width > std::numeric_limits<std::size_t>::max() / height
+        || pixels->pixels.size() != width * height) {
+        return {};
+    }
+
+    const QImage view(reinterpret_cast<const uchar *>(pixels->pixels.data()),
+                      pixels->width,
+                      pixels->height,
+                      pixels->width * 4,
+                      QImage::Format_ARGB32);
+    return view.copy();
+}
+
 bool DrawingSurfaceItem::replaceRasterCanvas(const QImage &source)
 {
     if (source.isNull() || source.width() <= 0 || source.height() <= 0) {
         return false;
     }
 
-    QImage image = source.convertToFormat(QImage::Format_ARGB32);
-    if (canvasWidth() != image.width() || canvasHeight() != image.height()
-        || !rasterLayerSelected()) {
-        m_isApplyingCanvasSurfaceSize = true;
-        setWidth(image.width());
-        setHeight(image.height());
-        m_isApplyingCanvasSurfaceSize = false;
-        if (!createRasterDocument(image.width(), image.height())) {
-            return false;
-        }
+    const QImage image = source.convertToFormat(QImage::Format_ARGB32);
+    m_isApplyingCanvasSurfaceSize = true;
+    setWidth(image.width());
+    setHeight(image.height());
+    m_isApplyingCanvasSurfaceSize = false;
+    if (!createRasterDocument(image.width(), image.height())) {
+        return false;
     }
+
+    return replaceSelectedRaster(image);
+}
+
+bool DrawingSurfaceItem::replaceSelectedRaster(const QImage &source)
+{
+    const RasterLayer *selected = selectedRasterPixels();
+    if (source.isNull() || !selected
+        || source.width() != selected->width || source.height() != selected->height) {
+        return false;
+    }
+
+    const QImage image = source.convertToFormat(QImage::Format_ARGB32);
 
     RasterLayer pixels = makeRasterLayer(image.width(), image.height());
     for (int y = 0; y < image.height(); ++y) {

@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-08-19
+
+### macOS 단축키 수정
+
+- Qt의 Apple 플랫폼 `QKeySequence`가 휴대형 `Ctrl` 토큰을 물리적 Command 키로, `Meta` 토큰을 물리적 Control 키로 변환하는 규칙에 맞춰 전역 단축키 정의를 교정했다. New/Open/Save/Undo/Paste/레이어/도형/창 명령은 macOS에서 Command를, Windows/Linux에서는 Control을 사용한다.
+- Help의 키보드 단축키 목록도 macOS에서 `Command`, `Control`, `Option` 명칭으로 표시한다. 전체 화면 전환은 macOS 표준 `Control+Command+F`를 의도적인 예외로 유지한다.
+
+### 환경설정 윈도우 기반
+
+- `StandardKey.Preferences`가 제공하는 macOS `Command+,` 및 Windows/Linux `Ctrl+,` 표준 단축키로 별도 LVRS 환경설정 윈도우를 열 수 있게 했다. 메뉴 항목은 macOS에서 Vincent 애플리케이션 메뉴로 승격되고 Windows/Linux에서는 Edit 메뉴에 남는다.
+- 환경설정 윈도우 상단 중앙에 LVRS `user` 아이콘과 Profile 제목을 배치하고, 그 아래에 프로필 설정을 구성했다.
+- 원형 보더리스 프로필 이미지 버튼은 먼저 LVRS 컨텍스트 메뉴를 열고 `Select profile image`와 `Delete profile image`를 표시한다. Select를 선택한 다음 단계에서 로컬 이미지 선택기를 열며, Delete는 등록 이미지가 있을 때 미리보기와 임시 파일을 제거한다. 선택 사진의 방향 메타데이터를 적용한 뒤 짧은 변의 원본 픽셀 수를 유지하는 최대 중앙 정사각형을 원형 무손실 PNG로 절삭한다. 프로필 이름 입력 필드와 다른 사용자 초대 허용 체크박스를 함께 제공하며, 값은 현재 실행 중인 윈도우 인스턴스에만 유지하고 계정 저장이나 서버 연동은 아직 수행하지 않는다.
+
+### 툴바 컬러 피커 및 프로필 배치
+
+- 우측 끝에 있던 컬러 피커를 브러시 컨트롤 다음의 좌측 정렬 흐름으로 이동했다.
+- 컬러 피커가 있던 우측 끝에는 같은 크기와 반경의 원형 프로필 버튼을 추가하고, 프로필 원형에는 보더를 표시하지 않는다.
+- 프로필 버튼은 LVRS `user` 아이콘과 접근성 이름·툴팁만 제공하며 클릭 동작은 아직 연결하지 않는다.
+
+## 5.1 App Store build metadata
+
+- App Store build number is now `50100`, which preserves the `5.1` marketing version while advancing beyond the previously uploaded build `20201` required by App Store Connect.
+
+## 2026-08-17
+
+### Vincent 5.1 릴리스 패키징
+
+- CMake 프로젝트와 런타임 표시의 릴리스 버전을 `5.1`로 올리고, macOS plist·PKG 및 Windows PE·MSI·MSIX 메타데이터가 같은 버전 원천을 따르도록 갱신했다.
+- 두 자리 마케팅 버전은 macOS와 사용자 문서에서 `5.1`로 유지하고, Windows 형식 제약에 맞춰 PE/MSIX는 `5.1.0.0`, MSI는 `5.1.0`으로 패딩한다.
+- iiUpdateManager의 안정 버전 비교 경계에는 표시 버전 `5.1`을 `5.1.0`으로만 정규화하여 수동 업데이트 확인이 두 자리 마케팅 버전에서도 동작하게 했다.
+- macOS 일반 배포·App Store·로컬 무서명 패키지와 Windows 대응 소스·웹사이트 MSI·Store MSIX의 문서 및 계약 테스트를 5.1 산출물 이름으로 맞췄다.
+- macOS 번들링 후 로컬 의존성에서 유입된 절대 `LC_RPATH`를 제거하고 이동 가능 경로 검증을 다시 수행하도록 패키징 계약을 강화했다.
+- Windows 실행 파일 버전 리소스 회귀 검증값을 `5.1.0.0`으로 갱신했다.
+- Windows 빌드·법적 고지·대응 소스 워크플로가 필수 `iiSharedCanvas` 바이너리, 라이선스와 고정 소스까지 함께 검증하도록 보완했다.
+- MinGW 공유 라이브러리에서 결과 상태 검사기가 미수출 심볼로 남던 `iiSharedCanvas` 결함을 헤더 인라인 구현으로 고친 커밋에 Windows 빌드와 대응 소스를 고정했다.
+- Windows runner가 `iiSharedCanvas` 테스트를 실행할 때 빌드 DLL과 iiPaintEngine·LVRS·Qt 런타임 디렉터리를 `PATH`에 명시해 DLL 로드 실패 코드 `0xc0000135`를 실제 테스트 실패와 구분하도록 했다.
+- 비공개 `iiUpdateManager`는 로그나 Git 설정에 토큰을 남기지 않는 별도 checkout으로 고정 커밋을 가져오고, checkout 자격 증명을 즉시 폐기하도록 Windows CI 경계를 보강했다.
+
+### 컬러피커 아이콘 가시성 개선
+
+- 툴바 우측 컬러피커를 별도 원형 프레임과 이중 스와치 링으로 그리던 구현에서 stock `LV.IconButton`의 `Borderless` tone으로 교체했다.
+- 아이콘은 현재 브러시 색상을 반영하는 단일 원과 정확한 2픽셀 흰색 보더만 표시한다. 외곽 버튼 프레임과 장식 링은 제거하면서 블랙 선택 상태의 식별성은 확보했다.
+- 툴바 콘텐츠 레이아웃 좌우에 `LV.Theme.gap16` 패딩을 적용해 첫 파일 버튼과 마지막 컬러피커가 창 끝자락에서 각각 16픽셀 떨어지게 했다.
+- 접근성 이름·툴팁·HSL 컬러피커 열기 동작을 유지하고, QML 계약 테스트가 stock LVRS geometry, 현재 색상 바인딩과 2픽셀 흰색 보더를 함께 고정한다.
+
+### Photoshop식 임시 카메라 조작
+
+- 캔버스 포커스에만 의존하던 Space 및 Control/Command 키 처리를 해당 카메라 조합만 소비하는 경량 애플리케이션 입력 필터로 보강했다. 전체 LVRS runtime-event 데몬은 활성화하지 않는다.
+- Space를 누른 동안 선택 도구를 바꾸지 않고 열린 손 커서로 임시 패닝하며, 드래그 중에는 닫힌 손으로 바뀌고 Space를 놓으면 원래 도구와 커서로 즉시 돌아간다.
+- Control 또는 Command와 Space를 함께 누르면 선택 도구를 바꾸지 않고 임시 Zoom으로 전환한다. 누른 채 오른쪽으로 드래그하면 확대하고 왼쪽으로 드래그하면 축소하며, 보조키만 놓으면 Pan으로 돌아가고 Space까지 놓으면 원래 선택 도구를 복원한다.
+- 캔버스 텍스트, 레이어 이름, 툴바 다이얼로그가 입력을 받는 동안에는 임시 카메라 모드를 시작하지 않아 공백 입력을 보존한다.
+
+### LVRS 순정 컴포넌트 치수 복원
+
+- Vincent가 `LV.IconButton`, `LV.IconMenuButton`, `LV.ToggleSwitch`, `LV.ContextMenu`, `LV.Hierarchy`, `LV.AppCard`, `LV.ApplicationWindow`의 프레임·아이콘·패딩·메뉴·최소 치수를 덮지 않고 설치된 LVRS의 테마 스케일과 `implicitSize`를 그대로 사용하도록 정리했다.
+- 수제 툴바 버튼과 shape 분할 버튼을 제거하고 stock `IconButton` 및 `IconMenuButton`으로 교체했다. 툴바 본문의 13개 `IconButton`과 1개 `IconMenuButton`은 모두 stock `LV.AbstractButton.Borderless` tone을 사용하며, 제품 코드는 아이콘, 접근성, 모델과 이벤트처럼 동작에 필요한 인자만 제공한다.
+- 초기 창은 표시 전에 LVRS가 산출한 숨은 창의 종횡비를 측정하고 가로 1,280 논리 픽셀에 맞춰 세로를 자동 계산한다. 화면에 들어가지 않을 때만 같은 비율로 축소하며 표시 후에는 크기를 강제하지 않는다.
+- 원시 픽셀 치수의 재도입을 막는 QML 계약 테스트를 추가하고 창 초기 크기 및 Windows 시작 문서를 LVRS 기본 geometry 기준으로 갱신했다.
+
+### 라이선스 시행 임시 중단
+
+- Vincent 앱 엔트리가 `LicenseManager::EnforcementMode::Disabled`를 명시적으로 선택하도록 하여 활성화 화면 없이 캔버스를 즉시 열고, 시작 시 보안 저장소 조회와 라이선스 검증 네트워크 요청을 수행하지 않게 했다.
+- 온라인 검증, 보안 자격 증명 저장, 수동 업데이트용 자격 증명 제공 구현은 삭제하지 않았다. 추후 앱 정책 한 줄을 `Enabled`로 바꾸면 기존 계약과 테스트를 그대로 재활성화할 수 있다.
+- 비활성 모드에서 활성화, 저장 라이선스 재시도, 라이선스 삭제 호출이 저장소나 네트워크를 변경하지 않는 회귀 테스트를 추가했다.
+
 ## 2026-08-13
 
 ### 보안 라이선스 자동 복원

@@ -7,8 +7,8 @@ publicly trusted Authenticode-signed release has been verified.
 
 ## Canonical facts
 
-- Product: Vincent 4.0
-- Current source release: 4.0.5
+- Product: Vincent 5.1
+- Current source release: 5.1
 - Category: raster drawing, digital paper, handwriting, note-taking
 - Platforms: Windows, macOS, and Linux source/build support
 - License: GNU AGPLv3
@@ -16,7 +16,7 @@ publicly trusted Authenticode-signed release has been verified.
 - Privacy: account email and license key are used only for online license validation and a user-requested update grant; no telemetry, analytics, advertising, document upload, polling, or automatic/background update checks
 - Public project URL: https://github.com/iisacc-Justmoong/Vincent
 - Source release URL:
-  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v4.0.5
+  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v5.1
 - Feedback URL:
   https://github.com/iisacc-Justmoong/Vincent/discussions/17
 - Windows testing URL:
@@ -35,7 +35,7 @@ local with no telemetry, advertising, polling, or automatic update checks.
 
 ## Directory summary
 
-Vincent 4.0 is a Qt 6 desktop raster editor for drawing, handwriting, layered
+Vincent 5.1 is a Qt 6 desktop raster editor for drawing, handwriting, layered
 canvas work, and PSD-compatible import and export. Its local-first design keeps
 documents on the user's device; the app sends only account-license credentials
 for activation and a user-requested update, with no telemetry, advertising, or automatic update checks.
@@ -57,7 +57,7 @@ layers, shapes, text, image import, and PSD-compatible workflows. Documents
 stay local. Vincent uses the purchaser's iisacc account email and license key
 only for activation or a user-requested update, and has no telemetry, advertising, or automatic update checks.
 
-Version 4.0.5 is available as complete AGPLv3 source. We are currently
+Version 5.1 is available as complete AGPLv3 source. We are currently
 preparing the publicly trusted Windows distribution and would especially value
 feedback from artists, pen-tablet users, Qt developers, and Windows testers.
 

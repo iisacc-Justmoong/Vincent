@@ -4,19 +4,11 @@ import QtQuick.Window as QtQuickWindow
 import LVRS 1.0 as LV
 import "./canvas" as CanvasViews
 import "./license" as LicenseViews
+import "./preferences" as PreferencesViews
 
 LV.ApplicationWindow {
     id: window
-    readonly property int initialWidth: 1400
-    readonly property int initialHeight: 880
-    readonly property int minimumWindowWidth: 640
-    readonly property int minimumWindowHeight: 400
-    width: initialWidth
-    height: initialHeight
-    minimumWidth: minimumWindowWidth
-    minimumHeight: minimumWindowHeight
     visible: false
-    windowColor: LV.Theme.window
     solidChrome: true
     windowDragHandleEnabled: Qt.platform.os === "osx" && visibility !== QtQuickWindow.Window.FullScreen
     navigationEnabled: false
@@ -24,19 +16,20 @@ LV.ApplicationWindow {
     property var canvasPage: null
     property bool canvasIncubationRequested: false
     property string clipboardPasteFailureMessage: ""
-    readonly property bool licenseGranted: VincentLicenseManager.licensed
+    readonly property bool licenseGranted: !VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
     readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
     readonly property string currentToolMode: canvasPage && canvasPage.vm ? canvasPage.vm.toolMode : ""
     readonly property string currentShapeKind: canvasPage && canvasPage.vm ? canvasPage.vm.shapeKind : ""
-    readonly property string menuCommandModifier: Qt.platform.os === "osx" ? "Meta" : "Ctrl"
+    // QKeySequence's portable Ctrl token maps to the physical Command key on Apple platforms.
+    readonly property string menuCommandModifier: "Ctrl"
     readonly property string shortcutNewCanvas: menuCommandModifier + "+N"
     readonly property string shortcutOpenImage: menuCommandModifier + "+O"
     readonly property string shortcutSaveImageAs: menuCommandModifier + "+S"
     readonly property string shortcutClearCanvas: menuCommandModifier + "+Shift+K"
     readonly property string shortcutQuit: menuCommandModifier + "+Q"
     readonly property string shortcutUndo: menuCommandModifier + "+Z"
-    readonly property string shortcutRedo: Qt.platform.os === "osx" ? "Meta+Shift+Z" : (Qt.platform.os === "windows" ? "Ctrl+Y" : "Ctrl+Shift+Z")
+    readonly property string shortcutRedo: Qt.platform.os === "windows" ? "Ctrl+Y" : "Ctrl+Shift+Z"
     readonly property string shortcutPasteImage: menuCommandModifier + "+V"
     readonly property string shortcutAddLayer: menuCommandModifier + "+Shift+N"
     readonly property string shortcutDeleteCurrentLayer: menuCommandModifier + "+Shift+Delete"
@@ -60,7 +53,8 @@ LV.ApplicationWindow {
     readonly property string shortcutFitCanvasToWindow: menuCommandModifier + "+0"
     readonly property string shortcutResetCanvasView: menuCommandModifier + "+1"
     readonly property string shortcutMinimizeWindow: menuCommandModifier + "+M"
-    readonly property string shortcutToggleFullScreen: Qt.platform.os === "osx" ? "Ctrl+Meta+F" : "F11"
+    readonly property string shortcutToggleFullScreen: Qt.platform.os === "osx" ? "Meta+Ctrl+F" : "F11"
+    readonly property string shortcutPreferences: menuCommandModifier + "+,"
 
     Component.onCompleted: Qt.callLater(function () {
         window.canvasIncubationRequested = true;
@@ -196,8 +190,34 @@ LV.ApplicationWindow {
         window.showFullScreen();
     }
 
+    function requestPreferences() {
+        preferencesWindow.showNormal();
+        preferencesWindow.raise();
+        preferencesWindow.requestActivate();
+    }
+
+    function nativeShortcutText(shortcutText) {
+        const shortcutTokens = String(shortcutText).split("+");
+        if (Qt.platform.os !== "osx") {
+            return shortcutTokens.join("+");
+        }
+
+        return shortcutTokens.map(function (token) {
+            switch (token) {
+            case "Ctrl":
+                return "Command";
+            case "Meta":
+                return "Control";
+            case "Alt":
+                return "Option";
+            default:
+                return token;
+            }
+        }).join("+");
+    }
+
     function shortcutReference(commandName, shortcutText) {
-        return commandName + " - " + shortcutText;
+        return commandName + " - " + window.nativeShortcutText(shortcutText);
     }
 
     Controls.Action {
@@ -237,6 +257,13 @@ LV.ApplicationWindow {
         text: qsTr("Quit Vincent")
         shortcut: window.shortcutQuit
         onTriggered: Qt.quit()
+    }
+
+    Controls.Action {
+        id: preferencesAction
+        text: qsTr("Preferences...")
+        shortcut: StandardKey.Preferences
+        onTriggered: window.requestPreferences()
     }
 
     Controls.Action {
@@ -552,6 +579,12 @@ LV.ApplicationWindow {
             title: qsTr("Edit")
 
             Controls.MenuItem {
+                action: preferencesAction
+            }
+
+            Controls.MenuSeparator {}
+
+            Controls.MenuItem {
                 action: undoAction
             }
 
@@ -690,6 +723,18 @@ LV.ApplicationWindow {
 
             Controls.Menu {
                 title: qsTr("Keyboard Shortcuts")
+
+                Controls.MenuItem {
+                    text: qsTr("Application")
+                    enabled: false
+                }
+
+                Controls.MenuItem {
+                    text: window.shortcutReference(qsTr("Preferences"), window.shortcutPreferences)
+                    enabled: false
+                }
+
+                Controls.MenuSeparator {}
 
                 Controls.MenuItem {
                     text: qsTr("File")
@@ -887,6 +932,11 @@ LV.ApplicationWindow {
         }
     }
 
+    PreferencesViews.PreferencesWindow {
+        id: preferencesWindow
+        transientParent: window
+    }
+
     Loader {
         id: painterPageLoader
         anchors.fill: parent
@@ -907,7 +957,7 @@ LV.ApplicationWindow {
 
     LicenseViews.LicenseActivationPage {
         anchors.fill: parent
-        visible: !window.licenseGranted
+        visible: VincentLicenseManager.enforcementEnabled && !window.licenseGranted
     }
 
     LV.AppCard {
@@ -915,9 +965,8 @@ LV.ApplicationWindow {
         anchors.top: parent.top
         anchors.topMargin: LV.Theme.gap24
         anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(560, Math.max(320, parent.width - LV.Theme.gap24 * 2))
         z: 1000
-        visible: window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
+        visible: VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
         title: qsTr("Vincent could not remember this license")
         subtitle: qsTr("The canvas is unlocked for this session. Enter the license again the next time Vincent starts.")
     }
@@ -928,7 +977,6 @@ LV.ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: LV.Theme.gap24
-        width: Math.min(620, Math.max(320, parent.width - LV.Theme.gap24 * 2))
         z: 1100
         visible: window.clipboardPasteFailureMessage.length > 0
         title: qsTr("Image not pasted")

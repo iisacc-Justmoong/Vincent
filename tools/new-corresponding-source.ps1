@@ -2,13 +2,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidatePattern("^\d+\.\d+\.\d+$")]
+    [ValidatePattern("^\d+\.\d+(?:\.\d+)?$")]
     [string]$Version,
 
     [string]$VincentRevision = "",
     [string]$RepositoryRoot = "",
     [string]$LvrsSource = "",
     [string]$IiPaintEngineSource = "",
+    [string]$IiSharedCanvasSource = "",
     [string]$IiUpdateManagerSource = "",
     [string]$PsdSdkSource = "",
     [string]$QtKeychainSource = "",
@@ -16,9 +17,11 @@ param(
     [string]$OutputDirectory = "",
 
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
-    [string]$LvrsRevision = "07efeb4490304b08454d645001c186e89735bb53",
+    [string]$LvrsRevision = "8132a48e4c0788f0548bff20fd7089878a09c760",
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
-    [string]$IiPaintEngineRevision = "83a199fbdc827b92ce346f42db0e33d85a520a1e",
+    [string]$IiPaintEngineRevision = "9979eae5f7925576ec2fb9f780ddbb0fcecf64dc",
+    [ValidatePattern("^[0-9a-fA-F]{40}$")]
+    [string]$IiSharedCanvasRevision = "2ceeb8c0cf81d01e9740df1635badc08d5a12ebe",
     [Parameter(Mandatory = $true)]
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$IiUpdateManagerRevision,
@@ -45,6 +48,9 @@ if ([string]::IsNullOrWhiteSpace($LvrsSource)) {
 }
 if ([string]::IsNullOrWhiteSpace($IiPaintEngineSource)) {
     $IiPaintEngineSource = Join-Path $parentDirectory "iiPaintEngine"
+}
+if ([string]::IsNullOrWhiteSpace($IiSharedCanvasSource)) {
+    $IiSharedCanvasSource = Join-Path $parentDirectory "iiSharedCanvas"
 }
 if ([string]::IsNullOrWhiteSpace($IiUpdateManagerSource)) {
     $IiUpdateManagerSource = Join-Path $parentDirectory "iiUpdateManager"
@@ -227,6 +233,11 @@ $components += Copy-GitRevision `
     -Label "iiPaintEngine" `
     -Revision $IiPaintEngineRevision
 $components += Copy-GitRevision `
+    -Source $IiSharedCanvasSource `
+    -Destination (Join-Path $stageDirectory "iiSharedCanvas") `
+    -Label "iiSharedCanvas" `
+    -Revision $IiSharedCanvasRevision
+$components += Copy-GitRevision `
     -Source $IiUpdateManagerSource `
     -Destination (Join-Path $stageDirectory "iiUpdateManager") `
     -Label "iiUpdateManager" `
@@ -283,7 +294,7 @@ This archive accompanies the Windows website build of Vincent @@VERSION@@. It co
 ## Windows build
 
 1. Install Qt 6.8.3 MinGW 64-bit and the matching MinGW 13.1.0 and Ninja tools.
-2. Install LVRS and iiPaintEngine using their included PowerShell install scripts, then configure, test, and install iiUpdateManager from its repository-local `build/` directory.
+2. Install LVRS and iiPaintEngine using their included PowerShell install scripts. Configure, test, and install iiSharedCanvas and iiUpdateManager from each repository-local `build/` directory.
 3. From `Vincent`, configure, build, and test using the repository-local `build/` directory.
 4. Set the public URL and SHA-256 of this archive. During the temporary 2026 unsigned policy, run `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -BuildType Release -AllowUnsignedPackage -SkipPackage -CreateMsi`. After trusted signing is available, use `-ExternalSigning` instead.
 
@@ -322,6 +333,8 @@ $requiredSuffixes = @(
     "/Vincent/CMakeLists.txt",
     "/LVRS/CMakeLists.txt",
     "/iiPaintEngine/LICENSE",
+    "/iiSharedCanvas/CMakeLists.txt",
+    "/iiSharedCanvas/LICENSE",
     "/iiUpdateManager/CMakeLists.txt",
     "/third_party/psd_sdk/LICENSE",
     "/third_party/qtkeychain/COPYING",

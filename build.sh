@@ -388,6 +388,7 @@ need_cmd /usr/libexec/PlistBuddy
 need_cmd /usr/bin/file
 need_cmd /usr/bin/lipo
 need_cmd /usr/bin/otool
+need_cmd /usr/bin/install_name_tool
 if [[ "$RUN_TESTS" == "1" ]]; then
   need_cmd ctest
 fi
@@ -558,7 +559,8 @@ run xattr -rc "$DIST_APP" || true
 require_nonempty_file "$DIST_APP/Contents/MacOS/$APP_NAME"
 assert_app_icon_bundle "$DIST_APP"
 
-# APP_VERSION 자동 결정(비어 있으면 dist 앱 Info.plist에서 추출) 후 두 버전 키를 함께 검증한다.
+# APP_VERSION 자동 결정(비어 있으면 dist 앱 Info.plist에서 추출) 후 마케팅 버전과
+# 단조 증가 App Store 빌드 번호를 각각 검증한다.
 INFO_PLIST="${DIST_APP}/Contents/Info.plist"
 require_file "$INFO_PLIST"
 PLIST_MARKETING_VERSION="$(plist_get "$INFO_PLIST" CFBundleShortVersionString)"
@@ -569,9 +571,10 @@ fi
 [[ -n "$APP_VERSION" ]] || die "APP_VERSION is empty and CFBundleShortVersionString not found in Info.plist. Set APP_VERSION explicitly."
 [[ "$PLIST_MARKETING_VERSION" == "$APP_VERSION" ]] \
   || die "CFBundleShortVersionString does not match APP_VERSION: ${PLIST_MARKETING_VERSION:-<missing>} != $APP_VERSION"
-[[ "$PLIST_BUNDLE_VERSION" == "$APP_VERSION" ]] \
-  || die "CFBundleVersion does not match APP_VERSION: ${PLIST_BUNDLE_VERSION:-<missing>} != $APP_VERSION"
-say "APP_VERSION: $APP_VERSION"
+[[ "$PLIST_BUNDLE_VERSION" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] \
+  || die "CFBundleVersion is not a valid numeric App Store build number: ${PLIST_BUNDLE_VERSION:-<missing>}"
+APP_BUNDLE_VERSION="$PLIST_BUNDLE_VERSION"
+say "APP_VERSION: $APP_VERSION (build $APP_BUNDLE_VERSION)"
 
 # =============================================================================
 # 임시 작업 디렉터리(모드별 스테이징/서명/패키징은 여기서 수행)
@@ -618,6 +621,31 @@ remove_unused_qt_sql_plugins() {
     say "removing unused Qt SQL driver plugins"
     run rm -rf "$app/Contents/PlugIns/sqldrivers"
   fi
+}
+
+remove_absolute_macho_rpaths() {
+  local app="$1"
+
+  while IFS= read -r -d '' binary; do
+    if ! /usr/bin/file -b "$binary" 2>/dev/null | grep -q 'Mach-O'; then
+      continue
+    fi
+
+    local runtime_paths
+    runtime_paths="$(/usr/bin/otool -l "$binary" 2>/dev/null \
+      | awk '$1 == "cmd" && $2 == "LC_RPATH" { want_path = 1; next }
+             want_path && $1 == "path" { print $2; want_path = 0 }' \
+      | awk '/^\// && !seen[$0]++' || true)"
+
+    if [[ -z "$runtime_paths" ]]; then
+      continue
+    fi
+
+    while IFS= read -r runtime_path; do
+      say "removing non-portable LC_RPATH from ${binary#${app}/}: $runtime_path"
+      run /usr/bin/install_name_tool -delete_rpath "$runtime_path" "$binary"
+    done <<< "$runtime_paths"
+  done < <(find "${app}/Contents" -type f -print0)
 }
 
 assert_portable_macho_links() {
@@ -796,6 +824,7 @@ prepare_app() {
   say "macdeployqt begins: mode=$mode"
   macdeployqt_run "$out_app" "$mode"
   remove_unused_qt_sql_plugins "$out_app"
+  remove_absolute_macho_rpaths "$out_app"
   assert_update_manager_runtime "$out_app"
   assert_portable_macho_links "$out_app"
   assert_macos_deployment_targets "$out_app"
@@ -938,8 +967,8 @@ verify_pkg_distribution() {
     || die "package Distribution does not require macOS $VINCENT_MIN_MACOS_VERSION or later: $pkg"
   grep -F "path=\"${APP_NAME}.app\"" "$distribution" \
     | grep -F "CFBundleShortVersionString=\"$APP_VERSION\"" \
-    | grep -F "CFBundleVersion=\"$APP_VERSION\"" >/dev/null \
-    || die "package Distribution app bundle versions do not match APP_VERSION: $pkg"
+    | grep -F "CFBundleVersion=\"$APP_BUNDLE_VERSION\"" >/dev/null \
+    || die "package Distribution app bundle versions do not match staged app: $pkg"
   case "$identity_kind" in
     pkg-ref)
       grep -F "<pkg-ref id=\"$pkg_id\" version=\"$APP_VERSION\"" "$distribution" >/dev/null \
