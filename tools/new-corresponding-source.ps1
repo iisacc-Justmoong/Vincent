@@ -11,6 +11,7 @@ param(
     [string]$IiPaintEngineSource = "",
     [string]$IiSharedCanvasSource = "",
     [string]$IiUpdateManagerSource = "",
+    [string]$IiLicenseManagerSource = "",
     [string]$PsdSdkSource = "",
     [string]$QtKeychainSource = "",
     [string]$QtSourceRoot = $env:QT_SOURCE_ROOT,
@@ -25,6 +26,9 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$IiUpdateManagerRevision,
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern("^[0-9a-fA-F]{40}$")]
+    [string]$IiLicenseManagerRevision,
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$PsdSdkRevision = "f51449543273cbf12058ae92b230e0c4209f5066",
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
@@ -54,6 +58,9 @@ if ([string]::IsNullOrWhiteSpace($IiSharedCanvasSource)) {
 }
 if ([string]::IsNullOrWhiteSpace($IiUpdateManagerSource)) {
     $IiUpdateManagerSource = Join-Path $parentDirectory "iiUpdateManager"
+}
+if ([string]::IsNullOrWhiteSpace($IiLicenseManagerSource)) {
+    $IiLicenseManagerSource = Join-Path $parentDirectory "iiLicenseManager"
 }
 if ([string]::IsNullOrWhiteSpace($PsdSdkSource)) {
     $PsdSdkSource = Join-Path $RepositoryRoot "build\_deps\psd_sdk-src"
@@ -243,6 +250,11 @@ $components += Copy-GitRevision `
     -Label "iiUpdateManager" `
     -Revision $IiUpdateManagerRevision
 $components += Copy-GitRevision `
+    -Source $IiLicenseManagerSource `
+    -Destination (Join-Path $stageDirectory "iiLicenseManager") `
+    -Label "iiLicenseManager" `
+    -Revision $IiLicenseManagerRevision
+$components += Copy-GitRevision `
     -Source $PsdSdkSource `
     -Destination (Join-Path $stageDirectory "third_party\psd_sdk") `
     -Label "psd_sdk" `
@@ -294,7 +306,7 @@ This archive accompanies the Windows website build of Vincent @@VERSION@@. It co
 ## Windows build
 
 1. Install Qt 6.8.3 MinGW 64-bit and the matching MinGW 13.1.0 and Ninja tools.
-2. Install LVRS and iiPaintEngine using their included PowerShell install scripts. Configure, test, and install iiSharedCanvas and iiUpdateManager from each repository-local `build/` directory.
+2. Install LVRS and iiPaintEngine using their included PowerShell install scripts. Configure, test, and install iiSharedCanvas and iiUpdateManager from each repository-local `build/` directory. Install static libsodium with vcpkg, then configure, test, and install iiLicenseManager from its repository-local `build/` directory with the `x64-mingw-static` triplet.
 3. From `Vincent`, configure, build, and test using the repository-local `build/` directory.
 4. Set the public URL and SHA-256 of this archive. During the temporary 2026 unsigned policy, run `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1 -BuildType Release -AllowUnsignedPackage -SkipPackage -CreateMsi`. After trusted signing is available, use `-ExternalSigning` instead.
 
@@ -336,6 +348,8 @@ $requiredSuffixes = @(
     "/iiSharedCanvas/CMakeLists.txt",
     "/iiSharedCanvas/LICENSE",
     "/iiUpdateManager/CMakeLists.txt",
+    "/iiLicenseManager/CMakeLists.txt",
+    "/iiLicenseManager/THIRD_PARTY_NOTICES.md",
     "/third_party/psd_sdk/LICENSE",
     "/third_party/qtkeychain/COPYING",
     "/third_party/Qt-6.8.3/qtbase/LICENSES/LGPL-3.0-only.txt",

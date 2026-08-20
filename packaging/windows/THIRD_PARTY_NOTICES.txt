@@ -23,6 +23,11 @@ iiSharedCanvas
   Source: https://github.com/iisacc-Justmoong/iiSharedCanvas
   Full text: legal/iiSharedCanvas/LICENSE.txt
 
+iiLicenseManager 0.2
+  Source: https://github.com/iisacc-Justmoong/iiLicenseManager
+  Its statically linked libsodium dependency is licensed under the ISC License.
+  Full third-party notice: legal/iiLicenseManager/THIRD_PARTY_NOTICES.md
+
 psd_sdk (pinned commit f51449543273cbf12058ae92b230e0c4209f5066)
   License: BSD 2-Clause
   Source: https://github.com/MolecularMatters/psd_sdk

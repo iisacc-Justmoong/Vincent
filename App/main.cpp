@@ -22,6 +22,7 @@
 
 #include "models/canvas/canvasdocumentviewmodel.h"
 #include "models/input/temporarycamerainput.h"
+#include "models/license/accountmanager.h"
 #include "models/license/licensemanager.h"
 #include "models/network/nearbyvincentdiscovery.h"
 #include "models/painting/drawingsurfaceitem.h"
@@ -253,6 +254,8 @@ int main(int argc, char *argv[])
     auto *licenseManager =
         new LicenseManager(LicenseManager::EnforcementMode::Disabled, &engine);
     engine.rootContext()->setContextProperty("VincentLicenseManager", licenseManager);
+    auto *accountManager = new AccountManager(licenseManager, &engine);
+    engine.rootContext()->setContextProperty("VincentAccountManager", accountManager);
     auto *updateManager = new VincentUpdateManager(licenseManager, &engine);
     engine.rootContext()->setContextProperty("VincentUpdateManager", updateManager);
     auto *nearbyDiscovery = new NearbyVincentDiscovery(&engine);

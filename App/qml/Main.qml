@@ -192,7 +192,7 @@ LV.ApplicationWindow {
     }
 
     function requestPreferences() {
-        VincentLicenseManager.refreshAccountEmail();
+        VincentAccountManager.refresh();
         preferencesWindow.showGeneralSection();
         preferencesWindow.applyInitialCentering();
         preferencesWindow.showNormal();
@@ -965,8 +965,8 @@ LV.ApplicationWindow {
     PreferencesViews.PreferencesWindow {
         id: preferencesWindow
         transientParent: window
-        accountEmail: VincentLicenseManager.accountEmail
-        accountEmailLoading: VincentLicenseManager.accountEmailLoading
+        accountEmail: VincentAccountManager.accountEmail
+        accountEmailLoading: VincentAccountManager.accountEmailLoading
         startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas
         discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers
         updateCheckEnabled: checkForUpdatesAction.enabled

@@ -169,7 +169,7 @@ LV.Window {
                     id: accountEmailLabel
 
                     objectName: "accountEmailLabel"
-                    text: qsTr("iisacc account email")
+                    text: qsTr("Account")
                     style: description
                     Accessible.name: text
                 }

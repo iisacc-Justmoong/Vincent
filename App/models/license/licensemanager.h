@@ -37,8 +37,6 @@ class LicenseManager : public QObject
     Q_PROPERTY(bool persistenceSupported READ persistenceSupported CONSTANT)
     Q_PROPERTY(bool hasStoredLicense READ hasStoredLicense NOTIFY hasStoredLicenseChanged)
     Q_PROPERTY(QString resultCode READ resultCode NOTIFY resultCodeChanged)
-    Q_PROPERTY(QString accountEmail READ accountEmail NOTIFY accountEmailChanged)
-    Q_PROPERTY(bool accountEmailLoading READ accountEmailLoading NOTIFY accountEmailLoadingChanged)
 
 public:
     enum class EnforcementMode
@@ -81,13 +79,10 @@ public:
     [[nodiscard]] bool persistenceSupported() const;
     [[nodiscard]] bool hasStoredLicense() const;
     [[nodiscard]] QString resultCode() const;
-    [[nodiscard]] QString accountEmail() const;
-    [[nodiscard]] bool accountEmailLoading() const;
 
     Q_INVOKABLE void validateLicense(const QString &email, const QString &licenseKey);
     Q_INVOKABLE void retryStoredLicense();
     Q_INVOKABLE void forgetLicense();
-    Q_INVOKABLE void refreshAccountEmail();
 
     // C++-only seam for consumers that must authenticate an explicit user action.
     // It intentionally does not expose credentials through the Qt meta-object/QML surface.
@@ -98,8 +93,6 @@ signals:
     void verifyingChanged();
     void hasStoredLicenseChanged();
     void resultCodeChanged();
-    void accountEmailChanged();
-    void accountEmailLoadingChanged();
     void validationFinished(bool valid);
 
 private:
@@ -114,8 +107,6 @@ private:
     void setLicensed(bool licensed);
     void setVerifying(bool verifying);
     void setResultCode(const QString &resultCode);
-    void setAccountEmail(const QString &accountEmail);
-    void setAccountEmailLoading(bool accountEmailLoading);
 
     QUrl m_validationEndpoint;
     int m_requestTimeoutMilliseconds = 10000;
@@ -134,6 +125,4 @@ private:
     QString m_storedEmail;
     QString m_storedLicenseKey;
     QString m_resultCode;
-    QString m_accountEmail;
-    bool m_accountEmailLoading = false;
 };

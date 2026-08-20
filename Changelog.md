@@ -4,7 +4,7 @@
 
 ### General 환경설정 실제 동작
 
-- General의 고정 `iisacc account email` 레이블 아래에 보안 저장소에서 명시적으로 읽은 계정 이메일을 표시한다. 환경설정을 열 때만 조회하며, 라이선스 키는 C++ 경계를 벗어나거나 QML에 노출되지 않는다. 저장 계정이 없거나 보안 저장소를 사용할 수 없으면 `Not connected`로 표시한다.
+- General의 고정 레이블을 `Account`로 바꾸고, `iiLicenseManager 0.2`가 서버 승인 활성화에서 확인·보존한 iisacc.com 계정 이메일을 표시한다. 환경설정을 열 때 먼저 서명된 오프라인 라이선스와 연결된 이메일을 읽고, 아직 이관되지 않은 기존 보안 저장소 자격 증명이 있을 때만 C++ 내부에서 iiLicenseManager 활성화를 수행한다. 라이선스 키는 QML에 노출되지 않으며 연결 계정이 없으면 `Not connected`로 표시한다.
 - New canvas/Recent canvas 시작 방식과 주변 Vincent 사용자 탐색 여부를 비민감 `QSettings`에 영속화했다. 최근 캔버스는 로컬 파일 열기 또는 저장이 실제 성공했을 때만 기록하며, Recent canvas 시작 시 해당 파일을 다시 연다. 파일이 사라졌거나 열기에 실패하면 기록을 제거하고 빈 캔버스를 유지한다.
 - 탐색 설정 변경을 C++의 `NearbyVincentDiscovery` 생명주기에 연결했다. 기본값은 활성화이지만 사용자가 끄면 현재 worker를 중지하고 이후 실행에서도 시작하지 않는다.
 - **Restore Purchases**를 활성화해 인증된 `https://iisacc.com/Account/Dashboard` 구매·제품 접근 복구 경로를 기본 브라우저로 연다. **Check for Updates…**는 기존 `iiUpdateManager 0.2` 수동 확인 모달을 그대로 사용하며 자동·시작 시 업데이트 요청은 추가하지 않는다.
@@ -20,7 +20,7 @@
 
 - `StandardKey.Preferences`가 제공하는 macOS `Command+,` 및 Windows/Linux `Ctrl+,` 표준 단축키로 별도 LVRS 환경설정 윈도우를 열 수 있게 했다. 메뉴 항목은 macOS에서 Vincent 애플리케이션 메뉴로 승격되고 Windows/Linux에서는 Edit 메뉴에 남는다. Preferences의 최초 표시 중심은 현재 Vincent 메인 윈도우 중심과 정확히 일치하며, 이후 사용자가 옮긴 위치는 강제로 되돌리지 않는다.
 - 환경설정 윈도우 상단 중앙 헤더를 Figma와 같은 LVRS `LabelSegmentedControl`로 구성하고 General, Profile, Members 항목을 배치했다. 환경설정 윈도우를 열 때마다 General에서 시작하고 기존 설정 내용은 Profile을 선택할 때만 표시하며, Members의 내용 영역은 의도적으로 비워 두었다.
-- General에는 고정 `iisacc account email` 레이블, New canvas/Recent canvas 라디오, 주변 Vincent 사용자 탐색 체크박스를 배치했다. 탐색 체크박스는 현재 프로세스의 익명 LAN 탐색을 즉시 시작·중지하고, 하단 좌우에는 구매 복원과 기존 수동 업데이트 확인 흐름을 각각 배치했다. 최근 캔버스 시작 선택은 아직 현재 윈도우 상태만 유지하며, 구매 복원은 실제 백엔드가 생길 때까지 보이는 비활성 상태를 유지한다.
+- General에는 고정 `Account` 레이블, New canvas/Recent canvas 라디오, 주변 Vincent 사용자 탐색 체크박스를 배치했다. 탐색 체크박스는 현재 프로세스의 익명 LAN 탐색을 즉시 시작·중지하고, 하단 좌우에는 구매 복원과 기존 수동 업데이트 확인 흐름을 각각 배치했다. 최근 캔버스 시작 선택은 아직 현재 윈도우 상태만 유지하며, 구매 복원은 실제 백엔드가 생길 때까지 보이는 비활성 상태를 유지한다.
 - 원형 보더리스 프로필 이미지 버튼은 먼저 LVRS 컨텍스트 메뉴를 열고 `Select profile image`와 `Delete profile image`를 표시한다. Select를 선택한 다음 단계에서 로컬 이미지 선택기를 열며, Delete는 등록 이미지가 있을 때 미리보기와 임시 파일을 제거한다. 선택 사진의 방향 메타데이터를 적용한 뒤 짧은 변의 원본 픽셀 수를 유지하는 최대 중앙 정사각형을 원형 무손실 PNG로 절삭한다. 프로필 이름 입력 필드와 다른 사용자 초대 허용 체크박스를 함께 제공하며, 값은 현재 실행 중인 윈도우 인스턴스에만 유지하고 계정 저장이나 서버 연동은 아직 수행하지 않는다.
 
 ### 툴바 컬러 피커 및 프로필 배치

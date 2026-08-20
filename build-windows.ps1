@@ -9,6 +9,7 @@ param(
     [string]$IiPaintEnginePrefix = $env:IIPAINTENGINE_PREFIX,
     [string]$IiSharedCanvasPrefix = $env:IISHAREDCANVAS_PREFIX,
     [string]$IiUpdateManagerPrefix = $env:IIUPDATEMANAGER_PREFIX,
+    [string]$IiLicenseManagerPrefix = $env:IILICENSEMANAGER_PREFIX,
 
     [ValidateSet("Ninja", "Visual Studio 17 2022")]
     [string]$Generator = "Ninja",
@@ -1071,6 +1072,16 @@ function Get-VincentOwnedStageFiles {
             throw "Vincent-owned signing target must contain exactly one iiUpdateManager runtime DLL."
         }
         Get-Item -LiteralPath $updateManagerCandidates[0]
+
+        $licenseManagerCandidates = @(
+            @("iiLicenseManager.dll", "libiiLicenseManager.dll") |
+                ForEach-Object { Join-Path $Directory $_ } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        )
+        if ($licenseManagerCandidates.Count -ne 1) {
+            throw "Vincent-owned signing target must contain exactly one iiLicenseManager runtime DLL."
+        }
+        Get-Item -LiteralPath $licenseManagerCandidates[0]
     )
 }
 
@@ -1265,6 +1276,7 @@ function Assert-PublicDistributionEvidence {
         [bool]$PublicRelease,
         [string]$IiPaintEngineLicenseFile,
         [string]$IiSharedCanvasLicenseFile,
+        [string]$IiLicenseManagerNoticeFile,
         [string]$SourceUrl,
         [string]$SourceSha256
     )
@@ -1283,6 +1295,12 @@ function Assert-PublicDistributionEvidence {
     }
     if ((Get-Item -LiteralPath $IiSharedCanvasLicenseFile).Length -le 0) {
         throw "Public Windows packaging rejects an empty iiSharedCanvas LICENSE."
+    }
+    if (-not $IiLicenseManagerNoticeFile -or (-not (Test-Path -LiteralPath $IiLicenseManagerNoticeFile -PathType Leaf))) {
+        throw "Public Windows packaging requires iiLicenseManager third-party notices."
+    }
+    if ((Get-Item -LiteralPath $IiLicenseManagerNoticeFile).Length -le 0) {
+        throw "Public Windows packaging rejects empty iiLicenseManager third-party notices."
     }
 
     $sourceUri = $null
@@ -1430,6 +1448,7 @@ function Assert-WindowsLegalMaterials {
         "SOURCE_OFFER.txt",
         "legal\LVRS\LICENSE.txt",
         "legal\iiSharedCanvas\LICENSE.txt",
+        "legal\iiLicenseManager\THIRD_PARTY_NOTICES.md",
         "legal\QtKeychain\COPYING.txt",
         "legal\psd_sdk\BSD-2-Clause.txt",
         "legal\psd_sdk\miniz-Unlicense.txt",
@@ -1476,6 +1495,7 @@ function Copy-WindowsLegalMaterials {
         [string]$LvrsLicenseFile,
         [string]$IiPaintEngineLicenseFile,
         [string]$IiSharedCanvasLicenseFile,
+        [string]$IiLicenseManagerNoticeFile,
         [bool]$PublicRelease,
         [string]$SourceUrl,
         [string]$SourceSha256
@@ -1489,6 +1509,7 @@ function Copy-WindowsLegalMaterials {
     Copy-LegalFile -Source (Join-Path $packagingRoot "THIRD_PARTY_NOTICES.txt") -Destination (Join-Path $Directory "THIRD_PARTY_NOTICES.txt")
     Copy-LegalFile -Source $LvrsLicenseFile -Destination (Join-Path $legalRoot "LVRS\LICENSE.txt")
     Copy-LegalFile -Source $IiSharedCanvasLicenseFile -Destination (Join-Path $legalRoot "iiSharedCanvas\LICENSE.txt")
+    Copy-LegalFile -Source $IiLicenseManagerNoticeFile -Destination (Join-Path $legalRoot "iiLicenseManager\THIRD_PARTY_NOTICES.md")
     Copy-LegalFile `
         -Source (Join-Path $RepositoryRoot "packaging\common\licenses\QtKeychain-BSD-3-Clause.txt") `
         -Destination (Join-Path $legalRoot "QtKeychain\COPYING.txt")
@@ -2393,7 +2414,9 @@ function Strip-WindowsRuntimeBinaries {
         "iiSharedCanvas.dll",
         "libiiSharedCanvas.dll",
         "iiUpdateManager.dll",
-        "libiiUpdateManager.dll"
+        "libiiUpdateManager.dll",
+        "iiLicenseManager.dll",
+        "libiiLicenseManager.dll"
     )) {
         $runtimePath = Join-Path $Directory $runtimeName
         if (Test-Path $runtimePath) {
@@ -2450,6 +2473,15 @@ function Verify-WindowsStage {
     )
     if ($updateManagerRuntime.Count -ne 1) {
         throw "iiUpdateManager runtime deployment must contain exactly one platform DLL."
+    }
+
+    $licenseManagerRuntime = @(
+        @("iiLicenseManager.dll", "libiiLicenseManager.dll") |
+            ForEach-Object { Join-Path $Directory $_ } |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    )
+    if ($licenseManagerRuntime.Count -ne 1) {
+        throw "iiLicenseManager runtime deployment must contain exactly one platform DLL."
     }
 
     $peHeader = Get-PeHeader -Binary $vincentExe
@@ -2771,16 +2803,24 @@ $IiUpdateManagerPrefix = Resolve-DependencyPrefix `
     -DefaultPrefix (Join-Path $HOME ".local\iiUpdateManager") `
     -ConfigRelativePaths @("lib\cmake\iiUpdateManager\iiUpdateManagerConfig.cmake", "iiUpdateManagerConfig.cmake")
 
+$IiLicenseManagerPrefix = Resolve-DependencyPrefix `
+    -Name "iiLicenseManager" `
+    -ConfiguredPrefix $IiLicenseManagerPrefix `
+    -DefaultPrefix (Join-Path $HOME ".local\iiLicenseManager") `
+    -ConfigRelativePaths @("lib\cmake\iiLicenseManager\iiLicenseManagerConfig.cmake", "iiLicenseManagerConfig.cmake")
+
 Write-Host "Qt: $QtPrefix"
 Write-Host "LVRS: $LVRSPrefix"
 Write-Host "iiPaintEngine: $IiPaintEnginePrefix"
 Write-Host "iiSharedCanvas: $IiSharedCanvasPrefix"
 Write-Host "iiUpdateManager: $IiUpdateManagerPrefix"
+Write-Host "iiLicenseManager: $IiLicenseManagerPrefix"
 
 $windowsPackageRequested = (-not $SkipPackage) -or $CreateMsi
 $lvrsLicenseFile = ""
 $iiPaintEngineLicenseFile = ""
 $iiSharedCanvasLicenseFile = ""
+$iiLicenseManagerNoticeFile = ""
 if ($windowsPackageRequested) {
     $dependencySourceRoot = Split-Path -Parent $RepositoryRoot
     $lvrsLicenseFile = Resolve-DependencyLicenseFile `
@@ -2817,10 +2857,21 @@ if ($windowsPackageRequested) {
     if (-not $iiSharedCanvasLicenseFile) {
         throw "Windows packaging requires the iiSharedCanvas AGPL license file."
     }
+    $iiLicenseManagerNoticeFile = Resolve-DependencyLicenseFile `
+        -Name "iiLicenseManager third-party notices" `
+        -Prefix $IiLicenseManagerPrefix `
+        -RelativeCandidates @(
+            "share\iiLicenseManager\THIRD_PARTY_NOTICES.md",
+            "THIRD_PARTY_NOTICES.md"
+        )
+    if (-not $iiLicenseManagerNoticeFile) {
+        throw "Windows packaging requires iiLicenseManager third-party notices."
+    }
     Assert-PublicDistributionEvidence `
         -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
         -IiSharedCanvasLicenseFile $iiSharedCanvasLicenseFile `
+        -IiLicenseManagerNoticeFile $iiLicenseManagerNoticeFile `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256
 }
@@ -2862,7 +2913,7 @@ if ($Clean) {
     Remove-Item $StageDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix, $IiSharedCanvasPrefix, $IiUpdateManagerPrefix) -join ";"
+$prefixPath = @($QtPrefix, $LVRSPrefix, $IiPaintEnginePrefix, $IiSharedCanvasPrefix, $IiUpdateManagerPrefix, $IiLicenseManagerPrefix) -join ";"
 $buildTesting = if ($SkipTests) { "OFF" } else { "ON" }
 
 Write-Step "Configuring Vincent"
@@ -2919,6 +2970,7 @@ Copy-DependencyRuntimeFiles -Name "LVRS" -Prefix $LVRSPrefix -Destination $Stage
 Copy-DependencyRuntimeFiles -Name "iiPaintEngine" -Prefix $IiPaintEnginePrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiSharedCanvas" -Prefix $IiSharedCanvasPrefix -Destination $StageDir
 Copy-DependencyRuntimeFiles -Name "iiUpdateManager" -Prefix $IiUpdateManagerPrefix -Destination $StageDir
+Copy-DependencyRuntimeFiles -Name "iiLicenseManager" -Prefix $IiLicenseManagerPrefix -Destination $StageDir
 Remove-EmbeddedDependencyQmlImport -ModuleName "LVRS" -Destination $StageDir
 Remove-ReleaseOnlyQtArtifacts -Directory $StageDir -BuildType $BuildType
 if ($windowsPackageRequested) {
@@ -2928,6 +2980,7 @@ if ($windowsPackageRequested) {
         -LvrsLicenseFile $lvrsLicenseFile `
         -IiPaintEngineLicenseFile $iiPaintEngineLicenseFile `
         -IiSharedCanvasLicenseFile $iiSharedCanvasLicenseFile `
+        -IiLicenseManagerNoticeFile $iiLicenseManagerNoticeFile `
         -PublicRelease ([bool]($Sign -or $ExternalSigning -or $AllowUnsignedPackage)) `
         -SourceUrl $CorrespondingSourceUrl `
         -SourceSha256 $CorrespondingSourceSha256

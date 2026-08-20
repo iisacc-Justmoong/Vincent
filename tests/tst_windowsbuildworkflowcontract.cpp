@@ -102,6 +102,11 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(source.contains(QStringLiteral("IiUpdateManagerSource")));
     QVERIFY(source.contains(QStringLiteral("-Label \"iiUpdateManager\"")));
     QVERIFY(source.contains(QStringLiteral("/iiUpdateManager/CMakeLists.txt")));
+    QVERIFY(source.contains(QStringLiteral("IiLicenseManagerRevision")));
+    QVERIFY(source.contains(QStringLiteral("IiLicenseManagerSource")));
+    QVERIFY(source.contains(QStringLiteral("-Label \"iiLicenseManager\"")));
+    QVERIFY(source.contains(QStringLiteral("/iiLicenseManager/CMakeLists.txt")));
+    QVERIFY(source.contains(QStringLiteral("/iiLicenseManager/THIRD_PARTY_NOTICES.md")));
     QVERIFY(source.contains(QStringLiteral("f51449543273cbf12058ae92b230e0c4209f5066")));
     QVERIFY(source.contains(QStringLiteral("875f77d9f61bd97fd84cca47ce3bc71186dfbd09")));
     QVERIFY(source.contains(QStringLiteral("third_party\\qtkeychain")));
@@ -128,7 +133,8 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(buildGuide.contains(
         QStringLiteral(".\\tools\\new-corresponding-source.ps1 -Version 5.1 -VincentRevision v5.1 "
                        "-IiSharedCanvasRevision $env:IISHAREDCANVAS_COMMIT "
-                       "-IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
+                       "-IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT "
+                       "-IiLicenseManagerRevision $env:IILICENSEMANAGER_COMMIT")));
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
@@ -158,6 +164,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("$env:IIPAINTENGINE_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:IISHAREDCANVAS_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("$env:IIUPDATEMANAGER_PREFIX")));
+    QVERIFY(source.contains(QStringLiteral("$env:IILICENSEMANAGER_PREFIX")));
     QVERIFY(source.contains(QStringLiteral("Resolve-QtPrefix")));
     QVERIFY(source.contains(QStringLiteral("Resolve-Objdump")));
     QVERIFY(source.contains(QStringLiteral("Assert-MinGwRuntimeCompatibility")));
@@ -209,10 +216,14 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
         source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiSharedCanvas\"")));
     QVERIFY(
         source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiUpdateManager\"")));
+    QVERIFY(
+        source.contains(QStringLiteral("Copy-DependencyRuntimeFiles -Name \"iiLicenseManager\"")));
     QVERIFY(source.contains(QStringLiteral("iiSharedCanvas.dll")));
     QVERIFY(source.contains(QStringLiteral("libiiSharedCanvas.dll")));
     QVERIFY(source.contains(QStringLiteral("iiUpdateManager.dll")));
     QVERIFY(source.contains(QStringLiteral("libiiUpdateManager.dll")));
+    QVERIFY(source.contains(QStringLiteral("iiLicenseManager.dll")));
+    QVERIFY(source.contains(QStringLiteral("libiiLicenseManager.dll")));
     QVERIFY(!source.contains(QStringLiteral("Copy-DependencyQmlImports -Name \"LVRS\"")));
     QVERIFY(!source.contains(
         QStringLiteral("Remove-QmlResourcePreferDirectives -ModuleName \"LVRS\"")));
@@ -272,6 +283,8 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(source.contains(QStringLiteral("winpthreads\\COPYING")));
     QVERIFY(source.contains(QStringLiteral("legal\\QtKeychain\\COPYING.txt")));
     QVERIFY(source.contains(QStringLiteral("legal\\iiSharedCanvas\\LICENSE.txt")));
+    QVERIFY(source.contains(
+        QStringLiteral("legal\\iiLicenseManager\\THIRD_PARTY_NOTICES.md")));
     QVERIFY(source.contains(QStringLiteral("QtKeychain-BSD-3-Clause.txt")));
 
     const QString noticesPath = QFINDTESTDATA("../packaging/windows/THIRD_PARTY_NOTICES.txt");
@@ -282,6 +295,10 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
     QVERIFY(notices.contains(QStringLiteral("legal/iiPaintEngine/LICENSE.txt")));
     QVERIFY(notices.contains(QStringLiteral("iiSharedCanvas")));
     QVERIFY(notices.contains(QStringLiteral("legal/iiSharedCanvas/LICENSE.txt")));
+    QVERIFY(notices.contains(QStringLiteral("iiLicenseManager 0.2")));
+    QVERIFY(notices.contains(QStringLiteral("libsodium")));
+    QVERIFY(notices.contains(
+        QStringLiteral("legal/iiLicenseManager/THIRD_PARTY_NOTICES.md")));
     QVERIFY(notices.contains(QStringLiteral("psd_sdk")));
     QVERIFY(notices.contains(QStringLiteral("QtKeychain 0.17.0")));
     QVERIFY(notices.contains(QStringLiteral("legal/QtKeychain/COPYING.txt")));
@@ -642,6 +659,8 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:LVRS::LVRS>")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiPaintEngine::iiPaintEngine>")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiSharedCanvas::iiSharedCanvas>")));
+    QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiUpdateManager::iiUpdateManager>")));
+    QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE:iiLicenseManager::iiLicenseManager>")));
     QVERIFY(source.contains(QStringLiteral("$<TARGET_FILE_DIR:Vincent>")));
     QVERIFY(source.contains(QStringLiteral("Copying Windows runtime DLLs next to Vincent.exe")));
     QVERIFY(source.contains(QStringLiteral("if(APPLE)\n    # productbuild")));
@@ -677,6 +696,8 @@ void tst_WindowsBuildWorkflowContract::cmakeHasWindowsInstallAndPackageRules()
         "PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>")));
     QVERIFY(testsSource.contains(QStringLiteral(
         "PATH=path_list_prepend:$<TARGET_FILE_DIR:iiUpdateManager::iiUpdateManager>")));
+    QVERIFY(testsSource.contains(QStringLiteral(
+        "PATH=path_list_prepend:$<TARGET_FILE_DIR:iiLicenseManager::iiLicenseManager>")));
     QVERIFY(testsSource.contains(QStringLiteral("tests_vincentupdatemanager")));
     QVERIFY(testsSource.contains(QStringLiteral("QT_QPA_PLATFORM=set:offscreen")));
     QVERIFY(testsSource.contains(QStringLiteral("NAME tests_windowsauthenticodepolicy")));
@@ -936,6 +957,12 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("repository: iisacc-Justmoong/iiUpdateManager")));
     QVERIFY(workflow.contains(QStringLiteral("persist-credentials: false")));
     QVERIFY(workflow.contains(QStringLiteral("Build, test, and install pinned iiUpdateManager")));
+    QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiLicenseManager")));
+    QVERIFY(workflow.contains(QStringLiteral("IILICENSEMANAGER_COMMIT")));
+    QVERIFY(workflow.contains(
+        QStringLiteral("Build, test, and install pinned iiLicenseManager")));
+    QVERIFY(workflow.contains(QStringLiteral("libsodium:x64-mingw-static")));
+    QVERIFY(workflow.contains(QStringLiteral("IILICENSEMANAGER_PREFIX")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
     const qsizetype updateManagerBuildIndex =
         workflow.indexOf(QStringLiteral("Build, test, and install pinned iiUpdateManager"));
@@ -1009,6 +1036,11 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
         QStringLiteral("The installed iiUpdateManager runtime is not Authenticode-signed")));
     QVERIFY(workflow.contains(
         QStringLiteral("SignTool rejected the installed iiUpdateManager runtime")));
+    QVERIFY(workflow.contains(QStringLiteral("iiLicenseManager.dll")));
+    QVERIFY(workflow.contains(
+        QStringLiteral("The installed iiLicenseManager runtime is not Authenticode-signed")));
+    QVERIFY(workflow.contains(
+        QStringLiteral("SignTool rejected the installed iiLicenseManager runtime")));
 
     const QString sourceWorkflowPath =
         QFINDTESTDATA("../.github/workflows/windows-corresponding-source.yml");
@@ -1032,6 +1064,12 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(sourceWorkflow.contains(QStringLiteral("-IiUpdateManagerSource $updateManagerSource")));
     QVERIFY(sourceWorkflow.contains(
         QStringLiteral("-IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("IILICENSEMANAGER_COMMIT")));
+    QVERIFY(sourceWorkflow.contains(QStringLiteral("iisacc-Justmoong/iiLicenseManager")));
+    QVERIFY(sourceWorkflow.contains(
+        QStringLiteral("-IiLicenseManagerSource $licenseManagerSource")));
+    QVERIFY(sourceWorkflow.contains(
+        QStringLiteral("-IiLicenseManagerRevision $env:IILICENSEMANAGER_COMMIT")));
 
     const QString readmePath = QFINDTESTDATA("../README.md");
     QVERIFY2(!readmePath.isEmpty(), "README.md test data was not found");
@@ -1076,10 +1114,11 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(buildGuide.contains(
         QStringLiteral("preserves the existing nested Authenticode verification")));
     QVERIFY(buildGuide.contains(QStringLiteral(
-        "copies the LVRS, iiPaintEngine, iiSharedCanvas, and iiUpdateManager runtime DLLs")));
+        "copies the LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager runtime DLLs")));
     QVERIFY(buildGuide.contains(
         QStringLiteral("`LVRS.dll`, `libiiPaintEngine.dll`, `libiiSharedCanvas.dll`, the installed "
-                       "`iiUpdateManager.dll`/`libiiUpdateManager.dll`")));
+                       "`iiUpdateManager.dll`/`libiiUpdateManager.dll`, and the installed "
+                       "`iiLicenseManager.dll`/`libiiLicenseManager.dll`")));
 }
 
 QTEST_APPLESS_MAIN(tst_WindowsBuildWorkflowContract)

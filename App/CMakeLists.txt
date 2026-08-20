@@ -39,6 +39,8 @@ target_sources(Vincent PRIVATE
         models/input/temporarycamerainput.h
         models/license/licensemanager.cpp
         models/license/licensemanager.h
+        models/license/accountmanager.cpp
+        models/license/accountmanager.h
         models/license/licensecredentialstore.cpp
         models/license/licensecredentialstore.h
         models/network/nearbyvincentdiscovery.cpp

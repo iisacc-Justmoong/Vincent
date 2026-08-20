@@ -104,26 +104,29 @@ Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $true
 Assert-AuthenticodePolicy -SigningRequested $true -UnsignedPackageAllowed $false -ZipPackageSkipped $false -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint $thumbprint -Rfc3161TimestampUrl "http://timestamp.digicert.com"
 Assert-AuthenticodePolicy -SigningRequested $false -UnsignedPackageAllowed $false -ExternalSigningRequested $true -ZipPackageSkipped $true -MsiRequested $true -TestsSkipped $false -Configuration Release -CertificateThumbprint "" -Rfc3161TimestampUrl ""
 
-Assert-PublicDistributionEvidence -PublicRelease $false -IiPaintEngineLicenseFile "" -IiSharedCanvasLicenseFile "" -SourceUrl "" -SourceSha256 ""
+Assert-PublicDistributionEvidence -PublicRelease $false -IiPaintEngineLicenseFile "" -IiSharedCanvasLicenseFile "" -IiLicenseManagerNoticeFile "" -SourceUrl "" -SourceSha256 ""
 Assert-Throws {
-    Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile "" -IiSharedCanvasLicenseFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
+    Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile "" -IiSharedCanvasLicenseFile "" -IiLicenseManagerNoticeFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
 } "explicit iiPaintEngine LICENSE"
 $temporaryLicenseFile = Join-Path ([System.IO.Path]::GetTempPath()) ("Vincent-LicenseTest-" + [Guid]::NewGuid().ToString("N") + ".txt")
 try {
     [System.IO.File]::WriteAllText($temporaryLicenseFile, "test license", [System.Text.Encoding]::UTF8)
     Assert-Throws {
-        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
+        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile "" -IiLicenseManagerNoticeFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
     } "iiSharedCanvas LICENSE"
     Assert-Throws {
-        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -SourceUrl "http://example.invalid/source.zip" -SourceSha256 ("A" * 64)
+        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -IiLicenseManagerNoticeFile "" -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
+    } "iiLicenseManager third-party notices"
+    Assert-Throws {
+        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -IiLicenseManagerNoticeFile $temporaryLicenseFile -SourceUrl "http://example.invalid/source.zip" -SourceSha256 ("A" * 64)
     } "absolute HTTPS URL"
     Assert-Throws {
-        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 "1234"
+        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -IiLicenseManagerNoticeFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 "1234"
     } "exact 64-hex"
     Assert-Throws {
-        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 (("A" * 32) + " " + ("A" * 32))
+        Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -IiLicenseManagerNoticeFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 (("A" * 32) + " " + ("A" * 32))
     } "exact 64-hex"
-    Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
+    Assert-PublicDistributionEvidence -PublicRelease $true -IiPaintEngineLicenseFile $temporaryLicenseFile -IiSharedCanvasLicenseFile $temporaryLicenseFile -IiLicenseManagerNoticeFile $temporaryLicenseFile -SourceUrl "https://example.invalid/source.zip" -SourceSha256 ("A" * 64)
 } finally {
     Remove-Item -LiteralPath $temporaryLicenseFile -Force -ErrorAction SilentlyContinue
 }

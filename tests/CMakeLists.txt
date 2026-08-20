@@ -141,6 +141,8 @@ add_test(NAME tests_temporarycamerainput COMMAND tests_temporarycamerainput)
 
 add_executable(tests_licensemanager
         tst_licensemanager.cpp
+        ../App/models/license/accountmanager.cpp
+        ../App/models/license/accountmanager.h
         ../App/models/license/licensecredentialstore.cpp
         ../App/models/license/licensecredentialstore.h
         ../App/models/license/licensemanager.cpp
@@ -155,6 +157,7 @@ target_link_libraries(tests_licensemanager PRIVATE
         Qt6::Core
         Qt6::Network
         Qt6::Test
+        iiLicenseManager::iiLicenseManager
 )
 if(APPLE OR WIN32)
     target_link_libraries(tests_licensemanager PRIVATE qt6keychain)
@@ -411,7 +414,7 @@ if(WIN32)
             tests_drawingsurfaceitem
             PROPERTIES
             ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiUpdateManager::iiUpdateManager>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
+        "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiUpdateManager::iiUpdateManager>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiLicenseManager::iiLicenseManager>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
     )
 endif()
 

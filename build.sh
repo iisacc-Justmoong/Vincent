@@ -30,6 +30,7 @@ Environment:
   CLEAN_BUILD_DIR=1 or --clean discards build/ before configuring.
   RUN_TESTS=0 skips ctest.
   IIUPDATEMANAGER_PREFIX selects the installed iiUpdateManager 0.2 prefix.
+  IILICENSEMANAGER_PREFIX selects the installed iiLicenseManager 0.2 prefix.
 USAGE
 }
 
@@ -201,6 +202,9 @@ verify_pkg_icon_payload() {
   grep -E "^\\./${app_bundle}/Contents/Frameworks/libiiUpdateManager([.][^/]*)?[.]dylib$" \
     "$payload_list" >/dev/null \
     || die "package payload is missing the iiUpdateManager runtime"
+  grep -E "^\\./${app_bundle}/Contents/Frameworks/libiiLicenseManager([.][^/]*)?[.]dylib$" \
+    "$payload_list" >/dev/null \
+    || die "package payload is missing the iiLicenseManager runtime"
 }
 
 to_lower() {
@@ -251,6 +255,8 @@ declare -a CMAKE_EXTRA_ARGS
 CMAKE_EXTRA_ARGS=()
 IIUPDATEMANAGER_PREFIX="${IIUPDATEMANAGER_PREFIX:-${HOME}/.local/iiUpdateManager}"
 CMAKE_EXTRA_ARGS+=("-DiiUpdateManager_DIR=${IIUPDATEMANAGER_PREFIX}/lib/cmake/iiUpdateManager")
+IILICENSEMANAGER_PREFIX="${IILICENSEMANAGER_PREFIX:-${HOME}/.local/iiLicenseManager}"
+CMAKE_EXTRA_ARGS+=("-DiiLicenseManager_DIR=${IILICENSEMANAGER_PREFIX}/lib/cmake/iiLicenseManager")
 # 빌드 병렬도(빈 값이면 cmake 기본 동작)
 CMAKE_BUILD_PARALLEL=""       # 예: "12"
 
@@ -261,6 +267,7 @@ MACDEPLOYQT_VERBOSE="2"       # 0-3
 MACDEPLOYQT_NO_STRIP="${MACDEPLOYQT_NO_STRIP:-}"
 MACDEPLOYQT_ALWAYS_OVERWRITE="1" # 1이면 -always-overwrite
 MACDEPLOYQT_LIBPATH="${MACDEPLOYQT_LIBPATH:-${IIUPDATEMANAGER_PREFIX}/lib}"
+MACDEPLOYQT_LICENSE_LIBPATH="${MACDEPLOYQT_LICENSE_LIBPATH:-${IILICENSEMANAGER_PREFIX}/lib}"
 # macdeployqt 추가 옵션이 필요하면 아래 배열에 추가한다.
 MACDEPLOYQT_EXTRA_ARGS=(
   # "-codesign="
@@ -417,6 +424,8 @@ fi
 require_dir "$CMAKE_SOURCE_DIR"
 require_file "${IIUPDATEMANAGER_PREFIX}/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake"
 require_dir "${IIUPDATEMANAGER_PREFIX}/lib"
+require_file "${IILICENSEMANAGER_PREFIX}/lib/cmake/iiLicenseManager/iiLicenseManagerConfig.cmake"
+require_dir "${IILICENSEMANAGER_PREFIX}/lib"
 run mkdir -p "$BUILD_DIR" "$DIST_DIR"
 
 [[ "$INSTALL_DIR" == /* ]] || die "INSTALL_DIR must be an absolute path, got: $INSTALL_DIR"
@@ -603,6 +612,7 @@ macdeployqt_run() {
   if [[ "$MACDEPLOYQT_ALWAYS_OVERWRITE" == "1" ]]; then cmd+=("-always-overwrite"); fi
   cmd+=("-qmldir=${QML_DIR}")
   if [[ -n "$MACDEPLOYQT_LIBPATH" ]]; then cmd+=("-libpath=${MACDEPLOYQT_LIBPATH}"); fi
+  if [[ -n "$MACDEPLOYQT_LICENSE_LIBPATH" ]]; then cmd+=("-libpath=${MACDEPLOYQT_LICENSE_LIBPATH}"); fi
   if [[ "$mode" == "mas" ]]; then cmd+=("-appstore-compliant"); fi
 
   # 추가 옵션
@@ -714,6 +724,29 @@ assert_update_manager_runtime() {
     || die "bundled iiUpdateManager runtime is not a Mach-O library: $runtime"
 }
 
+assert_license_manager_runtime() {
+  local app="$1"
+  local executable="${app}/Contents/MacOS/${APP_NAME}"
+  require_nonempty_file "$executable"
+
+  # Contract tests use a shell-script stand-in; deployed Vincent binaries are Mach-O.
+  if ! /usr/bin/file -b "$executable" 2>/dev/null | grep -q 'Mach-O'; then
+    return 0
+  fi
+
+  /usr/bin/otool -L "$executable" \
+    | sed -nE 's#^[[:space:]]+(@rpath/libiiLicenseManager[^[:space:]]*[.]dylib).*#\1#p' \
+    | grep -q . \
+    || die "Vincent does not link the iiLicenseManager runtime"
+
+  local runtime
+  runtime="$(find "${app}/Contents/Frameworks" -maxdepth 1 \
+    \( -type f -o -type l \) -name 'libiiLicenseManager*.dylib' -print -quit 2>/dev/null || true)"
+  require_nonempty_file "$runtime"
+  /usr/bin/file -b "$runtime" | grep -q 'Mach-O' \
+    || die "bundled iiLicenseManager runtime is not a Mach-O library: $runtime"
+}
+
 assert_macos_deployment_targets() {
   local app="$1"
   local violations="${WORKDIR}/macho_deployment_target_violations_$(basename "$app")_$$.txt"
@@ -777,7 +810,7 @@ assert_macos_architectures() {
 
     local relative_path="${binary#${app}/Contents/}"
     case "$relative_path" in
-      "MacOS/${APP_NAME}"|Frameworks/libLVRS.dylib|Frameworks/libiiPaintEngine.dylib|Frameworks/libiiUpdateManager*.dylib)
+      "MacOS/${APP_NAME}"|Frameworks/libLVRS.dylib|Frameworks/libiiPaintEngine.dylib|Frameworks/libiiUpdateManager*.dylib|Frameworks/libiiLicenseManager*.dylib)
         if [[ "$architectures" != "$VINCENT_MACOS_ARCHITECTURE" ]]; then
           printf '%s: Vincent-owned Mach-O architectures %s must be exactly %s\n' \
             "$binary" "$architectures" "$VINCENT_MACOS_ARCHITECTURE" >> "$violations"
@@ -826,6 +859,7 @@ prepare_app() {
   remove_unused_qt_sql_plugins "$out_app"
   remove_absolute_macho_rpaths "$out_app"
   assert_update_manager_runtime "$out_app"
+  assert_license_manager_runtime "$out_app"
   assert_portable_macho_links "$out_app"
   assert_macos_deployment_targets "$out_app"
   assert_macos_architectures "$out_app"

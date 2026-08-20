@@ -1,12 +1,18 @@
+#include "accountmanager.h"
 #include "licensemanager.h"
 #include "licensecredentialstore.h"
 
+#include <iiLicenseManager/LicenseClient.h>
+
+#include <QDir>
+#include <QFile>
 #include <QHostAddress>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include <type_traits>
@@ -14,6 +20,17 @@
 namespace
 {
 const QString validLicenseKey = QStringLiteral("IIL1_0123456789abcdefghijklmnopqrstuv");
+const QByteArray testAccountPublicKey = QByteArrayLiteral(
+    "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg");
+const QByteArray testAccountCertificate = QByteArrayLiteral(
+    "eyJhbGciOiJFZERTQSIsImtpZCI6InRlc3QtMjAyNiIsInR5cCI6IklJU0FDQy1MSUNFTlNFIn0."
+    "eyJ2IjoxLCJpc3MiOiJodHRwczovL2lpc2FjYy5jb20iLCJsaWNlbnNlSWQiOiIxMTExMTExMS0x"
+    "MTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJhY3RpdmF0aW9uSWQiOiIyMjIyMjIyMi0yMjIy"
+    "LTQyMjItODIyMi0yMjIyMjIyMjIyMjIiLCJwcm9kdWN0SWQiOiJ2aW5jZW50IiwiaW5zdGFsbGF0"
+    "aW9uSWQiOiJ0ZXN0aW5zdGFsbGF0aW9uaWQwMTIzNDU2Nzg5MDEyMyIsImlzc3VlZEF0IjoiMjAy"
+    "Ni0wOC0xNFQwMDowMDowMC4wMDBaIn0."
+    "-z2QlPCpjx8Mi85Wh3P8eO90LRBoOm7zAu5dCIikPPdQv1wgTKBuiFNaxYWDP0-ohUd2y9Ik47KI"
+    "7PPq5miJAA");
 
 QByteArray storedCredentials(const QString &email = QStringLiteral("verified@example.com"),
                              const QString &licenseKey = validLicenseKey)
@@ -184,7 +201,7 @@ class tst_LicenseManager : public QObject
 
 private slots:
     void disabledEnforcementStartsUnlockedWithoutAutomaticCredentialOrNetworkAccess();
-    void accountEmailLoadsOnlyOnExplicitPreferencesRefresh();
+    void accountEmailComesFromIiLicenseManagerActivation();
     void productIdentityIsApplicationOwned();
     void successfulValidationPostsPrivateFixedContractAndUnlocks();
     void successfulValidationStoresOnlyNormalizedVerifiedCredentials();
@@ -246,29 +263,73 @@ void tst_LicenseManager::disabledEnforcementStartsUnlockedWithoutAutomaticCreden
     QCOMPARE(server.connectionCount(), 0);
 }
 
-void tst_LicenseManager::accountEmailLoadsOnlyOnExplicitPreferencesRefresh()
+void tst_LicenseManager::accountEmailComesFromIiLicenseManagerActivation()
 {
+    QTemporaryDir licenseStorage;
+    QVERIFY(licenseStorage.isValid());
+    QFile installationIdFile(
+        QDir(licenseStorage.path()).filePath(QStringLiteral("installation.id")));
+    QVERIFY(installationIdFile.open(QIODevice::WriteOnly));
+    QCOMPARE(installationIdFile.write("testinstallationid01234567890123\n"), 33);
+    installationIdFile.close();
+
+    const QByteArray responseBody = QJsonDocument(QJsonObject{
+        {QStringLiteral("activated"), true},
+        {QStringLiteral("certificate"), QString::fromLatin1(testAccountCertificate)},
+        {QStringLiteral("productId"), QStringLiteral("vincent")},
+    }).toJson(QJsonDocument::Compact);
+    SingleResponseServer server(httpResponse(200, responseBody));
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
     FakeCredentialStore store;
     store.readStatus = LicenseCredentialStore::ReadStatus::Found;
     store.readData = storedCredentials();
 
-    LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")),
-                           1000,
-                           &store,
-                           LicenseManager::EnforcementMode::Disabled);
-    QCOMPARE(store.readCount, 0);
-    QVERIFY(manager.accountEmail().isEmpty());
-    QVERIFY(!manager.accountEmailLoading());
+    LicenseManager credentials(QUrl(QStringLiteral("http://127.0.0.1/validate")),
+                               1000,
+                               &store,
+                               LicenseManager::EnforcementMode::Disabled);
+    const QList<iisacc::licensing::TrustedLicenseKey> trustedKeys{{
+        QStringLiteral("test-2026"),
+        QByteArray::fromBase64(testAccountPublicKey,
+                               QByteArray::Base64UrlEncoding
+                                   | QByteArray::AbortOnBase64DecodingErrors),
+    }};
+    iisacc::licensing::LicenseClient accountLicense(QStringLiteral("vincent"),
+                                                    server.endpoint(),
+                                                    licenseStorage.path(),
+                                                    trustedKeys);
+    AccountManager account(&credentials, &accountLicense);
 
-    QSignalSpy emailSpy(&manager, &LicenseManager::accountEmailChanged);
-    QSignalSpy loadingSpy(&manager, &LicenseManager::accountEmailLoadingChanged);
-    manager.refreshAccountEmail();
+    QCOMPARE(store.readCount, 0);
+    QVERIFY(account.accountEmail().isEmpty());
+    QVERIFY(!account.accountEmailLoading());
+
+    QSignalSpy emailSpy(&account, &AccountManager::accountEmailChanged);
+    QSignalSpy loadingSpy(&account, &AccountManager::accountEmailLoadingChanged);
+    account.refresh();
 
     QCOMPARE(store.readCount, 1);
-    QCOMPARE(manager.accountEmail(), QStringLiteral("verified@example.com"));
-    QVERIFY(!manager.accountEmailLoading());
+    QTRY_COMPARE_WITH_TIMEOUT(account.accountEmail(), QStringLiteral("verified@example.com"), 2000);
+    QVERIFY(!account.accountEmailLoading());
     QCOMPARE(emailSpy.size(), 1);
     QCOMPARE(loadingSpy.size(), 2);
+    QCOMPARE(accountLicense.accountEmail(), QStringLiteral("verified@example.com"));
+    QCOMPARE(server.connectionCount(), 1);
+
+    SingleResponseServer offlineTrap(httpResponse(503, QByteArrayLiteral("{}")));
+    QVERIFY(offlineTrap.listen(QHostAddress::LocalHost));
+    iisacc::licensing::LicenseClient restartedLicense(QStringLiteral("vincent"),
+                                                      offlineTrap.endpoint(),
+                                                      licenseStorage.path(),
+                                                      trustedKeys);
+    AccountManager restartedAccount(&credentials, &restartedLicense);
+    restartedAccount.refresh();
+
+    QCOMPARE(restartedAccount.accountEmail(), QStringLiteral("verified@example.com"));
+    QVERIFY(!restartedAccount.accountEmailLoading());
+    QCOMPARE(store.readCount, 1);
+    QCOMPARE(offlineTrap.connectionCount(), 0);
 }
 
 void tst_LicenseManager::updateCredentialsAreMoveOnlyAndReadOnlyOnExplicitRequest()

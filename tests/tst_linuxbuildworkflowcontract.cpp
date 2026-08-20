@@ -38,6 +38,7 @@ void tst_LinuxBuildWorkflowContract::cmakeBuildsDeployableLinuxArchive()
     QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib")));
     QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiSharedCanvas/lib")));
     QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiUpdateManager/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiLicenseManager/lib")));
     QVERIFY(!source.contains(QStringLiteral("$ENV{HOME}/.local/LVRS/platforms/macos\"\n"
                                              "        \"$ENV{HOME}/.local/LVRS")));
 
@@ -53,6 +54,8 @@ void tst_LinuxBuildWorkflowContract::cmakeBuildsDeployableLinuxArchive()
     QVERIFY(source.contains(QStringLiteral("packaging/linux/com.iisacc.vincent.painter.desktop")));
     QVERIFY(source.contains(QStringLiteral("${CMAKE_INSTALL_DATAROOTDIR}/applications")));
     QVERIFY(source.contains(QStringLiteral("${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps")));
+    QVERIFY(source.contains(QStringLiteral(
+        "${CMAKE_INSTALL_DATAROOTDIR}/doc/Vincent/legal/iiLicenseManager")));
     QVERIFY(source.contains(QStringLiteral("set(CPACK_GENERATOR \"TGZ\")")));
     QVERIFY(source.contains(QStringLiteral("set(CPACK_PACKAGE_FILE_NAME \"Vincent-${CPACK_PACKAGE_VERSION}-Linux\")")));
     QVERIFY(source.contains(QStringLiteral("set(CPACK_PACKAGING_INSTALL_PREFIX \"/\")")));
@@ -92,7 +95,7 @@ void tst_LinuxBuildWorkflowContract::documentationMatchesTheInstalledLinuxLayout
 
     QVERIFY(readme.contains(QStringLiteral("`bin/Vincent`")));
     QVERIFY(readme.contains(QStringLiteral(
-        "Qt, LVRS, iiPaintEngine, iiSharedCanvas, and iiUpdateManager shared runtimes")));
+        "Qt, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager shared runtimes")));
     QVERIFY(readme.contains(QStringLiteral("native macOS global menu bar")));
     QVERIFY(readme.contains(QStringLiteral("Windows and Linux use a compact dark in-window menu bar")));
     QVERIFY(buildGuide.contains(QStringLiteral("qt_generate_deploy_qml_app_script")));

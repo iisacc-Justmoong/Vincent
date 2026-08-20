@@ -166,6 +166,7 @@ function Assert-StorePackageContent {
         "LICENSE.txt",
         "THIRD_PARTY_NOTICES.txt",
         "SOURCE_OFFER.txt",
+        "legal\iiLicenseManager\THIRD_PARTY_NOTICES.md",
         "legal\QtKeychain\COPYING.txt",
         "Assets\StoreLogo.png",
         "Assets\Square44x44Logo.png",

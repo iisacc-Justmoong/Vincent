@@ -96,6 +96,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $contentRoot "Assets") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $contentRoot "legal") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $contentRoot "legal\QtKeychain") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $contentRoot "legal\iiLicenseManager") -Force | Out-Null
 
     Write-StoreAppxManifest `
         -TemplatePath $ManifestTemplatePath `
@@ -131,6 +132,7 @@ try {
             "LICENSE.txt",
             "THIRD_PARTY_NOTICES.txt",
             "SOURCE_OFFER.txt",
+            "legal\iiLicenseManager\THIRD_PARTY_NOTICES.md",
             "legal\QtKeychain\COPYING.txt",
             "Assets\StoreLogo.png",
             "Assets\Square44x44Logo.png",

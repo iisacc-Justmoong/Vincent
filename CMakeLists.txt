@@ -121,6 +121,17 @@ if(EXISTS "${_vincent_iiupdatemanager_prefix}/lib/cmake/iiUpdateManager/iiUpdate
 endif()
 unset(_vincent_iiupdatemanager_prefix)
 
+# 로컬 iiLicenseManager 설치 경로 힌트(.local) 우선 반영
+set(_vincent_iilicensemanager_prefix "$ENV{HOME}/.local/iiLicenseManager")
+if(EXISTS "${_vincent_iilicensemanager_prefix}/lib/cmake/iiLicenseManager/iiLicenseManagerConfig.cmake")
+    list(FIND CMAKE_PREFIX_PATH "${_vincent_iilicensemanager_prefix}" _vincent_iilicensemanager_index)
+    if(_vincent_iilicensemanager_index EQUAL -1)
+        list(PREPEND CMAKE_PREFIX_PATH "${_vincent_iilicensemanager_prefix}")
+    endif()
+    unset(_vincent_iilicensemanager_index)
+endif()
+unset(_vincent_iilicensemanager_prefix)
+
 # 요구 버전
 set(QT_MIN_VERSION "6.8.0")
 
@@ -138,6 +149,17 @@ find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
 find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)
 find_package(iiUpdateManager 0.2 CONFIG REQUIRED)
+find_package(iiLicenseManager 0.2 CONFIG REQUIRED)
+
+get_filename_component(_vincent_iilicensemanager_prefix
+        "${iiLicenseManager_DIR}/../../.." ABSOLUTE)
+set(VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES
+        "${_vincent_iilicensemanager_prefix}/share/iiLicenseManager/THIRD_PARTY_NOTICES.md")
+if(NOT EXISTS "${VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES}")
+    message(FATAL_ERROR
+            "iiLicenseManager third-party notices are missing: ${VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES}")
+endif()
+unset(_vincent_iilicensemanager_prefix)
 
 if(APPLE OR WIN32)
     FetchContent_Declare(qtkeychain
@@ -201,20 +223,23 @@ if(APPLE)
             "$ENV{HOME}/.local/LVRS/platforms/macos/lib"
             "$ENV{HOME}/.local/iiPaintEngine/platforms/macos/lib"
             "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib")
+            "$ENV{HOME}/.local/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/iiLicenseManager/lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/platforms/linux/lib"
             "$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib"
             "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib")
+            "$ENV{HOME}/.local/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/iiLicenseManager/lib")
 endif()
 if(UNIX AND NOT APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
             "$ENV{HOME}/.local/LVRS/lib"
             "$ENV{HOME}/.local/iiPaintEngine/lib"
             "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib")
+            "$ENV{HOME}/.local/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/iiLicenseManager/lib")
 endif()
 foreach(_vincent_runtime_path IN LISTS _vincent_local_dependency_runtime_candidates)
     if(IS_DIRECTORY "${_vincent_runtime_path}")
@@ -306,6 +331,7 @@ target_link_libraries(Vincent PRIVATE
         iiPaintEngine::iiPaintEngine
         iiSharedCanvas::iiSharedCanvas
         iiUpdateManager::iiUpdateManager
+        iiLicenseManager::iiLicenseManager
         vincent_psd_sdk
 )
 if(APPLE OR WIN32)
@@ -352,6 +378,7 @@ if(WIN32)
                     $<TARGET_FILE:iiPaintEngine::iiPaintEngine>
                     $<TARGET_FILE:iiSharedCanvas::iiSharedCanvas>
                     $<TARGET_FILE:iiUpdateManager::iiUpdateManager>
+                    $<TARGET_FILE:iiLicenseManager::iiLicenseManager>
                     ${_vincent_windows_runtime_files}
                     $<TARGET_FILE_DIR:Vincent>
             COMMAND_EXPAND_LISTS
@@ -399,7 +426,11 @@ if(APPLE)
             "${CMAKE_SOURCE_DIR}/packaging/common/licenses/QtKeychain-BSD-3-Clause.txt")
     set_source_files_properties("${VINCENT_QTKEYCHAIN_LICENSE}" PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources/legal/QtKeychain")
-    target_sources(Vincent PRIVATE "${VINCENT_QTKEYCHAIN_LICENSE}")
+    set_source_files_properties("${VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES}" PROPERTIES
+            MACOSX_PACKAGE_LOCATION "Resources/legal/iiLicenseManager")
+    target_sources(Vincent PRIVATE
+            "${VINCENT_QTKEYCHAIN_LICENSE}"
+            "${VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES}")
 endif()
 
 if(APPLE)
@@ -474,6 +505,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES "${CMAKE_SOURCE_DIR}/packaging/macos/Vincent.xcassets/AppIcon.appiconset/icon_256x256.png"
             DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps"
             RENAME "com.iisacc.vincent.painter.png"
+            COMPONENT Runtime)
+    install(FILES "${VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES}"
+            DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/doc/Vincent/legal/iiLicenseManager"
             COMPONENT Runtime)
 endif()
 

@@ -19,6 +19,7 @@ env:
   IISHAREDCANVAS_COMMIT: 2ceeb8c0cf81d01e9740df1635badc08d5a12ebe
   IIUPDATEMANAGER_REPOSITORY: ${{ vars.IIUPDATEMANAGER_REPOSITORY }}
   IIUPDATEMANAGER_COMMIT: ${{ vars.IIUPDATEMANAGER_COMMIT }}
+  IILICENSEMANAGER_COMMIT: ${{ vars.IILICENSEMANAGER_COMMIT }}
 
 jobs:
   build-and-sign:
@@ -43,6 +44,9 @@ jobs:
           }
           if ($env:IIUPDATEMANAGER_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
               throw "Configure IIUPDATEMANAGER_COMMIT as the reviewed 40-hex commit."
+          }
+          if ($env:IILICENSEMANAGER_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
+              throw "Configure IILICENSEMANAGER_COMMIT as the reviewed 40-hex commit."
           }
           if ([string]::IsNullOrWhiteSpace($env:IIUPDATEMANAGER_READ_TOKEN)) {
               throw "Configure IIUPDATEMANAGER_READ_TOKEN for the private pinned dependency checkout."
@@ -118,6 +122,7 @@ jobs:
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
           $sharedCanvasSource = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
+          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/LVRS.git $lvrsSource
           git -C $lvrsSource checkout --detach $env:LVRS_COMMIT
@@ -125,6 +130,8 @@ jobs:
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiSharedCanvas.git $sharedCanvasSource
           git -C $sharedCanvasSource checkout --detach $env:IISHAREDCANVAS_COMMIT
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiLicenseManager.git $licenseManagerSource
+          git -C $licenseManagerSource checkout --detach $env:IILICENSEMANAGER_COMMIT
           $resolvedUpdateManagerCommit = (git -C $updateManagerSource rev-parse HEAD).Trim()
           if ($resolvedUpdateManagerCommit -cne $env:IIUPDATEMANAGER_COMMIT.ToLowerInvariant()) {
               throw "iiUpdateManager checkout does not match the pinned commit."
@@ -159,6 +166,45 @@ jobs:
           cmake --install $build --prefix $prefix
           if ($LASTEXITCODE -ne 0) { throw "iiUpdateManager installation failed." }
           "IIUPDATEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build, test, and install pinned iiLicenseManager
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
+          $build = Join-Path $source "build"
+          $prefix = Join-Path $env:USERPROFILE ".local\iiLicenseManager"
+          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) {
+              $env:VCPKG_INSTALLATION_ROOT
+          } else {
+              $env:VCPKG_ROOT
+          }
+          $vcpkg = Join-Path $vcpkgRoot "vcpkg.exe"
+          $vcpkgToolchain = Join-Path $vcpkgRoot "scripts\buildsystems\vcpkg.cmake"
+          if (-not (Test-Path -LiteralPath $vcpkg -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $vcpkgToolchain -PathType Leaf)) {
+              throw "The GitHub-hosted runner vcpkg installation was not found."
+          }
+          & $vcpkg install libsodium:x64-mingw-static
+          if ($LASTEXITCODE -ne 0) { throw "Static libsodium installation failed." }
+          cmake -S $source -B $build -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DBUILD_TESTING=ON `
+              "-DCMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" `
+              -DVCPKG_TARGET_TRIPLET=x64-mingw-static `
+              "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { throw "iiLicenseManager configure failed." }
+          cmake --build $build --parallel
+          if ($LASTEXITCODE -ne 0) { throw "iiLicenseManager build failed." }
+          $env:PATH = (@($build, (Join-Path $env:QT_ROOT_DIR "bin")) + @($env:PATH)) -join ";"
+          ctest --test-dir $build --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "iiLicenseManager tests failed." }
+          cmake --install $build --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "iiLicenseManager installation failed." }
+          $notice = Join-Path $prefix "share\iiLicenseManager\THIRD_PARTY_NOTICES.md"
+          if (-not (Test-Path -LiteralPath $notice -PathType Leaf)) {
+              throw "iiLicenseManager third-party notices were not installed."
+          }
+          "IILICENSEMANAGER_PREFIX=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build and install pinned LVRS
         shell: pwsh
@@ -412,6 +458,27 @@ jobs:
           & $signTool.FullName verify /pa /all /tw /v $updateRuntime
           if ($LASTEXITCODE -ne 0) {
               throw "SignTool rejected the installed iiUpdateManager runtime."
+          }
+          $licenseRuntimeCandidates = @(
+              @("iiLicenseManager.dll", "libiiLicenseManager.dll") |
+                  ForEach-Object {
+                      @(Get-ChildItem -LiteralPath $administrativeImageDirectory -Filter $_ -Recurse -File)
+                  }
+          )
+          if ($licenseRuntimeCandidates.Count -ne 1) {
+              throw "The signed MSI must install exactly one iiLicenseManager runtime; found $($licenseRuntimeCandidates.Count)."
+          }
+          $licenseRuntime = $licenseRuntimeCandidates[0].FullName
+          $licenseRuntimeSignature = Get-AuthenticodeSignature -LiteralPath $licenseRuntime
+          if ($licenseRuntimeSignature.Status -ne "Valid") {
+              throw "The installed iiLicenseManager runtime is not Authenticode-signed: $($licenseRuntimeSignature.Status)"
+          }
+          if ($licenseRuntimeSignature.SignerCertificate.Subject -notmatch "SignPath Foundation") {
+              throw "The installed iiLicenseManager runtime was not signed by the approved SignPath Foundation identity."
+          }
+          & $signTool.FullName verify /pa /all /tw /v $licenseRuntime
+          if ($LASTEXITCODE -ne 0) {
+              throw "SignTool rejected the installed iiLicenseManager runtime."
           }
 
       - name: Upload the single website release file

@@ -14,6 +14,7 @@ env:
   QTKEYCHAIN_COMMIT: 875f77d9f61bd97fd84cca47ce3bc71186dfbd09
   IIUPDATEMANAGER_REPOSITORY: ${{ vars.IIUPDATEMANAGER_REPOSITORY }}
   IIUPDATEMANAGER_COMMIT: ${{ vars.IIUPDATEMANAGER_COMMIT }}
+  IILICENSEMANAGER_COMMIT: ${{ vars.IILICENSEMANAGER_COMMIT }}
 
 jobs:
   package-source:
@@ -40,6 +41,9 @@ jobs:
           }
           if ($env:IIUPDATEMANAGER_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
               throw "Configure IIUPDATEMANAGER_COMMIT as the reviewed 40-hex commit."
+          }
+          if ($env:IILICENSEMANAGER_COMMIT -notmatch '^[0-9a-fA-F]{40}$') {
+              throw "Configure IILICENSEMANAGER_COMMIT as the reviewed 40-hex commit."
           }
           if ([string]::IsNullOrWhiteSpace($env:IIUPDATEMANAGER_READ_TOKEN)) {
               throw "Configure IIUPDATEMANAGER_READ_TOKEN for the private pinned dependency checkout."
@@ -73,6 +77,7 @@ jobs:
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
           $sharedCanvasSource = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
+          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
           $dependencyRoot = Join-Path $env:GITHUB_WORKSPACE "build\_deps"
           $psdSource = Join-Path $dependencyRoot "psd_sdk-src"
@@ -85,6 +90,8 @@ jobs:
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiSharedCanvas.git $sharedCanvasSource
           git -C $sharedCanvasSource checkout --detach $env:IISHAREDCANVAS_COMMIT
+          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiLicenseManager.git $licenseManagerSource
+          git -C $licenseManagerSource checkout --detach $env:IILICENSEMANAGER_COMMIT
           $resolvedUpdateManagerCommit = (git -C $updateManagerSource rev-parse HEAD).Trim()
           if ($resolvedUpdateManagerCommit -cne $env:IIUPDATEMANAGER_COMMIT.ToLowerInvariant()) {
               throw "iiUpdateManager checkout does not match the pinned commit."
@@ -99,12 +106,15 @@ jobs:
         run: |
           $qtSourceRoot = Join-Path (Split-Path -Parent $env:QT_ROOT_DIR) "Src"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
+          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
           .\tools\new-corresponding-source.ps1 `
               -Version 5.1 `
               -VincentRevision $env:GITHUB_SHA `
               -IiSharedCanvasRevision $env:IISHAREDCANVAS_COMMIT `
               -IiUpdateManagerSource $updateManagerSource `
               -IiUpdateManagerRevision $env:IIUPDATEMANAGER_COMMIT `
+              -IiLicenseManagerSource $licenseManagerSource `
+              -IiLicenseManagerRevision $env:IILICENSEMANAGER_COMMIT `
               -QtSourceRoot $qtSourceRoot
 
       - name: Upload corresponding source and checksum

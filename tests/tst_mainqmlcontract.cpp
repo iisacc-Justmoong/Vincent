@@ -477,7 +477,7 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         QStringLiteral("readonly property string shortcutPreferences: menuCommandModifier + \"+,\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function requestPreferences()")));
     const qsizetype refreshAccountEmailIndex =
-        mainSource.indexOf(QStringLiteral("VincentLicenseManager.refreshAccountEmail();"));
+        mainSource.indexOf(QStringLiteral("VincentAccountManager.refresh();"));
     const qsizetype centerPreferencesIndex =
         mainSource.indexOf(QStringLiteral("preferencesWindow.applyInitialCentering();"));
     const qsizetype showGeneralSectionIndex =
@@ -507,9 +507,15 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(mainSource.contains(
         QStringLiteral("updateCheckEnabled: checkForUpdatesAction.enabled")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("accountEmail: VincentLicenseManager.accountEmail")));
+        QStringLiteral("accountEmail: VincentAccountManager.accountEmail")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("accountEmailLoading: VincentLicenseManager.accountEmailLoading")));
+        QStringLiteral("accountEmailLoading: VincentAccountManager.accountEmailLoading")));
+    QVERIFY(!mainSource.contains(QStringLiteral("VincentLicenseManager.accountEmail")));
+    QVERIFY(appEntrySource.contains(QStringLiteral("new AccountManager(licenseManager, &engine)")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("setContextProperty(\"VincentAccountManager\", accountManager)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("find_package(iiLicenseManager 0.2 CONFIG REQUIRED)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("iiLicenseManager::iiLicenseManager")));
     QVERIFY(mainSource.contains(QStringLiteral(
         "startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas")));
     QVERIFY(mainSource.contains(QStringLiteral(
@@ -647,7 +653,8 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(preferencesSource.contains(QStringLiteral("id: generalSettings")));
     QVERIFY(preferencesSource.contains(QStringLiteral("visible: generalSectionButton.checked")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: accountEmailLabel")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"iisacc account email\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Account\")")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("iisacc account email")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: accountEmailValueLabel")));
     QVERIFY(preferencesSource.contains(QStringLiteral("preferencesWindow.accountEmailLoading")));
     QVERIFY(preferencesSource.contains(QStringLiteral("preferencesWindow.accountEmail.length")));

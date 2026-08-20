@@ -122,6 +122,11 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
     QVERIFY(source.contains(QStringLiteral("MACOSX_PACKAGE_LOCATION \"Resources/legal/QtKeychain\"")));
     QVERIFY(source.contains(QStringLiteral("find_package(iiUpdateManager 0.2 CONFIG REQUIRED)")));
     QVERIFY(source.contains(QStringLiteral("iiUpdateManager::iiUpdateManager")));
+    QVERIFY(source.contains(QStringLiteral("find_package(iiLicenseManager 0.2 CONFIG REQUIRED)")));
+    QVERIFY(source.contains(QStringLiteral("iiLicenseManager::iiLicenseManager")));
+    QVERIFY(source.contains(QStringLiteral(
+        "MACOSX_PACKAGE_LOCATION \"Resources/legal/iiLicenseManager\"")));
+    QVERIFY(source.contains(QStringLiteral("VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES")));
     QVERIFY(source.contains(QStringLiteral("find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)")));
     QVERIFY(source.contains(QStringLiteral("iiSharedCanvas::iiSharedCanvas")));
 }
@@ -283,6 +288,10 @@ void tst_MacOSBuildWorkflowContract::buildScriptUsesIncrementalBuildsAndStripsDi
     QVERIFY(source.contains(QStringLiteral("libiiUpdateManager*.dylib")));
     QVERIFY(source.contains(QStringLiteral("assert_update_manager_runtime \"$out_app\"")));
     QVERIFY(source.contains(QStringLiteral("package payload is missing the iiUpdateManager runtime")));
+    QVERIFY(source.contains(QStringLiteral("assert_license_manager_runtime()")));
+    QVERIFY(source.contains(QStringLiteral("libiiLicenseManager*.dylib")));
+    QVERIFY(source.contains(QStringLiteral("assert_license_manager_runtime \"$out_app\"")));
+    QVERIFY(source.contains(QStringLiteral("package payload is missing the iiLicenseManager runtime")));
     QVERIFY(source.contains(QStringLiteral("IISACCDistributionChannel")));
     QVERIFY(source.contains(QStringLiteral("distribution_channel=\"direct\"")));
     QVERIFY(source.contains(QStringLiteral("distribution_channel=\"appstore\"")));
@@ -340,6 +349,14 @@ void tst_MacOSBuildWorkflowContract::buildScriptRunsLocalModeWithEmptyOptionalAr
     QVERIFY(updateManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
     QVERIFY(updateManagerConfig.write("# fake installed dependency\n") > 0);
     updateManagerConfig.close();
+    const QString licenseManagerPrefix = temp.filePath(QStringLiteral("iiLicenseManager"));
+    QVERIFY(temp.mkpath(QStringLiteral("iiLicenseManager/lib/cmake/iiLicenseManager")));
+    QFile licenseManagerConfig(
+        temp.filePath(QStringLiteral(
+            "iiLicenseManager/lib/cmake/iiLicenseManager/iiLicenseManagerConfig.cmake")));
+    QVERIFY(licenseManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(licenseManagerConfig.write("# fake installed dependency\n") > 0);
+    licenseManagerConfig.close();
 
     const QString buildScriptPath = temp.filePath(QStringLiteral("build.sh"));
     QVERIFY(QFile::copy(sourceBuildScriptPath, buildScriptPath));
@@ -451,6 +468,7 @@ case "${1:-}" in
         printf './Vincent.app/Contents/MacOS/Vincent\n'
         printf './Vincent.app/Contents/Resources/Appicon.icns\n'
         printf './Vincent.app/Contents/Frameworks/libiiUpdateManager.0.dylib\n'
+        printf './Vincent.app/Contents/Frameworks/libiiLicenseManager.0.dylib\n'
         ;;
     --expand)
         mkdir -p "${3:-}"
@@ -481,6 +499,7 @@ esac
     environment.insert(QStringLiteral("RUN_TESTS"), QStringLiteral("0"));
     environment.insert(QStringLiteral("VINCENT_BUILD_MODE"), QStringLiteral("local"));
     environment.insert(QStringLiteral("IIUPDATEMANAGER_PREFIX"), updateManagerPrefix);
+    environment.insert(QStringLiteral("IILICENSEMANAGER_PREFIX"), licenseManagerPrefix);
     process.setProcessEnvironment(environment);
     process.setWorkingDirectory(tempDir.path());
     process.start(QStringLiteral("/bin/bash"), QStringList{QStringLiteral("./build.sh")});
@@ -529,6 +548,14 @@ void tst_MacOSBuildWorkflowContract::buildScriptFailsClosedOnMissingNotaryProfil
     QVERIFY(updateManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
     QVERIFY(updateManagerConfig.write("# fake installed dependency\n") > 0);
     updateManagerConfig.close();
+    const QString licenseManagerPrefix = temp.filePath(QStringLiteral("iiLicenseManager"));
+    QVERIFY(temp.mkpath(QStringLiteral("iiLicenseManager/lib/cmake/iiLicenseManager")));
+    QFile licenseManagerConfig(
+        temp.filePath(QStringLiteral(
+            "iiLicenseManager/lib/cmake/iiLicenseManager/iiLicenseManagerConfig.cmake")));
+    QVERIFY(licenseManagerConfig.open(QIODevice::WriteOnly | QIODevice::Text));
+    QVERIFY(licenseManagerConfig.write("# fake installed dependency\n") > 0);
+    licenseManagerConfig.close();
 
     const QString buildScriptPath = temp.filePath(QStringLiteral("build.sh"));
     QVERIFY(QFile::copy(sourceBuildScriptPath, buildScriptPath));
@@ -602,6 +629,7 @@ exit 1
     environment.insert(QStringLiteral("PATH"), binDir + QStringLiteral(":") + environment.value(QStringLiteral("PATH")));
     environment.insert(QStringLiteral("RUN_TESTS"), QStringLiteral("0"));
     environment.insert(QStringLiteral("IIUPDATEMANAGER_PREFIX"), updateManagerPrefix);
+    environment.insert(QStringLiteral("IILICENSEMANAGER_PREFIX"), licenseManagerPrefix);
     environment.remove(QStringLiteral("VINCENT_BUILD_MODE"));
     environment.remove(QStringLiteral("NOTARY_APP_PASSWORD"));
     process.setProcessEnvironment(environment);
