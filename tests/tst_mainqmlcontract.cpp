@@ -551,9 +551,10 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         QStringLiteral("VincentApplicationPreferences.clearRecentCanvas();")));
     QVERIFY(mainSource.contains(
         QStringLiteral("onPageReady: window.acceptCanvasPage(painterPage)")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "onCanvasFileActivated: fileUrl => "
-        "VincentApplicationPreferences.recordRecentCanvas(fileUrl)")));
+    QVERIFY(mainSource.contains(QStringLiteral("page.openRecentCanvas(recentCanvasUrl)")));
+    QVERIFY(!mainSource.contains(QStringLiteral("onCanvasFileActivated:")));
+    QVERIFY(mainSource.contains(QStringLiteral("onClosing: event =>")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.flushRecentCanvasSave();")));
 
     QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationName(QStringLiteral(\"iisacc\"))")));
     QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationDomain(QStringLiteral(\"iisacc.com\"))")));

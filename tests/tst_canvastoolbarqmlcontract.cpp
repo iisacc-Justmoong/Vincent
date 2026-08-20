@@ -21,29 +21,55 @@ private slots:
     void painterPageUsesLvHierarchyLayerPanel();
     void pressureCurveControlsUseThreePointGraphAtBottom();
     void brushSettingsExposePressureOpacityToggle();
-    void successfulOpenAndSaveBecomeRecentCanvasCandidates();
+    void recentCanvasUsesDebouncedInternalContainer();
 };
 
-void tst_CanvasToolBarQmlContract::successfulOpenAndSaveBecomeRecentCanvasCandidates()
+void tst_CanvasToolBarQmlContract::recentCanvasUsesDebouncedInternalContainer()
 {
     const QString painterPageQmlPath =
         QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
     QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
 
     QFile painterPageQml(painterPageQmlPath);
+    QFile drawingSurfaceQml(drawingSurfaceQmlPath);
     QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(drawingSurfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString pageSource = QString::fromUtf8(painterPageQml.readAll());
+    const QString surfaceSource = QString::fromUtf8(drawingSurfaceQml.readAll());
 
-    QVERIFY(pageSource.contains(QStringLiteral("signal canvasFileActivated(url fileUrl)")));
+    QVERIFY(!pageSource.contains(QStringLiteral("signal canvasFileActivated(url fileUrl)")));
     QVERIFY(pageSource.contains(
         QStringLiteral("const saved = drawingSurface.saveToFile(fileUrl);")));
-    QVERIFY(pageSource.contains(QStringLiteral("if (saved)")));
-    QVERIFY(pageSource.contains(QStringLiteral("canvasFileActivated(fileUrl);")));
+    QVERIFY(pageSource.contains(QStringLiteral("painterPage.scheduleRecentCanvasSave();")));
     QVERIFY(pageSource.contains(QStringLiteral("return saved;")));
     QVERIFY(pageSource.contains(
         QStringLiteral("const opened = drawingSurface.openRaster(fileUrl);")));
-    QVERIFY(pageSource.contains(QStringLiteral("if (opened)")));
     QVERIFY(pageSource.contains(QStringLiteral("return opened;")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: recentCanvasSaveTimer")));
+    QVERIFY(pageSource.contains(QStringLiteral("interval: 1200")));
+    QVERIFY(pageSource.contains(QStringLiteral("function saveRecentCanvasNow()")));
+    QVERIFY(pageSource.contains(QStringLiteral("function flushRecentCanvasSave()")));
+    QVERIFY(pageSource.contains(QStringLiteral("Qt.callLater(function ()")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("VincentApplicationPreferences.recentCanvasStorageUrl")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.saveRecentCanvas(")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("VincentApplicationPreferences.recordRecentCanvas(storageUrl)")));
+    QVERIFY(pageSource.contains(QStringLiteral("function openRecentCanvas(fileUrl)")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.openRecentCanvas(fileUrl)")));
+    QVERIFY(pageSource.contains(QStringLiteral("onSessionChanged:")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("signal sessionChanged")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function saveRecentCanvas(fileUrl)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.saveRecentCanvas(")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("property bool recentCanvasRestoreInProgress: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function cancelPendingRecentCanvasRestore()")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("const restoreGeneration = ++surface.recentCanvasRestoreGeneration")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (!surface.recentCanvasRestoreInProgress)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.sessionChanged();")));
 }
 
 void tst_CanvasToolBarQmlContract::modifierSpaceUsesApplicationWideCameraModes()
@@ -721,7 +747,7 @@ void tst_CanvasToolBarQmlContract::shapeToolUsesStockIconMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.toolMode !== \"fill\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("const rasterSurface = activeRasterSurface();")));
     QVERIFY(surfaceSource.contains(QStringLiteral("if (!rasterSurface)")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("rasterSurface.fillAt(pointX, pointY, surface.brushColor);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("if (rasterSurface.fillAt(pointX, pointY, surface.brushColor))")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.fillAt(mouse.x, mouse.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasZoomScale: 1")));
     QVERIFY(surfaceSource.contains(QStringLiteral("readonly property real defaultCanvasZoomScale: 1")));
@@ -1133,11 +1159,12 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
         "cacheDrawableObjectThumbnailSource(drawableObject, surface.layerHierarchyThumbnailSize, "
         "surface.layerHierarchyThumbnailSize)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("livePreviewFrameIntervalMs: surface.brushLivePreviewFrameIntervalMs")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.requestBackgroundLayerThumbnailRefresh()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral(
-        "onRasterContentChanged: "
-        "surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId)")));
-    QVERIFY(!surfaceSource.contains(QStringLiteral("onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.requestBackgroundLayerThumbnailRefresh();")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.requestRasterLayerThumbnailRefresh("
+                                                  "drawableObjectDelegate.rasterLayerObjectId);")));
+    QVERIFY(!surfaceSource.contains(
+        QStringLiteral("onRasterContentChanged: surface.refreshBackgroundLayerThumbnailSource()")));
     QVERIFY(!surfaceSource.contains(QStringLiteral(
         "onRasterContentChanged: "
         "surface.refreshRasterLayerThumbnailSource(drawableObjectDelegate.rasterLayerObjectId)")));

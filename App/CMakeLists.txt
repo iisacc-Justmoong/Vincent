@@ -35,6 +35,8 @@ target_sources(Vincent PRIVATE
         models/document/psdimagereader.h
         models/document/psdimagewriter.cpp
         models/document/psdimagewriter.h
+        models/document/recentcanvascontainer.cpp
+        models/document/recentcanvascontainer.h
         models/input/temporarycamerainput.cpp
         models/input/temporarycamerainput.h
         models/license/licensemanager.cpp

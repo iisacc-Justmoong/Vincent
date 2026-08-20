@@ -53,6 +53,21 @@ when such objects are present. Mapping those session objects to native
 iiSharedCanvas assets is a separate product migration, not a prerequisite for
 using the mixed canvas base.
 
+Recent canvas persistence is deliberately a separate application-session
+boundary rather than pretending those QML objects are already native `.iisc`
+assets. `recent-canvas.vrc` wraps the validated iiSharedCanvas document plus
+PNG bytes for inserted images and additional raster layers and JSON-safe
+text/shape/object metadata. It is limited to one owner-only file below
+`QStandardPaths::AppLocalDataLocation/canvas`, uses a versioned header and
+SHA-256 payload check, and replaces the previous snapshot through `QSaveFile`.
+The native snapshot extent is normalized to the live visual canvas size before
+encoding. The page schedules it 1.2 seconds after the latest session mutation
+and flushes a pending edit during normal window close. Decode and every embedded
+image are validated before the current native document is replaced. Valid PNGs
+are extracted only to one owner-only temporary directory held by the restored
+surface and are removed with that surface, so the `.vrc` remains the sole
+persistent recent-session artifact.
+
 Version 0.1 rerenders synchronously after edits. Large-document memory budgets,
-partial repaint/decode, background rendering, autosave, and cross-platform
-package validation remain product-hardening gates.
+partial repaint/decode, background rendering, and cross-platform package
+validation remain product-hardening gates.

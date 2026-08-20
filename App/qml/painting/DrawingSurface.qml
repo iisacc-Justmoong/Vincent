@@ -161,6 +161,8 @@ Rectangle {
     property var rasterLayerSnapshotSources: ({})
     property var rasterLayerThumbnailSources: ({})
     property bool persistRasterLayerSnapshots: true
+    property bool recentCanvasRestoreInProgress: false
+    property int recentCanvasRestoreGeneration: 0
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
     property string drawableObjectHoverHandleMode: ""
@@ -170,8 +172,20 @@ Rectangle {
 
     signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
+    signal sessionChanged
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
+
+    onDrawableObjectsChanged: {
+        if (!surface.recentCanvasRestoreInProgress) {
+            sessionChanged();
+        }
+    }
+    onBackgroundLayerPresentChanged: {
+        if (!surface.recentCanvasRestoreInProgress) {
+            sessionChanged();
+        }
+    }
 
     onSelectedDrawableObjectIdChanged: {
         surface.drawableObjectHoverHandleMode = "";
@@ -253,6 +267,7 @@ Rectangle {
     }
 
     function newCanvas(canvasWidth, canvasHeight) {
+        cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
@@ -268,6 +283,7 @@ Rectangle {
     }
 
     function clearCanvas() {
+        cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
@@ -279,6 +295,7 @@ Rectangle {
     }
 
     function openRaster(fileUrl) {
+        cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
@@ -298,6 +315,73 @@ Rectangle {
         fitCanvasZoomToCurrentCanvas();
         addDefaultDrawingLayer();
         return true;
+    }
+
+    function openRecentCanvas(fileUrl) {
+        cancelPendingRecentCanvasRestore();
+        cancelActiveText();
+        cancelActiveShape();
+        resetCanvasPan();
+        const session = canvasSurface.openRecentCanvas(fileUrl ? fileUrl.toString() : "");
+        if (!session || !session.valid) {
+            return false;
+        }
+
+        const restoredObjectSequence = session.drawableObjects || [];
+        const restoredObjects = [];
+        for (let index = 0; index < Number(restoredObjectSequence.length || 0); ++index) {
+            restoredObjects.push(restoredObjectSequence[index]);
+        }
+
+        const seenObjectIds = {};
+        var maximumObjectId = 0;
+        for (let index = 0; index < restoredObjects.length; ++index) {
+            const restoredObject = restoredObjects[index];
+            const objectId = restoredObject ? Number(restoredObject.id) : 0;
+            if (!restoredObject || objectId <= 0 || seenObjectIds[String(objectId)]) {
+                return false;
+            }
+            seenObjectIds[String(objectId)] = true;
+            maximumObjectId = Math.max(maximumObjectId, objectId);
+        }
+
+        const restoreGeneration = ++surface.recentCanvasRestoreGeneration;
+        surface.recentCanvasRestoreInProgress = true;
+        clearDrawableObjects();
+        surface.backgroundLayerPresent = Boolean(session.backgroundLayerPresent);
+        surface.nextDrawableObjectId = 1;
+        Qt.callLater(function () {
+            if (restoreGeneration !== surface.recentCanvasRestoreGeneration) {
+                return;
+            }
+
+            for (let index = 0; index < restoredObjects.length; ++index) {
+                const restoredObject = restoredObjects[index];
+                const objectId = Number(restoredObject.id);
+                if (String(restoredObject.type) === "layer") {
+                    const snapshotSources = copyStringMap(surface.rasterLayerSnapshotSources);
+                    snapshotSources[String(objectId)] = String(restoredObject.snapshotSource || "");
+                    surface.rasterLayerSnapshotSources = snapshotSources;
+                }
+                appendDrawableObject(restoredObject);
+            }
+            surface.nextDrawableObjectId = maximumObjectId + 1;
+            surface.canvasSizeCreated = true;
+            resizeRasterLayerItems(canvasSurface.width, canvasSurface.height);
+            fitCanvasZoomToCurrentCanvas();
+            rebuildLayerHierarchyRows();
+            Qt.callLater(function () {
+                if (restoreGeneration === surface.recentCanvasRestoreGeneration) {
+                    surface.recentCanvasRestoreInProgress = false;
+                }
+            });
+        });
+        return true;
+    }
+
+    function cancelPendingRecentCanvasRestore() {
+        ++surface.recentCanvasRestoreGeneration;
+        surface.recentCanvasRestoreInProgress = false;
     }
 
     function imageInsertionPlacement(sourceValue, objectWidth, objectHeight, requestedCenterX, requestedCenterY) {
@@ -474,6 +558,10 @@ Rectangle {
         commitActiveText();
         commitActiveShape();
         return canvasSurface.saveToFileWithObjectsAndRasterLayers(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors(), surface.backgroundLayerPresent);
+    }
+
+    function saveRecentCanvas(fileUrl) {
+        return canvasSurface.saveRecentCanvas(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors(), surface.backgroundLayerPresent);
     }
 
     function psdCompatibilityManifest() {
@@ -915,14 +1003,19 @@ Rectangle {
     }
 
     function unregisterRasterLayerItem(objectId, surfaceItem) {
+        const objectKey = String(objectId);
+        if (surface.rasterLayerItems[objectKey] !== surfaceItem) {
+            return;
+        }
+
         if (surface.persistRasterLayerSnapshots && surfaceItem) {
             const snapshotSource = surfaceItem.cacheRasterSnapshotSource();
             if (snapshotSource.length > 0) {
-                surface.rasterLayerSnapshotSources[String(objectId)] = snapshotSource;
+                surface.rasterLayerSnapshotSources[objectKey] = snapshotSource;
             }
         }
 
-        delete surface.rasterLayerItems[String(objectId)];
+        delete surface.rasterLayerItems[objectKey];
         clearRasterLayerThumbnailState(objectId);
     }
 
@@ -1661,7 +1754,9 @@ Rectangle {
         if (!rasterSurface) {
             return;
         }
-        rasterSurface.fillAt(pointX, pointY, surface.brushColor);
+        if (rasterSurface.fillAt(pointX, pointY, surface.brushColor)) {
+            surface.sessionChanged();
+        }
     }
 
     function resetCanvasPan() {
@@ -2110,7 +2205,14 @@ Rectangle {
                 surface.rebuildLayerHierarchyRows();
             }
 
-            onRasterContentChanged: surface.requestBackgroundLayerThumbnailRefresh()
+            onRasterContentChanged: {
+                surface.requestBackgroundLayerThumbnailRefresh();
+            }
+            onStrokeCountChanged: {
+                if (!surface.recentCanvasRestoreInProgress) {
+                    surface.sessionChanged();
+                }
+            }
             onDroppedImageReady: (imageObject, dropX, dropY) => surface.insertDroppedImageObject(imageObject, dropX, dropY)
             onDroppedImageFailed: errorCode => surface.imageDropFailed(errorCode)
 
@@ -2298,7 +2400,14 @@ Rectangle {
                         documentViewModel: surface.documentViewModel
                         viewId: surface.viewId
 
-                        onRasterContentChanged: surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId)
+                        onRasterContentChanged: {
+                            surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId);
+                        }
+                        onStrokeCountChanged: {
+                            if (!surface.recentCanvasRestoreInProgress) {
+                                surface.sessionChanged();
+                            }
+                        }
                     }
                 }
 

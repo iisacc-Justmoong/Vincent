@@ -61,6 +61,12 @@ LV.ApplicationWindow {
         window.canvasIncubationRequested = true;
     })
 
+    onClosing: event => {
+        if (window.canvasPage) {
+            window.canvasPage.flushRecentCanvasSave();
+        }
+    }
+
     function requestNewCanvas() {
         if (window.canvasPage) {
             window.canvasPage.openNewCanvasDialog();
@@ -214,7 +220,7 @@ LV.ApplicationWindow {
         if (recentCanvasUrl.toString().length === 0) {
             return;
         }
-        if (!page.openRaster(recentCanvasUrl)) {
+        if (!page.openRecentCanvas(recentCanvasUrl)) {
             VincentApplicationPreferences.clearRecentCanvas();
         }
     }
@@ -985,7 +991,6 @@ LV.ApplicationWindow {
             id: painterPage
             topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
             onPageReady: window.acceptCanvasPage(painterPage)
-            onCanvasFileActivated: fileUrl => VincentApplicationPreferences.recordRecentCanvas(fileUrl)
             onClipboardImagePasteFailed: errorCode => window.showClipboardPasteFailure(errorCode)
             onImageDropSucceeded: {
                 window.clipboardPasteFailureMessage = "";

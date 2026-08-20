@@ -4,6 +4,7 @@
 #include "../document/psdcompatibilitydocument.h"
 #include "../document/psdimagereader.h"
 #include "../document/psdimagewriter.h"
+#include "../document/recentcanvascontainer.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QByteArray>
@@ -39,8 +40,10 @@
 #include <QRegularExpression>
 #include <QSize>
 #include <QSaveFile>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTabletEvent>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTextDocument>
 #include <QTextBlock>
@@ -417,6 +420,111 @@ bool imageSizeExceedsSafetyLimit(const QSize& size)
 bool imageExceedsSafetyLimit(const QImage& image)
 {
     return imageSizeExceedsSafetyLimit(image.size());
+}
+
+QByteArray pngDataForRecentCanvas(const QImage& image)
+{
+    if (image.isNull() || imageExceedsSafetyLimit(image))
+    {
+        return {};
+    }
+
+    QByteArray data;
+    QBuffer buffer(&data);
+    if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG"))
+    {
+        return {};
+    }
+    return data;
+}
+
+QImage recentCanvasPngImage(const QByteArray& data)
+{
+    QBuffer buffer;
+    buffer.setData(data);
+    if (!buffer.open(QIODevice::ReadOnly))
+    {
+        return {};
+    }
+    QImageReader reader(&buffer, "PNG");
+    const QSize imageSize = reader.size();
+    if (!imageSize.isValid() || imageSizeExceedsSafetyLimit(imageSize))
+    {
+        return {};
+    }
+    const QImage image = reader.read();
+    return image.isNull() || imageExceedsSafetyLimit(image) ? QImage{} : image;
+}
+
+QString extractedRecentCanvasAssetSource(const QString& directoryPath, int objectId,
+                                         RecentCanvasAssetKind kind, const QByteArray& pngData)
+{
+    if (directoryPath.isEmpty() || objectId <= 0 || pngData.isEmpty())
+    {
+        return {};
+    }
+
+    const QString kindName =
+        kind == RecentCanvasAssetKind::Image ? QStringLiteral("image") : QStringLiteral("layer");
+    const QString imagePath = QDir(directoryPath)
+                                  .filePath(kindName + QLatin1Char('-') +
+                                            QString::number(objectId) + QStringLiteral(".png"));
+    QSaveFile imageFile(imagePath);
+    imageFile.setDirectWriteFallback(false);
+    if (!imageFile.open(QIODevice::WriteOnly) || imageFile.write(pngData) != pngData.size() ||
+        !imageFile.commit())
+    {
+        return {};
+    }
+    if (!QFile::setPermissions(imagePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner))
+    {
+        QFile::remove(imagePath);
+        return {};
+    }
+    return QUrl::fromLocalFile(imagePath).toString();
+}
+
+QVariantMap sanitizedRecentCanvasObject(const QVariantMap& object)
+{
+    const int objectId = object.value(QStringLiteral("id")).toInt();
+    const QString type = object.value(QStringLiteral("type")).toString().trimmed().toLower();
+    if (objectId <= 0 || (type != QStringLiteral("layer") && type != QStringLiteral("image") &&
+                          type != QStringLiteral("text") && type != QStringLiteral("shape")))
+    {
+        return {};
+    }
+
+    static const QStringList retainedKeys{
+        QStringLiteral("id"),
+        QStringLiteral("type"),
+        QStringLiteral("name"),
+        QStringLiteral("x"),
+        QStringLiteral("y"),
+        QStringLiteral("width"),
+        QStringLiteral("height"),
+        QStringLiteral("opacity"),
+        QStringLiteral("visible"),
+        QStringLiteral("blendMode"),
+        QStringLiteral("originalWidth"),
+        QStringLiteral("originalHeight"),
+        QStringLiteral("text"),
+        QStringLiteral("fontPixelSize"),
+        QStringLiteral("color"),
+        QStringLiteral("shapeKind"),
+        QStringLiteral("psdBounds"),
+    };
+
+    QVariantMap sanitized;
+    for (const QString& key : retainedKeys)
+    {
+        if (object.contains(key))
+        {
+            sanitized.insert(key, object.value(key));
+        }
+    }
+    sanitized.insert(QStringLiteral("id"), objectId);
+    sanitized.insert(QStringLiteral("type"), type);
+    return sanitized;
 }
 
 QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
@@ -1722,6 +1830,317 @@ bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fil
     const QImage baseImage = includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
     const QImage image = compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
     return image.save(localFilePath(fileUrl));
+}
+
+bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariantList& objects,
+                                          const QVariantList& rasterLayers,
+                                          bool includeBackgroundLayer)
+{
+    syncCanvasSize();
+    if (!document())
+    {
+        return false;
+    }
+
+    iiSharedCanvas::Document sharedCanvasSnapshot = *document();
+    iiSharedCanvas::DocumentEditor snapshotEditor(sharedCanvasSnapshot);
+    const QSize snapshotSize = canvasSize();
+    const iiSharedCanvas::DocumentEditResult extentResult =
+        snapshotEditor.setCanvasExtent({snapshotSize.width(), snapshotSize.height()});
+    if (!extentResult.ok())
+    {
+        return false;
+    }
+
+    const iiSharedCanvas::IiscEncodeResult encoded =
+        iiSharedCanvas::encodeIisc(sharedCanvasSnapshot);
+    if (!encoded.ok() ||
+        encoded.bytes.size() > static_cast<std::size_t>(std::numeric_limits<qsizetype>::max()))
+    {
+        return false;
+    }
+
+    RecentCanvasContainer container;
+    container.sharedCanvasDocument = QByteArray(reinterpret_cast<const char*>(encoded.bytes.data()),
+                                                static_cast<qsizetype>(encoded.bytes.size()));
+    container.backgroundLayerPresent = includeBackgroundLayer;
+
+    QHash<int, QVariantMap> rasterDescriptors;
+    for (const QVariant& descriptorValue : rasterLayers)
+    {
+        const QVariantMap descriptor = descriptorValue.toMap();
+        const int objectId = descriptor.value(QStringLiteral("objectId")).toInt();
+        if (objectId <= 0 || rasterDescriptors.contains(objectId))
+        {
+            return false;
+        }
+        rasterDescriptors.insert(objectId, descriptor);
+    }
+
+    QSet<int> objectIds;
+    for (const QVariant& objectValue : objects)
+    {
+        const QVariantMap object = objectValue.toMap();
+        QVariantMap sanitized = sanitizedRecentCanvasObject(object);
+        if (sanitized.isEmpty())
+        {
+            return false;
+        }
+        const int objectId = sanitized.value(QStringLiteral("id")).toInt();
+        const QString type = sanitized.value(QStringLiteral("type")).toString();
+        if (objectIds.contains(objectId))
+        {
+            return false;
+        }
+        objectIds.insert(objectId);
+
+        if (type == QStringLiteral("image"))
+        {
+            const QImage image =
+                imageFromFileUrl(object.value(QStringLiteral("source")).toString());
+            const QByteArray pngData = pngDataForRecentCanvas(image);
+            if (pngData.isEmpty())
+            {
+                return false;
+            }
+            container.embeddedAssets.append({objectId, RecentCanvasAssetKind::Image, pngData});
+        }
+        else if (type == QStringLiteral("layer"))
+        {
+            const QVariantMap descriptor = rasterDescriptors.value(objectId);
+            if (descriptor.isEmpty())
+            {
+                return false;
+            }
+
+            QImage layerImage;
+            if (auto* layerItem = qobject_cast<DrawingSurfaceItem*>(
+                    descriptor.value(QStringLiteral("item")).value<QObject*>()))
+            {
+                layerItem->syncCanvasSize();
+                layerImage = layerItem->currentRasterCanvasImage(canvasSize());
+            }
+            if (layerImage.isNull())
+            {
+                layerImage =
+                    imageFromFileUrl(descriptor.value(QStringLiteral("snapshotSource")).toString());
+            }
+            if (layerImage.isNull())
+            {
+                return false;
+            }
+            if (layerImage.size() != canvasSize())
+            {
+                QImage resizedLayer = transparentCanvasImage(canvasSize());
+                QPainter painter(&resizedLayer);
+                painter.drawImage(QPointF(0.0, 0.0), layerImage);
+                painter.end();
+                layerImage = resizedLayer;
+            }
+            const QByteArray pngData = pngDataForRecentCanvas(layerImage);
+            if (pngData.isEmpty())
+            {
+                return false;
+            }
+            container.embeddedAssets.append(
+                {objectId, RecentCanvasAssetKind::RasterLayer, pngData});
+        }
+        container.drawableObjects.append(std::move(sanitized));
+    }
+
+    QString encodeError;
+    const QByteArray bytes = encodeRecentCanvasContainer(container, &encodeError);
+    if (bytes.isEmpty())
+    {
+        return false;
+    }
+
+    const QString filePath = localFilePath(fileUrl);
+    if (filePath.isEmpty())
+    {
+        return false;
+    }
+    const QFileInfo targetInfo(filePath);
+    if (targetInfo.isSymLink() || !QDir().mkpath(targetInfo.absolutePath()))
+    {
+        return false;
+    }
+
+    QSaveFile file(filePath);
+    file.setDirectWriteFallback(false);
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
+    {
+        return false;
+    }
+    if (!QFile::setPermissions(filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner))
+    {
+        QFile::remove(filePath);
+        return false;
+    }
+    return true;
+}
+
+QVariantMap DrawingSurfaceItem::openRecentCanvas(const QString& fileUrl)
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("valid"), false);
+
+    QFile file(localFilePath(fileUrl));
+    if (!file.open(QIODevice::ReadOnly) || file.size() <= 0 ||
+        file.size() > RecentCanvasMaximumContainerBytes)
+    {
+        return result;
+    }
+    const QByteArray bytes = file.read(RecentCanvasMaximumContainerBytes + 1);
+    if (bytes.size() != file.size())
+    {
+        return result;
+    }
+
+    RecentCanvasDecodeResult decodedContainer = decodeRecentCanvasContainer(bytes);
+    if (!decodedContainer.ok())
+    {
+        return result;
+    }
+
+    const QByteArray& sharedCanvasBytes = decodedContainer.container.sharedCanvasDocument;
+    const iiSharedCanvas::SerializationLimits limits;
+    iiSharedCanvas::IiscDecodeResult decodedDocument = iiSharedCanvas::decodeIisc(
+        std::span<const std::uint8_t>(
+            reinterpret_cast<const std::uint8_t*>(sharedCanvasBytes.constData()),
+            static_cast<std::size_t>(sharedCanvasBytes.size())),
+        limits);
+    if (!decodedDocument.ok())
+    {
+        return result;
+    }
+
+    QHash<int, QImage> imageAssets;
+    QHash<int, QImage> rasterLayerAssets;
+    QHash<int, QByteArray> imageAssetData;
+    QHash<int, QByteArray> rasterLayerAssetData;
+    for (const RecentCanvasEmbeddedAsset& asset : decodedContainer.container.embeddedAssets)
+    {
+        const QImage image = recentCanvasPngImage(asset.pngData);
+        if (image.isNull())
+        {
+            return result;
+        }
+        QHash<int, QImage>* target =
+            asset.kind == RecentCanvasAssetKind::Image ? &imageAssets : &rasterLayerAssets;
+        QHash<int, QByteArray>* dataTarget =
+            asset.kind == RecentCanvasAssetKind::Image ? &imageAssetData : &rasterLayerAssetData;
+        if (target->contains(asset.objectId))
+        {
+            return result;
+        }
+        target->insert(asset.objectId, image);
+        dataTarget->insert(asset.objectId, asset.pngData);
+    }
+
+    std::unique_ptr<QTemporaryDir> extractionDirectory;
+    if (!decodedContainer.container.embeddedAssets.isEmpty())
+    {
+        extractionDirectory = std::make_unique<QTemporaryDir>(
+            QDir(QDir::tempPath()).filePath(QStringLiteral("Vincent-recent-canvas-XXXXXX")));
+        if (!extractionDirectory->isValid() ||
+            !QFile::setPermissions(extractionDirectory->path(), QFileDevice::ReadOwner |
+                                                                    QFileDevice::WriteOwner |
+                                                                    QFileDevice::ExeOwner))
+        {
+            return result;
+        }
+    }
+
+    QVariantList restoredObjects;
+    QSet<int> objectIds;
+    int requiredImageAssetCount = 0;
+    int requiredRasterLayerAssetCount = 0;
+    for (const QVariant& objectValue : decodedContainer.container.drawableObjects)
+    {
+        QVariantMap object = sanitizedRecentCanvasObject(objectValue.toMap());
+        if (object.isEmpty())
+        {
+            return result;
+        }
+        const int objectId = object.value(QStringLiteral("id")).toInt();
+        const QString type = object.value(QStringLiteral("type")).toString();
+        if (objectIds.contains(objectId))
+        {
+            return result;
+        }
+        objectIds.insert(objectId);
+
+        if (type == QStringLiteral("image"))
+        {
+            const QImage image = imageAssets.value(objectId);
+            const QString source = extractedRecentCanvasAssetSource(
+                extractionDirectory ? extractionDirectory->path() : QString{}, objectId,
+                RecentCanvasAssetKind::Image, imageAssetData.value(objectId));
+            if (image.isNull() || source.isEmpty())
+            {
+                return result;
+            }
+            object.insert(QStringLiteral("source"), source);
+            object.insert(QStringLiteral("originalSource"), QString{});
+            ++requiredImageAssetCount;
+        }
+        else if (type == QStringLiteral("layer"))
+        {
+            const QImage image = rasterLayerAssets.value(objectId);
+            const QString source = extractedRecentCanvasAssetSource(
+                extractionDirectory ? extractionDirectory->path() : QString{}, objectId,
+                RecentCanvasAssetKind::RasterLayer, rasterLayerAssetData.value(objectId));
+            if (image.isNull() || source.isEmpty())
+            {
+                return result;
+            }
+            object.insert(QStringLiteral("snapshotSource"), source);
+            ++requiredRasterLayerAssetCount;
+        }
+        restoredObjects.append(std::move(object));
+    }
+    if (requiredImageAssetCount != imageAssets.size() ||
+        requiredRasterLayerAssetCount != rasterLayerAssets.size())
+    {
+        return result;
+    }
+
+    if (!document() && !createDocument(decodedDocument.document.extent.width,
+                                       decodedDocument.document.extent.height,
+                                       decodedDocument.document.timeline.frameCount))
+    {
+        return result;
+    }
+    iiSharedCanvas::Document* target = document();
+    *target = std::move(decodedDocument.document);
+    if (!bind(*target))
+    {
+        return result;
+    }
+    for (const iiSharedCanvas::Layer& layer : target->layers)
+    {
+        const iiSharedCanvas::Asset* asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
+        if (asset && std::holds_alternative<iiSharedCanvas::RasterAsset>(*asset))
+        {
+            selectLayer(
+                QString::fromUtf8(layer.id.data(), static_cast<qsizetype>(layer.id.size())));
+            break;
+        }
+    }
+
+    resizeCanvasSurface(target->extent.width, target->extent.height);
+    m_recentCanvasExtractionDirectory = std::move(extractionDirectory);
+    m_backgroundSource.clear();
+    m_hasBackground = decodedContainer.container.backgroundLayerPresent;
+    emit backgroundChanged();
+    emit rasterContentChanged();
+
+    result.insert(QStringLiteral("valid"), true);
+    result.insert(QStringLiteral("backgroundLayerPresent"),
+                  decodedContainer.container.backgroundLayerPresent);
+    result.insert(QStringLiteral("drawableObjects"), restoredObjects);
+    return result;
 }
 
 QString DrawingSurfaceItem::cacheRasterSnapshotSource()

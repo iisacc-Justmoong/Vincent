@@ -68,6 +68,10 @@ private slots:
   void rasterToolsRespectSelectedLayerTransform();
   void openingRasterReplacesMixedSharedCanvasDocument();
   void roundTripsNativeSharedCanvasDocument();
+  void roundTripsRecentCanvasContainerWithEditableObjects();
+  void recentCanvasPreservesVisualCanvasExtentAfterLateResize();
+  void roundTripsRecentCanvasThroughQmlSurface();
+  void rejectsCorruptRecentCanvasWithoutReplacingTheCurrentDocument();
   void pressureSensitiveManualStrokesPreserveInputPressure();
   void erasesCommittedStrokePixels();
   void commitsTextToRasterCanvas();
@@ -3161,6 +3165,322 @@ void tst_DrawingSurfaceItem::roundTripsNativeSharedCanvasDocument()
     const QImage rendered(pngPath);
     QVERIFY(!rendered.isNull());
     QVERIFY(qAlpha(rendered.pixel(16, 12)) > 0);
+}
+
+void tst_DrawingSurfaceItem::roundTripsRecentCanvasContainerWithEditableObjects()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem background;
+    background.setWidth(32);
+    background.setHeight(24);
+    background.setDocumentViewModel(&viewModel);
+    background.setBrushColor(QColor(QStringLiteral("#26c6da")));
+    background.setBrushSize(6);
+    background.beginStroke(4, 12, 1.0, false);
+    QVERIFY(background.appendStrokePoint(28, 12, 1.0, false));
+    background.endStroke(28, 12, 1.0, false);
+
+    DrawingSurfaceItem rasterLayer;
+    rasterLayer.setWidth(32);
+    rasterLayer.setHeight(24);
+    rasterLayer.setDocumentViewModel(&viewModel);
+    rasterLayer.setBrushColor(QColor(QStringLiteral("#ff3366")));
+    rasterLayer.setBrushSize(4);
+    rasterLayer.beginStroke(16, 4, 1.0, false);
+    rasterLayer.endStroke(16, 20, 1.0, false);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString sourceImagePath = directory.filePath(QStringLiteral("inserted.png"));
+    QImage sourceImage(6, 5, QImage::Format_ARGB32_Premultiplied);
+    sourceImage.fill(QColor(QStringLiteral("#43a047")));
+    QVERIFY(sourceImage.save(sourceImagePath));
+
+    QVariantList objects;
+    objects.append(QVariantMap{
+        {QStringLiteral("id"), 1},
+        {QStringLiteral("type"), QStringLiteral("layer")},
+        {QStringLiteral("name"), QStringLiteral("Ink")},
+        {QStringLiteral("x"), 0},
+        {QStringLiteral("y"), 0},
+        {QStringLiteral("width"), 32},
+        {QStringLiteral("height"), 24},
+        {QStringLiteral("opacity"), 1.0},
+        {QStringLiteral("visible"), true},
+    });
+    objects.append(QVariantMap{
+        {QStringLiteral("id"), 2},
+        {QStringLiteral("type"), QStringLiteral("image")},
+        {QStringLiteral("name"), QStringLiteral("Reference")},
+        {QStringLiteral("source"), QUrl::fromLocalFile(sourceImagePath).toString()},
+        {QStringLiteral("originalSource"), QUrl::fromLocalFile(sourceImagePath).toString()},
+        {QStringLiteral("x"), 3.0},
+        {QStringLiteral("y"), 4.0},
+        {QStringLiteral("width"), 6.0},
+        {QStringLiteral("height"), 5.0},
+        {QStringLiteral("originalWidth"), 6},
+        {QStringLiteral("originalHeight"), 5},
+        {QStringLiteral("opacity"), 1.0},
+        {QStringLiteral("visible"), true},
+    });
+    objects.append(QVariantMap{
+        {QStringLiteral("id"), 3},
+        {QStringLiteral("type"), QStringLiteral("text")},
+        {QStringLiteral("name"), QStringLiteral("Caption")},
+        {QStringLiteral("x"), 2.0},
+        {QStringLiteral("y"), 2.0},
+        {QStringLiteral("width"), 18.0},
+        {QStringLiteral("height"), 8.0},
+        {QStringLiteral("text"), QStringLiteral("Recent")},
+        {QStringLiteral("fontPixelSize"), 12.0},
+        {QStringLiteral("color"), QStringLiteral("#ffffff")},
+    });
+    objects.append(QVariantMap{
+        {QStringLiteral("id"), 4},
+        {QStringLiteral("type"), QStringLiteral("shape")},
+        {QStringLiteral("name"), QStringLiteral("Marker")},
+        {QStringLiteral("x"), 20.0},
+        {QStringLiteral("y"), 10.0},
+        {QStringLiteral("width"), 8.0},
+        {QStringLiteral("height"), 6.0},
+        {QStringLiteral("shapeKind"), QStringLiteral("ellipse")},
+        {QStringLiteral("color"), QStringLiteral("#ffcc00")},
+    });
+    const QVariantList rasterLayers{QVariantMap{
+        {QStringLiteral("objectId"), 1},
+        {QStringLiteral("item"), QVariant::fromValue<QObject*>(&rasterLayer)},
+    }};
+
+    const QString recentDirectory = directory.filePath(QStringLiteral("canvas"));
+    const QString recentPath = QDir(recentDirectory).filePath(QStringLiteral("recent-canvas.vrc"));
+    QVERIFY(background.saveRecentCanvas(recentPath, objects, rasterLayers, true));
+    QVERIFY(QFileInfo(recentPath).size() > 0);
+    QFile firstSnapshot(recentPath);
+    QVERIFY(firstSnapshot.open(QIODevice::ReadOnly));
+    const QByteArray firstSnapshotBytes = firstSnapshot.readAll();
+    QVERIFY(firstSnapshotBytes.startsWith("VINCENTRC\r\n\x1a\n"));
+    firstSnapshot.close();
+
+    QVERIFY(background.saveRecentCanvas(recentPath, objects, rasterLayers, false));
+    QFile latestSnapshot(recentPath);
+    QVERIFY(latestSnapshot.open(QIODevice::ReadOnly));
+    const QByteArray latestSnapshotBytes = latestSnapshot.readAll();
+    QVERIFY(latestSnapshotBytes != firstSnapshotBytes);
+    QCOMPARE(
+        QDir(recentDirectory).entryList(QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot).size(),
+        1);
+
+    QString extractionDirectory;
+    {
+        DrawingSurfaceItem opened;
+        opened.setWidth(1);
+        opened.setHeight(1);
+        opened.setDocumentViewModel(&viewModel);
+        const QVariantMap restored = opened.openRecentCanvas(recentPath);
+        QVERIFY(restored.value(QStringLiteral("valid")).toBool());
+        QVERIFY(!restored.value(QStringLiteral("backgroundLayerPresent")).toBool());
+        QCOMPARE(opened.width(), 32.0);
+        QCOMPARE(opened.height(), 24.0);
+
+        const QVariantList restoredObjects =
+            restored.value(QStringLiteral("drawableObjects")).toList();
+        QCOMPARE(restoredObjects.size(), 4);
+        QCOMPARE(restoredObjects.at(0).toMap().value(QStringLiteral("type")).toString(),
+                 QStringLiteral("layer"));
+        const QString layerSnapshot =
+            restoredObjects.at(0).toMap().value(QStringLiteral("snapshotSource")).toString();
+        QVERIFY(QUrl(layerSnapshot).isLocalFile());
+        QVERIFY(!QImage(QUrl(layerSnapshot).toLocalFile()).isNull());
+        extractionDirectory = QFileInfo(QUrl(layerSnapshot).toLocalFile()).absolutePath();
+        QCOMPARE(restoredObjects.at(1).toMap().value(QStringLiteral("type")).toString(),
+                 QStringLiteral("image"));
+        const QString restoredImageSource =
+            restoredObjects.at(1).toMap().value(QStringLiteral("source")).toString();
+        QVERIFY(QUrl(restoredImageSource).isLocalFile());
+        QCOMPARE(QFileInfo(QUrl(restoredImageSource).toLocalFile()).absolutePath(),
+                 extractionDirectory);
+        QCOMPARE(QImage(QUrl(restoredImageSource).toLocalFile()).pixelColor(0, 0),
+                 QColor(QStringLiteral("#43a047")));
+        QCOMPARE(restoredObjects.at(2).toMap().value(QStringLiteral("text")).toString(),
+                 QStringLiteral("Recent"));
+        QCOMPARE(restoredObjects.at(3).toMap().value(QStringLiteral("shapeKind")).toString(),
+                 QStringLiteral("ellipse"));
+
+        const QString renderedPath = directory.filePath(QStringLiteral("restored-background.png"));
+        QVERIFY(opened.saveToFile(renderedPath));
+        const QImage rendered(renderedPath);
+        QVERIFY(!rendered.isNull());
+        QVERIFY(qAlpha(rendered.pixel(16, 12)) > 0);
+        QVERIFY(QFileInfo::exists(extractionDirectory));
+    }
+    QVERIFY(!QFileInfo::exists(extractionDirectory));
+}
+
+void tst_DrawingSurfaceItem::recentCanvasPreservesVisualCanvasExtentAfterLateResize()
+{
+    PaletteUtils sourcePaletteUtils;
+    CanvasDocumentViewModel sourceViewModel(&sourcePaletteUtils);
+    DrawingSurfaceItem source;
+    source.setWidth(1);
+    source.setHeight(1);
+    source.setDocumentViewModel(&sourceViewModel);
+    source.resizeCanvasSurface(64, 48);
+    QCOMPARE(source.width(), 64.0);
+    QCOMPARE(source.height(), 48.0);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString recentPath = directory.filePath(QStringLiteral("recent-canvas.vrc"));
+    QVERIFY(source.saveRecentCanvas(recentPath, {}, {}, true));
+
+    PaletteUtils restoredPaletteUtils;
+    CanvasDocumentViewModel restoredViewModel(&restoredPaletteUtils);
+    DrawingSurfaceItem restored;
+    restored.setWidth(1);
+    restored.setHeight(1);
+    restored.setDocumentViewModel(&restoredViewModel);
+    const QVariantMap session = restored.openRecentCanvas(recentPath);
+    QVERIFY(session.value(QStringLiteral("valid")).toBool());
+    QCOMPARE(restored.width(), 64.0);
+    QCOMPARE(restored.height(), 48.0);
+}
+
+void tst_DrawingSurfaceItem::roundTripsRecentCanvasThroughQmlSurface()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString recentPath = directory.filePath(QStringLiteral("recent-canvas.vrc"));
+
+    PaletteUtils sourcePaletteUtils;
+    CanvasDocumentViewModel sourceViewModel(&sourcePaletteUtils);
+    QVariantMap sourceProperties;
+    sourceProperties.insert(QStringLiteral("width"), 500);
+    sourceProperties.insert(QStringLiteral("height"), 360);
+    sourceProperties.insert(QStringLiteral("documentViewModel"),
+                            QVariant::fromValue(static_cast<QObject*>(&sourceViewModel)));
+    sourceProperties.insert(QStringLiteral("brushColor"), QColor(QStringLiteral("#1976d2")));
+    sourceProperties.insert(QStringLiteral("brushSize"), 10);
+    sourceProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+
+    QScopedPointer<QObject> sourceObject(component.createWithInitialProperties(sourceProperties));
+    QVERIFY2(!sourceObject.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    QTRY_VERIFY(
+        [&]()
+        {
+            QQmlExpression layerReady(engine.rootContext(), sourceObject.data(),
+                                      QStringLiteral("rasterLayerItemById(1) !== null"));
+            const QVariant result = layerReady.evaluate();
+            return !layerReady.hasError() && result.toBool();
+        }());
+
+    QQmlExpression paintLayer(engine.rootContext(), sourceObject.data(),
+                              QStringLiteral("var rasterSurface = rasterLayerItemById(1);"
+                                             "rasterSurface.beginStroke(0, 0, 1.0, false);"
+                                             "rasterSurface.endStroke(0, 0, 1.0, false);"));
+    paintLayer.evaluate();
+    QVERIFY2(!paintLayer.hasError(), qPrintable(paintLayer.error().toString()));
+    QCOMPARE(sourceObject->property("drawableObjects").toList().size(), 1);
+
+    QQmlExpression saveRecent(engine.rootContext(), sourceObject.data(),
+                              QStringLiteral("saveRecentCanvas(\"%1\");")
+                                  .arg(QUrl::fromLocalFile(recentPath).toString()));
+    const QVariant saved = saveRecent.evaluate();
+    QVERIFY2(!saveRecent.hasError(), qPrintable(saveRecent.error().toString()));
+    QVERIFY(saved.toBool());
+    sourceObject.reset();
+
+    PaletteUtils restoredPaletteUtils;
+    CanvasDocumentViewModel restoredViewModel(&restoredPaletteUtils);
+    QVariantMap restoredProperties;
+    restoredProperties.insert(QStringLiteral("width"), 500);
+    restoredProperties.insert(QStringLiteral("height"), 360);
+    restoredProperties.insert(QStringLiteral("documentViewModel"),
+                              QVariant::fromValue(static_cast<QObject*>(&restoredViewModel)));
+
+    QScopedPointer<QObject> restoredObject(
+        component.createWithInitialProperties(restoredProperties));
+    QVERIFY2(!restoredObject.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    QQmlExpression openRecent(engine.rootContext(), restoredObject.data(),
+                              QStringLiteral("openRecentCanvas(\"%1\");")
+                                  .arg(QUrl::fromLocalFile(recentPath).toString()));
+    const QVariant opened = openRecent.evaluate();
+    QVERIFY2(!openRecent.hasError(), qPrintable(openRecent.error().toString()));
+    QVERIFY(opened.toBool());
+
+    QTRY_VERIFY(
+        [&]()
+        {
+            QQmlExpression layerReady(engine.rootContext(), restoredObject.data(),
+                                      QStringLiteral("rasterLayerItemById(1) !== null"));
+            const QVariant result = layerReady.evaluate();
+            return !layerReady.hasError() && result.toBool();
+        }());
+
+    QQmlExpression restoredSnapshot(
+        engine.rootContext(), restoredObject.data(),
+        QStringLiteral("rasterLayerItemById(1).cacheRasterSnapshotSource();"));
+    const QString restoredSnapshotUrl = restoredSnapshot.evaluate().toString();
+    QVERIFY2(!restoredSnapshot.hasError(), qPrintable(restoredSnapshot.error().toString()));
+    QVERIFY(QUrl(restoredSnapshotUrl).isLocalFile());
+    const QImage rendered(QUrl(restoredSnapshotUrl).toLocalFile());
+    QVERIFY(!rendered.isNull());
+    const QColor restoredPixel = rendered.pixelColor(0, 0);
+    QVERIFY(restoredPixel.alpha() > 0);
+}
+
+void tst_DrawingSurfaceItem::rejectsCorruptRecentCanvasWithoutReplacingTheCurrentDocument()
+{
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    DrawingSurfaceItem item;
+    item.setWidth(16);
+    item.setHeight(12);
+    item.setDocumentViewModel(&viewModel);
+    item.setBrushColor(QColor(QStringLiteral("#26c6da")));
+    item.beginStroke(8, 6, 1.0, false);
+    item.endStroke(8, 6, 1.0, false);
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString corruptPath = directory.filePath(QStringLiteral("corrupt.vrc"));
+    QVERIFY(item.saveRecentCanvas(corruptPath, {}, {}, true));
+
+    item.setBrushColor(QColor(QStringLiteral("#ef5350")));
+    item.beginStroke(2, 2, 1.0, false);
+    item.endStroke(2, 2, 1.0, false);
+    QVERIFY(item.framePixels());
+    const std::vector<std::uint32_t> pixelsBefore = item.framePixels()->pixels;
+
+    QFile corrupt(corruptPath);
+    QVERIFY(corrupt.open(QIODevice::ReadWrite));
+    QVERIFY(corrupt.size() > 1);
+    const qint64 lastByteOffset = corrupt.size() - 1;
+    QVERIFY(corrupt.seek(lastByteOffset));
+    char lastByte = 0;
+    QCOMPARE(corrupt.read(&lastByte, 1), qint64{1});
+    lastByte ^= 0x01;
+    QVERIFY(corrupt.seek(lastByteOffset));
+    QCOMPARE(corrupt.write(&lastByte, 1), qint64{1});
+    QVERIFY(corrupt.flush());
+    corrupt.close();
+
+    const QVariantMap restored = item.openRecentCanvas(corruptPath);
+    QVERIFY(!restored.value(QStringLiteral("valid")).toBool());
+    QVERIFY(item.framePixels());
+    QCOMPARE(item.framePixels()->pixels, pixelsBefore);
+    QCOMPARE(item.width(), 16.0);
+    QCOMPARE(item.height(), 12.0);
 }
 
 void tst_DrawingSurfaceItem::pressureSensitiveManualStrokesPreserveInputPressure()

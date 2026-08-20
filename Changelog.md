@@ -5,7 +5,7 @@
 ### General 환경설정 실제 동작
 
 - General의 고정 레이블을 `Account`로 바꾸고, `iiLicenseManager 0.2`가 서버 승인 활성화에서 확인·보존한 iisacc.com 계정 이메일을 표시한다. 환경설정을 열 때 먼저 서명된 오프라인 라이선스와 연결된 이메일을 읽고, 아직 이관되지 않은 기존 보안 저장소 자격 증명이 있을 때만 C++ 내부에서 iiLicenseManager 활성화를 수행한다. 라이선스 키는 QML에 노출되지 않으며 연결 계정이 없으면 `Not connected`로 표시한다.
-- New canvas/Recent canvas 시작 방식과 주변 Vincent 사용자 탐색 여부를 비민감 `QSettings`에 영속화했다. 최근 캔버스는 로컬 파일 열기 또는 저장이 실제 성공했을 때만 기록하며, Recent canvas 시작 시 해당 파일을 다시 연다. 파일이 사라졌거나 열기에 실패하면 기록을 제거하고 빈 캔버스를 유지한다.
+- New canvas/Recent canvas 시작 방식과 주변 Vincent 사용자 탐색 여부를 비민감 `QSettings`에 영속화했다. 최근 캔버스는 외부 파일 경로가 아니라 앱 데이터 디렉터리의 단일 `recent-canvas.vrc` 내부 컨테이너에 1.2초 디바운스로 자동 저장한다. 컨테이너는 현재 보이는 캔버스 크기로 정규화한 iiSharedCanvas 문서와 추가 래스터 레이어·삽입 이미지 PNG, 텍스트·도형 편집 메타데이터를 함께 보존하고 SHA-256 무결성 검사를 거쳐 원자적으로 이전 스냅샷을 교체한다. Recent canvas 시작 시 이 내부 스냅샷을 복원하며, 포함된 PNG는 세션 수명에 묶인 소유자 전용 임시 디렉터리에서만 사용한다. 파일이 없거나 손상되었으면 이를 제거하고 빈 캔버스를 유지한다.
 - 탐색 설정 변경을 C++의 `NearbyVincentDiscovery` 생명주기에 연결했다. 기본값은 활성화이지만 사용자가 끄면 현재 worker를 중지하고 이후 실행에서도 시작하지 않는다.
 - **Restore Purchases**를 활성화해 인증된 `https://iisacc.com/Account/Dashboard` 구매·제품 접근 복구 경로를 기본 브라우저로 연다. **Check for Updates…**는 기존 `iiUpdateManager 0.2` 수동 확인 모달을 그대로 사용하며 자동·시작 시 업데이트 요청은 추가하지 않는다.
 

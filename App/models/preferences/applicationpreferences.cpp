@@ -1,19 +1,36 @@
 #include "applicationpreferences.h"
 
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSettings>
+#include <QStandardPaths>
 
 namespace
 {
 constexpr auto startWithRecentCanvasKey = "General/startWithRecentCanvas";
 constexpr auto discoverNearbyVincentUsersKey = "General/discoverNearbyVincentUsers";
-constexpr auto recentCanvasUrlKey = "General/recentCanvasUrl";
+constexpr auto legacyRecentCanvasUrlKey = "General/recentCanvasUrl";
+constexpr auto recentCanvasFileName = "recent-canvas.vrc";
+
+QString defaultStorageDirectory()
+{
+    QString applicationData =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (applicationData.isEmpty())
+    {
+        applicationData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    }
+    return applicationData.isEmpty() ? QString{}
+                                     : QDir(applicationData).filePath(QStringLiteral("canvas"));
 }
+} // namespace
 
 ApplicationPreferences::ApplicationPreferences(QObject *parent)
     : QObject(parent)
     , m_ownedSettings(std::make_unique<QSettings>())
     , m_settings(m_ownedSettings.get())
+    , m_storageDirectory(defaultStorageDirectory())
 {
     load();
 }
@@ -21,6 +38,19 @@ ApplicationPreferences::ApplicationPreferences(QObject *parent)
 ApplicationPreferences::ApplicationPreferences(QSettings *settings, QObject *parent)
     : QObject(parent)
     , m_settings(settings)
+    , m_storageDirectory(defaultStorageDirectory())
+{
+    Q_ASSERT(m_settings);
+    load();
+}
+
+ApplicationPreferences::ApplicationPreferences(QSettings *settings,
+                                               const QString &storageDirectory,
+                                               QObject *parent)
+    : QObject(parent)
+    , m_settings(settings)
+    , m_storageDirectory(storageDirectory.isEmpty() ? QString{}
+                                                    : QDir::cleanPath(storageDirectory))
 {
     Q_ASSERT(m_settings);
     load();
@@ -41,6 +71,12 @@ bool ApplicationPreferences::discoverNearbyVincentUsers() const noexcept
 QUrl ApplicationPreferences::recentCanvasUrl() const
 {
     return m_recentCanvasUrl;
+}
+
+QUrl ApplicationPreferences::recentCanvasStorageUrl() const
+{
+    const QString path = recentCanvasStoragePath();
+    return path.isEmpty() ? QUrl{} : QUrl::fromLocalFile(path);
 }
 
 void ApplicationPreferences::setStartWithRecentCanvas(bool startWithRecentCanvas)
@@ -70,31 +106,46 @@ void ApplicationPreferences::setDiscoverNearbyVincentUsers(bool discoverNearbyVi
 
 bool ApplicationPreferences::recordRecentCanvas(const QUrl &fileUrl)
 {
-    const QUrl canonicalUrl = canonicalLocalFileUrl(fileUrl);
-    if (canonicalUrl.isEmpty()) {
+    if (!fileUrl.isLocalFile()) {
         return false;
     }
-    if (m_recentCanvasUrl == canonicalUrl) {
+    const QString storagePath = recentCanvasStoragePath();
+    if (storagePath.isEmpty()) {
+        return false;
+    }
+    const QString expectedPath = QFileInfo(storagePath).absoluteFilePath();
+    const QString requestedPath = QFileInfo(fileUrl.toLocalFile()).absoluteFilePath();
+    if (requestedPath != expectedPath) {
+        return false;
+    }
+
+    const QUrl internalUrl = existingInternalCanvasUrl();
+    if (internalUrl.isEmpty()) {
+        return false;
+    }
+    if (m_recentCanvasUrl == internalUrl) {
         return true;
     }
 
-    m_recentCanvasUrl = canonicalUrl;
-    m_settings->setValue(QLatin1String(recentCanvasUrlKey), canonicalUrl);
-    m_settings->sync();
+    m_recentCanvasUrl = internalUrl;
     emit recentCanvasUrlChanged();
     return true;
 }
 
-void ApplicationPreferences::clearRecentCanvas()
+bool ApplicationPreferences::clearRecentCanvas()
 {
-    m_settings->remove(QLatin1String(recentCanvasUrlKey));
-    m_settings->sync();
-    if (m_recentCanvasUrl.isEmpty()) {
-        return;
+    const QString storagePath = recentCanvasStoragePath();
+    if (!storagePath.isEmpty() && QFileInfo::exists(storagePath)
+        && !QFile::remove(storagePath)) {
+        return false;
     }
 
+    const bool changed = !m_recentCanvasUrl.isEmpty();
     m_recentCanvasUrl = QUrl{};
-    emit recentCanvasUrlChanged();
+    if (changed) {
+        emit recentCanvasUrlChanged();
+    }
+    return true;
 }
 
 void ApplicationPreferences::load()
@@ -104,34 +155,39 @@ void ApplicationPreferences::load()
     m_discoverNearbyVincentUsers =
         m_settings->value(QLatin1String(discoverNearbyVincentUsersKey), true).toBool();
 
-    const QUrl storedRecentCanvasUrl =
-        m_settings->value(QLatin1String(recentCanvasUrlKey)).toUrl();
-    m_recentCanvasUrl = canonicalLocalFileUrl(storedRecentCanvasUrl);
-    if (m_recentCanvasUrl.isEmpty()) {
-        if (m_settings->contains(QLatin1String(recentCanvasUrlKey))) {
-            m_settings->remove(QLatin1String(recentCanvasUrlKey));
-            m_settings->sync();
-        }
-        return;
-    }
-
-    if (m_recentCanvasUrl != storedRecentCanvasUrl) {
-        m_settings->setValue(QLatin1String(recentCanvasUrlKey), m_recentCanvasUrl);
+    if (m_settings->contains(QLatin1String(legacyRecentCanvasUrlKey))) {
+        m_settings->remove(QLatin1String(legacyRecentCanvasUrlKey));
         m_settings->sync();
     }
+
+    if (!m_storageDirectory.isEmpty()) {
+        QDir().mkpath(m_storageDirectory);
+        QFile::setPermissions(m_storageDirectory,
+                              QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                  | QFileDevice::ExeOwner);
+    }
+    m_recentCanvasUrl = existingInternalCanvasUrl();
 }
 
-QUrl ApplicationPreferences::canonicalLocalFileUrl(const QUrl &fileUrl)
+QUrl ApplicationPreferences::existingInternalCanvasUrl() const
 {
-    if (!fileUrl.isLocalFile()) {
+    const QString path = recentCanvasStoragePath();
+    if (path.isEmpty()) {
         return {};
     }
 
-    const QFileInfo fileInfo(fileUrl.toLocalFile());
-    if (!fileInfo.exists() || !fileInfo.isFile()) {
+    const QFileInfo fileInfo(path);
+    if (!fileInfo.exists() || !fileInfo.isFile() || fileInfo.isSymLink()) {
         return {};
     }
 
     const QString canonicalPath = fileInfo.canonicalFilePath();
     return canonicalPath.isEmpty() ? QUrl{} : QUrl::fromLocalFile(canonicalPath);
+}
+
+QString ApplicationPreferences::recentCanvasStoragePath() const
+{
+    return m_storageDirectory.isEmpty()
+               ? QString{}
+               : QDir(m_storageDirectory).filePath(QLatin1String(recentCanvasFileName));
 }

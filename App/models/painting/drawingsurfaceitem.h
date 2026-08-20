@@ -8,11 +8,14 @@
 #include <QVariantMap>
 #include <iiSharedCanvas.h>
 
+#include <memory>
+
 class CanvasViewModelBridge;
 class QEvent;
 class QMouseEvent;
 class QNetworkAccessManager;
 class QObject;
+class QTemporaryDir;
 class QUrl;
 
 class DrawingSurfaceItem : public iiSharedCanvas::CanvasItem
@@ -55,6 +58,10 @@ public:
                                                           const QVariantList &objects,
                                                           const QVariantList &rasterLayers,
                                                           bool includeBackgroundLayer = true);
+    Q_INVOKABLE bool saveRecentCanvas(const QString& fileUrl, const QVariantList& objects,
+                                      const QVariantList& rasterLayers,
+                                      bool includeBackgroundLayer = true);
+    Q_INVOKABLE QVariantMap openRecentCanvas(const QString& fileUrl);
     Q_INVOKABLE QString cacheRasterSnapshotSource();
     Q_INVOKABLE QString cacheRasterThumbnailSource(qreal maximumWidth = 32, qreal maximumHeight = 32);
     Q_INVOKABLE QString cacheGrabbedThumbnailSource(QObject *grabResult);
@@ -129,6 +136,7 @@ private:
 
     CanvasViewModelBridge *m_viewModelBridge = nullptr;
     QNetworkAccessManager* m_networkAccessManager = nullptr;
+    std::unique_ptr<QTemporaryDir> m_recentCanvasExtractionDirectory;
     QString m_viewId;
     QString m_backgroundSource;
     bool m_hasBackground = false;

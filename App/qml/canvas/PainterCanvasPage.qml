@@ -33,9 +33,10 @@ Item {
     property real layerRenameEditorX: 0
     property real layerRenameEditorY: 0
     property real layerRenameEditorHeight: 20
+    property bool recentCanvasTrackingEnabled: false
+    property bool recentCanvasSaveInProgress: false
 
     signal pageReady
-    signal canvasFileActivated(url fileUrl)
     signal clipboardImagePasteFailed(string errorCode)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
@@ -59,7 +60,12 @@ Item {
 
     Component.onCompleted: {
         painterPage.bindViewModel();
-        pageReady();
+        Qt.callLater(function () {
+            pageReady();
+            Qt.callLater(function () {
+                painterPage.recentCanvasTrackingEnabled = true;
+            });
+        });
     }
 
     Component.onDestruction: {
@@ -76,6 +82,59 @@ Item {
         function onBindingsChanged() {
             painterPage.refreshViewModel();
         }
+    }
+
+    Timer {
+        id: recentCanvasSaveTimer
+
+        interval: 1200
+        repeat: false
+        onTriggered: painterPage.saveRecentCanvasNow()
+    }
+
+    function scheduleRecentCanvasSave() {
+        if (!painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress) {
+            return;
+        }
+        recentCanvasSaveTimer.restart();
+    }
+
+    function saveRecentCanvasNow() {
+        if (!painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress || !drawingSurface.canvasItemReady) {
+            return false;
+        }
+        if (drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive) {
+            recentCanvasSaveTimer.restart();
+            return false;
+        }
+
+        const storageUrl = VincentApplicationPreferences.recentCanvasStorageUrl;
+        if (!storageUrl || storageUrl.toString().length === 0) {
+            return false;
+        }
+
+        painterPage.recentCanvasSaveInProgress = true;
+        const saved = drawingSurface.saveRecentCanvas(storageUrl);
+        painterPage.recentCanvasSaveInProgress = false;
+        if (saved) {
+            VincentApplicationPreferences.recordRecentCanvas(storageUrl);
+        } else {
+            console.warn("Vincent could not update the internal recent canvas container.");
+        }
+        return saved;
+    }
+
+    function flushRecentCanvasSave() {
+        const activeEdit = drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive;
+        if (!recentCanvasSaveTimer.running && !activeEdit) {
+            return true;
+        }
+
+        recentCanvasSaveTimer.stop();
+        drawingSurface.commitActiveText();
+        drawingSurface.commitActiveShape();
+        drawingSurface.commitDrawableObjectTransform();
+        return painterPage.saveRecentCanvasNow();
     }
 
     Binding {
@@ -95,10 +154,12 @@ Item {
 
     function newCanvas(canvasWidth, canvasHeight) {
         drawingSurface.newCanvas(canvasWidth, canvasHeight);
+        painterPage.scheduleRecentCanvasSave();
     }
 
     function clearCanvas() {
         drawingSurface.clearCanvas();
+        painterPage.scheduleRecentCanvasSave();
     }
 
     function setBrushColor(colorValue) {
@@ -129,7 +190,7 @@ Item {
     function saveCanvasAs(fileUrl) {
         const saved = drawingSurface.saveToFile(fileUrl);
         if (saved) {
-            canvasFileActivated(fileUrl);
+            painterPage.scheduleRecentCanvasSave();
         }
         return saved;
     }
@@ -137,8 +198,17 @@ Item {
     function openRaster(fileUrl) {
         const opened = drawingSurface.openRaster(fileUrl);
         if (opened) {
-            canvasFileActivated(fileUrl);
+            painterPage.scheduleRecentCanvasSave();
         }
+        return opened;
+    }
+
+    function openRecentCanvas(fileUrl) {
+        const trackingWasEnabled = painterPage.recentCanvasTrackingEnabled;
+        painterPage.recentCanvasTrackingEnabled = false;
+        recentCanvasSaveTimer.stop();
+        const opened = drawingSurface.openRecentCanvas(fileUrl);
+        painterPage.recentCanvasTrackingEnabled = trackingWasEnabled;
         return opened;
     }
 
@@ -169,6 +239,7 @@ Item {
         const rasterSurface = drawingSurface.activeRasterSurface();
         if (rasterSurface) {
             rasterSurface.undo();
+            painterPage.scheduleRecentCanvasSave();
         }
     }
 
@@ -176,6 +247,7 @@ Item {
         const rasterSurface = drawingSurface.activeRasterSurface();
         if (rasterSurface) {
             rasterSurface.redo();
+            painterPage.scheduleRecentCanvasSave();
         }
     }
 
@@ -376,6 +448,7 @@ Item {
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onBrushDeltaRequested: delta => painterPage.adjustBrush(delta)
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
+                onSessionChanged: painterPage.scheduleRecentCanvasSave()
                 onImageDropSucceeded: {
                     painterPage.setToolMode("move");
                     Qt.callLater(painterPage.syncLayerHierarchySelection);

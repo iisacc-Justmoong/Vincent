@@ -265,6 +265,8 @@ add_executable(tests_drawingsurfaceitem
         ../App/models/document/psdimagereader.h
         ../App/models/document/psdimagewriter.cpp
         ../App/models/document/psdimagewriter.h
+        ../App/models/document/recentcanvascontainer.cpp
+        ../App/models/document/recentcanvascontainer.h
         ../App/models/painting/drawingsurfaceitem.cpp
         ../App/models/painting/drawingsurfaceitem.h
 )
