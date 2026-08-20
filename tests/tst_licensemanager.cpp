@@ -184,6 +184,7 @@ class tst_LicenseManager : public QObject
 
 private slots:
     void disabledEnforcementStartsUnlockedWithoutAutomaticCredentialOrNetworkAccess();
+    void accountEmailLoadsOnlyOnExplicitPreferencesRefresh();
     void productIdentityIsApplicationOwned();
     void successfulValidationPostsPrivateFixedContractAndUnlocks();
     void successfulValidationStoresOnlyNormalizedVerifiedCredentials();
@@ -243,6 +244,31 @@ void tst_LicenseManager::disabledEnforcementStartsUnlockedWithoutAutomaticCreden
     QCOMPARE(store.readCount, 0);
     QCOMPARE(store.removeCount, 0);
     QCOMPARE(server.connectionCount(), 0);
+}
+
+void tst_LicenseManager::accountEmailLoadsOnlyOnExplicitPreferencesRefresh()
+{
+    FakeCredentialStore store;
+    store.readStatus = LicenseCredentialStore::ReadStatus::Found;
+    store.readData = storedCredentials();
+
+    LicenseManager manager(QUrl(QStringLiteral("http://127.0.0.1/validate")),
+                           1000,
+                           &store,
+                           LicenseManager::EnforcementMode::Disabled);
+    QCOMPARE(store.readCount, 0);
+    QVERIFY(manager.accountEmail().isEmpty());
+    QVERIFY(!manager.accountEmailLoading());
+
+    QSignalSpy emailSpy(&manager, &LicenseManager::accountEmailChanged);
+    QSignalSpy loadingSpy(&manager, &LicenseManager::accountEmailLoadingChanged);
+    manager.refreshAccountEmail();
+
+    QCOMPARE(store.readCount, 1);
+    QCOMPARE(manager.accountEmail(), QStringLiteral("verified@example.com"));
+    QVERIFY(!manager.accountEmailLoading());
+    QCOMPARE(emailSpy.size(), 1);
+    QCOMPARE(loadingSpy.size(), 2);
 }
 
 void tst_LicenseManager::updateCredentialsAreMoveOnlyAndReadOnlyOnExplicitRequest()

@@ -448,9 +448,11 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     const QString preferencesQmlPath =
         QFINDTESTDATA("../App/qml/preferences/PreferencesWindow.qml");
     const QString rootCMakePath = QFINDTESTDATA("../CMakeLists.txt");
+    const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
     QVERIFY2(!preferencesQmlPath.isEmpty(), "PreferencesWindow.qml test data was not found");
     QVERIFY2(!rootCMakePath.isEmpty(), "CMakeLists.txt test data was not found");
+    QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
 
     auto readSource = [](const QString &path) {
         QFile file(path);
@@ -463,15 +465,32 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     const QString mainSource = readSource(mainQmlPath);
     const QString preferencesSource = readSource(preferencesQmlPath);
     const QString cmakeSource = readSource(rootCMakePath);
+    const QString appEntrySource = readSource(appEntryPath);
     QVERIFY(!mainSource.isEmpty());
     QVERIFY(!preferencesSource.isEmpty());
     QVERIFY(!cmakeSource.isEmpty());
+    QVERIFY(!appEntrySource.isEmpty());
 
     QVERIFY(mainSource.contains(
         QStringLiteral("import \"./preferences\" as PreferencesViews")));
     QVERIFY(mainSource.contains(
         QStringLiteral("readonly property string shortcutPreferences: menuCommandModifier + \"+,\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function requestPreferences()")));
+    const qsizetype refreshAccountEmailIndex =
+        mainSource.indexOf(QStringLiteral("VincentLicenseManager.refreshAccountEmail();"));
+    const qsizetype centerPreferencesIndex =
+        mainSource.indexOf(QStringLiteral("preferencesWindow.applyInitialCentering();"));
+    const qsizetype showGeneralSectionIndex =
+        mainSource.indexOf(QStringLiteral("preferencesWindow.showGeneralSection();"));
+    const qsizetype showPreferencesIndex =
+        mainSource.indexOf(QStringLiteral("preferencesWindow.showNormal();"));
+    QVERIFY(centerPreferencesIndex >= 0);
+    QVERIFY(refreshAccountEmailIndex >= 0);
+    QVERIFY(showGeneralSectionIndex >= 0);
+    QVERIFY(showPreferencesIndex >= 0);
+    QVERIFY(refreshAccountEmailIndex < showPreferencesIndex);
+    QVERIFY(centerPreferencesIndex < showPreferencesIndex);
+    QVERIFY(showGeneralSectionIndex < showPreferencesIndex);
     QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.showNormal();")));
     QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.raise();")));
     QVERIFY(mainSource.contains(QStringLiteral("preferencesWindow.requestActivate();")));
@@ -485,17 +504,101 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(mainSource.contains(QStringLiteral("PreferencesViews.PreferencesWindow {")));
     QVERIFY(mainSource.contains(QStringLiteral("id: preferencesWindow")));
     QVERIFY(mainSource.contains(QStringLiteral("transientParent: window")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("updateCheckEnabled: checkForUpdatesAction.enabled")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("accountEmail: VincentLicenseManager.accountEmail")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("accountEmailLoading: VincentLicenseManager.accountEmailLoading")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "onStartWithRecentCanvasRequested: enabled => "
+        "VincentApplicationPreferences.setStartWithRecentCanvas(enabled)")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "onDiscoverNearbyVincentUsersRequested: enabled => "
+        "VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onRestorePurchasesRequested: window.requestRestorePurchases()")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("function requestUpdateCheckFromPreferences()")));
+    const qsizetype hidePreferencesForUpdateIndex =
+        mainSource.indexOf(QStringLiteral("preferencesWindow.hide();"));
+    const qsizetype triggerUpdateFromPreferencesIndex =
+        mainSource.indexOf(QStringLiteral("checkForUpdatesAction.trigger();"));
+    QVERIFY(hidePreferencesForUpdateIndex >= 0);
+    QVERIFY(triggerUpdateFromPreferencesIndex > hidePreferencesForUpdateIndex);
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "readonly property url accountDashboardUrl: \"https://iisacc.com/Account/Dashboard\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("function requestRestorePurchases()")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("Qt.openUrlExternally(window.accountDashboardUrl)")));
+    QVERIFY(mainSource.contains(QStringLiteral("function acceptCanvasPage(page)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentApplicationPreferences.startWithRecentCanvas")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentApplicationPreferences.recentCanvasUrl")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentApplicationPreferences.clearRecentCanvas();")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onPageReady: window.acceptCanvasPage(painterPage)")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "onCanvasFileActivated: fileUrl => "
+        "VincentApplicationPreferences.recordRecentCanvas(fileUrl)")));
+
+    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationName(QStringLiteral(\"iisacc\"))")));
+    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationDomain(QStringLiteral(\"iisacc.com\"))")));
+    QVERIFY(appEntrySource.contains(QStringLiteral("new ApplicationPreferences(&engine)")));
+    QVERIFY(appEntrySource.contains(QStringLiteral(
+        "setContextProperty(\"VincentApplicationPreferences\",")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("LV.Window {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"preferencesWindow\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("visible: false")));
     QVERIFY(preferencesSource.contains(QStringLiteral("title: qsTr(\"Preferences\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool initialCenteringApplied: false")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("function applyInitialCentering()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "if (initialCenteringApplied || !transientParent)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "const parentCenterX = transientParent.x + transientParent.width / 2;")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "const parentCenterY = transientParent.y + transientParent.height / 2;")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("x = Math.round(parentCenterX - width / 2);")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("y = Math.round(parentCenterY - height / 2);")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("initialCenteringApplied = true;")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("function showGeneralSection()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("generalSectionButton.checked = true;")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "readonly property url profileImageSource: VincentProfileImageProcessor.imageSource")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("property alias profileName: profileNameField.text")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "property alias canInviteOtherUsers: inviteOtherUsersCheckBox.checked")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property string accountEmail: \"\"")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool accountEmailLoading: false")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool startWithRecentCanvas: false")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool discoverNearbyVincentUsers: true")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool restorePurchasesEnabled: true")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool updateCheckEnabled: false")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("signal restorePurchasesRequested")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("signal checkForUpdatesRequested")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("signal startWithRecentCanvasRequested(bool enabled)")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("signal discoverNearbyVincentUsersRequested(bool enabled)")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("Dialogs.FileDialog {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageDialog")));
@@ -505,10 +608,92 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(!preferencesSource.contains(QStringLiteral(
         "preferencesWindow.profileImageSource = selectedFile")));
 
-    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSectionHeader")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("source: LV.Theme.iconPath(\"user\")")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.LabelSegmentedControl {")), 1);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: preferencesSectionHeader")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("objectName: \"preferencesSectionHeader\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("anchors.top: parent.top")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("anchors.topMargin: LV.Theme.gap24")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.LabelButton {")), 5);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: generalSectionButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"General\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSectionButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Profile\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: membersSectionButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Members\")")));
+    const qsizetype generalSectionIndex =
+        preferencesSource.indexOf(QStringLiteral("id: generalSectionButton"));
+    const qsizetype profileSectionIndex =
+        preferencesSource.indexOf(QStringLiteral("id: profileSectionButton"));
+    const qsizetype defaultCheckedIndex =
+        preferencesSource.indexOf(QStringLiteral("checked: true"), generalSectionIndex);
+    QVERIFY(generalSectionIndex >= 0);
+    QVERIFY(profileSectionIndex >= 0);
+    QVERIFY(defaultCheckedIndex > generalSectionIndex);
+    QVERIFY(defaultCheckedIndex < profileSectionIndex);
+    QCOMPARE(preferencesSource.count(QStringLiteral("checked: true")), 1);
+    QCOMPARE(preferencesSource.count(QStringLiteral("checkable: true")), 3);
+    QCOMPARE(preferencesSource.count(QStringLiteral("autoExclusive: true")), 5);
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("anchors.top: preferencesSectionHeader.bottom")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("id: profileSectionHeader")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("id: profileSectionIcon")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSettings")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("visible: profileSectionButton.checked")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("selectedSection")));
+
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: generalSettings")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("visible: generalSectionButton.checked")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: accountEmailLabel")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"iisacc account email\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: accountEmailValueLabel")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("preferencesWindow.accountEmailLoading")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("preferencesWindow.accountEmail.length")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("qsTr(\"Not connected\")")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("licenseKey")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Startup with\")")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.RadioButton {")), 2);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: newCanvasRadioButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"New canvas\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("checked: !preferencesWindow.startWithRecentCanvas")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("preferencesWindow.startWithRecentCanvasRequested(false)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: recentCanvasRadioButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Recent canvas\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("checked: preferencesWindow.startWithRecentCanvas")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("preferencesWindow.startWithRecentCanvasRequested(true)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "id: discoverNearbyVincentUsersCheckBox")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "text: qsTr(\"Discover nearby Vincent users\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "checked: preferencesWindow.discoverNearbyVincentUsers")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "onToggled: preferencesWindow.discoverNearbyVincentUsersRequested(checked)")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("onToggled:")), 3);
+    QVERIFY(!preferencesSource.contains(QStringLiteral("VincentNearbyDiscovery.start();")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("VincentNearbyDiscovery.stop();")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: generalActions")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("anchors.bottom: parent.bottom")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.Spacer {")), 1);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: restorePurchasesButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Restore Purchases\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "enabled: preferencesWindow.restorePurchasesEnabled")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "onClicked: preferencesWindow.restorePurchasesRequested()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: checkForUpdatesButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Check for Updates…\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "enabled: preferencesWindow.updateCheckEnabled")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "onClicked: preferencesWindow.checkForUpdatesRequested()")));
+    QVERIFY(!preferencesSource.contains(QStringLiteral("id: membersSettings")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("tone: LV.AbstractButton.Borderless")));
@@ -544,7 +729,7 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.InputField {")), 1);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileNameField")));
     QVERIFY(preferencesSource.contains(QStringLiteral("placeholder: qsTr(\"Profile name\")")));
-    QCOMPARE(preferencesSource.count(QStringLiteral("LV.CheckBox {")), 1);
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.CheckBox {")), 2);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: inviteOtherUsersCheckBox")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "text: qsTr(\"Allow inviting other users\")")));

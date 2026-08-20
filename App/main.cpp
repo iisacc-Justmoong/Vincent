@@ -9,6 +9,7 @@
 #include <QQmlContext>
 #include <QSet>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
 #include <QVariant>
 #include <QWindow>
@@ -22,7 +23,9 @@
 #include "models/canvas/canvasdocumentviewmodel.h"
 #include "models/input/temporarycamerainput.h"
 #include "models/license/licensemanager.h"
+#include "models/network/nearbyvincentdiscovery.h"
 #include "models/painting/drawingsurfaceitem.h"
+#include "models/preferences/applicationpreferences.h"
 #include "models/profile/profileimageprocessor.h"
 #include "models/brush/paletteutils.h"
 #include "models/update/vincentupdatemanager.h"
@@ -223,6 +226,8 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("Vincent"));
     QGuiApplication::setApplicationVersion(QStringLiteral(VINCENT_VERSION));
+    QGuiApplication::setOrganizationName(QStringLiteral("iisacc"));
+    QGuiApplication::setOrganizationDomain(QStringLiteral("iisacc.com"));
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     traceStartup(QStringLiteral("Vincent startup initialized in %1 ms").arg(launchTimer.elapsed()));
 
@@ -242,11 +247,26 @@ int main(int argc, char *argv[])
     auto *profileImageProcessor = new ProfileImageProcessor(&engine);
     engine.rootContext()->setContextProperty("VincentProfileImageProcessor",
                                              profileImageProcessor);
+    auto *applicationPreferences = new ApplicationPreferences(&engine);
+    engine.rootContext()->setContextProperty("VincentApplicationPreferences",
+                                             applicationPreferences);
     auto *licenseManager =
         new LicenseManager(LicenseManager::EnforcementMode::Disabled, &engine);
     engine.rootContext()->setContextProperty("VincentLicenseManager", licenseManager);
     auto *updateManager = new VincentUpdateManager(licenseManager, &engine);
     engine.rootContext()->setContextProperty("VincentUpdateManager", updateManager);
+    auto *nearbyDiscovery = new NearbyVincentDiscovery(&engine);
+    engine.rootContext()->setContextProperty("VincentNearbyDiscovery", nearbyDiscovery);
+    QObject::connect(applicationPreferences,
+                     &ApplicationPreferences::discoverNearbyVincentUsersChanged,
+                     nearbyDiscovery,
+                     [applicationPreferences, nearbyDiscovery]() {
+                         if (applicationPreferences->discoverNearbyVincentUsers()) {
+                             nearbyDiscovery->start();
+                             return;
+                         }
+                         nearbyDiscovery->stop();
+                     });
     registerViewModels(engine, paletteUtils);
 
     QObject::connect(&engine,
@@ -266,6 +286,11 @@ int main(int argc, char *argv[])
                      .arg(engine.rootObjects().size())
                      .arg(launchTimer.elapsed()));
     showLaunchWindow(engine);
+    QTimer::singleShot(0, nearbyDiscovery, [applicationPreferences, nearbyDiscovery]() {
+        if (applicationPreferences->discoverNearbyVincentUsers()) {
+            nearbyDiscovery->start();
+        }
+    });
     traceStartup(QStringLiteral("Launch window shown at its final geometry in %1 ms")
                      .arg(launchTimer.elapsed()),
                  true);

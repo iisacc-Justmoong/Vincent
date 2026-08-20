@@ -240,6 +240,16 @@ QString LicenseManager::resultCode() const
     return m_resultCode;
 }
 
+QString LicenseManager::accountEmail() const
+{
+    return m_accountEmail;
+}
+
+bool LicenseManager::accountEmailLoading() const
+{
+    return m_accountEmailLoading;
+}
+
 void LicenseManager::validateLicense(const QString &email, const QString &licenseKey)
 {
     if (!m_enforcementEnabled || m_licensed || m_verifying) {
@@ -287,6 +297,29 @@ void LicenseManager::forgetLicense()
     setLicensed(false);
     setResultCode(QString{});
     clearStoredCredentials();
+}
+
+void LicenseManager::refreshAccountEmail()
+{
+    if (m_accountEmailLoading) {
+        return;
+    }
+
+    setAccountEmailLoading(true);
+    QPointer<LicenseManager> guard(this);
+    requestStoredCredentials(
+        [guard](StoredCredentialStatus status, StoredLicenseCredentials credentials) mutable {
+            if (!guard) {
+                return;
+            }
+
+            const QString email = status == StoredCredentialStatus::Available
+                ? credentials.email
+                : QString{};
+            credentials.clear();
+            guard->setAccountEmail(email);
+            guard->setAccountEmailLoading(false);
+        });
 }
 
 void LicenseManager::requestStoredCredentials(StoredCredentialCompletion completion)
@@ -530,6 +563,7 @@ void LicenseManager::clearStoredCredentials()
     m_activeLicenseKey.clear();
     m_storedEmail.clear();
     m_storedLicenseKey.clear();
+    setAccountEmail(QString{});
     setHasStoredLicense(false);
     if (!persistenceSupported()) {
         return;
@@ -581,4 +615,24 @@ void LicenseManager::setResultCode(const QString &resultCode)
 
     m_resultCode = resultCode;
     emit resultCodeChanged();
+}
+
+void LicenseManager::setAccountEmail(const QString &accountEmail)
+{
+    if (m_accountEmail == accountEmail) {
+        return;
+    }
+
+    m_accountEmail = accountEmail;
+    emit accountEmailChanged();
+}
+
+void LicenseManager::setAccountEmailLoading(bool accountEmailLoading)
+{
+    if (m_accountEmailLoading == accountEmailLoading) {
+        return;
+    }
+
+    m_accountEmailLoading = accountEmailLoading;
+    emit accountEmailLoadingChanged();
 }

@@ -48,6 +48,7 @@ private slots:
     void cmakeFixesApplicationVersionAt51();
     void cmakeRequiresRepositoryBuildDirectory();
     void cmakeAvoidsRedundantMacOSRuntimeRpaths();
+    void localNetworkDiscoveryDeclaresPrivacyAndSandboxAccess();
     void repositoryGuidelinesUseOnlyBuildDirectory();
     void buildGuideSeparatesLocalAndDistributionSigning();
     void platformAppIconsAreBundledFromResources();
@@ -123,6 +124,29 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
     QVERIFY(source.contains(QStringLiteral("iiUpdateManager::iiUpdateManager")));
     QVERIFY(source.contains(QStringLiteral("find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)")));
     QVERIFY(source.contains(QStringLiteral("iiSharedCanvas::iiSharedCanvas")));
+}
+
+void tst_MacOSBuildWorkflowContract::localNetworkDiscoveryDeclaresPrivacyAndSandboxAccess()
+{
+    const QString infoPlistPath = QFINDTESTDATA("../packaging/macos/Info.plist");
+    QVERIFY2(!infoPlistPath.isEmpty(), "packaging/macos/Info.plist test data was not found");
+    QFile infoPlist(infoPlistPath);
+    QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
+    QVERIFY(infoPlistSource.contains(QStringLiteral("<key>NSLocalNetworkUsageDescription</key>")));
+    QVERIFY(infoPlistSource.contains(QStringLiteral(
+        "Vincent uses your local network to find other nearby Vincent users.")));
+
+    const QString entitlementsPath =
+        QFINDTESTDATA("../packaging/macos/Vincent.entitlements");
+    QVERIFY2(!entitlementsPath.isEmpty(), "Vincent.entitlements test data was not found");
+    QFile entitlements(entitlementsPath);
+    QVERIFY(entitlements.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString entitlementSource = QString::fromUtf8(entitlements.readAll());
+    QVERIFY(entitlementSource.contains(QStringLiteral(
+        "<key>com.apple.security.network.client</key>\n\t<true/>")));
+    QVERIFY(entitlementSource.contains(QStringLiteral(
+        "<key>com.apple.security.network.server</key>\n\t<true/>")));
 }
 
 void tst_MacOSBuildWorkflowContract::repositoryGuidelinesUseOnlyBuildDirectory()

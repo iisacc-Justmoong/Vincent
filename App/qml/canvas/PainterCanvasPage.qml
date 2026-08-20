@@ -35,6 +35,7 @@ Item {
     property real layerRenameEditorHeight: 20
 
     signal pageReady
+    signal canvasFileActivated(url fileUrl)
     signal clipboardImagePasteFailed(string errorCode)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
@@ -126,11 +127,19 @@ Item {
     }
 
     function saveCanvasAs(fileUrl) {
-        drawingSurface.saveToFile(fileUrl);
+        const saved = drawingSurface.saveToFile(fileUrl);
+        if (saved) {
+            canvasFileActivated(fileUrl);
+        }
+        return saved;
     }
 
     function openRaster(fileUrl) {
-        drawingSurface.openRaster(fileUrl);
+        const opened = drawingSurface.openRaster(fileUrl);
+        if (opened) {
+            canvasFileActivated(fileUrl);
+        }
+        return opened;
     }
 
     function pasteClipboardImage() {

@@ -41,8 +41,12 @@ target_sources(Vincent PRIVATE
         models/license/licensemanager.h
         models/license/licensecredentialstore.cpp
         models/license/licensecredentialstore.h
+        models/network/nearbyvincentdiscovery.cpp
+        models/network/nearbyvincentdiscovery.h
         models/painting/drawingsurfaceitem.cpp
         models/painting/drawingsurfaceitem.h
+        models/preferences/applicationpreferences.cpp
+        models/preferences/applicationpreferences.h
         models/profile/profileimageprocessor.cpp
         models/profile/profileimageprocessor.h
         models/update/vincentupdatecredentialprovider.cpp
@@ -59,7 +63,9 @@ target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/models/document
         ${CMAKE_CURRENT_SOURCE_DIR}/models/input
         ${CMAKE_CURRENT_SOURCE_DIR}/models/license
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/network
         ${CMAKE_CURRENT_SOURCE_DIR}/models/painting
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/preferences
         ${CMAKE_CURRENT_SOURCE_DIR}/models/profile
         ${CMAKE_CURRENT_SOURCE_DIR}/models/update
 )

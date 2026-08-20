@@ -83,6 +83,43 @@ vincent_configure_local_runtime_paths(tests_profileimageprocessor)
 
 add_test(NAME tests_profileimageprocessor COMMAND tests_profileimageprocessor)
 
+add_executable(tests_applicationpreferences
+        tst_applicationpreferences.cpp
+        ../App/models/preferences/applicationpreferences.cpp
+        ../App/models/preferences/applicationpreferences.h
+)
+
+target_include_directories(tests_applicationpreferences PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/preferences
+)
+
+target_link_libraries(tests_applicationpreferences PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_applicationpreferences)
+
+add_test(NAME tests_applicationpreferences COMMAND tests_applicationpreferences)
+
+add_executable(tests_nearbyvincentdiscovery
+        tst_nearbyvincentdiscovery.cpp
+        ../App/models/network/nearbyvincentdiscovery.cpp
+        ../App/models/network/nearbyvincentdiscovery.h
+)
+
+target_include_directories(tests_nearbyvincentdiscovery PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/network
+)
+
+target_link_libraries(tests_nearbyvincentdiscovery PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_nearbyvincentdiscovery)
+
+add_test(NAME tests_nearbyvincentdiscovery COMMAND tests_nearbyvincentdiscovery)
+
 add_executable(tests_temporarycamerainput
         tst_temporarycamerainput.cpp
         ../App/models/input/temporarycamerainput.cpp
@@ -267,6 +304,8 @@ set_tests_properties(
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
         tests_profileimageprocessor
+        tests_applicationpreferences
+        tests_nearbyvincentdiscovery
         tests_temporarycamerainput
         tests_licensemanager
         tests_vincentupdatemanager
@@ -356,7 +395,12 @@ if(WIN32)
             tests_psdcompatibilitydocument
             tests_canvastoolbarqmlcontract
             tests_mainqmlcontract
+            tests_profileimageprocessor
+            tests_applicationpreferences
+            tests_nearbyvincentdiscovery
+            tests_temporarycamerainput
             tests_licensemanager
+            tests_vincentupdatemanager
             tests_macosbuildworkflowcontract
             tests_linuxbuildworkflowcontract
             tests_windowsbuildworkflowcontract
@@ -367,7 +411,7 @@ if(WIN32)
             tests_drawingsurfaceitem
             PROPERTIES
             ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
+        "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiPaintEngine::iiPaintEngine>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiSharedCanvas::iiSharedCanvas>;PATH=path_list_prepend:$<TARGET_FILE_DIR:iiUpdateManager::iiUpdateManager>;PATH=path_list_prepend:$<TARGET_FILE_DIR:LVRS::LVRS>"
     )
 endif()
 

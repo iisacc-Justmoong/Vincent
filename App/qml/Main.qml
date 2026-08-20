@@ -16,6 +16,7 @@ LV.ApplicationWindow {
     property var canvasPage: null
     property bool canvasIncubationRequested: false
     property string clipboardPasteFailureMessage: ""
+    readonly property url accountDashboardUrl: "https://iisacc.com/Account/Dashboard"
     readonly property bool licenseGranted: !VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
     readonly property bool canvasEditingCommandsEnabled: canvasCommandsEnabled && !canvasPage.textEditingActive
@@ -191,9 +192,38 @@ LV.ApplicationWindow {
     }
 
     function requestPreferences() {
+        VincentLicenseManager.refreshAccountEmail();
+        preferencesWindow.showGeneralSection();
+        preferencesWindow.applyInitialCentering();
         preferencesWindow.showNormal();
         preferencesWindow.raise();
         preferencesWindow.requestActivate();
+    }
+
+    function requestRestorePurchases() {
+        return Qt.openUrlExternally(window.accountDashboardUrl);
+    }
+
+    function acceptCanvasPage(page) {
+        window.canvasPage = page;
+        if (!VincentApplicationPreferences.startWithRecentCanvas) {
+            return;
+        }
+
+        const recentCanvasUrl = VincentApplicationPreferences.recentCanvasUrl;
+        if (recentCanvasUrl.toString().length === 0) {
+            return;
+        }
+        if (!page.openRaster(recentCanvasUrl)) {
+            VincentApplicationPreferences.clearRecentCanvas();
+        }
+    }
+
+    function requestUpdateCheckFromPreferences() {
+        preferencesWindow.hide();
+        window.raise();
+        window.requestActivate();
+        checkForUpdatesAction.trigger();
     }
 
     function nativeShortcutText(shortcutText) {
@@ -935,6 +965,15 @@ LV.ApplicationWindow {
     PreferencesViews.PreferencesWindow {
         id: preferencesWindow
         transientParent: window
+        accountEmail: VincentLicenseManager.accountEmail
+        accountEmailLoading: VincentLicenseManager.accountEmailLoading
+        startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas
+        discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers
+        updateCheckEnabled: checkForUpdatesAction.enabled
+        onStartWithRecentCanvasRequested: enabled => VincentApplicationPreferences.setStartWithRecentCanvas(enabled)
+        onDiscoverNearbyVincentUsersRequested: enabled => VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled)
+        onRestorePurchasesRequested: window.requestRestorePurchases()
+        onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()
     }
 
     Loader {
@@ -945,7 +984,8 @@ LV.ApplicationWindow {
         sourceComponent: CanvasViews.PainterCanvasPage {
             id: painterPage
             topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
-            onPageReady: window.canvasPage = painterPage
+            onPageReady: window.acceptCanvasPage(painterPage)
+            onCanvasFileActivated: fileUrl => VincentApplicationPreferences.recordRecentCanvas(fileUrl)
             onClipboardImagePasteFailed: errorCode => window.showClipboardPasteFailure(errorCode)
             onImageDropSucceeded: {
                 window.clipboardPasteFailureMessage = "";

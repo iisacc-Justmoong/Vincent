@@ -15,6 +15,34 @@ LV.Window {
     readonly property url profileImageSource: VincentProfileImageProcessor.imageSource
     property alias profileName: profileNameField.text
     property alias canInviteOtherUsers: inviteOtherUsersCheckBox.checked
+    property string accountEmail: ""
+    property bool accountEmailLoading: false
+    property bool startWithRecentCanvas: false
+    property bool discoverNearbyVincentUsers: true
+    property bool restorePurchasesEnabled: true
+    property bool updateCheckEnabled: false
+    property bool initialCenteringApplied: false
+
+    signal restorePurchasesRequested
+    signal checkForUpdatesRequested
+    signal startWithRecentCanvasRequested(bool enabled)
+    signal discoverNearbyVincentUsersRequested(bool enabled)
+
+    function applyInitialCentering() {
+        if (initialCenteringApplied || !transientParent)
+            return false;
+
+        const parentCenterX = transientParent.x + transientParent.width / 2;
+        const parentCenterY = transientParent.y + transientParent.height / 2;
+        x = Math.round(parentCenterX - width / 2);
+        y = Math.round(parentCenterY - height / 2);
+        initialCenteringApplied = true;
+        return true;
+    }
+
+    function showGeneralSection() {
+        generalSectionButton.checked = true;
+    }
 
     Dialogs.FileDialog {
         id: profileImageDialog
@@ -74,42 +102,180 @@ LV.Window {
         }
     }
 
-    LV.HStack {
-        id: profileSectionHeader
+    LV.LabelSegmentedControl {
+        id: preferencesSectionHeader
 
+        objectName: "preferencesSectionHeader"
         anchors.top: parent.top
         anchors.topMargin: LV.Theme.gap24
         anchors.horizontalCenter: parent.horizontalCenter
-        spacing: LV.Theme.gap6
 
-        Image {
-            objectName: "profileSectionIcon"
-            source: LV.Theme.iconPath("user")
-            sourceSize.width: LV.Theme.iconSm
-            sourceSize.height: LV.Theme.iconSm
-            smooth: true
-            mipmap: LV.RenderQuality.mipmapEnabled
-            Layout.preferredWidth: LV.Theme.iconSm
-            Layout.preferredHeight: LV.Theme.iconSm
-            Layout.alignment: Qt.AlignVCenter
-            Accessible.ignored: true
+        LV.LabelButton {
+            id: generalSectionButton
+
+            objectName: "generalSectionButton"
+            text: qsTr("General")
+            checkable: true
+            autoExclusive: true
+            checked: true
+            backgroundColor: checked ? LV.Theme.panelBackground12 : "transparent"
         }
 
-        LV.Label {
-            objectName: "profileSectionTitle"
+        LV.LabelButton {
+            id: profileSectionButton
+
+            objectName: "profileSectionButton"
             text: qsTr("Profile")
-            style: title2
-            Layout.alignment: Qt.AlignVCenter
+            checkable: true
+            autoExclusive: true
+            backgroundColor: checked ? LV.Theme.panelBackground12 : "transparent"
+        }
+
+        LV.LabelButton {
+            id: membersSectionButton
+
+            objectName: "membersSectionButton"
+            text: qsTr("Members")
+            checkable: true
+            autoExclusive: true
+            backgroundColor: checked ? LV.Theme.panelBackground12 : "transparent"
+        }
+    }
+
+    Item {
+        id: generalSettings
+
+        anchors.top: preferencesSectionHeader.bottom
+        anchors.topMargin: LV.Theme.gap20
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: generalSectionButton.checked
+
+        LV.VStack {
+            id: generalContent
+
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.leftMargin: LV.Theme.gap24
+            alignment: Qt.AlignLeft
+            spacing: LV.Theme.gap20
+
+            LV.VStack {
+                alignment: Qt.AlignLeft
+                spacing: LV.Theme.gap6
+
+                LV.Label {
+                    id: accountEmailLabel
+
+                    objectName: "accountEmailLabel"
+                    text: qsTr("iisacc account email")
+                    style: description
+                    Accessible.name: text
+                }
+
+                LV.Label {
+                    id: accountEmailValueLabel
+
+                    objectName: "accountEmailValueLabel"
+                    text: preferencesWindow.accountEmailLoading ? qsTr("Loading…") : (preferencesWindow.accountEmail.length ? preferencesWindow.accountEmail : qsTr("Not connected"))
+                    style: body
+                    Accessible.name: accountEmailLabel.text + ": " + text
+                }
+            }
+
+            LV.VStack {
+                alignment: Qt.AlignLeft
+                spacing: LV.Theme.gap6
+
+                LV.Label {
+                    text: qsTr("Startup with")
+                    style: description
+                }
+
+                LV.HStack {
+                    spacing: LV.Theme.gap16
+
+                    LV.RadioButton {
+                        id: newCanvasRadioButton
+
+                        objectName: "newCanvasRadioButton"
+                        text: qsTr("New canvas")
+                        autoExclusive: true
+                        checked: !preferencesWindow.startWithRecentCanvas
+                        onToggled: {
+                            if (checked)
+                                preferencesWindow.startWithRecentCanvasRequested(false);
+                        }
+                    }
+
+                    LV.RadioButton {
+                        id: recentCanvasRadioButton
+
+                        objectName: "recentCanvasRadioButton"
+                        text: qsTr("Recent canvas")
+                        autoExclusive: true
+                        checked: preferencesWindow.startWithRecentCanvas
+                        onToggled: {
+                            if (checked)
+                                preferencesWindow.startWithRecentCanvasRequested(true);
+                        }
+                    }
+                }
+            }
+
+            LV.CheckBox {
+                id: discoverNearbyVincentUsersCheckBox
+
+                objectName: "discoverNearbyVincentUsersCheckBox"
+                text: qsTr("Discover nearby Vincent users")
+                checked: preferencesWindow.discoverNearbyVincentUsers
+                onToggled: preferencesWindow.discoverNearbyVincentUsersRequested(checked)
+            }
+        }
+
+        LV.HStack {
+            id: generalActions
+
+            anchors.left: parent.left
+            anchors.leftMargin: LV.Theme.gap24
+            anchors.right: parent.right
+            anchors.rightMargin: LV.Theme.gap24
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: LV.Theme.gap24
+
+            LV.LabelButton {
+                id: restorePurchasesButton
+
+                objectName: "restorePurchasesButton"
+                text: qsTr("Restore Purchases")
+                tone: LV.AbstractButton.Default
+                enabled: preferencesWindow.restorePurchasesEnabled
+                onClicked: preferencesWindow.restorePurchasesRequested()
+            }
+
+            LV.Spacer {}
+
+            LV.LabelButton {
+                id: checkForUpdatesButton
+
+                objectName: "checkForUpdatesButton"
+                text: qsTr("Check for Updates…")
+                tone: LV.AbstractButton.Primary
+                enabled: preferencesWindow.updateCheckEnabled
+                onClicked: preferencesWindow.checkForUpdatesRequested()
+            }
         }
     }
 
     LV.VStack {
         id: profileSettings
 
-        anchors.top: profileSectionHeader.bottom
+        anchors.top: preferencesSectionHeader.bottom
         anchors.topMargin: LV.Theme.gap20
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: LV.Theme.gap16
+        visible: profileSectionButton.checked
 
         LV.VStack {
             spacing: LV.Theme.gap6

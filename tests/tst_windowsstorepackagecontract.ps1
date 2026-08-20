@@ -50,6 +50,7 @@ $manifestTemplateSource = Get-Content -LiteralPath $ManifestTemplatePath -Raw
 Assert-Condition ($manifestTemplateSource.Contains('ProcessorArchitecture="x64"')) "The Store manifest must declare native x64 architecture."
 Assert-Condition ($manifestTemplateSource.Contains('MinVersion="10.0.19041.0"')) "The Store manifest must target the uap10 packaged desktop baseline."
 Assert-Condition ($manifestTemplateSource.Contains('IgnorableNamespaces="uap uap10 rescap"')) "The Store manifest namespaces are incomplete."
+Assert-Condition ($manifestTemplateSource.Contains('<Capability Name="privateNetworkClientServer" />')) "The Store manifest must declare private local-network access."
 Assert-Condition (([regex]::Matches($manifestTemplateSource, '@DISPLAY_NAME@')).Count -eq 2) "The reserved Store display name must drive both package and application display names."
 $ast = [System.Management.Automation.Language.Parser]::ParseFile(
     $resolvedScriptPath,
@@ -123,6 +124,7 @@ try {
     $visualElements = $manifest.SelectSingleNode("/f:Package/f:Applications/f:Application/uap:VisualElements", $namespaceManager)
     Assert-Condition ($visualElements.GetAttribute("DisplayName") -eq "Vincent 4 & Paint") "The application display name must match the reserved package display name."
     Assert-Condition ($null -ne $manifest.SelectSingleNode("/f:Package/f:Capabilities/rescap:Capability[@Name='runFullTrust']", $namespaceManager)) "The manifest must declare runFullTrust."
+    Assert-Condition ($null -ne $manifest.SelectSingleNode("/f:Package/f:Capabilities/f:Capability[@Name='privateNetworkClientServer']", $namespaceManager)) "The manifest must declare privateNetworkClientServer."
 
     foreach ($relativePath in @(
             "Vincent.exe",

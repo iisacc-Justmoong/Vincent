@@ -239,7 +239,7 @@ The workflow requests only Qt 6.8.3 modules that the online installer exposes se
 
 Microsoft Store MSIX is Vincent's certificate-free public Windows distribution route. Microsoft re-signs an MSIX after certification, so the publisher does not buy, renew, export, or protect a public OV/EV certificate and customers do not receive a SmartScreen unknown-publisher warning for the Store installation. This applies to an actual MSIX submission only. Microsoft does not re-sign an MSI or EXE submitted through the separate Win32 installer path. See Microsoft's current [Windows code-signing options](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options) and [manual desktop MSIX packaging guide](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-manual-conversion).
 
-`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity and exact reserved app name into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and publishes the Store files and SHA-256 sidecars under `dist/`. The reserved name drives both `Package/Properties/DisplayName` and `uap:VisualElements/@DisplayName`; Partner Center rejects an unreserved package-level name even when the package identity and publisher are correct. The manifest is x64, uses package version `5.1.0.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
+`build-windows-store.ps1` owns this workflow separately from the non-Store ZIP/MSI signing path. It reuses the tested `dist/Vincent-Windows` runtime, writes the Partner Center identity and exact reserved app name into `AppxManifest.xml`, generates exact Store PNG assets from the canonical 1024 px icon, packages with the installed x64 Windows SDK MakeAppx, and publishes the Store files and SHA-256 sidecars under `dist/`. The reserved name drives both `Package/Properties/DisplayName` and `uap:VisualElements/@DisplayName`; Partner Center rejects an unreserved package-level name even when the package identity and publisher are correct. The manifest is x64, uses package version `5.1.0.0`, targets `Windows.Desktop` from build 19041, and declares `uap10:RuntimeBehavior="packagedClassicApp"`, `uap10:TrustLevel="mediumIL"`, `privateNetworkClientServer` for nearby Vincent discovery, and `runFullTrust`. The fourth version field is reserved for Store use and must remain zero.
 
 ### Local self-signed MSIX verification
 
@@ -394,10 +394,10 @@ Update the generated `Info.plist` (inside `dist/Vincent.app/Contents/`) with:
 - `CFBundleIdentifier` matching your bundle ID.
 - `CFBundleShortVersionString` set to marketing version `5.1` and `CFBundleVersion` set to the higher App Store build number `50100`.
 - `CFBundleIconFile` should resolve to the bundled `resources/Appicon.icns` file. Windows builds embed `resources/Appicon.ico` through the generated resource script.
-- Any usage description strings your app requires (e.g., `NSMicrophoneUsageDescription`)—Vincent 5.1 currently relies only on file picker access.
+- `NSLocalNetworkUsageDescription` with the factual explanation that Vincent uses the local network to find other nearby Vincent users. The prompt is expected on the first local discovery operation on current macOS versions.
 
 ## 6. Sandbox Entitlements
-Customize `packaging/macos/Vincent.entitlements` if the app needs additional capabilities. The default template enables the App Sandbox and grants read/write access to user-selected files and picture libraries. Keep entitlements minimal to improve App Review approval chances.
+`packaging/macos/Vincent.entitlements` enables the App Sandbox, grants read/write access to user-selected files and picture libraries, and grants both `com.apple.security.network.client` and `com.apple.security.network.server`. UDP multicast discovery sends datagrams and binds a listening socket, so both network directions are intentional. Keep any future entitlement additions minimal to improve App Review approval chances.
 
 ## 7. Codesign the Bundle
 ```bash

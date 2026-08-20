@@ -21,7 +21,30 @@ private slots:
     void painterPageUsesLvHierarchyLayerPanel();
     void pressureCurveControlsUseThreePointGraphAtBottom();
     void brushSettingsExposePressureOpacityToggle();
+    void successfulOpenAndSaveBecomeRecentCanvasCandidates();
 };
+
+void tst_CanvasToolBarQmlContract::successfulOpenAndSaveBecomeRecentCanvasCandidates()
+{
+    const QString painterPageQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+
+    QFile painterPageQml(painterPageQmlPath);
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString pageSource = QString::fromUtf8(painterPageQml.readAll());
+
+    QVERIFY(pageSource.contains(QStringLiteral("signal canvasFileActivated(url fileUrl)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("const saved = drawingSurface.saveToFile(fileUrl);")));
+    QVERIFY(pageSource.contains(QStringLiteral("if (saved)")));
+    QVERIFY(pageSource.contains(QStringLiteral("canvasFileActivated(fileUrl);")));
+    QVERIFY(pageSource.contains(QStringLiteral("return saved;")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("const opened = drawingSurface.openRaster(fileUrl);")));
+    QVERIFY(pageSource.contains(QStringLiteral("if (opened)")));
+    QVERIFY(pageSource.contains(QStringLiteral("return opened;")));
+}
 
 void tst_CanvasToolBarQmlContract::modifierSpaceUsesApplicationWideCameraModes()
 {
