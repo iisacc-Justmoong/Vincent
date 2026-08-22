@@ -384,9 +384,10 @@ LV.Window {
 
             objectName: "memberList"
             anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: LV.Theme.gap24
             anchors.horizontalCenter: parent.horizontalCenter
             width: implicitWidth
-            height: implicitHeight
             listWidth: LV.Theme.scaleMetric(237)
             minimumListHeight: LV.Theme.scaleMetric(231)
             model: preferencesWindow.displayedCanvasMemberProfiles

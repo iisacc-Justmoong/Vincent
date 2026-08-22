@@ -735,6 +735,24 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(preferencesSource.contains(QStringLiteral("id: memberProfileDelegate")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: memberList")));
     QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"memberList\"")));
+    const qsizetype membersSettingsIndex =
+        preferencesSource.indexOf(QStringLiteral("id: membersSettings"));
+    const qsizetype memberListIndex =
+        preferencesSource.indexOf(QStringLiteral("id: memberList"), membersSettingsIndex);
+    QVERIFY(membersSettingsIndex >= 0);
+    QVERIFY(memberListIndex > membersSettingsIndex);
+    const QString membersSettingsSource =
+        preferencesSource.mid(membersSettingsIndex, memberListIndex - membersSettingsIndex);
+    const QString memberListSource = preferencesSource.mid(memberListIndex);
+    QVERIFY(membersSettingsSource.contains(
+        QStringLiteral("anchors.topMargin: LV.Theme.gap20")));
+    QVERIFY(memberListSource.contains(QStringLiteral("anchors.top: parent.top")));
+    QVERIFY(memberListSource.contains(QStringLiteral("anchors.bottom: parent.bottom")));
+    QVERIFY(memberListSource.contains(
+        QStringLiteral("anchors.bottomMargin: LV.Theme.gap24")));
+    QVERIFY(memberListSource.contains(
+        QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
+    QVERIFY(!memberListSource.contains(QStringLiteral("height: implicitHeight")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("listWidth: LV.Theme.scaleMetric(237)")));
     QVERIFY(preferencesSource.contains(
