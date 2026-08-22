@@ -29,6 +29,8 @@ target_sources(Vincent PRIVATE
         models/canvas/canvasdocumentviewmodel.h
         models/canvas/canvasviewmodelbridge.cpp
         models/canvas/canvasviewmodelbridge.h
+        models/collaboration/memberprofilelistbuilder.cpp
+        models/collaboration/memberprofilelistbuilder.h
         models/document/psdcompatibilitydocument.cpp
         models/document/psdcompatibilitydocument.h
         models/document/psdimagereader.cpp
@@ -64,6 +66,7 @@ target_include_directories(Vincent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/models/brush
         ${CMAKE_CURRENT_SOURCE_DIR}/models/canvas
+        ${CMAKE_CURRENT_SOURCE_DIR}/models/collaboration
         ${CMAKE_CURRENT_SOURCE_DIR}/models/document
         ${CMAKE_CURRENT_SOURCE_DIR}/models/input
         ${CMAKE_CURRENT_SOURCE_DIR}/models/license

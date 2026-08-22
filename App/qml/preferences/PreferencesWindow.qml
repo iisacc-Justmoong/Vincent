@@ -22,11 +22,16 @@ LV.Window {
     property bool restorePurchasesEnabled: true
     property bool updateCheckEnabled: false
     property bool initialCenteringApplied: false
+    property var currentCanvasMemberProfiles: []
+    property bool currentUserIsCanvasHost: true
+    readonly property var displayedCanvasMemberProfiles: VincentMemberProfileListBuilder.build(currentCanvasMemberProfiles, profileName, profileImageSource, currentUserIsCanvasHost)
 
     signal restorePurchasesRequested
     signal checkForUpdatesRequested
     signal startWithRecentCanvasRequested(bool enabled)
     signal discoverNearbyVincentUsersRequested(bool enabled)
+    signal addCanvasMemberRequested
+    signal deleteCanvasMemberRequested(var profile, int index)
 
     function applyInitialCentering() {
         if (initialCenteringApplied || !transientParent)
@@ -99,6 +104,32 @@ LV.Window {
             if (item.action === "delete") {
                 VincentProfileImageProcessor.clearProfileImage();
             }
+        }
+    }
+
+    Component {
+        id: memberProfileDelegate
+
+        LV.ListItem {
+            property var modelData: ({})
+            readonly property var entry: modelData.entry || ({})
+
+            size: LV.ListItem.Mini
+            label: modelData.label || ""
+            iconSource: memberList.memberProfileImageSource(entry)
+            iconName: iconSource.toString().length > 0 ? "" : (modelData.iconName || "user")
+            selected: modelData.selected === true
+            enabled: modelData.enabled === true
+            rowHorizontalPadding: memberList.itemLabelLeftPadding
+            rowVerticalPadding: LV.Theme.gap2
+            miniItemWidth: memberList.listWidth
+            minItemWidth: memberList.listWidth
+            listBackgroundColor: "transparent"
+            selectedBackgroundColor: memberList.selectedRowColor
+            separatorColor: memberList.separatorColor
+            separatorOpacity: memberList.separatorOpacity
+            separatorVisible: false
+            onClicked: modelData.trigger()
         }
     }
 
@@ -329,6 +360,82 @@ LV.Window {
 
             text: qsTr("Allow inviting other users")
             checked: false
+        }
+    }
+
+    Item {
+        id: membersSettings
+
+        anchors.top: preferencesSectionHeader.bottom
+        anchors.topMargin: LV.Theme.gap20
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        visible: membersSectionButton.checked
+
+        LV.List {
+            id: memberList
+
+            readonly property bool canDeleteSelectedMember: {
+                if (selectedIndex < 0 || selectedIndex >= entryCount)
+                    return false;
+                return roleValue(entryAt(selectedIndex), "removable", true);
+            }
+
+            objectName: "memberList"
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: implicitWidth
+            height: implicitHeight
+            listWidth: LV.Theme.scaleMetric(237)
+            minimumListHeight: LV.Theme.scaleMetric(231)
+            model: preferencesWindow.displayedCanvasMemberProfiles
+            labelRole: "displayName"
+            defaultItemIconName: "user"
+            itemDelegate: memberProfileDelegate
+            footerVisible: true
+            footerButton1: ({
+                    type: "icon",
+                    iconName: "addFile",
+                    enabled: true
+                })
+            footerButton2: ({
+                    type: "icon",
+                    iconName: "generaldelete",
+                    enabled: memberList.canDeleteSelectedMember
+                })
+            footerButton3: ({
+                    type: "icon",
+                    iconName: "",
+                    iconGlyph: " ",
+                    enabled: false
+                })
+
+            function memberProfileImageSource(entry) {
+                const value = roleValue(entry, "profileImageSource", "");
+                return value === null || value === undefined ? "" : String(value);
+            }
+
+            onModelChanged: selectedIndex = -1
+            onEntryCountChanged: {
+                if (selectedIndex >= entryCount)
+                    selectedIndex = -1;
+            }
+            onItemTriggered: function (index) {
+                selectedIndex = index;
+            }
+            onFooterButtonTriggered: function (index) {
+                if (index === 0) {
+                    preferencesWindow.addCanvasMemberRequested();
+                    return;
+                }
+                if (index === 1 && memberList.canDeleteSelectedMember) {
+                    const selectedProfile = entryAt(selectedIndex);
+                    const sourceProfile = memberList.roleValue(selectedProfile, "sourceProfile", selectedProfile);
+                    const sourceIndex = memberList.roleValue(selectedProfile, "sourceIndex", -1);
+                    preferencesWindow.deleteCanvasMemberRequested(sourceProfile, sourceIndex);
+                }
+            }
         }
     }
 }

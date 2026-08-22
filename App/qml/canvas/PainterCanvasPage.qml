@@ -25,6 +25,8 @@ Item {
 
     property int topChromeReservedHeight: 0
     property var vm: null
+    property var collaboratorProfiles: []
+    property bool currentUserIsCanvasHost: true
     property bool layerRenameActive: false
     property string layerRenameKey: ""
     property string layerRenameActivationKey: ""
@@ -40,9 +42,19 @@ Item {
     signal clipboardImagePasteFailed(string errorCode)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
+    signal collaboratorInvitationRequested
+    signal collaboratorRemovalRequested(var profile, int index)
 
     function refreshViewModel() {
         painterPage.vm = LV.ViewModels.getForView(painterPage.viewId);
+    }
+
+    function requestAddCollaborator() {
+        painterPage.collaboratorInvitationRequested();
+    }
+
+    function requestRemoveCollaborator(profile, index) {
+        painterPage.collaboratorRemovalRequested(profile, index);
     }
 
     function bindViewModel() {

@@ -21,6 +21,7 @@
 #include <iiSharedCanvas.h>
 
 #include "models/canvas/canvasdocumentviewmodel.h"
+#include "models/collaboration/memberprofilelistbuilder.h"
 #include "models/input/temporarycamerainput.h"
 #include "models/license/accountmanager.h"
 #include "models/license/licensemanager.h"
@@ -248,6 +249,9 @@ int main(int argc, char *argv[])
     auto *profileImageProcessor = new ProfileImageProcessor(&engine);
     engine.rootContext()->setContextProperty("VincentProfileImageProcessor",
                                              profileImageProcessor);
+    auto *memberProfileListBuilder = new MemberProfileListBuilder(&engine);
+    engine.rootContext()->setContextProperty("VincentMemberProfileListBuilder",
+                                             memberProfileListBuilder);
     auto *applicationPreferences = new ApplicationPreferences(&engine);
     engine.rootContext()->setContextProperty("VincentApplicationPreferences",
                                              applicationPreferences);

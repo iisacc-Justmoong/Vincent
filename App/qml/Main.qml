@@ -975,9 +975,19 @@ LV.ApplicationWindow {
         accountEmailLoading: VincentAccountManager.accountEmailLoading
         startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas
         discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers
+        currentCanvasMemberProfiles: window.canvasPage ? window.canvasPage.collaboratorProfiles : []
+        currentUserIsCanvasHost: window.canvasPage ? window.canvasPage.currentUserIsCanvasHost : true
         updateCheckEnabled: checkForUpdatesAction.enabled
         onStartWithRecentCanvasRequested: enabled => VincentApplicationPreferences.setStartWithRecentCanvas(enabled)
         onDiscoverNearbyVincentUsersRequested: enabled => VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled)
+        onAddCanvasMemberRequested: {
+            if (window.canvasPage)
+                window.canvasPage.requestAddCollaborator();
+        }
+        onDeleteCanvasMemberRequested: function (profile, index) {
+            if (window.canvasPage)
+                window.canvasPage.requestRemoveCollaborator(profile, index);
+        }
         onRestorePurchasesRequested: window.requestRestorePurchases()
         onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()
     }

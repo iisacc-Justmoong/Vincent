@@ -447,10 +447,13 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     const QString preferencesQmlPath =
         QFINDTESTDATA("../App/qml/preferences/PreferencesWindow.qml");
+    const QString painterPageQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
     const QString rootCMakePath = QFINDTESTDATA("../CMakeLists.txt");
     const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
     QVERIFY2(!preferencesQmlPath.isEmpty(), "PreferencesWindow.qml test data was not found");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
     QVERIFY2(!rootCMakePath.isEmpty(), "CMakeLists.txt test data was not found");
     QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
 
@@ -464,10 +467,12 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
 
     const QString mainSource = readSource(mainQmlPath);
     const QString preferencesSource = readSource(preferencesQmlPath);
+    const QString painterPageSource = readSource(painterPageQmlPath);
     const QString cmakeSource = readSource(rootCMakePath);
     const QString appEntrySource = readSource(appEntryPath);
     QVERIFY(!mainSource.isEmpty());
     QVERIFY(!preferencesSource.isEmpty());
+    QVERIFY(!painterPageSource.isEmpty());
     QVERIFY(!cmakeSource.isEmpty());
     QVERIFY(!appEntrySource.isEmpty());
 
@@ -520,6 +525,19 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         "startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas")));
     QVERIFY(mainSource.contains(QStringLiteral(
         "discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "currentCanvasMemberProfiles: window.canvasPage ? "
+        "window.canvasPage.collaboratorProfiles : []")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "currentUserIsCanvasHost: window.canvasPage ? "
+        "window.canvasPage.currentUserIsCanvasHost : true")));
+    QVERIFY(appEntrySource.contains(QStringLiteral(
+        "setContextProperty(\"VincentMemberProfileListBuilder\",")));
+    QVERIFY(mainSource.contains(QStringLiteral("onAddCanvasMemberRequested:")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.requestAddCollaborator();")));
+    QVERIFY(mainSource.contains(QStringLiteral("onDeleteCanvasMemberRequested:")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "window.canvasPage.requestRemoveCollaborator(profile, index);")));
     QVERIFY(mainSource.contains(QStringLiteral(
         "onStartWithRecentCanvasRequested: enabled => "
         "VincentApplicationPreferences.setStartWithRecentCanvas(enabled)")));
@@ -600,12 +618,22 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         QStringLiteral("property bool restorePurchasesEnabled: true")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("property bool updateCheckEnabled: false")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property var currentCanvasMemberProfiles: []")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("property bool currentUserIsCanvasHost: true")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "readonly property var displayedCanvasMemberProfiles: "
+        "VincentMemberProfileListBuilder.build(")));
     QVERIFY(preferencesSource.contains(QStringLiteral("signal restorePurchasesRequested")));
     QVERIFY(preferencesSource.contains(QStringLiteral("signal checkForUpdatesRequested")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("signal startWithRecentCanvasRequested(bool enabled)")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("signal discoverNearbyVincentUsersRequested(bool enabled)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("signal addCanvasMemberRequested")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "signal deleteCanvasMemberRequested(var profile, int index)")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("Dialogs.FileDialog {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageDialog")));
@@ -701,7 +729,48 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         "enabled: preferencesWindow.updateCheckEnabled")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "onClicked: preferencesWindow.checkForUpdatesRequested()")));
-    QVERIFY(!preferencesSource.contains(QStringLiteral("id: membersSettings")));
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.List {")), 1);
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: membersSettings")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("visible: membersSectionButton.checked")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: memberProfileDelegate")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: memberList")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"memberList\"")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("listWidth: LV.Theme.scaleMetric(237)")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("minimumListHeight: LV.Theme.scaleMetric(231)")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("model: preferencesWindow.displayedCanvasMemberProfiles")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("labelRole: \"displayName\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("defaultItemIconName: \"user\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("itemDelegate: memberProfileDelegate")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("iconSource: memberList.memberProfileImageSource(entry)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("footerVisible: true")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"addFile\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"generaldelete\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconGlyph: \" \"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("enabled: false")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "preferencesWindow.addCanvasMemberRequested();")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "const sourceProfile = memberList.roleValue(selectedProfile, \"sourceProfile\",")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "const sourceIndex = memberList.roleValue(selectedProfile, \"sourceIndex\", -1);")));
+    QVERIFY(preferencesSource.contains(QStringLiteral(
+        "preferencesWindow.deleteCanvasMemberRequested(sourceProfile, sourceIndex);")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("property var collaboratorProfiles: []")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("property bool currentUserIsCanvasHost: true")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("signal collaboratorInvitationRequested")));
+    QVERIFY(painterPageSource.contains(QStringLiteral(
+        "signal collaboratorRemovalRequested(var profile, int index)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("function requestAddCollaborator()")));
+    QVERIFY(painterPageSource.contains(QStringLiteral(
+        "function requestRemoveCollaborator(profile, index)")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("tone: LV.AbstractButton.Borderless")));

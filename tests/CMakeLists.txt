@@ -64,6 +64,24 @@ vincent_configure_local_runtime_paths(tests_mainqmlcontract)
 
 add_test(NAME tests_mainqmlcontract COMMAND tests_mainqmlcontract)
 
+add_executable(tests_memberprofilelistbuilder
+        tst_memberprofilelistbuilder.cpp
+        ../App/models/collaboration/memberprofilelistbuilder.cpp
+        ../App/models/collaboration/memberprofilelistbuilder.h
+)
+
+target_include_directories(tests_memberprofilelistbuilder PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/collaboration
+)
+
+target_link_libraries(tests_memberprofilelistbuilder PRIVATE
+        Qt6::Core
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_memberprofilelistbuilder)
+
+add_test(NAME tests_memberprofilelistbuilder COMMAND tests_memberprofilelistbuilder)
+
 add_executable(tests_profileimageprocessor
         tst_profileimageprocessor.cpp
         ../App/models/profile/profileimageprocessor.cpp
@@ -308,6 +326,7 @@ set_tests_properties(
         tests_psdcompatibilitydocument
         tests_canvastoolbarqmlcontract
         tests_mainqmlcontract
+        tests_memberprofilelistbuilder
         tests_profileimageprocessor
         tests_applicationpreferences
         tests_nearbyvincentdiscovery
@@ -400,6 +419,7 @@ if(WIN32)
             tests_psdcompatibilitydocument
             tests_canvastoolbarqmlcontract
             tests_mainqmlcontract
+            tests_memberprofilelistbuilder
             tests_profileimageprocessor
             tests_applicationpreferences
             tests_nearbyvincentdiscovery
