@@ -9,6 +9,7 @@ Rectangle {
     color: workspaceColor
     focus: true
     clip: true
+    enabled: !surface.presentationMode
 
     property color workspaceColor: "#1f1f20"
     property color canvasColor: "white"
@@ -36,6 +37,11 @@ Rectangle {
     property string temporaryCameraMode: ""
     property bool textEditingActive: false
     property bool toolShortcutsEnabled: true
+    property bool presentationMode: false
+    property real presentationPreviousCanvasZoomScale: 1
+    property real presentationPreviousCanvasPanOffsetX: 0
+    property real presentationPreviousCanvasPanOffsetY: 0
+    property real presentationFittedCanvasZoomScale: 1
     property string shapeKind: "rectangle"
     property bool shapeDraggingActive: false
     property bool shapeAspectLocked: false
@@ -61,9 +67,9 @@ Rectangle {
     readonly property real workspaceCanvasTopInsetRatio: 0.12
     readonly property real workspaceCanvasBottomInsetRatio: 0.10
     readonly property int workspaceCanvasMinimumInset: 24
-    readonly property int workspaceCanvasHorizontalInset: Math.max(workspaceCanvasMinimumInset, Math.round(width * workspaceCanvasHorizontalInsetRatio))
-    readonly property int workspaceCanvasTopInset: Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasTopInsetRatio))
-    readonly property int workspaceCanvasBottomInset: Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasBottomInsetRatio))
+    readonly property int workspaceCanvasHorizontalInset: surface.presentationMode ? 0 : Math.max(workspaceCanvasMinimumInset, Math.round(width * workspaceCanvasHorizontalInsetRatio))
+    readonly property int workspaceCanvasTopInset: surface.presentationMode ? 0 : Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasTopInsetRatio))
+    readonly property int workspaceCanvasBottomInset: surface.presentationMode ? 0 : Math.max(workspaceCanvasMinimumInset, Math.round(height * workspaceCanvasBottomInsetRatio))
     readonly property int workspaceCanvasWidth: Math.max(1, Math.round(width) - workspaceCanvasHorizontalInset * 2)
     readonly property int workspaceCanvasHeight: Math.max(1, Math.round(height) - workspaceCanvasTopInset - workspaceCanvasBottomInset)
     readonly property int minimumCanvasDimension: 1
@@ -91,6 +97,8 @@ Rectangle {
     readonly property real defaultCanvasZoomScale: 1
     readonly property real minimumCanvasZoomScale: 0.01
     readonly property real maximumCanvasZoomScale: 8
+    readonly property real presentationMinimumZoomMultiplier: 0.125
+    readonly property real presentationMaximumZoomMultiplier: 8
     readonly property real zoomDragPixelsPerDoubling: 180
     readonly property bool brushCursorToolActive: {
         const mode = surface.effectiveToolMode();
@@ -1907,6 +1915,81 @@ Rectangle {
         surface.canvasZoomScale = fittedCanvasZoomScale(canvasSurface.width, canvasSurface.height);
     }
 
+    function fittedPresentationCanvasZoomScale(canvasWidth, canvasHeight) {
+        const normalizedWidth = Math.max(surface.minimumCanvasDimension, Number(canvasWidth));
+        const normalizedHeight = Math.max(surface.minimumCanvasDimension, Number(canvasHeight));
+        if (!isFinite(normalizedWidth) || !isFinite(normalizedHeight)) {
+            return surface.defaultCanvasZoomScale;
+        }
+
+        return Math.max(surface.minimumCanvasZoomScale, Math.min(surface.workspaceCanvasWidth / normalizedWidth, surface.workspaceCanvasHeight / normalizedHeight));
+    }
+
+    function fitCanvasZoomToPresentationViewport() {
+        if (!surface.presentationMode) {
+            return;
+        }
+        surface.resetCanvasPan();
+        surface.zoomDraggingActive = false;
+        const fittedScale = fittedPresentationCanvasZoomScale(canvasSurface.width, canvasSurface.height);
+        surface.presentationFittedCanvasZoomScale = fittedScale;
+        surface.canvasZoomScale = fittedScale;
+    }
+
+    function zoomPresentationCanvas(zoomFactor) {
+        if (!surface.presentationMode) {
+            return false;
+        }
+        const normalizedZoomFactor = Number(zoomFactor);
+        if (!isFinite(normalizedZoomFactor) || normalizedZoomFactor <= 0) {
+            return false;
+        }
+
+        const minimumScale = Math.max(surface.minimumCanvasZoomScale, surface.presentationFittedCanvasZoomScale * surface.presentationMinimumZoomMultiplier);
+        const maximumScale = Math.max(minimumScale, surface.presentationFittedCanvasZoomScale * surface.presentationMaximumZoomMultiplier);
+        surface.canvasPanOffsetX = 0;
+        surface.canvasPanOffsetY = 0;
+        surface.panDraggingActive = false;
+        surface.zoomDraggingActive = false;
+        surface.canvasZoomScale = Math.max(minimumScale, Math.min(maximumScale, surface.canvasZoomScale * normalizedZoomFactor));
+        return true;
+    }
+
+    function enterPresentationMode() {
+        if (surface.presentationMode) {
+            return;
+        }
+
+        surface.commitActiveText();
+        surface.commitActiveShape();
+        surface.commitDrawableObjectTransform();
+        surface.presentationPreviousCanvasZoomScale = surface.canvasZoomScale;
+        surface.presentationPreviousCanvasPanOffsetX = surface.canvasPanOffsetX;
+        surface.presentationPreviousCanvasPanOffsetY = surface.canvasPanOffsetY;
+        surface.presentationMode = true;
+        Qt.callLater(surface.fitCanvasZoomToPresentationViewport);
+    }
+
+    function refreshPresentationMode() {
+        if (surface.presentationMode) {
+            Qt.callLater(surface.fitCanvasZoomToPresentationViewport);
+        }
+    }
+
+    function exitPresentationMode() {
+        if (!surface.presentationMode) {
+            return;
+        }
+
+        surface.presentationMode = false;
+        surface.canvasZoomScale = surface.presentationPreviousCanvasZoomScale;
+        surface.canvasPanOffsetX = surface.presentationPreviousCanvasPanOffsetX;
+        surface.canvasPanOffsetY = surface.presentationPreviousCanvasPanOffsetY;
+        surface.panDraggingActive = false;
+        surface.zoomDraggingActive = false;
+        surface.forceActiveFocus();
+    }
+
     function beginZoomDrag(pointX) {
         if (surface.effectiveToolMode() !== "zoom") {
             return;
@@ -2208,12 +2291,20 @@ Rectangle {
     }
 
     onWidthChanged: {
+        if (surface.presentationMode) {
+            surface.refreshPresentationMode();
+            return;
+        }
         if (!surface.canvasSizeCreated) {
             syncCanvasItemSizeToWorkspace();
         }
     }
 
     onHeightChanged: {
+        if (surface.presentationMode) {
+            surface.refreshPresentationMode();
+            return;
+        }
         if (!surface.canvasSizeCreated) {
             syncCanvasItemSizeToWorkspace();
         }
@@ -2535,7 +2626,7 @@ Rectangle {
         Rectangle {
             id: drawableObjectSelectionFrame
             parent: canvasSurface
-            visible: surface.effectiveToolMode() === "move" && surface.hasTransformableSelectedDrawableObject()
+            visible: !surface.presentationMode && surface.effectiveToolMode() === "move" && surface.hasTransformableSelectedDrawableObject()
             z: 5
             x: surface.selectedDrawableObjectProperty("x", 0)
             y: surface.selectedDrawableObjectProperty("y", 0)
@@ -2570,6 +2661,7 @@ Rectangle {
             parent: canvasSurface
             anchors.fill: parent
             z: 7
+            visible: !surface.presentationMode
 
             HoverHandler {
                 id: brushCursorHoverHandler

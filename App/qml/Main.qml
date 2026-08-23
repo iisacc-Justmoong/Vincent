@@ -16,6 +16,9 @@ LV.ApplicationWindow {
     property var canvasPage: null
     property bool canvasIncubationRequested: false
     property string clipboardPasteFailureMessage: ""
+    property bool presentationMode: false
+    property int prePresentationWindowVisibility: QtQuickWindow.Window.Windowed
+    property bool prePresentationPreferencesVisible: false
     readonly property url accountDashboardUrl: "https://iisacc.com/Account/Dashboard"
     readonly property bool licenseGranted: !VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed
     readonly property bool canvasCommandsEnabled: canvasPage !== null && !canvasPage.dialogActive
@@ -64,6 +67,12 @@ LV.ApplicationWindow {
     onClosing: event => {
         if (window.canvasPage) {
             window.canvasPage.flushRecentCanvasSave();
+        }
+    }
+
+    onVisibilityChanged: {
+        if (window.presentationMode && window.visibility === QtQuickWindow.Window.FullScreen && window.canvasPage) {
+            Qt.callLater(window.canvasPage.refreshPresentationMode);
         }
     }
 
@@ -190,11 +199,67 @@ LV.ApplicationWindow {
     }
 
     function requestToggleFullScreen() {
+        if (window.presentationMode) {
+            window.exitPresentationMode();
+            return;
+        }
         if (window.visibility === QtQuickWindow.Window.FullScreen) {
             window.showNormal();
             return;
         }
         window.showFullScreen();
+    }
+
+    function restorePrePresentationWindowVisibility() {
+        switch (window.prePresentationWindowVisibility) {
+        case QtQuickWindow.Window.FullScreen:
+            window.showFullScreen();
+            break;
+        case QtQuickWindow.Window.Maximized:
+            window.showMaximized();
+            break;
+        case QtQuickWindow.Window.Minimized:
+            window.showMinimized();
+            break;
+        default:
+            window.showNormal();
+            break;
+        }
+    }
+
+    function enterPresentationMode() {
+        if (window.presentationMode || !window.canvasPage) {
+            return;
+        }
+
+        window.prePresentationWindowVisibility = window.visibility;
+        window.prePresentationPreferencesVisible = preferencesWindow.visible;
+        preferencesWindow.hide();
+        window.clipboardPasteFailureMessage = "";
+        clipboardPasteFailureTimer.stop();
+        window.presentationMode = true;
+        window.canvasPage.enterPresentationMode();
+        window.showFullScreen();
+    }
+
+    function exitPresentationMode() {
+        if (!window.presentationMode) {
+            return;
+        }
+
+        if (window.canvasPage) {
+            window.canvasPage.exitPresentationMode();
+        }
+        window.presentationMode = false;
+        window.restorePrePresentationWindowVisibility();
+
+        if (window.prePresentationPreferencesVisible) {
+            Qt.callLater(function () {
+                preferencesWindow.show();
+                preferencesWindow.raise();
+            });
+        }
+        window.prePresentationPreferencesVisible = false;
     }
 
     function requestPreferences() {
@@ -548,9 +613,17 @@ LV.ApplicationWindow {
         onTriggered: window.requestToggleFullScreen()
     }
 
+    Controls.Action {
+        id: exitPresentationModeAction
+        shortcut: "Escape"
+        enabled: window.presentationMode
+        onTriggered: window.exitPresentationMode()
+    }
+
     menuBar: Controls.MenuBar {
         id: applicationMenuBar
         objectName: "applicationMenuBar"
+        visible: !window.presentationMode
         implicitHeight: LV.Theme.controlHeightSm
         padding: LV.Theme.gapNone
         spacing: LV.Theme.gapNone
@@ -1001,6 +1074,7 @@ LV.ApplicationWindow {
             id: painterPage
             topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
             onPageReady: window.acceptCanvasPage(painterPage)
+            onPresentationModeRequested: window.enterPresentationMode()
             onClipboardImagePasteFailed: errorCode => window.showClipboardPasteFailure(errorCode)
             onImageDropSucceeded: {
                 window.clipboardPasteFailureMessage = "";
@@ -1021,7 +1095,7 @@ LV.ApplicationWindow {
         anchors.topMargin: LV.Theme.gap24
         anchors.horizontalCenter: parent.horizontalCenter
         z: 1000
-        visible: VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable"
+        visible: VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "secure_storage_unavailable" && !window.presentationMode
         title: qsTr("Vincent could not remember this license")
         subtitle: qsTr("The canvas is unlocked for this session. Enter the license again the next time Vincent starts.")
     }
@@ -1033,7 +1107,7 @@ LV.ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: LV.Theme.gap24
         z: 1100
-        visible: window.clipboardPasteFailureMessage.length > 0
+        visible: window.clipboardPasteFailureMessage.length > 0 && !window.presentationMode
         title: qsTr("Image not pasted")
         subtitle: window.clipboardPasteFailureMessage
         Accessible.name: title + ": " + subtitle
@@ -1049,7 +1123,7 @@ LV.ApplicationWindow {
 
     LV.Label {
         anchors.centerIn: parent
-        visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready
+        visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready && !window.presentationMode
         text: qsTr("Loading canvas…")
     }
 

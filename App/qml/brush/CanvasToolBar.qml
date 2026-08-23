@@ -97,6 +97,7 @@ Item {
     signal colorPicked(color swatchColor)
     signal toolSelected(string tool)
     signal shapeSelected(string shapeKind)
+    signal presentationModeRequested
 
     function openFileDialog() {
         openDialog.open();
@@ -1164,6 +1165,17 @@ Item {
         }
 
         LV.Spacer {}
+
+        ToolbarCircleButton {
+            id: presentationModeButton
+            circleBorderWidth: 0
+            circleIconName: "screens"
+            Accessible.name: qsTr("Presentation mode")
+            onClicked: toolbar.presentationModeRequested()
+
+            Controls.ToolTip.visible: hovered
+            Controls.ToolTip.text: qsTr("Presentation mode")
+        }
 
         ToolbarCircleButton {
             id: profileButton

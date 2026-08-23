@@ -14,6 +14,7 @@ private slots:
     void applicationWindowUsesStockLvrsGeometry();
     void applicationWindowUsesDeferredCanvasIncubation();
     void applicationWindowTemporarilyDisablesLicenseEnforcement();
+    void presentationModeUsesFullScreenCanvasOnlyAndRestoresOnEscape();
     void applicationWindowProvidesApplicationMenuBar();
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
@@ -22,6 +23,202 @@ private slots:
     void clipboardPasteFailuresAreExplainedWithoutBlockingCanvas();
     void manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque();
 };
+
+void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnEscape()
+{
+    const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString painterPageQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath =
+        QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
+    const QString laserPointerQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PresentationLaserPointer.qml");
+    const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
+    QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+    QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
+    QVERIFY2(!laserPointerQmlPath.isEmpty(),
+             "PresentationLaserPointer.qml test data was not found");
+    QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
+
+    auto readSource = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString mainSource = readSource(mainQmlPath);
+    const QString pageSource = readSource(painterPageQmlPath);
+    const QString surfaceSource = readSource(drawingSurfaceQmlPath);
+    const QString toolbarSource = readSource(toolbarQmlPath);
+    const QString laserPointerSource = readSource(laserPointerQmlPath);
+    const QString cmakeSource = readSource(cmakePath);
+    QVERIFY(!mainSource.isEmpty());
+    QVERIFY(!pageSource.isEmpty());
+    QVERIFY(!surfaceSource.isEmpty());
+    QVERIFY(!toolbarSource.isEmpty());
+    QVERIFY(!laserPointerSource.isEmpty());
+    QVERIFY(!cmakeSource.isEmpty());
+
+    QVERIFY(toolbarSource.contains(QStringLiteral("signal presentationModeRequested")));
+    QVERIFY(toolbarSource.contains(
+        QStringLiteral("onClicked: toolbar.presentationModeRequested()")));
+
+    QVERIFY(mainSource.contains(QStringLiteral("property bool presentationMode: false")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("property int prePresentationWindowVisibility: "
+                       "QtQuickWindow.Window.Windowed")));
+    QVERIFY(mainSource.contains(QStringLiteral("function enterPresentationMode()")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("window.prePresentationWindowVisibility = window.visibility;")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.enterPresentationMode();")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.showFullScreen();")));
+    QVERIFY(mainSource.contains(QStringLiteral("function exitPresentationMode()")));
+    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.exitPresentationMode();")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("window.restorePrePresentationWindowVisibility();")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: exitPresentationModeAction")));
+    QVERIFY(mainSource.contains(QStringLiteral("shortcut: \"Escape\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("enabled: window.presentationMode")));
+    QVERIFY(mainSource.contains(QStringLiteral("visible: !window.presentationMode")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onPresentationModeRequested: window.enterPresentationMode()")));
+
+    QVERIFY(pageSource.contains(QStringLiteral("readonly property bool presentationMode: "
+                                               "drawingSurface.presentationMode")));
+    QVERIFY(pageSource.contains(QStringLiteral("signal presentationModeRequested")));
+    QVERIFY(pageSource.contains(QStringLiteral("function enterPresentationMode()")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.enterPresentationMode();")));
+    QVERIFY(pageSource.contains(QStringLiteral("function exitPresentationMode()")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.exitPresentationMode();")));
+    QVERIFY(pageSource.contains(QStringLiteral("function zoomPresentationMode(zoomFactor)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("drawingSurface.zoomPresentationCanvas(zoomFactor);")));
+    QVERIFY(pageSource.contains(QStringLiteral("visible: !painterPage.presentationMode")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("anchors.left: painterPage.presentationMode ? parent.left : "
+                       "layerHierarchyPanel.right")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("onPresentationModeRequested: painterPage.presentationModeRequested()")));
+    QVERIFY(pageSource.contains(QStringLiteral("PresentationLaserPointer {")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: presentationLaserPointer")));
+    QVERIFY(pageSource.contains(QStringLiteral("visible: painterPage.presentationMode")));
+    QVERIFY(pageSource.contains(QStringLiteral("anchors.fill: parent")));
+    QVERIFY(pageSource.contains(QStringLiteral("z: 20")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("onZoomRequested: zoomFactor => "
+                       "painterPage.zoomPresentationMode(zoomFactor)")));
+
+    QVERIFY(cmakeSource.contains(
+        QStringLiteral("App/qml/canvas/PresentationLaserPointer.qml")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("readonly property int trailLifetimeMs: 2000")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("readonly property int repaintIntervalMs: 16")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("readonly property int maximumTrailPointCount: 256")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("property var trailPoints: []")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("property bool laserActive: false")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("signal zoomRequested(real zoomFactor)")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("function wheelZoomFactor(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("function beginLaserPoint(x, y)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("function updateLaserPoint(x, y)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("function endLaserPoint(x, y)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("function pruneExpiredTrailPoints()")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("function clearLaserTrail()")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("Timer {")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("interval: laserPointer.repaintIntervalMs")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("repeat: true")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("Canvas {")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("const ageMs = now - point.createdAt;")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("1 - ageMs / laserPointer.trailLifetimeMs")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("color: \"#ff2b2b\"")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("MouseArea {")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("acceptedButtons: Qt.LeftButton")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("preventStealing: true")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("cursorShape: pressed ? Qt.BlankCursor : Qt.ArrowCursor")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("mouse.accepted = true;")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("onWheel: function (wheel)")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("laserPointer.zoomRequested(zoomFactor);")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("wheel.accepted = true;")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("signal panRequested")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("beginPanDrag")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("onVisibleChanged: if (!visible)")));
+
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool presentationMode: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: !surface.presentationMode")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property real presentationMinimumZoomMultiplier: 0.125")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property real presentationMaximumZoomMultiplier: 8")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("property real presentationFittedCanvasZoomScale: 1")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationPreviousCanvasZoomScale = "
+                       "surface.canvasZoomScale;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationPreviousCanvasPanOffsetX = "
+                       "surface.canvasPanOffsetX;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationPreviousCanvasPanOffsetY = "
+                       "surface.canvasPanOffsetY;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("function fittedPresentationCanvasZoomScale(canvasWidth, canvasHeight)")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("function fitCanvasZoomToPresentationViewport()")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("function zoomPresentationCanvas(zoomFactor)")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationFittedCanvasZoomScale = fittedScale;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasPanOffsetX = 0;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasPanOffsetY = 0;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationFittedCanvasZoomScale * "
+                       "surface.presentationMinimumZoomMultiplier")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.presentationFittedCanvasZoomScale * "
+                       "surface.presentationMaximumZoomMultiplier")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasZoomScale * normalizedZoomFactor")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("const fittedScale = fittedPresentationCanvasZoomScale(")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasZoomScale = fittedScale;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral(
+        "return Math.max(surface.minimumCanvasZoomScale, Math.min(")));
+    QVERIFY(!surfaceSource.contains(QStringLiteral(
+        "return boundedCanvasZoomScale(Math.min(surface.workspaceCanvasWidth")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property int workspaceCanvasHorizontalInset: "
+                       "surface.presentationMode ? 0 :")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property int workspaceCanvasTopInset: "
+                       "surface.presentationMode ? 0 :")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("readonly property int workspaceCanvasBottomInset: "
+                       "surface.presentationMode ? 0 :")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasZoomScale = "
+                       "surface.presentationPreviousCanvasZoomScale;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasPanOffsetX = "
+                       "surface.presentationPreviousCanvasPanOffsetX;")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("surface.canvasPanOffsetY = "
+                       "surface.presentationPreviousCanvasPanOffsetY;")));
+}
 
 void tst_MainQmlContract::clipboardPasteFailuresAreExplainedWithoutBlockingCanvas()
 {

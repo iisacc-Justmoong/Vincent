@@ -281,6 +281,7 @@ qt_add_qml_module(Vincent
         App/qml/license/LicenseActivationPage.qml
         App/qml/preferences/PreferencesWindow.qml
         App/qml/canvas/PainterCanvasPage.qml
+        App/qml/canvas/PresentationLaserPointer.qml
         App/qml/brush/CanvasToolBar.qml
         App/qml/brush/HslTriangleColorPicker.qml
         App/qml/painting/DrawingSurface.qml

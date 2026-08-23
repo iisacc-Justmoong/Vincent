@@ -327,13 +327,16 @@ void tst_CanvasToolBarQmlContract::colorPickerMovesIntoLeftClusterAndProfileStay
         toolbarSource.indexOf(QStringLiteral("id: currentColorButton"), brushControlsIndex);
     const qsizetype spacerIndex =
         toolbarSource.indexOf(QStringLiteral("LV.Spacer {}"), currentColorButtonIndex);
+    const qsizetype presentationModeButtonIndex =
+        toolbarSource.indexOf(QStringLiteral("id: presentationModeButton"), spacerIndex);
     const qsizetype profileButtonIndex =
-        toolbarSource.indexOf(QStringLiteral("id: profileButton"), spacerIndex);
+        toolbarSource.indexOf(QStringLiteral("id: profileButton"), presentationModeButtonIndex);
     QVERIFY(toolbarLayoutIndex >= 0);
     QVERIFY(brushControlsIndex > toolbarLayoutIndex);
     QVERIFY(currentColorButtonIndex > brushControlsIndex);
     QVERIFY(spacerIndex > currentColorButtonIndex);
-    QVERIFY(profileButtonIndex > spacerIndex);
+    QVERIFY(presentationModeButtonIndex > spacerIndex);
+    QVERIFY(profileButtonIndex > presentationModeButtonIndex);
 
     const QString currentColorButtonSource =
         toolbarSource.mid(currentColorButtonIndex, spacerIndex - currentColorButtonIndex);
@@ -341,6 +344,17 @@ void tst_CanvasToolBarQmlContract::colorPickerMovesIntoLeftClusterAndProfileStay
         QStringLiteral("circleColor: toolbar.currentColor")));
     QVERIFY(currentColorButtonSource.contains(
         QStringLiteral("onClicked: toolbar.openColorPickerMenu(currentColorButton)")));
+
+    const QString presentationModeButtonSource = toolbarSource.mid(
+        presentationModeButtonIndex, profileButtonIndex - presentationModeButtonIndex);
+    QVERIFY(presentationModeButtonSource.contains(QStringLiteral("circleBorderWidth: 0")));
+    QVERIFY(presentationModeButtonSource.contains(QStringLiteral("circleIconName: \"screens\"")));
+    QVERIFY(presentationModeButtonSource.contains(
+        QStringLiteral("Accessible.name: qsTr(\"Presentation mode\")")));
+    QVERIFY(presentationModeButtonSource.contains(
+        QStringLiteral("Controls.ToolTip.text: qsTr(\"Presentation mode\")")));
+    QVERIFY(presentationModeButtonSource.contains(
+        QStringLiteral("onClicked: toolbar.presentationModeRequested()")));
 
     const QString profileButtonSource = toolbarSource.mid(profileButtonIndex);
     QVERIFY(profileButtonSource.contains(QStringLiteral("circleBorderWidth: 0")));
@@ -1095,7 +1109,8 @@ void tst_CanvasToolBarQmlContract::painterPageUsesLvHierarchyLayerPanel()
     QVERIFY(!panelBlock.contains(QStringLiteral("LV.ToolbarButton")));
     QVERIFY(!panelBlock.contains(QStringLiteral("buttonId: \"layers\"")));
     QVERIFY(!pageSource.contains(QStringLiteral("buttonId: \"delete\"")));
-    QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.left: layerHierarchyPanel.right")));
+    QVERIFY(surfaceBlock.contains(QStringLiteral(
+        "anchors.left: painterPage.presentationMode ? parent.left : layerHierarchyPanel.right")));
     QVERIFY(surfaceBlock.contains(QStringLiteral("anchors.leftMargin: 0")));
     QVERIFY(!panelBlock.contains(QStringLiteral("anchors.leftMargin: painterPage.spacingSmall")));
     QVERIFY(!panelBlock.contains(QStringLiteral("anchors.bottomMargin: painterPage.spacingSmall")));

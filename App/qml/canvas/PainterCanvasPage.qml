@@ -22,6 +22,7 @@ Item {
     readonly property int layerRenameRepeatActivationThreshold: 3
     readonly property bool dialogActive: canvasToolBar.dialogActive
     readonly property bool textEditingActive: drawingSurface.textEditingActive || painterPage.layerRenameActive
+    readonly property bool presentationMode: drawingSurface.presentationMode
 
     property int topChromeReservedHeight: 0
     property var vm: null
@@ -42,6 +43,7 @@ Item {
     signal clipboardImagePasteFailed(string errorCode)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
+    signal presentationModeRequested
     signal collaboratorInvitationRequested
     signal collaboratorRemovalRequested(var profile, int index)
 
@@ -291,6 +293,25 @@ Item {
         drawingSurface.fitCanvasZoomToCurrentCanvas();
     }
 
+    function enterPresentationMode() {
+        if (painterPage.layerRenameActive) {
+            painterPage.commitLayerRename();
+        }
+        drawingSurface.enterPresentationMode();
+    }
+
+    function refreshPresentationMode() {
+        drawingSurface.refreshPresentationMode();
+    }
+
+    function exitPresentationMode() {
+        drawingSurface.exitPresentationMode();
+    }
+
+    function zoomPresentationMode(zoomFactor) {
+        drawingSurface.zoomPresentationCanvas(zoomFactor);
+    }
+
     function syncLayerHierarchySelection() {
         if (!layerHierarchyPanel.visible) {
             return;
@@ -383,6 +404,7 @@ Item {
             LV.Hierarchy {
                 id: layerHierarchyPanel
                 objectName: "layerHierarchyPanel"
+                visible: !painterPage.presentationMode
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -434,7 +456,7 @@ Item {
                 anchors.top: parent.top
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.left: layerHierarchyPanel.right
+                anchors.left: painterPage.presentationMode ? parent.left : layerHierarchyPanel.right
                 anchors.leftMargin: 0
                 workspaceColor: LV.Theme.window
                 documentViewModel: painterPage.vm
@@ -452,7 +474,7 @@ Item {
                 brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
-                toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive
+                toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive && !painterPage.presentationMode
                 shapeKind: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
                 textToolAccentColor: LV.Theme.primary
                 textToolFramePadding: painterPage.spacingSmall
@@ -524,6 +546,7 @@ Item {
 
         Rectangle {
             id: toolbarChromeBackground
+            visible: !painterPage.presentationMode
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
@@ -534,6 +557,7 @@ Item {
 
         BrushUi.CanvasToolBar {
             id: canvasToolBar
+            visible: !painterPage.presentationMode
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
@@ -566,8 +590,17 @@ Item {
             onColorPicked: swatchColor => painterPage.setBrushColor(swatchColor)
             onToolSelected: tool => painterPage.setToolMode(tool)
             onShapeSelected: shapeKind => painterPage.setShapeKind(shapeKind)
+            onPresentationModeRequested: painterPage.presentationModeRequested()
             onSaveRequested: fileUrl => painterPage.saveCanvasAs(fileUrl)
             onOpenRequested: fileUrl => painterPage.openRaster(fileUrl)
+        }
+
+        PresentationLaserPointer {
+            id: presentationLaserPointer
+            anchors.fill: parent
+            visible: painterPage.presentationMode
+            z: 20
+            onZoomRequested: zoomFactor => painterPage.zoomPresentationMode(zoomFactor)
         }
     }
 }
