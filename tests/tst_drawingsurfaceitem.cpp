@@ -43,6 +43,7 @@ private slots:
   void initTestCase();
   void createsInitialCanvasInsideWorkspaceMargins();
   void createsNewCanvasAtCurrentWorkspaceSize();
+  void createsInfiniteCanvasAndExpandsItWhilePanning();
   void constrainsShapeDragWithShiftModifier();
   void pansCanvasWithHandToolDrag();
   void zoomsCanvasWithHorizontalDrag();
@@ -701,6 +702,240 @@ void tst_DrawingSurfaceItem::createsNewCanvasAtCurrentWorkspaceSize()
     QTRY_COMPARE(viewModel.canvasWidth(), compactCanvasSize.width());
     QTRY_COMPARE(viewModel.canvasHeight(), compactCanvasSize.height());
     QCOMPARE(rootItem->property("canvasZoomScale").toReal(), 1.0);
+}
+
+void tst_DrawingSurfaceItem::createsInfiniteCanvasAndExpandsItWhilePanning()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQuickWindow window;
+    window.setGeometry(100, 100, 720, 480);
+    rootItem->setParentItem(window.contentItem());
+    window.show();
+    QVERIFY2(QTest::qWaitForWindowExposed(&window, nativeWindowExposureTimeoutMs),
+             "The infinite-canvas input test window was not exposed before the compositor timeout");
+
+    QQmlExpression createInfinite(engine.rootContext(), object.data(),
+                                  QStringLiteral("newCanvas(320, 240, true);"));
+    createInfinite.evaluate();
+    QVERIFY2(!createInfinite.hasError(), qPrintable(createInfinite.error().toString()));
+
+    DrawingSurfaceItem *canvasItem = findDrawingSurfaceItem(rootItem);
+    QVERIFY(canvasItem);
+    QQuickItem *canvasPaper = findItemByObjectName(rootItem, QStringLiteral("canvasPaper"));
+    QQuickItem *canvasViewport = findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasPaper);
+    QVERIFY(canvasViewport);
+    QTRY_VERIFY(canvasItem->infiniteCanvas());
+    QTRY_COMPARE(canvasItem->width(), 320.0);
+    QTRY_COMPARE(canvasItem->height(), 240.0);
+    QCOMPARE(canvasItem->canvasOriginX(), 0);
+    QCOMPARE(canvasItem->canvasOriginY(), 0);
+    QCOMPARE(canvasItem->canvasChunkSize(), 256);
+    QVERIFY(canvasItem->document());
+    QVERIFY(iiSharedCanvas::findChunkedRasterAsset(*canvasItem->document(), "canvas.raster.0"));
+    const QVariantList createdObjects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(createdObjects.size(), 1);
+    const int defaultLayerId = createdObjects.first().toMap().value(QStringLiteral("id")).toInt();
+    QVERIFY(defaultLayerId > 0);
+    QTRY_VERIFY([&]() {
+        QQmlExpression layerReady(engine.rootContext(), object.data(),
+                                  QStringLiteral("const item = rasterLayerItemById(%1); "
+                                                 "item !== null && item.infiniteCanvas;")
+                                      .arg(defaultLayerId));
+        const QVariant result = layerReady.evaluate();
+        return !layerReady.hasError() && result.toBool();
+    }());
+
+    const QPointF worldZeroBefore = canvasItem->mapToItem(canvasViewport, QPointF(0.0, 0.0));
+    QVERIFY(rootItem->setProperty("toolMode", QStringLiteral("pan")));
+    QQmlExpression pan(engine.rootContext(), object.data(),
+                       QStringLiteral("beginPanDrag(100, 100); updatePanDrag(500, 100); commitPanDrag();"));
+    pan.evaluate();
+    QVERIFY2(!pan.hasError(), qPrintable(pan.error().toString()));
+
+    QTRY_VERIFY(canvasItem->canvasOriginX() < 0);
+    QTRY_VERIFY(canvasItem->canvasWidth() > 320);
+    QTRY_COMPARE(canvasItem->width(), static_cast<qreal>(canvasItem->canvasWidth()));
+    QTRY_COMPARE(canvasItem->height(), static_cast<qreal>(canvasItem->canvasHeight()));
+    QTRY_COMPARE(canvasPaper->width(), canvasItem->width());
+    QTRY_COMPARE(canvasPaper->height(), canvasItem->height());
+
+    const QPointF worldZeroAfter = canvasItem->mapToItem(
+        canvasViewport,
+        QPointF(-canvasItem->canvasOriginX(), -canvasItem->canvasOriginY()));
+    QVERIFY(qAbs(worldZeroAfter.x() - (worldZeroBefore.x() + 400.0)) <= 1.5);
+    QVERIFY(qAbs(worldZeroAfter.y() - worldZeroBefore.y()) <= 1.5);
+
+    QQmlExpression layerObject(engine.rootContext(), object.data(),
+                               QStringLiteral("rasterLayerItemById(%1);")
+                                   .arg(defaultLayerId));
+    const QVariant layerObjectResult = layerObject.evaluate();
+    QVERIFY2(!layerObject.hasError(), qPrintable(layerObject.error().toString()));
+    auto *layerItem = qobject_cast<DrawingSurfaceItem *>(layerObjectResult.value<QObject *>());
+    QVERIFY(layerItem);
+    QQmlExpression staleLayerGeometry(
+        engine.rootContext(), object.data(),
+        QStringLiteral("(function () { const layer = cloneDrawableObject(drawableObjects[0]); "
+                       "layer.width = 320; layer.height = 240; "
+                       "return layer.id === %1 && replaceDrawableObjectById(%1, layer); })();")
+            .arg(defaultLayerId));
+    const QVariant staleLayerGeometryResult = staleLayerGeometry.evaluate();
+    QVERIFY2(!staleLayerGeometry.hasError(),
+             qPrintable(staleLayerGeometry.error().toString()));
+    QCOMPARE(staleLayerGeometryResult.toBool(), true);
+    QCoreApplication::processEvents();
+    QCOMPARE(layerItem->width(), canvasItem->width());
+    QCOMPARE(layerItem->height(), canvasItem->height());
+    QVERIFY(rootItem->setProperty("toolMode", QStringLiteral("brush")));
+    QCoreApplication::processEvents();
+    QTRY_VERIFY(layerItem->isEnabled());
+
+    const QPointF expandedLayerPoint(layerItem->width() - 10.0,
+                                     layerItem->height() - 10.0);
+    QVERIFY(layerItem->contains(expandedLayerPoint));
+    layerItem->beginStroke(expandedLayerPoint.x(), expandedLayerPoint.y(), 1.0, false);
+    layerItem->endStroke(expandedLayerPoint.x(), expandedLayerPoint.y(), 1.0, false);
+    const auto *layerPaintAsset = iiSharedCanvas::findChunkedRasterAsset(
+        *layerItem->document(), "canvas.raster.0");
+    QVERIFY(layerPaintAsset);
+    const int layerChunkColumn = qFloor(
+        (layerItem->canvasOriginX() + expandedLayerPoint.x())
+        / layerItem->canvasChunkSize());
+    const int layerChunkRow = qFloor(
+        (layerItem->canvasOriginY() + expandedLayerPoint.y())
+        / layerItem->canvasChunkSize());
+    QVERIFY(iiSharedCanvas::findRasterChunk(*layerPaintAsset,
+                                            layerChunkColumn,
+                                            layerChunkRow));
+
+    QQmlExpression exposeZoomedWorld(engine.rootContext(), object.data(),
+                                     QStringLiteral("canvasZoomScale = 0.5; "
+                                                    "ensureInfiniteCanvasForViewport();"));
+    exposeZoomedWorld.evaluate();
+    QVERIFY2(!exposeZoomedWorld.hasError(),
+             qPrintable(exposeZoomedWorld.error().toString()));
+    QTRY_COMPARE(layerItem->width(), canvasItem->width());
+    QTRY_COMPARE(layerItem->height(), canvasItem->height());
+
+    const QPointF visibleViewportPoint(canvasViewport->width() / 2.0,
+                                       canvasViewport->height() - 12.0);
+    const QPointF visibleLayerPoint = layerItem->mapFromItem(canvasViewport,
+                                                             visibleViewportPoint);
+    QVERIFY(layerItem->contains(visibleLayerPoint));
+    const qreal visibleWorldX = layerItem->canvasOriginX() + visibleLayerPoint.x();
+    const qreal visibleWorldY = layerItem->canvasOriginY() + visibleLayerPoint.y();
+    QVERIFY(visibleWorldX < 0.0 || visibleWorldX >= 320.0
+            || visibleWorldY < 0.0 || visibleWorldY >= 240.0);
+    const int priorLayerStrokeCount = layerItem->strokeCount();
+    const QPoint visibleWindowPoint = canvasViewport->mapToScene(visibleViewportPoint).toPoint();
+    QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, visibleWindowPoint);
+    QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, visibleWindowPoint);
+    QTRY_COMPARE(layerItem->strokeCount(), priorLayerStrokeCount + 1);
+    layerPaintAsset = iiSharedCanvas::findChunkedRasterAsset(
+        *layerItem->document(), "canvas.raster.0");
+    QVERIFY(layerPaintAsset);
+    QVERIFY(iiSharedCanvas::findRasterChunk(
+        *layerPaintAsset,
+        qFloor(visibleWorldX / layerItem->canvasChunkSize()),
+        qFloor(visibleWorldY / layerItem->canvasChunkSize())));
+
+    QQmlExpression activateBackground(engine.rootContext(), object.data(),
+                                      QStringLiteral("activateLayerByKey(\"raster-canvas\");"));
+    QCOMPARE(activateBackground.evaluate().toBool(), true);
+    QVERIFY2(!activateBackground.hasError(), qPrintable(activateBackground.error().toString()));
+    QVERIFY(rootItem->setProperty("toolMode", QStringLiteral("brush")));
+    QCoreApplication::processEvents();
+    canvasItem->beginStroke(10, 10, 1.0, false);
+    canvasItem->endStroke(10, 10, 1.0, false);
+    auto *paintAsset = iiSharedCanvas::findChunkedRasterAsset(
+        *canvasItem->document(), "canvas.raster.0");
+    QVERIFY(paintAsset);
+    QVERIFY(iiSharedCanvas::findRasterChunk(*paintAsset,
+                                            canvasItem->canvasOriginX() / canvasItem->canvasChunkSize(),
+                                            canvasItem->canvasOriginY() / canvasItem->canvasChunkSize()));
+
+    QTemporaryDir nativeCanvasDirectory;
+    QVERIFY(nativeCanvasDirectory.isValid());
+    const QString nativeCanvasPath = nativeCanvasDirectory.filePath(QStringLiteral("infinite.iisc"));
+    QVERIFY(canvasItem->saveToFile(nativeCanvasPath));
+    CanvasDocumentViewModel reopenedViewModel(&paletteUtils);
+    DrawingSurfaceItem reopened;
+    reopened.setWidth(1);
+    reopened.setHeight(1);
+    reopened.setDocumentViewModel(&reopenedViewModel);
+    QVERIFY(reopened.openRaster(nativeCanvasPath));
+    QVERIFY(reopened.infiniteCanvas());
+    QCOMPARE(reopened.canvasOriginX(), canvasItem->canvasOriginX());
+    QCOMPARE(reopened.canvasOriginY(), canvasItem->canvasOriginY());
+    QCOMPARE(reopened.canvasWidth(), canvasItem->canvasWidth());
+    QCOMPARE(reopened.canvasHeight(), canvasItem->canvasHeight());
+    QVERIFY(iiSharedCanvas::findChunkedRasterAsset(*reopened.document(), "canvas.raster.0"));
+
+    const QString recentCanvasPath = nativeCanvasDirectory.filePath(QStringLiteral("infinite.vrc"));
+    QVERIFY(canvasItem->saveRecentCanvas(recentCanvasPath, {}, {}, true));
+    CanvasDocumentViewModel recentViewModel(&paletteUtils);
+    DrawingSurfaceItem recent;
+    recent.setWidth(1);
+    recent.setHeight(1);
+    recent.setDocumentViewModel(&recentViewModel);
+    const QVariantMap recentSession = recent.openRecentCanvas(recentCanvasPath);
+    QVERIFY(recentSession.value(QStringLiteral("valid")).toBool());
+    QVERIFY(recent.infiniteCanvas());
+    QCOMPARE(recent.canvasOriginX(), canvasItem->canvasOriginX());
+    QCOMPARE(recent.canvasOriginY(), canvasItem->canvasOriginY());
+    QCOMPARE(recent.canvasWidth(), canvasItem->canvasWidth());
+    QCOMPARE(recent.canvasHeight(), canvasItem->canvasHeight());
+
+    QVariantList objects = rootItem->property("drawableObjects").toList();
+    QCOMPARE(objects.size(), 1);
+    const QVariantMap rasterLayer = objects.first().toMap();
+    QCOMPARE(rasterLayer.value(QStringLiteral("x")).toReal(), 0.0);
+    QCOMPARE(rasterLayer.value(QStringLiteral("y")).toReal(), 0.0);
+    QCOMPARE(rasterLayer.value(QStringLiteral("width")).toReal(), canvasItem->width());
+    QCOMPARE(rasterLayer.value(QStringLiteral("height")).toReal(), canvasItem->height());
+
+    QQmlExpression layerState(
+        engine.rootContext(), object.data(),
+        QStringLiteral("const item = rasterLayerItemById(%5); "
+                       "item !== null && item.infiniteCanvas "
+                       "&& item.canvasOriginX === %1 && item.canvasOriginY === %2 "
+                       "&& item.canvasWidth === %3 && item.canvasHeight === %4;")
+            .arg(canvasItem->canvasOriginX())
+            .arg(canvasItem->canvasOriginY())
+            .arg(canvasItem->canvasWidth())
+            .arg(canvasItem->canvasHeight())
+            .arg(defaultLayerId));
+    QTRY_VERIFY(!layerState.evaluate().isNull());
+    QQmlExpression layerDebug(
+        engine.rootContext(), object.data(),
+        QStringLiteral("const item = rasterLayerItemById(%1); item === null ? \"null\" : "
+                       "[item.infiniteCanvas, item.canvasOriginX, item.canvasOriginY, "
+                       "item.canvasWidth, item.canvasHeight].join(\",\");")
+            .arg(defaultLayerId));
+    const QVariant layerStateResult = layerState.evaluate();
+    QVERIFY2(!layerState.hasError() && layerStateResult.toBool(),
+             qPrintable(layerDebug.evaluate().toString()));
 }
 
 void tst_DrawingSurfaceItem::constrainsShapeDragWithShiftModifier()

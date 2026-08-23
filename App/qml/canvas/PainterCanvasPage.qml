@@ -164,8 +164,8 @@ Item {
         }
     }
 
-    function newCanvas(canvasWidth, canvasHeight) {
-        drawingSurface.newCanvas(canvasWidth, canvasHeight);
+    function newCanvas(canvasWidth, canvasHeight, infiniteCanvas) {
+        drawingSurface.newCanvas(canvasWidth, canvasHeight, infiniteCanvas);
         painterPage.scheduleRecentCanvasSave();
     }
 
@@ -558,7 +558,7 @@ Item {
             currentShape: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
             canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : painterPage.fallbackNewCanvasWidth
             canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : painterPage.fallbackNewCanvasHeight
-            onNewCanvasRequested: (canvasWidth, canvasHeight) => painterPage.newCanvas(canvasWidth, canvasHeight)
+            onNewCanvasRequested: (canvasWidth, canvasHeight, infiniteCanvas) => painterPage.newCanvas(canvasWidth, canvasHeight, infiniteCanvas)
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)
             onBrushPropertyChangeRequested: (propertyName, value) => painterPage.setBrushProperty(propertyName, value)

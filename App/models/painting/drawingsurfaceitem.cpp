@@ -136,7 +136,21 @@ std::optional<QTransform> documentToSelectedRasterTransform(
                                       transform.translationY);
     bool invertible = false;
     const QTransform documentToRaster = rasterToDocument.inverted(&invertible);
-    return invertible ? std::optional<QTransform>{documentToRaster} : std::nullopt;
+    if (!invertible) {
+        return std::nullopt;
+    }
+
+    const iiSharedCanvas::CanvasOrigin origin = iiSharedCanvas::canvasOrigin(*document);
+    return QTransform(documentToRaster.m11(),
+                      documentToRaster.m12(),
+                      documentToRaster.m21(),
+                      documentToRaster.m22(),
+                      documentToRaster.m11() * origin.x
+                          + documentToRaster.m21() * origin.y
+                          + documentToRaster.dx() - origin.x,
+                      documentToRaster.m12() * origin.x
+                          + documentToRaster.m22() * origin.y
+                          + documentToRaster.dy() - origin.y);
 }
 
 QImage imageFromFileUrl(const QString &fileUrl)
@@ -1336,14 +1350,29 @@ void DrawingSurfaceItem::setViewId(const QString &viewId)
     emit viewIdChanged();
 }
 
-void DrawingSurfaceItem::newCanvas()
+void DrawingSurfaceItem::newCanvas(bool useInfiniteCanvas,
+                                   int originX,
+                                   int originY,
+                                   int chunkSize)
 {
     if (!canMutateDocument()) {
         return;
     }
 
     syncCanvasSize();
-    const bool created = createRasterDocument(canvasSize().width(), canvasSize().height());
+    bool created = useInfiniteCanvas
+        ? createInfiniteRasterDocument(canvasSize().width(), canvasSize().height(), chunkSize)
+        : createRasterDocument(canvasSize().width(), canvasSize().height());
+    if (created && useInfiniteCanvas && (originX != 0 || originY != 0)) {
+        iiSharedCanvas::Document *canvasDocument = document();
+        const iiSharedCanvas::CanvasOrigin priorOrigin = canvasDocument->infiniteCanvas.origin;
+        canvasDocument->infiniteCanvas.origin = {originX, originY};
+        if (!iiSharedCanvas::validate(*canvasDocument).ok() || !refresh()) {
+            canvasDocument->infiniteCanvas.origin = priorOrigin;
+            refresh();
+            created = false;
+        }
+    }
     if (created && m_hasBackground) {
         m_hasBackground = false;
         m_backgroundSource.clear();
@@ -1356,7 +1385,11 @@ void DrawingSurfaceItem::newCanvas()
 
 void DrawingSurfaceItem::clearCanvas()
 {
-    newCanvas();
+    const bool wasInfinite = infiniteCanvas();
+    const int originX = canvasOriginX();
+    const int originY = canvasOriginY();
+    const int chunkSize = wasInfinite ? canvasChunkSize() : 256;
+    newCanvas(wasInfinite, originX, originY, chunkSize);
 }
 
 bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasWidth, qreal maximumCanvasHeight)
@@ -2121,7 +2154,7 @@ QVariantMap DrawingSurfaceItem::openRecentCanvas(const QString& fileUrl)
     for (const iiSharedCanvas::Layer& layer : target->layers)
     {
         const iiSharedCanvas::Asset* asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
-        if (asset && std::holds_alternative<iiSharedCanvas::RasterAsset>(*asset))
+        if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster)
         {
             selectLayer(
                 QString::fromUtf8(layer.id.data(), static_cast<qsizetype>(layer.id.size())));
@@ -2236,7 +2269,9 @@ bool DrawingSurfaceItem::restoreRasterSnapshot(const QString &fileUrl)
         image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     }
 
-    const bool restored = replaceRasterCanvas(image);
+    const bool restored = infiniteCanvas()
+        ? replaceSelectedRaster(image)
+        : replaceRasterCanvas(image);
     if (restored) {
         emitUndoRedoSignals();
         emit rasterContentChanged();
@@ -2775,7 +2810,7 @@ bool DrawingSurfaceItem::openSharedCanvasDocument(const QString &fileUrl)
     }
     for (const iiSharedCanvas::Layer &layer : target->layers) {
         const iiSharedCanvas::Asset *asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
-        if (asset && std::holds_alternative<iiSharedCanvas::RasterAsset>(*asset)) {
+        if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster) {
             selectLayer(QString::fromUtf8(layer.id.data(),
                                           static_cast<qsizetype>(layer.id.size())));
             break;

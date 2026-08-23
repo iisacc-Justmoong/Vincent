@@ -6,6 +6,14 @@ raster layer, and the existing LVRS QML painting surface binds its brush,
 pressure curve, stabilizer, tool, input-state, and undo/redo properties to that
 item.
 
+The new-canvas modal also exposes an LVRS `CheckBox` for an infinite canvas.
+That path creates iiSharedCanvas 1.1 `ChunkedRasterAsset` documents with a
+256-pixel chunk size and the entered width/height as the small initial allocated
+region. Pan and zoom camera movement maps the fixed viewport into world
+coordinates and requests any newly visible region from
+`ensureInfiniteCanvasRegion()`. Growth is rounded outwards to chunk boundaries;
+only painted chunks store pixels.
+
 The application discovers the installed `iiSharedCanvas` CMake package from
 `$HOME/.local/iiSharedCanvas`. The package is linked alongside the current
 installed iiPaintEngine; the removed legacy `CanvasAdapter` is no longer part of
@@ -23,6 +31,9 @@ The integration test exercises these application-level gates:
 - ordinary raster open replacing the prior mixed document even when both
   documents have the same extent;
 - canonical `.iisc` save, validated decode, reopen, and raster export;
+- infinite-canvas creation, signed world-origin growth, camera anchoring,
+  sparse brush allocation, added-raster-layer synchronization, and native 1.1
+  save/reopen;
 - a fresh CMake configure selecting the installed iiPaintEngine and
   iiSharedCanvas packages rather than the former build-local legacy prefix.
 
@@ -38,6 +49,16 @@ with `replaceSelectedPixels()`. This keeps native vector, sibling raster, and
 other-frame content separate while editing. Opening an ordinary bitmap is an
 explicit new-document operation and therefore replaces, rather than partially
 mutates, any previously opened mixed document.
+
+When an infinite region grows left or above its prior origin, QML shifts
+session objects by the reported margin and expands every added raster-layer
+item to the same origin and extent. It adjusts the center-origin pan offset by
+the asymmetric growth, so a world point keeps its screen position during the
+structural resize. Existing finite-canvas behavior remains unchanged.
+Full-canvas raster-layer delegates bind their visual and pointer geometry
+directly to the base canvas surface rather than cached session dimensions, so
+every visibly allocated pixel remains drawable during asynchronous model
+updates and recent-session restoration.
 
 The application open dialog includes `.iisc`, so a mixed raster/vector/timeline
 document can be selected and displayed by the Vincent canvas. The Save As

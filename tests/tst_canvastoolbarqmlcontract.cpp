@@ -439,13 +439,17 @@ void tst_CanvasToolBarQmlContract::toolbarUsesStockLvrsControlGeometry()
     QVERIFY(typeIndex > fillIndex);
 
     QVERIFY(toolbarSource.contains(QStringLiteral("Accessible.name: qsTr(\"New canvas\")")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("signal newCanvasRequested(int canvasWidth, int canvasHeight)")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("signal newCanvasRequested(int canvasWidth, int canvasHeight, bool infiniteCanvas)")));
     QVERIFY(toolbarSource.contains(QStringLiteral("function openNewCanvasDialog()")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasDialog")));
     QVERIFY(toolbarSource.contains(QStringLiteral("modal: true")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasWidthField")));
     QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasHeightField")));
-    QVERIFY(toolbarSource.contains(QStringLiteral("toolbar.newCanvasRequested(nextWidth, nextHeight);")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("id: newCanvasInfiniteCheckBox")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("text: qsTr(\"Infinite canvas\")")));
+    QCOMPARE(toolbarSource.count(QStringLiteral("enabled: !newCanvasInfiniteCheckBox.checked")), 2);
+    QVERIFY(toolbarSource.contains(QStringLiteral("enabled: newCanvasInfiniteCheckBox.checked ||")));
+    QVERIFY(toolbarSource.contains(QStringLiteral("toolbar.newCanvasRequested(nextWidth, nextHeight, newCanvasInfiniteCheckBox.checked);")));
     QVERIFY(toolbarSource.contains(QStringLiteral("onClicked: toolbar.openNewCanvasDialog()")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onActivated: toolbar.openNewCanvasDialog()")));
     QVERIFY(!toolbarSource.contains(QStringLiteral("onClicked: toolbar.newCanvasRequested()")));
@@ -777,6 +781,9 @@ void tst_CanvasToolBarQmlContract::shapeToolUsesStockIconMenuAndDragInsertion()
     QVERIFY(surfaceSource.contains(QStringLiteral("property real canvasPanOffsetX: 0")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function beginPanDrag(pointX, pointY)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function updatePanDrag(pointX, pointY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function ensureInfiniteCanvasForViewport()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.ensureInfiniteCanvasRegion(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.applyInfiniteCanvasGrowth(growth);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function resetCanvasPan()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("id: canvasPanMouseArea")));
     QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.effectiveToolMode() === \"pan\"")));
@@ -889,8 +896,8 @@ void tst_CanvasToolBarQmlContract::shapeToolUsesStockIconMenuAndDragInsertion()
     const QString painterPageSource = QString::fromUtf8(painterPageQml.readAll());
 
     QVERIFY(painterPageSource.contains(QStringLiteral("function setShapeKind(shapeKind)")));
-    QVERIFY(painterPageSource.contains(QStringLiteral("function newCanvas(canvasWidth, canvasHeight)")));
-    QVERIFY(painterPageSource.contains(QStringLiteral("drawingSurface.newCanvas(canvasWidth, canvasHeight);")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("function newCanvas(canvasWidth, canvasHeight, infiniteCanvas)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("drawingSurface.newCanvas(canvasWidth, canvasHeight, infiniteCanvas);")));
     QVERIFY(painterPageSource.contains(QStringLiteral("function openNewCanvasDialog()")));
     QVERIFY(painterPageSource.contains(QStringLiteral("canvasToolBar.openNewCanvasDialog();")));
     QVERIFY(painterPageSource.contains(QStringLiteral("function openFileDialog()")));
@@ -918,8 +925,8 @@ void tst_CanvasToolBarQmlContract::shapeToolUsesStockIconMenuAndDragInsertion()
         QStringLiteral("canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : "
                        "painterPage.fallbackNewCanvasHeight")));
     QVERIFY(painterPageSource.contains(
-        QStringLiteral("onNewCanvasRequested: (canvasWidth, canvasHeight) => "
-                       "painterPage.newCanvas(canvasWidth, canvasHeight)")));
+        QStringLiteral("onNewCanvasRequested: (canvasWidth, canvasHeight, infiniteCanvas) => "
+                       "painterPage.newCanvas(canvasWidth, canvasHeight, infiniteCanvas)")));
     QVERIFY(painterPageSource.contains(QStringLiteral("painterPage.updateDocumentProperty(\"shapeKind\", shapeKind);")));
     QVERIFY(painterPageSource.contains(QStringLiteral("shapeKind: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));
     QVERIFY(painterPageSource.contains(QStringLiteral("currentShape: painterPage.vm ? painterPage.vm.shapeKind : \"rectangle\"")));

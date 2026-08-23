@@ -38,7 +38,10 @@ public:
     void setDocumentViewModel(QObject *documentViewModel);
     void setViewId(const QString &viewId);
 
-    Q_INVOKABLE void newCanvas();
+    Q_INVOKABLE void newCanvas(bool infiniteCanvas = false,
+                               int originX = 0,
+                               int originY = 0,
+                               int chunkSize = 256);
     Q_INVOKABLE void clearCanvas();
     Q_INVOKABLE bool openRaster(const QString &fileUrl,
                                 qreal maximumCanvasWidth = 0,

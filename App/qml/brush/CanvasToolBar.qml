@@ -87,7 +87,7 @@ Item {
     implicitWidth: toolbarLayout.implicitWidth
     height: implicitHeight
 
-    signal newCanvasRequested(int canvasWidth, int canvasHeight)
+    signal newCanvasRequested(int canvasWidth, int canvasHeight, bool infiniteCanvas)
     signal clearCanvasRequested
     signal openRequested(string fileUrl)
     signal saveRequested(string fileUrl)
@@ -178,6 +178,7 @@ Item {
     function resetNewCanvasDialogFields() {
         newCanvasWidthField.text = String(currentCanvasDimension(toolbar.canvasWidth, toolbar.fallbackNewCanvasWidth));
         newCanvasHeightField.text = String(currentCanvasDimension(toolbar.canvasHeight, toolbar.fallbackNewCanvasHeight));
+        newCanvasInfiniteCheckBox.checked = false;
     }
 
     function acceptNewCanvasDialog() {
@@ -187,7 +188,7 @@ Item {
         const nextWidth = normalizedCanvasDimension(newCanvasWidthField.text, toolbar.fallbackNewCanvasWidth);
         const nextHeight = normalizedCanvasDimension(newCanvasHeightField.text, toolbar.fallbackNewCanvasHeight);
         newCanvasDialog.close();
-        toolbar.newCanvasRequested(nextWidth, nextHeight);
+        toolbar.newCanvasRequested(nextWidth, nextHeight, newCanvasInfiniteCheckBox.checked);
     }
 
     function selectedDialogFileUrl(dialog) {
@@ -703,6 +704,7 @@ Item {
                 LV.InputField {
                     id: newCanvasWidthField
                     objectName: "newCanvasWidthField"
+                    enabled: !newCanvasInfiniteCheckBox.checked
                     text: String(toolbar.fallbackNewCanvasWidth)
                     placeholderText: String(toolbar.fallbackNewCanvasWidth)
                     inputMethodHints: Qt.ImhDigitsOnly
@@ -720,6 +722,7 @@ Item {
                 LV.InputField {
                     id: newCanvasHeightField
                     objectName: "newCanvasHeightField"
+                    enabled: !newCanvasInfiniteCheckBox.checked
                     text: String(toolbar.fallbackNewCanvasHeight)
                     placeholderText: String(toolbar.fallbackNewCanvasHeight)
                     inputMethodHints: Qt.ImhDigitsOnly
@@ -732,6 +735,14 @@ Item {
             LV.Label {
                 text: qsTr("1-8192 px")
                 style: caption
+                Layout.fillWidth: true
+            }
+
+            LV.CheckBox {
+                id: newCanvasInfiniteCheckBox
+                objectName: "newCanvasInfiniteCheckBox"
+                text: qsTr("Infinite canvas")
+                checked: false
                 Layout.fillWidth: true
             }
 
@@ -748,7 +759,7 @@ Item {
                 LV.LabelButton {
                     text: qsTr("Create")
                     tone: LV.AbstractButton.Primary
-                    enabled: toolbar.isCanvasDimensionTextValid(newCanvasWidthField.text) && toolbar.isCanvasDimensionTextValid(newCanvasHeightField.text)
+                    enabled: newCanvasInfiniteCheckBox.checked || (toolbar.isCanvasDimensionTextValid(newCanvasWidthField.text) && toolbar.isCanvasDimensionTextValid(newCanvasHeightField.text))
                     onClicked: toolbar.acceptNewCanvasDialog()
                 }
             }

@@ -49,6 +49,7 @@ Rectangle {
     property real zoomDragStartScale: 1
     property real canvasPanOffsetX: 0
     property real canvasPanOffsetY: 0
+    property bool infiniteCanvasExpansionActive: false
     property bool panDraggingActive: false
     property real panDragStartX: 0
     property real panDragStartY: 0
@@ -67,6 +68,7 @@ Rectangle {
     readonly property int workspaceCanvasHeight: Math.max(1, Math.round(height) - workspaceCanvasTopInset - workspaceCanvasBottomInset)
     readonly property int minimumCanvasDimension: 1
     readonly property int maximumCanvasDimension: 8192
+    readonly property int defaultInfiniteCanvasChunkSize: 256
     readonly property int minimumTextToolFontPixelSize: 8
     readonly property int textToolFontPixelSize: Math.max(surface.minimumTextToolFontPixelSize, Math.round(surface.brushSize))
     readonly property int textToolMinimumWidth: 96
@@ -266,7 +268,86 @@ Rectangle {
         fitCanvasZoomToCurrentCanvas();
     }
 
-    function newCanvas(canvasWidth, canvasHeight) {
+    function applyInfiniteCanvasGrowth(growth) {
+        const leftGrowth = Math.max(0, Number(growth.left || 0));
+        const topGrowth = Math.max(0, Number(growth.top || 0));
+        const rightGrowth = Math.max(0, Number(growth.right || 0));
+        const bottomGrowth = Math.max(0, Number(growth.bottom || 0));
+        const nextWidth = canvasSurface.canvasWidth;
+        const nextHeight = canvasSurface.canvasHeight;
+        const nextOriginX = canvasSurface.canvasOriginX;
+        const nextOriginY = canvasSurface.canvasOriginY;
+
+        for (const key in surface.rasterLayerItems) {
+            const item = surface.rasterLayerItems[key];
+            if (!item) {
+                continue;
+            }
+            const layerGrowth = item.ensureInfiniteCanvasRegion(nextOriginX, nextOriginY, nextWidth, nextHeight);
+            if (layerGrowth && layerGrowth.error) {
+                console.warn("Vincent could not expand raster layer " + key + ": " + layerGrowth.error);
+            }
+            item.resizeCanvasSurface(nextWidth, nextHeight);
+        }
+
+        const shiftedObjects = [];
+        for (let index = 0; index < surface.drawableObjects.length; ++index) {
+            const shiftedObject = cloneDrawableObject(surface.drawableObjects[index]);
+            if (shiftedObject.type === "layer") {
+                shiftedObject.x = 0;
+                shiftedObject.y = 0;
+                shiftedObject.width = nextWidth;
+                shiftedObject.height = nextHeight;
+            } else {
+                shiftedObject.x = Number(shiftedObject.x || 0) + leftGrowth;
+                shiftedObject.y = Number(shiftedObject.y || 0) + topGrowth;
+            }
+            shiftedObjects.push(shiftedObject);
+        }
+        surface.drawableObjects = shiftedObjects;
+        for (let index = 0; index < shiftedObjects.length; ++index) {
+            const shiftedObject = shiftedObjects[index];
+            const visualIndex = drawableObjectVisualModelIndexForObjectId(shiftedObject.id);
+            if (visualIndex < 0) {
+                continue;
+            }
+            drawableObjectVisualModel.setProperty(visualIndex, "objectX", shiftedObject.x);
+            drawableObjectVisualModel.setProperty(visualIndex, "objectY", shiftedObject.y);
+            drawableObjectVisualModel.setProperty(visualIndex, "objectWidth", shiftedObject.width);
+            drawableObjectVisualModel.setProperty(visualIndex, "objectHeight", shiftedObject.height);
+        }
+
+        canvasSurface.resizeCanvasSurface(nextWidth, nextHeight);
+        surface.canvasPanOffsetX += (rightGrowth - leftGrowth) * surface.canvasZoomScale / 2;
+        surface.canvasPanOffsetY += (bottomGrowth - topGrowth) * surface.canvasZoomScale / 2;
+        surface.canvasSizeCreated = true;
+    }
+
+    function ensureInfiniteCanvasForViewport() {
+        if (!surface.canvasItemReady || !canvasSurface.infiniteCanvas || surface.infiniteCanvasExpansionActive || canvasViewport.width <= 0 || canvasViewport.height <= 0) {
+            return false;
+        }
+
+        const firstCorner = canvasSurface.mapFromItem(canvasViewport, 0, 0);
+        const secondCorner = canvasSurface.mapFromItem(canvasViewport, canvasViewport.width, canvasViewport.height);
+        const localLeft = Math.floor(Math.min(firstCorner.x, secondCorner.x));
+        const localTop = Math.floor(Math.min(firstCorner.y, secondCorner.y));
+        const localRight = Math.ceil(Math.max(firstCorner.x, secondCorner.x));
+        const localBottom = Math.ceil(Math.max(firstCorner.y, secondCorner.y));
+        if (![localLeft, localTop, localRight, localBottom].every(isFinite) || localRight <= localLeft || localBottom <= localTop) {
+            return false;
+        }
+
+        surface.infiniteCanvasExpansionActive = true;
+        const growth = canvasSurface.ensureInfiniteCanvasRegion(canvasSurface.canvasOriginX + localLeft, canvasSurface.canvasOriginY + localTop, localRight - localLeft, localBottom - localTop);
+        if (growth && growth.changed) {
+            surface.applyInfiniteCanvasGrowth(growth);
+        }
+        surface.infiniteCanvasExpansionActive = false;
+        return Boolean(growth && growth.changed);
+    }
+
+    function newCanvas(canvasWidth, canvasHeight, infiniteCanvas) {
         cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
@@ -278,7 +359,7 @@ Rectangle {
         } else {
             syncCanvasItemSizeToWorkspace();
         }
-        canvasSurface.newCanvas();
+        canvasSurface.newCanvas(infiniteCanvas === true, 0, 0, surface.defaultInfiniteCanvasChunkSize);
         addDefaultDrawingLayer();
     }
 
@@ -533,7 +614,7 @@ Rectangle {
         surface.backgroundLayerPresent = false;
         clearDrawableObjects();
         resizeCanvasItemToDimensions(psdDocument.canvasWidth, psdDocument.canvasHeight);
-        canvasSurface.newCanvas();
+        canvasSurface.newCanvas(false);
 
         var firstObjectId = -1;
         var startIndex = 0;
@@ -993,11 +1074,10 @@ Rectangle {
         surface.rasterLayerItems[String(objectId)] = surfaceItem;
 
         surfaceItem.resizeCanvasSurface(canvasSurface.width, canvasSurface.height);
+        surfaceItem.newCanvas(canvasSurface.infiniteCanvas, canvasSurface.canvasOriginX, canvasSurface.canvasOriginY, canvasSurface.infiniteCanvas ? canvasSurface.canvasChunkSize : surface.defaultInfiniteCanvasChunkSize);
         const snapshotSource = rasterLayerSnapshotSource(objectId);
         if (snapshotSource.length > 0) {
             surfaceItem.restoreRasterSnapshot(snapshotSource);
-        } else {
-            surfaceItem.newCanvas();
         }
         refreshRasterLayerThumbnailSource(objectId);
     }
@@ -1329,7 +1409,7 @@ Rectangle {
         surface.backgroundLayerThumbnailRefreshPending = false;
         surface.selectedDrawableObjectId = surface.drawableObjects.length > 0 ? surface.drawableObjects[surface.drawableObjects.length - 1].id : -1;
         resetDrawableObjectTransform();
-        canvasSurface.newCanvas();
+        canvasSurface.newCanvas(canvasSurface.infiniteCanvas, canvasSurface.canvasOriginX, canvasSurface.canvasOriginY, canvasSurface.infiniteCanvas ? canvasSurface.canvasChunkSize : surface.defaultInfiniteCanvasChunkSize);
         rebuildLayerHierarchyRows();
         return true;
     }
@@ -1788,6 +1868,7 @@ Rectangle {
 
         surface.canvasPanOffsetX = surface.panDragStartOffsetX + pointX - surface.panDragStartX;
         surface.canvasPanOffsetY = surface.panDragStartOffsetY + pointY - surface.panDragStartY;
+        surface.ensureInfiniteCanvasForViewport();
     }
 
     function commitPanDrag() {
@@ -1846,6 +1927,7 @@ Rectangle {
 
         const deltaX = pointX - surface.zoomDragStartX;
         surface.canvasZoomScale = boundedCanvasZoomScale(surface.zoomDragStartScale * Math.pow(2, deltaX / surface.zoomDragPixelsPerDoubling));
+        surface.ensureInfiniteCanvasForViewport();
     }
 
     function commitZoomDrag() {
@@ -2350,10 +2432,10 @@ Rectangle {
                 readonly property int rasterLayerObjectId: objectId
 
                 z: isRasterLayer && surface.selectedDrawableObjectId === rasterLayerObjectId && (surface.effectiveToolMode() === "brush" || surface.effectiveToolMode() === "eraser") ? 4 : 2
-                x: objectX
-                y: objectY
-                width: Math.max(1, objectWidth)
-                height: Math.max(1, objectHeight)
+                x: isRasterLayer ? 0 : objectX
+                y: isRasterLayer ? 0 : objectY
+                width: isRasterLayer ? canvasSurface.width : Math.max(1, objectWidth)
+                height: isRasterLayer ? canvasSurface.height : Math.max(1, objectHeight)
                 visible: objectVisible
                 opacity: objectOpacity
 
