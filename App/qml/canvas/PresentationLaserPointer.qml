@@ -20,20 +20,7 @@ Item {
     property real currentPointX: 0
     property real currentPointY: 0
 
-    signal zoomRequested(real zoomFactor)
-
-    function wheelZoomFactor(angleDeltaY, pixelDeltaY) {
-        const normalizedAngleDelta = Number(angleDeltaY);
-        const normalizedPixelDelta = Number(pixelDeltaY);
-        let wheelSteps = 0;
-        if (isFinite(normalizedAngleDelta) && normalizedAngleDelta !== 0) {
-            wheelSteps = normalizedAngleDelta / 120;
-        } else if (isFinite(normalizedPixelDelta) && normalizedPixelDelta !== 0) {
-            wheelSteps = normalizedPixelDelta / 40;
-        }
-        const boundedWheelSteps = Math.max(-4, Math.min(4, wheelSteps));
-        return Math.pow(1.12, boundedWheelSteps);
-    }
+    signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)
 
     function appendTrailPoint(x, y, forceSample) {
         const now = Date.now();
@@ -229,12 +216,11 @@ Item {
         }
 
         onWheel: function (wheel) {
-            const zoomFactor = laserPointer.wheelZoomFactor(wheel.angleDelta.y, wheel.pixelDelta.y);
-            if (zoomFactor === 1) {
+            if (wheel.angleDelta.y === 0 && wheel.pixelDelta.y === 0) {
                 wheel.accepted = false;
                 return;
             }
-            laserPointer.zoomRequested(zoomFactor);
+            laserPointer.wheelZoomRequested(wheel.angleDelta.y, wheel.pixelDelta.y);
             wheel.accepted = true;
         }
 

@@ -180,7 +180,6 @@ Rectangle {
     property real drawableObjectTransformStartY: 0
     property var drawableObjectTransformOriginal: null
 
-    signal brushDeltaRequested(int delta)
     signal toolShortcutRequested(string tool)
     signal sessionChanged
     signal imageDropSucceeded
@@ -1900,6 +1899,47 @@ Rectangle {
         return Math.max(surface.minimumCanvasZoomScale, Math.min(surface.maximumCanvasZoomScale, parsedScale));
     }
 
+    function wheelZoomFactor(angleDeltaY, pixelDeltaY) {
+        const normalizedAngleDelta = Number(angleDeltaY);
+        const normalizedPixelDelta = Number(pixelDeltaY);
+        let wheelSteps = 0;
+        if (isFinite(normalizedAngleDelta) && normalizedAngleDelta !== 0) {
+            wheelSteps = normalizedAngleDelta / 120;
+        } else if (isFinite(normalizedPixelDelta) && normalizedPixelDelta !== 0) {
+            wheelSteps = normalizedPixelDelta / 40;
+        }
+        const boundedWheelSteps = Math.max(-4, Math.min(4, wheelSteps));
+        return Math.pow(1.12, boundedWheelSteps);
+    }
+
+    function zoomCanvas(zoomFactor) {
+        const normalizedZoomFactor = Number(zoomFactor);
+        if (!isFinite(normalizedZoomFactor) || normalizedZoomFactor <= 0) {
+            return false;
+        }
+        if (surface.presentationMode) {
+            return surface.zoomPresentationCanvas(normalizedZoomFactor);
+        }
+
+        surface.zoomDraggingActive = false;
+        surface.canvasZoomScale = surface.boundedCanvasZoomScale(surface.canvasZoomScale * normalizedZoomFactor);
+        surface.ensureInfiniteCanvasForViewport();
+        return true;
+    }
+
+    function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY) {
+        const zoomFactor = surface.wheelZoomFactor(angleDeltaY, pixelDeltaY);
+        if (zoomFactor === 1) {
+            return false;
+        }
+        return surface.zoomCanvas(zoomFactor);
+    }
+
+    function handleCanvasWheel(wheel) {
+        const handled = surface.zoomCanvasFromWheel(wheel.angleDelta.y, wheel.pixelDelta.y);
+        wheel.accepted = handled;
+    }
+
     function fittedCanvasZoomScale(canvasWidth, canvasHeight) {
         const normalizedWidth = Math.max(surface.minimumCanvasDimension, Number(canvasWidth));
         const normalizedHeight = Math.max(surface.minimumCanvasDimension, Number(canvasHeight));
@@ -2663,6 +2703,17 @@ Rectangle {
             z: 7
             visible: !surface.presentationMode
 
+            WheelHandler {
+                id: canvasWheelZoomHandler
+                objectName: "canvasWheelZoomHandler"
+                target: null
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                cursorShape: surface.canvasCursorShape()
+                onWheel: function (wheel) {
+                    surface.handleCanvasWheel(wheel);
+                }
+            }
+
             HoverHandler {
                 id: brushCursorHoverHandler
                 objectName: "brushCursorHoverHandler"
@@ -2766,6 +2817,10 @@ Rectangle {
             }
 
             onCanceled: surface.cancelPanDrag()
+
+            onWheel: function (wheel) {
+                surface.handleCanvasWheel(wheel);
+            }
         }
 
         MouseArea {
@@ -2797,6 +2852,10 @@ Rectangle {
             }
 
             onCanceled: surface.cancelZoomDrag()
+
+            onWheel: function (wheel) {
+                surface.handleCanvasWheel(wheel);
+            }
         }
     }
 
@@ -2885,10 +2944,6 @@ Rectangle {
             surface.cancelActiveDrawableObjectTransform();
             surface.cancelPanDrag();
             surface.cancelZoomDrag();
-        }
-
-        onWheel: function (wheel) {
-            surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);
         }
     }
 

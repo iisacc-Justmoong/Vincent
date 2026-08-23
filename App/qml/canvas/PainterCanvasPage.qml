@@ -308,8 +308,8 @@ Item {
         drawingSurface.exitPresentationMode();
     }
 
-    function zoomPresentationMode(zoomFactor) {
-        drawingSurface.zoomPresentationCanvas(zoomFactor);
+    function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY) {
+        drawingSurface.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY);
     }
 
     function syncLayerHierarchySelection() {
@@ -480,7 +480,6 @@ Item {
                 textToolFramePadding: painterPage.spacingSmall
                 canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : 1
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
-                onBrushDeltaRequested: delta => painterPage.adjustBrush(delta)
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
                 onSessionChanged: painterPage.scheduleRecentCanvasSave()
                 onImageDropSucceeded: {
@@ -600,7 +599,7 @@ Item {
             anchors.fill: parent
             visible: painterPage.presentationMode
             z: 20
-            onZoomRequested: zoomFactor => painterPage.zoomPresentationMode(zoomFactor)
+            onWheelZoomRequested: (angleDeltaY, pixelDeltaY) => painterPage.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)
         }
     }
 }

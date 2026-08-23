@@ -15,6 +15,7 @@ private slots:
     void applicationWindowUsesDeferredCanvasIncubation();
     void applicationWindowTemporarilyDisablesLicenseEnforcement();
     void presentationModeUsesFullScreenCanvasOnlyAndRestoresOnEscape();
+    void canvasWheelZoomIsAvailableInEveryToolMode();
     void applicationWindowProvidesApplicationMenuBar();
     void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
     void applicationMenuAssignsShortcutContracts();
@@ -95,9 +96,10 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.enterPresentationMode();")));
     QVERIFY(pageSource.contains(QStringLiteral("function exitPresentationMode()")));
     QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.exitPresentationMode();")));
-    QVERIFY(pageSource.contains(QStringLiteral("function zoomPresentationMode(zoomFactor)")));
     QVERIFY(pageSource.contains(
-        QStringLiteral("drawingSurface.zoomPresentationCanvas(zoomFactor);")));
+        QStringLiteral("function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("drawingSurface.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY);")));
     QVERIFY(pageSource.contains(QStringLiteral("visible: !painterPage.presentationMode")));
     QVERIFY(pageSource.contains(
         QStringLiteral("anchors.left: painterPage.presentationMode ? parent.left : "
@@ -109,9 +111,9 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(pageSource.contains(QStringLiteral("visible: painterPage.presentationMode")));
     QVERIFY(pageSource.contains(QStringLiteral("anchors.fill: parent")));
     QVERIFY(pageSource.contains(QStringLiteral("z: 20")));
-    QVERIFY(pageSource.contains(
-        QStringLiteral("onZoomRequested: zoomFactor => "
-                       "painterPage.zoomPresentationMode(zoomFactor)")));
+    QVERIFY(pageSource.contains(QStringLiteral(
+        "onWheelZoomRequested: (angleDeltaY, pixelDeltaY) => "
+        "painterPage.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
 
     QVERIFY(cmakeSource.contains(
         QStringLiteral("App/qml/canvas/PresentationLaserPointer.qml")));
@@ -123,9 +125,8 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
         QStringLiteral("readonly property int maximumTrailPointCount: 256")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property var trailPoints: []")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property bool laserActive: false")));
-    QVERIFY(laserPointerSource.contains(QStringLiteral("signal zoomRequested(real zoomFactor)")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("function wheelZoomFactor(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function beginLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function updateLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function endLaserPoint(x, y)")));
@@ -147,8 +148,8 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
         QStringLiteral("cursorShape: pressed ? Qt.BlankCursor : Qt.ArrowCursor")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("mouse.accepted = true;")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("onWheel: function (wheel)")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("laserPointer.zoomRequested(zoomFactor);")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "laserPointer.wheelZoomRequested(wheel.angleDelta.y, wheel.pixelDelta.y);")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("wheel.accepted = true;")));
     QVERIFY(!laserPointerSource.contains(QStringLiteral("signal panRequested")));
     QVERIFY(!laserPointerSource.contains(QStringLiteral("beginPanDrag")));
@@ -218,6 +219,70 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(surfaceSource.contains(
         QStringLiteral("surface.canvasPanOffsetY = "
                        "surface.presentationPreviousCanvasPanOffsetY;")));
+}
+
+void tst_MainQmlContract::canvasWheelZoomIsAvailableInEveryToolMode()
+{
+    const QString painterPageQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath =
+        QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    const QString laserPointerQmlPath =
+        QFINDTESTDATA("../App/qml/canvas/PresentationLaserPointer.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+    QVERIFY2(!laserPointerQmlPath.isEmpty(),
+             "PresentationLaserPointer.qml test data was not found");
+
+    auto readSource = [](const QString &path) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString pageSource = readSource(painterPageQmlPath);
+    const QString surfaceSource = readSource(drawingSurfaceQmlPath);
+    const QString laserPointerSource = readSource(laserPointerQmlPath);
+    QVERIFY(!pageSource.isEmpty());
+    QVERIFY(!surfaceSource.isEmpty());
+    QVERIFY(!laserPointerSource.isEmpty());
+
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("function wheelZoomFactor(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function zoomCanvas(zoomFactor)")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function handleCanvasWheel(wheel)")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("return surface.zoomPresentationCanvas(normalizedZoomFactor);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral(
+        "surface.canvasZoomScale = surface.boundedCanvasZoomScale(surface.canvasZoomScale * "
+        "normalizedZoomFactor);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.ensureInfiniteCanvasForViewport();")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("objectName: \"canvasWheelZoomHandler\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("target: null")));
+    QVERIFY(surfaceSource.contains(QStringLiteral(
+        "acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.canvasCursorShape()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral(
+        "const handled = surface.zoomCanvasFromWheel(wheel.angleDelta.y, "
+        "wheel.pixelDelta.y);")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("wheel.accepted = handled;")));
+    QCOMPARE(surfaceSource.count(QStringLiteral("surface.handleCanvasWheel(wheel);")), 3);
+    QVERIFY(!surfaceSource.contains(QStringLiteral(
+        "surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);")));
+
+    QVERIFY(pageSource.contains(
+        QStringLiteral("function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(pageSource.contains(QStringLiteral(
+        "drawingSurface.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY);")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
+    QVERIFY(!laserPointerSource.contains(
+        QStringLiteral("function wheelZoomFactor(angleDeltaY, pixelDeltaY)")));
 }
 
 void tst_MainQmlContract::clipboardPasteFailuresAreExplainedWithoutBlockingCanvas()

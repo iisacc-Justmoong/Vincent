@@ -47,6 +47,7 @@ private slots:
   void constrainsShapeDragWithShiftModifier();
   void pansCanvasWithHandToolDrag();
   void zoomsCanvasWithHorizontalDrag();
+  void zoomsCanvasWithMouseWheelInEveryToolMode();
   void zoomsCanvasWithNativeTemporaryCameraDrag();
   void usesToolAppropriateCanvasCursors();
   void tracksBrushCursorDuringNativePointerInput();
@@ -1250,6 +1251,69 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithHorizontalDrag()
     QCOMPARE(canvasPaper->scale(), emptyWorkspaceZoomedScale);
 }
 
+void tst_DrawingSurfaceItem::zoomsCanvasWithMouseWheelInEveryToolMode()
+{
+    qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
+
+    QQmlEngine engine;
+    QQmlComponent component(&engine);
+    const QString drawingSurfaceQml = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!drawingSurfaceQml.isEmpty(), "DrawingSurface.qml test data was not found");
+    component.loadUrl(QUrl::fromLocalFile(drawingSurfaceQml));
+    QTRY_VERIFY(component.isReady() || component.isError());
+    QVERIFY2(component.isReady(), qPrintable(qmlErrorsToString(component.errors())));
+
+    PaletteUtils paletteUtils;
+    CanvasDocumentViewModel viewModel(&paletteUtils);
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("width"), 720);
+    initialProperties.insert(QStringLiteral("height"), 480);
+    initialProperties.insert(QStringLiteral("toolMode"), QStringLiteral("brush"));
+    initialProperties.insert(QStringLiteral("brushSize"), 12);
+    initialProperties.insert(QStringLiteral("documentViewModel"),
+                             QVariant::fromValue(static_cast<QObject *>(&viewModel)));
+
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties));
+    QVERIFY2(!object.isNull(), qPrintable(qmlErrorsToString(component.errors())));
+    auto *rootItem = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(rootItem);
+
+    QQuickWindow window;
+    window.setGeometry(100, 100, 720, 480);
+    rootItem->setParentItem(window.contentItem());
+    window.show();
+    QVERIFY2(QTest::qWaitForWindowExposed(&window, nativeWindowExposureTimeoutMs),
+             "The wheel-zoom test window was not exposed before the compositor timeout");
+
+    QQuickItem *canvasViewport =
+        findItemByObjectName(rootItem, QStringLiteral("canvasViewport"));
+    QVERIFY(canvasViewport);
+    const QPoint wheelPoint = canvasViewport
+                                  ->mapToScene(QPointF(canvasViewport->width() / 2,
+                                                      canvasViewport->height() / 2))
+                                  .toPoint();
+    const QStringList toolModes = {QStringLiteral("brush"), QStringLiteral("eraser"),
+                                   QStringLiteral("pan"), QStringLiteral("move"),
+                                   QStringLiteral("zoom"), QStringLiteral("shape"),
+                                   QStringLiteral("fill"), QStringLiteral("text")};
+
+    for (const QString &toolMode : toolModes)
+    {
+        QVERIFY(rootItem->setProperty("toolMode", toolMode));
+        QVERIFY(rootItem->setProperty("canvasZoomScale", 1.0));
+        QTest::wheelEvent(&window, wheelPoint, QPoint(0, 120));
+        QTRY_VERIFY2(rootItem->property("canvasZoomScale").toReal() > 1.0,
+                     qPrintable(QStringLiteral("Wheel zoom did not activate in %1 mode; scale=%2")
+                                    .arg(toolMode)
+                                    .arg(rootItem->property("canvasZoomScale").toReal())));
+    }
+
+    QCOMPARE(rootItem->property("brushSize").toReal(), 12.0);
+    const qreal zoomedInScale = rootItem->property("canvasZoomScale").toReal();
+    QTest::wheelEvent(&window, wheelPoint, QPoint(0, -120));
+    QTRY_VERIFY(rootItem->property("canvasZoomScale").toReal() < zoomedInScale);
+}
+
 void tst_DrawingSurfaceItem::zoomsCanvasWithNativeTemporaryCameraDrag()
 {
     qmlRegisterType<DrawingSurfaceItem>("Vincent", 2, 0, "DrawingSurfaceItem");
@@ -1289,6 +1353,9 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithNativeTemporaryCameraDrag()
     QQuickItem *canvasZoomMouseArea =
         findItemByObjectName(rootItem, QStringLiteral("canvasZoomMouseArea"));
     QVERIFY(canvasZoomMouseArea);
+    QObject *canvasWheelZoomHandler =
+        rootItem->findChild<QObject *>(QStringLiteral("canvasWheelZoomHandler"));
+    QVERIFY(canvasWheelZoomHandler);
     QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
     QCOMPARE(rootItem->property("temporaryCameraMode").toString(), QString{});
     QCOMPARE(canvasZoomMouseArea->property("enabled").toBool(), false);
@@ -1301,12 +1368,15 @@ void tst_DrawingSurfaceItem::zoomsCanvasWithNativeTemporaryCameraDrag()
     QVERIFY2(!beginTemporaryZoom.hasError(),
              qPrintable(beginTemporaryZoom.error().toString()));
     QTRY_COMPARE(canvasZoomMouseArea->property("enabled").toBool(), true);
+    QTRY_COMPARE(canvasWheelZoomHandler->property("cursorShape").toInt(),
+                 static_cast<int>(Qt::CrossCursor));
     QCOMPARE(rootItem->property("temporaryCameraMode").toString(), QStringLiteral("zoom"));
     QCOMPARE(rootItem->property("toolMode").toString(), QStringLiteral("brush"));
 
     const QPoint startPoint = canvasViewport->mapToScene(
         QPointF(canvasViewport->width() / 2, canvasViewport->height() / 2)).toPoint();
     const QPoint finishPoint = startPoint + QPoint(120, 0);
+    QTest::mouseMove(&window, startPoint + QPoint(-1, 0));
     QTest::mouseMove(&window, startPoint);
     QTRY_COMPARE(window.cursor().shape(), Qt::CrossCursor);
     QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, startPoint);
