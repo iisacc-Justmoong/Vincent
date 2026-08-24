@@ -1084,7 +1084,8 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(preferencesSource.contains(
         QStringLiteral("iconSource: memberList.memberProfileImageSource(entry)")));
     QVERIFY(preferencesSource.contains(QStringLiteral("footerVisible: true")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"addFile\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"add\"")));
+    QVERIFY(!memberListSource.contains(QStringLiteral("iconName: \"addFile\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"generaldelete\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("iconGlyph: \" \"")));

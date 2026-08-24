@@ -523,7 +523,7 @@ LV.Window {
             footerVisible: true
             footerButton1: ({
                     type: "icon",
-                    iconName: "addFile",
+                    iconName: "add",
                     enabled: (preferencesWindow.localCanvasState === "idle" || preferencesWindow.localCanvasState === "hosting") && Number((preferencesWindow.availableLocalInvitees || []).length || 0) > 0
                 })
             footerButton2: ({
