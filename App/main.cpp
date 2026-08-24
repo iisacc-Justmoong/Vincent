@@ -25,6 +25,7 @@
 #include "models/input/temporarycamerainput.h"
 #include "models/license/accountmanager.h"
 #include "models/license/licensemanager.h"
+#include "models/network/localcanvassession.h"
 #include "models/network/nearbyvincentdiscovery.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "models/preferences/applicationpreferences.h"
@@ -264,6 +265,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("VincentUpdateManager", updateManager);
     auto *nearbyDiscovery = new NearbyVincentDiscovery(&engine);
     engine.rootContext()->setContextProperty("VincentNearbyDiscovery", nearbyDiscovery);
+    auto* localCanvasSession = new LocalCanvasSession(nearbyDiscovery, &engine);
+    engine.rootContext()->setContextProperty("VincentLocalCanvasSession", localCanvasSession);
     QObject::connect(applicationPreferences,
                      &ApplicationPreferences::discoverNearbyVincentUsersChanged,
                      nearbyDiscovery,

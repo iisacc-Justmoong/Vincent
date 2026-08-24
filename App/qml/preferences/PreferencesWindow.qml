@@ -24,14 +24,23 @@ LV.Window {
     property bool initialCenteringApplied: false
     property var currentCanvasMemberProfiles: []
     property bool currentUserIsCanvasHost: true
+    property string localCanvasState: "idle"
+    property string localCanvasError: ""
+    property int localCanvasParticipantCount: 0
+    property var availableLocalCanvases: []
+    property var availableLocalInvitees: []
+    readonly property bool localCanvasActive: localCanvasState !== "idle"
     readonly property var displayedCanvasMemberProfiles: VincentMemberProfileListBuilder.build(currentCanvasMemberProfiles, profileName, profileImageSource, currentUserIsCanvasHost)
 
     signal restorePurchasesRequested
     signal checkForUpdatesRequested
     signal startWithRecentCanvasRequested(bool enabled)
     signal discoverNearbyVincentUsersRequested(bool enabled)
-    signal addCanvasMemberRequested
+    signal inviteCanvasMemberRequested(string sessionId)
     signal deleteCanvasMemberRequested(var profile, int index)
+    signal hostCanvasRequested
+    signal joinCanvasRequested(string sessionId)
+    signal leaveCanvasRequested
 
     function applyInitialCentering() {
         if (initialCenteringApplied || !transientParent)
@@ -47,6 +56,49 @@ LV.Window {
 
     function showGeneralSection() {
         generalSectionButton.checked = true;
+    }
+
+    function localCanvasStatusText() {
+        if (localCanvasError.length > 0)
+            return localCanvasError;
+        if (localCanvasState === "hosting")
+            return qsTr("Sharing on local network · %1 connected").arg(localCanvasParticipantCount);
+        if (localCanvasState === "joining")
+            return qsTr("Connecting to nearby canvas…");
+        if (localCanvasState === "connected")
+            return qsTr("Connected to host canvas");
+        return qsTr("Canvas stays on this device");
+    }
+
+    function localCanvasJoinItems() {
+        const result = [];
+        const canvases = availableLocalCanvases || [];
+        for (let index = 0; index < Number(canvases.length || 0); ++index) {
+            const canvas = canvases[index];
+            result.push({
+                label: canvas.displayName || qsTr("Nearby canvas"),
+                sessionId: String(canvas.sessionId || ""),
+                showIconSlot: false,
+                showChevron: false
+            });
+        }
+        return result;
+    }
+
+    function localCanvasInviteItems() {
+        const result = [];
+        const invitees = availableLocalInvitees || [];
+        for (let index = 0; index < Number(invitees.length || 0); ++index) {
+            const invitee = invitees[index];
+            result.push({
+                label: invitee.displayName || qsTr("Nearby Vincent user"),
+                sessionId: String(invitee.sessionId || ""),
+                showIconSlot: true,
+                iconName: "user",
+                showChevron: false
+            });
+        }
+        return result;
     }
 
     Dialogs.FileDialog {
@@ -104,6 +156,27 @@ LV.Window {
             if (item.action === "delete") {
                 VincentProfileImageProcessor.clearProfileImage();
             }
+        }
+    }
+
+    LV.ContextMenu {
+        id: localCanvasJoinMenu
+
+        showIconSlot: false
+        items: preferencesWindow.localCanvasJoinItems()
+        onItemTriggered: function (index, item) {
+            if (item && item.sessionId)
+                preferencesWindow.joinCanvasRequested(String(item.sessionId));
+        }
+    }
+
+    LV.ContextMenu {
+        id: localCanvasInviteMenu
+
+        items: preferencesWindow.localCanvasInviteItems()
+        onItemTriggered: function (index, item) {
+            if (item && item.sessionId)
+                preferencesWindow.inviteCanvasMemberRequested(String(item.sessionId));
         }
     }
 
@@ -373,6 +446,58 @@ LV.Window {
         anchors.bottom: parent.bottom
         visible: membersSectionButton.checked
 
+        LV.HStack {
+            id: localCanvasActions
+
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.leftMargin: LV.Theme.gap24
+            anchors.right: parent.right
+            anchors.rightMargin: LV.Theme.gap24
+            spacing: LV.Theme.gap8
+
+            LV.Label {
+                id: localCanvasStatusLabel
+
+                objectName: "localCanvasStatusLabel"
+                text: preferencesWindow.localCanvasStatusText()
+                style: description
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+                Accessible.name: text
+            }
+
+            LV.LabelButton {
+                id: shareCanvasButton
+
+                objectName: "shareCanvasButton"
+                visible: !preferencesWindow.localCanvasActive
+                text: qsTr("Share canvas")
+                tone: LV.AbstractButton.Primary
+                onClicked: preferencesWindow.hostCanvasRequested()
+            }
+
+            LV.LabelButton {
+                id: joinCanvasButton
+
+                objectName: "joinCanvasButton"
+                visible: !preferencesWindow.localCanvasActive && Number((preferencesWindow.availableLocalCanvases || []).length || 0) > 0
+                text: qsTr("Join nearby…")
+                tone: LV.AbstractButton.Default
+                onClicked: localCanvasJoinMenu.openFor(joinCanvasButton, 0, joinCanvasButton.height)
+            }
+
+            LV.LabelButton {
+                id: leaveCanvasButton
+
+                objectName: "leaveCanvasButton"
+                visible: preferencesWindow.localCanvasActive
+                text: preferencesWindow.localCanvasState === "hosting" ? qsTr("Stop sharing") : qsTr("Leave canvas")
+                tone: LV.AbstractButton.Default
+                onClicked: preferencesWindow.leaveCanvasRequested()
+            }
+        }
+
         LV.List {
             id: memberList
 
@@ -383,7 +508,8 @@ LV.Window {
             }
 
             objectName: "memberList"
-            anchors.top: parent.top
+            anchors.top: localCanvasActions.bottom
+            anchors.topMargin: LV.Theme.gap12
             anchors.bottom: parent.bottom
             anchors.bottomMargin: LV.Theme.gap24
             anchors.horizontalCenter: parent.horizontalCenter
@@ -398,7 +524,7 @@ LV.Window {
             footerButton1: ({
                     type: "icon",
                     iconName: "addFile",
-                    enabled: true
+                    enabled: (preferencesWindow.localCanvasState === "idle" || preferencesWindow.localCanvasState === "hosting") && Number((preferencesWindow.availableLocalInvitees || []).length || 0) > 0
                 })
             footerButton2: ({
                     type: "icon",
@@ -427,7 +553,7 @@ LV.Window {
             }
             onFooterButtonTriggered: function (index) {
                 if (index === 0) {
-                    preferencesWindow.addCanvasMemberRequested();
+                    localCanvasInviteMenu.openFor(memberList, 0, memberList.height);
                     return;
                 }
                 if (index === 1 && memberList.canDeleteSelectedMember) {

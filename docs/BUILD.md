@@ -396,10 +396,10 @@ Update the generated `Info.plist` (inside `dist/Vincent.app/Contents/`) with:
 - `CFBundleIdentifier` matching your bundle ID.
 - `CFBundleShortVersionString` set to marketing version `5.1` and `CFBundleVersion` set to the higher App Store build number `50100`.
 - `CFBundleIconFile` should resolve to the bundled `resources/Appicon.icns` file. Windows builds embed `resources/Appicon.ico` through the generated resource script.
-- `NSLocalNetworkUsageDescription` with the factual explanation that Vincent uses the local network to find other nearby Vincent users. The prompt is expected on the first local discovery operation on current macOS versions.
+- `NSLocalNetworkUsageDescription` with the factual explanation that Vincent uses the local network to find nearby Vincent users and share a canvas when the user chooses. The prompt is expected on the first local discovery operation on current macOS versions.
 
 ## 6. Sandbox Entitlements
-`packaging/macos/Vincent.entitlements` enables the App Sandbox, grants read/write access to user-selected files and picture libraries, and grants both `com.apple.security.network.client` and `com.apple.security.network.server`. UDP multicast discovery sends datagrams and binds a listening socket, so both network directions are intentional. Keep any future entitlement additions minimal to improve App Review approval chances.
+`packaging/macos/Vincent.entitlements` enables the App Sandbox, grants read/write access to user-selected files and picture libraries, and grants both `com.apple.security.network.client` and `com.apple.security.network.server`. UDP multicast discovery sends datagrams and binds a listening socket, while explicit canvas sharing accepts and opens local TCP connections, so both network directions are intentional. Keep any future entitlement additions minimal to improve App Review approval chances.
 
 ## 7. Codesign the Bundle
 ```bash

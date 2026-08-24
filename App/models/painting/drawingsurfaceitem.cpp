@@ -1865,14 +1865,14 @@ bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fil
     return image.save(localFilePath(fileUrl));
 }
 
-bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariantList& objects,
-                                          const QVariantList& rasterLayers,
-                                          bool includeBackgroundLayer)
+QByteArray DrawingSurfaceItem::exportCanvasSession(const QVariantList& objects,
+                                                   const QVariantList& rasterLayers,
+                                                   bool includeBackgroundLayer)
 {
     syncCanvasSize();
     if (!document())
     {
-        return false;
+        return {};
     }
 
     iiSharedCanvas::Document sharedCanvasSnapshot = *document();
@@ -1882,7 +1882,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
         snapshotEditor.setCanvasExtent({snapshotSize.width(), snapshotSize.height()});
     if (!extentResult.ok())
     {
-        return false;
+        return {};
     }
 
     const iiSharedCanvas::IiscEncodeResult encoded =
@@ -1890,7 +1890,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
     if (!encoded.ok() ||
         encoded.bytes.size() > static_cast<std::size_t>(std::numeric_limits<qsizetype>::max()))
     {
-        return false;
+        return {};
     }
 
     RecentCanvasContainer container;
@@ -1905,7 +1905,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
         const int objectId = descriptor.value(QStringLiteral("objectId")).toInt();
         if (objectId <= 0 || rasterDescriptors.contains(objectId))
         {
-            return false;
+            return {};
         }
         rasterDescriptors.insert(objectId, descriptor);
     }
@@ -1917,13 +1917,13 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
         QVariantMap sanitized = sanitizedRecentCanvasObject(object);
         if (sanitized.isEmpty())
         {
-            return false;
+            return {};
         }
         const int objectId = sanitized.value(QStringLiteral("id")).toInt();
         const QString type = sanitized.value(QStringLiteral("type")).toString();
         if (objectIds.contains(objectId))
         {
-            return false;
+            return {};
         }
         objectIds.insert(objectId);
 
@@ -1934,7 +1934,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
             const QByteArray pngData = pngDataForRecentCanvas(image);
             if (pngData.isEmpty())
             {
-                return false;
+                return {};
             }
             container.embeddedAssets.append({objectId, RecentCanvasAssetKind::Image, pngData});
         }
@@ -1943,7 +1943,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
             const QVariantMap descriptor = rasterDescriptors.value(objectId);
             if (descriptor.isEmpty())
             {
-                return false;
+                return {};
             }
 
             QImage layerImage;
@@ -1960,7 +1960,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
             }
             if (layerImage.isNull())
             {
-                return false;
+                return {};
             }
             if (layerImage.size() != canvasSize())
             {
@@ -1973,7 +1973,7 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
             const QByteArray pngData = pngDataForRecentCanvas(layerImage);
             if (pngData.isEmpty())
             {
-                return false;
+                return {};
             }
             container.embeddedAssets.append(
                 {objectId, RecentCanvasAssetKind::RasterLayer, pngData});
@@ -1983,6 +1983,18 @@ bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariant
 
     QString encodeError;
     const QByteArray bytes = encodeRecentCanvasContainer(container, &encodeError);
+    if (bytes.isEmpty())
+    {
+        return {};
+    }
+    return bytes;
+}
+
+bool DrawingSurfaceItem::saveRecentCanvas(const QString& fileUrl, const QVariantList& objects,
+                                          const QVariantList& rasterLayers,
+                                          bool includeBackgroundLayer)
+{
+    const QByteArray bytes = exportCanvasSession(objects, rasterLayers, includeBackgroundLayer);
     if (bytes.isEmpty())
     {
         return false;
@@ -2026,6 +2038,18 @@ QVariantMap DrawingSurfaceItem::openRecentCanvas(const QString& fileUrl)
     }
     const QByteArray bytes = file.read(RecentCanvasMaximumContainerBytes + 1);
     if (bytes.size() != file.size())
+    {
+        return result;
+    }
+
+    return importCanvasSession(bytes);
+}
+
+QVariantMap DrawingSurfaceItem::importCanvasSession(const QByteArray& bytes)
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("valid"), false);
+    if (bytes.isEmpty() || bytes.size() > RecentCanvasMaximumContainerBytes)
     {
         return result;
     }
@@ -2686,7 +2710,22 @@ bool DrawingSurfaceItem::isOverlayToolActive() const
 QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
 {
     QImage image;
-    const RasterLayer *pixels = framePixels();
+    RasterLayer renderedPixels;
+    if (const iiSharedCanvas::Document* canvasDocument = document();
+        canvasDocument && targetSize.isValid() &&
+        targetSize.width() <= std::numeric_limits<std::int32_t>::max() &&
+        targetSize.height() <= std::numeric_limits<std::int32_t>::max())
+    {
+        iiSharedCanvas::FrameRenderResult rendered = iiSharedCanvas::renderFrameRegion(
+            *canvasDocument, frame(), iiSharedCanvas::canvasRegion(*canvasDocument),
+            {targetSize.width(), targetSize.height()});
+        if (rendered.ok())
+        {
+            renderedPixels = std::move(rendered.pixels);
+        }
+    }
+
+    const RasterLayer* pixels = renderedPixels.pixels.empty() ? framePixels() : &renderedPixels;
     if (pixels && pixels->width > 0 && pixels->height > 0
         && pixels->width <= std::numeric_limits<int>::max() / 4) {
         const QImage view(reinterpret_cast<const uchar *>(pixels->pixels.data()),

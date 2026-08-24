@@ -10,7 +10,9 @@
 #include <QNetworkDatagram>
 #include <QNetworkInterface>
 #include <QSet>
+#include <QStringList>
 #include <QTimer>
+#include <QVariantMap>
 #include <QUdpSocket>
 #include <QUuid>
 
@@ -21,6 +23,7 @@ namespace
 {
 constexpr int protocolVersion = 1;
 constexpr qsizetype maximumTrackedSessions = 256;
+constexpr qsizetype maximumInvitationProfileNameLength = 80;
 
 NearbyVincentDiscovery::Configuration
 normalizedConfiguration(NearbyVincentDiscovery::Configuration configuration)
@@ -77,18 +80,27 @@ QString NearbyVincentProtocol::serviceName()
     return QStringLiteral("com.iisacc.vincent.nearby");
 }
 
-QByteArray NearbyVincentProtocol::encodePresence(const QString& sessionId, bool online)
+QByteArray NearbyVincentProtocol::encodePresence(const QString& sessionId, bool online,
+                                                 quint16 canvasPort, bool invitationsAllowed)
 {
     if (!isCanonicalSessionId(sessionId))
     {
         return {};
     }
 
-    const QJsonObject object{
+    QJsonObject object{
         {QStringLiteral("service"), serviceName()},
         {QStringLiteral("version"), protocolVersion},
         {QStringLiteral("session"), sessionId.toLower()},
         {QStringLiteral("state"), online ? QStringLiteral("online") : QStringLiteral("offline")}};
+    if (online && canvasPort > 0)
+    {
+        object.insert(QStringLiteral("canvasPort"), canvasPort);
+    }
+    if (online && invitationsAllowed)
+    {
+        object.insert(QStringLiteral("invitationsAllowed"), true);
+    }
     return QJsonDocument(object).toJson(QJsonDocument::Compact);
 }
 
@@ -127,7 +139,108 @@ NearbyVincentProtocol::decodePresence(const QByteArray& payload)
         return std::nullopt;
     }
 
-    return NearbyVincentPresence{sessionId.toLower(), state == QStringLiteral("online")};
+    quint16 canvasPort = 0;
+    const QJsonValue canvasPortValue = object.value(QStringLiteral("canvasPort"));
+    if (!canvasPortValue.isUndefined())
+    {
+        const double rawCanvasPort = canvasPortValue.toDouble(-1);
+        if (!canvasPortValue.isDouble() || rawCanvasPort < 1 || rawCanvasPort > 65535 ||
+            rawCanvasPort != static_cast<int>(rawCanvasPort))
+        {
+            return std::nullopt;
+        }
+        canvasPort = static_cast<quint16>(rawCanvasPort);
+    }
+
+    bool invitationsAllowed = false;
+    const QJsonValue invitationsAllowedValue = object.value(QStringLiteral("invitationsAllowed"));
+    if (!invitationsAllowedValue.isUndefined())
+    {
+        if (!invitationsAllowedValue.isBool())
+        {
+            return std::nullopt;
+        }
+        invitationsAllowed = invitationsAllowedValue.toBool();
+    }
+
+    const bool online = state == QStringLiteral("online");
+    return NearbyVincentPresence{sessionId.toLower(), online,
+                                 online ? canvasPort : static_cast<quint16>(0),
+                                 online && invitationsAllowed};
+}
+
+QByteArray NearbyVincentProtocol::encodeInvitation(const QString& invitationId,
+                                                   const QString& senderSessionId,
+                                                   const QString& targetSessionId,
+                                                   quint16 canvasPort,
+                                                   const QString& inviterProfileName)
+{
+    const QString normalizedProfileName =
+        inviterProfileName.simplified().left(maximumInvitationProfileNameLength);
+    if (!isCanonicalSessionId(invitationId) || !isCanonicalSessionId(senderSessionId) ||
+        !isCanonicalSessionId(targetSessionId) ||
+        senderSessionId.compare(targetSessionId, Qt::CaseInsensitive) == 0 || canvasPort == 0 ||
+        normalizedProfileName.isEmpty())
+    {
+        return {};
+    }
+
+    const QJsonObject object{{QStringLiteral("service"), serviceName()},
+                             {QStringLiteral("version"), protocolVersion},
+                             {QStringLiteral("type"), QStringLiteral("canvas-invitation")},
+                             {QStringLiteral("invitation"), invitationId.toLower()},
+                             {QStringLiteral("sender"), senderSessionId.toLower()},
+                             {QStringLiteral("target"), targetSessionId.toLower()},
+                             {QStringLiteral("canvasPort"), canvasPort},
+                             {QStringLiteral("profileName"), normalizedProfileName}};
+    const QByteArray payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    return payload.size() <= maximumDatagramSize() ? payload : QByteArray{};
+}
+
+std::optional<NearbyVincentInvitation>
+NearbyVincentProtocol::decodeInvitation(const QByteArray& payload)
+{
+    if (payload.isEmpty() || payload.size() > maximumDatagramSize())
+    {
+        return std::nullopt;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject())
+    {
+        return std::nullopt;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue versionValue = object.value(QStringLiteral("version"));
+    if (object.value(QStringLiteral("service")).toString() != serviceName() ||
+        !versionValue.isDouble() || versionValue.toDouble() != protocolVersion ||
+        object.value(QStringLiteral("type")).toString() != QStringLiteral("canvas-invitation"))
+    {
+        return std::nullopt;
+    }
+
+    const QString invitationId = object.value(QStringLiteral("invitation")).toString();
+    const QString senderSessionId = object.value(QStringLiteral("sender")).toString();
+    const QString targetSessionId = object.value(QStringLiteral("target")).toString();
+    const QString inviterProfileName =
+        object.value(QStringLiteral("profileName")).toString().simplified();
+    const QJsonValue canvasPortValue = object.value(QStringLiteral("canvasPort"));
+    const double rawCanvasPort = canvasPortValue.toDouble(-1);
+    if (!isCanonicalSessionId(invitationId) || !isCanonicalSessionId(senderSessionId) ||
+        !isCanonicalSessionId(targetSessionId) ||
+        senderSessionId.compare(targetSessionId, Qt::CaseInsensitive) == 0 ||
+        !canvasPortValue.isDouble() || rawCanvasPort < 1 || rawCanvasPort > 65535 ||
+        rawCanvasPort != static_cast<int>(rawCanvasPort) || inviterProfileName.isEmpty() ||
+        inviterProfileName.size() > maximumInvitationProfileNameLength)
+    {
+        return std::nullopt;
+    }
+
+    return NearbyVincentInvitation{invitationId.toLower(), senderSessionId.toLower(),
+                                   targetSessionId.toLower(), static_cast<quint16>(rawCanvasPort),
+                                   inviterProfileName};
 }
 
 class NearbyVincentDiscoveryWorker final : public QObject
@@ -194,7 +307,10 @@ class NearbyVincentDiscoveryWorker final : public QObject
             {
                 m_peers.clear();
                 emit nearbyDeviceCountChanged(0);
+                emit availableCanvasSessionsChanged({});
+                emit availableInvitationTargetsChanged({});
             }
+            m_seenInvitationIds.clear();
             setError({});
             emit runningChanged(false);
             return;
@@ -218,21 +334,74 @@ class NearbyVincentDiscoveryWorker final : public QObject
         {
             m_peers.clear();
             emit nearbyDeviceCountChanged(0);
+            emit availableCanvasSessionsChanged({});
+            emit availableInvitationTargetsChanged({});
         }
+        m_seenInvitationIds.clear();
         setError({});
         emit runningChanged(false);
+    }
+
+    void setHostedCanvasPort(quint16 port)
+    {
+        Q_ASSERT(QThread::currentThread() == thread());
+        if (m_hostedCanvasPort == port)
+        {
+            return;
+        }
+        m_hostedCanvasPort = port;
+        if (m_socket)
+        {
+            sendPresence(true);
+        }
+    }
+
+    void setInvitationsAllowed(bool allowed)
+    {
+        Q_ASSERT(QThread::currentThread() == thread());
+        if (m_invitationsAllowed == allowed)
+        {
+            return;
+        }
+        m_invitationsAllowed = allowed;
+        if (m_socket)
+        {
+            sendPresence(true);
+        }
+    }
+
+    void sendCanvasInvitation(const QString& invitationId, const QString& targetSessionId,
+                              quint16 canvasPort, const QString& inviterProfileName)
+    {
+        Q_ASSERT(QThread::currentThread() == thread());
+        const auto target = m_peers.constFind(targetSessionId);
+        if (!m_socket || target == m_peers.cend() || !target->invitationsAllowed)
+        {
+            return;
+        }
+        const QByteArray payload = NearbyVincentProtocol::encodeInvitation(
+            invitationId, m_sessionId, targetSessionId, canvasPort, inviterProfileName);
+        if (!payload.isEmpty())
+        {
+            sendDatagram(payload);
+        }
     }
 
   signals:
     void runningChanged(bool running);
     void nearbyDeviceCountChanged(int nearbyDeviceCount);
+    void availableCanvasSessionsChanged(const QVariantList& sessions);
+    void availableInvitationTargetsChanged(const QVariantList& targets);
     void errorStringChanged(const QString& errorString);
+    void canvasInvitationReceived(const QVariantMap& invitation);
 
   private:
     struct Peer
     {
         QHostAddress senderAddress;
         qint64 lastSeenMs = 0;
+        quint16 canvasPort = 0;
+        bool invitationsAllowed = false;
     };
 
     void sendHeartbeat()
@@ -322,7 +491,17 @@ class NearbyVincentDiscoveryWorker final : public QObject
             return;
         }
 
-        const QByteArray payload = NearbyVincentProtocol::encodePresence(m_sessionId, online);
+        const QByteArray payload = NearbyVincentProtocol::encodePresence(
+            m_sessionId, online, m_hostedCanvasPort, m_invitationsAllowed);
+        sendDatagram(payload);
+    }
+
+    void sendDatagram(const QByteArray& payload)
+    {
+        if (!m_socket || payload.isEmpty())
+        {
+            return;
+        }
         bool sent = false;
         for (const QNetworkInterface& networkInterface : std::as_const(m_joinedInterfaces))
         {
@@ -366,12 +545,6 @@ class NearbyVincentDiscoveryWorker final : public QObject
                 continue;
             }
 
-            const std::optional<NearbyVincentPresence> presence =
-                NearbyVincentProtocol::decodePresence(datagram.data());
-            if (!presence || presence->sessionId == m_sessionId)
-            {
-                continue;
-            }
             if (m_configuration.ignoreLocalSenders &&
                 (datagram.senderAddress().isLoopback() ||
                  m_localAddresses.contains(datagram.senderAddress())))
@@ -379,7 +552,45 @@ class NearbyVincentDiscoveryWorker final : public QObject
                 continue;
             }
 
+            const std::optional<NearbyVincentInvitation> invitation =
+                NearbyVincentProtocol::decodeInvitation(datagram.data());
+            if (invitation)
+            {
+                const auto sender = m_peers.constFind(invitation->senderSessionId);
+                if (m_invitationsAllowed && invitation->targetSessionId == m_sessionId &&
+                    invitation->senderSessionId != m_sessionId && sender != m_peers.cend() &&
+                    sender->senderAddress == datagram.senderAddress() &&
+                    !m_seenInvitationIds.contains(invitation->invitationId))
+                {
+                    if (m_seenInvitationIds.size() >= maximumTrackedSessions)
+                    {
+                        const auto oldestInvitation = std::min_element(m_seenInvitationIds.cbegin(),
+                                                                       m_seenInvitationIds.cend());
+                        if (oldestInvitation != m_seenInvitationIds.cend())
+                        {
+                            m_seenInvitationIds.erase(oldestInvitation);
+                        }
+                    }
+                    m_seenInvitationIds.insert(invitation->invitationId, m_clock.elapsed());
+                    emit canvasInvitationReceived(QVariantMap{
+                        {QStringLiteral("invitationId"), invitation->invitationId},
+                        {QStringLiteral("sessionId"), invitation->senderSessionId},
+                        {QStringLiteral("address"), datagram.senderAddress().toString()},
+                        {QStringLiteral("port"), invitation->canvasPort},
+                        {QStringLiteral("profileName"), invitation->inviterProfileName}});
+                }
+                continue;
+            }
+
+            const std::optional<NearbyVincentPresence> presence =
+                NearbyVincentProtocol::decodePresence(datagram.data());
+            if (!presence || presence->sessionId == m_sessionId)
+            {
+                continue;
+            }
             const int previousCount = peerDeviceCount();
+            const QVariantList previousCanvasSessions = availableCanvasSessions();
+            const QVariantList previousInvitationTargets = availableInvitationTargets();
             if (presence->online)
             {
                 if (!m_peers.contains(presence->sessionId) &&
@@ -394,19 +605,22 @@ class NearbyVincentDiscoveryWorker final : public QObject
                     }
                 }
                 m_peers.insert(presence->sessionId,
-                               Peer{datagram.senderAddress(), m_clock.elapsed()});
+                               Peer{datagram.senderAddress(), m_clock.elapsed(),
+                                    presence->canvasPort, presence->invitationsAllowed});
             }
             else
             {
                 m_peers.remove(presence->sessionId);
             }
-            emitDeviceCountIfChanged(previousCount);
+            emitPresenceChanges(previousCount, previousCanvasSessions, previousInvitationTargets);
         }
     }
 
     void pruneExpiredPeers()
     {
         const int previousCount = peerDeviceCount();
+        const QVariantList previousCanvasSessions = availableCanvasSessions();
+        const QVariantList previousInvitationTargets = availableInvitationTargets();
         const qint64 oldestAllowed = m_clock.elapsed() - m_configuration.peerTimeoutMs;
         for (auto iterator = m_peers.begin(); iterator != m_peers.end();)
         {
@@ -419,7 +633,18 @@ class NearbyVincentDiscoveryWorker final : public QObject
                 ++iterator;
             }
         }
-        emitDeviceCountIfChanged(previousCount);
+        for (auto iterator = m_seenInvitationIds.begin(); iterator != m_seenInvitationIds.end();)
+        {
+            if (iterator.value() < oldestAllowed)
+            {
+                iterator = m_seenInvitationIds.erase(iterator);
+            }
+            else
+            {
+                ++iterator;
+            }
+        }
+        emitPresenceChanges(previousCount, previousCanvasSessions, previousInvitationTargets);
     }
 
     [[nodiscard]] int peerDeviceCount() const
@@ -432,12 +657,60 @@ class NearbyVincentDiscoveryWorker final : public QObject
         return addresses.size();
     }
 
-    void emitDeviceCountIfChanged(int previousCount)
+    [[nodiscard]] QVariantList availableCanvasSessions() const
+    {
+        QVariantList sessions;
+        QStringList sessionIds = m_peers.keys();
+        sessionIds.sort(Qt::CaseInsensitive);
+        for (const QString& peerSessionId : sessionIds)
+        {
+            const Peer peer = m_peers.value(peerSessionId);
+            if (peer.canvasPort == 0)
+            {
+                continue;
+            }
+            sessions.append(QVariantMap{{QStringLiteral("sessionId"), peerSessionId},
+                                        {QStringLiteral("address"), peer.senderAddress.toString()},
+                                        {QStringLiteral("port"), peer.canvasPort}});
+        }
+        return sessions;
+    }
+
+    [[nodiscard]] QVariantList availableInvitationTargets() const
+    {
+        QVariantList targets;
+        QStringList sessionIds = m_peers.keys();
+        sessionIds.sort(Qt::CaseInsensitive);
+        for (const QString& peerSessionId : sessionIds)
+        {
+            const Peer peer = m_peers.value(peerSessionId);
+            if (!peer.invitationsAllowed)
+            {
+                continue;
+            }
+            targets.append(QVariantMap{{QStringLiteral("sessionId"), peerSessionId},
+                                       {QStringLiteral("address"), peer.senderAddress.toString()}});
+        }
+        return targets;
+    }
+
+    void emitPresenceChanges(int previousCount, const QVariantList& previousCanvasSessions,
+                             const QVariantList& previousInvitationTargets)
     {
         const int currentCount = peerDeviceCount();
         if (currentCount != previousCount)
         {
             emit nearbyDeviceCountChanged(currentCount);
+        }
+        const QVariantList currentCanvasSessions = availableCanvasSessions();
+        if (currentCanvasSessions != previousCanvasSessions)
+        {
+            emit availableCanvasSessionsChanged(currentCanvasSessions);
+        }
+        const QVariantList currentInvitationTargets = availableInvitationTargets();
+        if (currentInvitationTargets != previousInvitationTargets)
+        {
+            emit availableInvitationTargetsChanged(currentInvitationTargets);
         }
     }
 
@@ -461,6 +734,9 @@ class NearbyVincentDiscoveryWorker final : public QObject
     bool m_joinedDefaultInterface = false;
     QSet<QHostAddress> m_localAddresses;
     QHash<QString, Peer> m_peers;
+    QHash<QString, qint64> m_seenInvitationIds;
+    quint16 m_hostedCanvasPort = 0;
+    bool m_invitationsAllowed = false;
     QString m_errorString;
 };
 
@@ -470,9 +746,9 @@ NearbyVincentDiscovery::NearbyVincentDiscovery(QObject* parent)
 }
 
 NearbyVincentDiscovery::NearbyVincentDiscovery(Configuration configuration, QObject* parent)
-    : QObject(parent),
+    : QObject(parent), m_sessionId(QUuid::createUuid().toString(QUuid::WithoutBraces)),
       m_worker(new NearbyVincentDiscoveryWorker(normalizedConfiguration(std::move(configuration)),
-                                                QUuid::createUuid().toString(QUuid::WithoutBraces)))
+                                                m_sessionId))
 {
     m_workerThread.setObjectName(QStringLiteral("Vincent nearby discovery"));
     m_worker->moveToThread(&m_workerThread);
@@ -481,6 +757,12 @@ NearbyVincentDiscovery::NearbyVincentDiscovery(Configuration configuration, QObj
             &NearbyVincentDiscovery::applyRunning);
     connect(m_worker, &NearbyVincentDiscoveryWorker::nearbyDeviceCountChanged, this,
             &NearbyVincentDiscovery::applyNearbyDeviceCount);
+    connect(m_worker, &NearbyVincentDiscoveryWorker::availableCanvasSessionsChanged, this,
+            &NearbyVincentDiscovery::applyAvailableCanvasSessions);
+    connect(m_worker, &NearbyVincentDiscoveryWorker::availableInvitationTargetsChanged, this,
+            &NearbyVincentDiscovery::applyAvailableInvitationTargets);
+    connect(m_worker, &NearbyVincentDiscoveryWorker::canvasInvitationReceived, this,
+            &NearbyVincentDiscovery::canvasInvitationReceived);
     connect(m_worker, &NearbyVincentDiscoveryWorker::errorStringChanged, this,
             &NearbyVincentDiscovery::applyErrorString);
     m_workerThread.start();
@@ -515,9 +797,72 @@ int NearbyVincentDiscovery::nearbyDeviceCount() const noexcept
     return m_nearbyDeviceCount;
 }
 
+QString NearbyVincentDiscovery::sessionId() const
+{
+    return m_sessionId;
+}
+
+QVariantList NearbyVincentDiscovery::availableCanvasSessions() const
+{
+    return m_availableCanvasSessions;
+}
+
+QVariantList NearbyVincentDiscovery::availableInvitationTargets() const
+{
+    return m_availableInvitationTargets;
+}
+
+quint16 NearbyVincentDiscovery::hostedCanvasPort() const noexcept
+{
+    return m_hostedCanvasPort;
+}
+
+bool NearbyVincentDiscovery::invitationsAllowed() const noexcept
+{
+    return m_invitationsAllowed;
+}
+
 QString NearbyVincentDiscovery::errorString() const
 {
     return m_errorString;
+}
+
+bool NearbyVincentDiscovery::sendCanvasInvitation(const QString& invitationId,
+                                                  const QString& targetSessionId, int canvasPort,
+                                                  const QString& inviterProfileName)
+{
+    const quint16 normalizedPort =
+        canvasPort > 0 && canvasPort <= 65535 ? static_cast<quint16>(canvasPort) : 0;
+    const QString normalizedTargetSessionId = targetSessionId.toLower();
+    const QString normalizedProfileName =
+        inviterProfileName.simplified().left(maximumInvitationProfileNameLength);
+    const bool targetAvailable =
+        std::any_of(m_availableInvitationTargets.cbegin(), m_availableInvitationTargets.cend(),
+                    [&normalizedTargetSessionId](const QVariant& value)
+                    {
+                        return value.toMap().value(QStringLiteral("sessionId")).toString() ==
+                               normalizedTargetSessionId;
+                    });
+    const QByteArray payload = NearbyVincentProtocol::encodeInvitation(
+        invitationId, m_sessionId, normalizedTargetSessionId, normalizedPort,
+        normalizedProfileName);
+    if (!m_workerThread.isRunning() || !isCanonicalSessionId(invitationId) ||
+        !isCanonicalSessionId(normalizedTargetSessionId) || normalizedPort == 0 ||
+        normalizedProfileName.isEmpty() || payload.isEmpty() || !targetAvailable)
+    {
+        return false;
+    }
+
+    QMetaObject::invokeMethod(
+        m_worker,
+        [worker = m_worker, normalizedInvitationId = invitationId.toLower(),
+         normalizedTargetSessionId, normalizedPort, normalizedProfileName]()
+        {
+            worker->sendCanvasInvitation(normalizedInvitationId, normalizedTargetSessionId,
+                                         normalizedPort, normalizedProfileName);
+        },
+        Qt::QueuedConnection);
+    return true;
 }
 
 void NearbyVincentDiscovery::start()
@@ -535,13 +880,52 @@ void NearbyVincentDiscovery::stop()
     {
         applyRunning(false);
         applyNearbyDeviceCount(0);
+        applyAvailableCanvasSessions({});
+        applyAvailableInvitationTargets({});
         return;
     }
     QMetaObject::invokeMethod(m_worker, &NearbyVincentDiscoveryWorker::stop,
                               Qt::BlockingQueuedConnection);
     applyRunning(false);
     applyNearbyDeviceCount(0);
+    applyAvailableCanvasSessions({});
+    applyAvailableInvitationTargets({});
     applyErrorString({});
+}
+
+void NearbyVincentDiscovery::setHostedCanvasPort(int port)
+{
+    const quint16 normalizedPort = port > 0 && port <= 65535 ? static_cast<quint16>(port) : 0;
+    if (m_hostedCanvasPort == normalizedPort)
+    {
+        return;
+    }
+    m_hostedCanvasPort = normalizedPort;
+    emit hostedCanvasPortChanged();
+    if (!m_workerThread.isRunning())
+    {
+        return;
+    }
+    QMetaObject::invokeMethod(
+        m_worker, [worker = m_worker, normalizedPort]()
+        { worker->setHostedCanvasPort(normalizedPort); }, Qt::QueuedConnection);
+}
+
+void NearbyVincentDiscovery::setInvitationsAllowed(bool allowed)
+{
+    if (m_invitationsAllowed == allowed)
+    {
+        return;
+    }
+    m_invitationsAllowed = allowed;
+    emit invitationsAllowedChanged();
+    if (!m_workerThread.isRunning())
+    {
+        return;
+    }
+    QMetaObject::invokeMethod(
+        m_worker, [worker = m_worker, allowed]() { worker->setInvitationsAllowed(allowed); },
+        Qt::QueuedConnection);
 }
 
 void NearbyVincentDiscovery::applyRunning(bool running)
@@ -562,6 +946,26 @@ void NearbyVincentDiscovery::applyNearbyDeviceCount(int nearbyDeviceCount)
     }
     m_nearbyDeviceCount = nearbyDeviceCount;
     emit nearbyPresenceChanged();
+}
+
+void NearbyVincentDiscovery::applyAvailableCanvasSessions(const QVariantList& sessions)
+{
+    if (m_availableCanvasSessions == sessions)
+    {
+        return;
+    }
+    m_availableCanvasSessions = sessions;
+    emit availableCanvasSessionsChanged();
+}
+
+void NearbyVincentDiscovery::applyAvailableInvitationTargets(const QVariantList& targets)
+{
+    if (m_availableInvitationTargets == targets)
+    {
+        return;
+    }
+    m_availableInvitationTargets = targets;
+    emit availableInvitationTargetsChanged();
 }
 
 void NearbyVincentDiscovery::applyErrorString(const QString& errorString)

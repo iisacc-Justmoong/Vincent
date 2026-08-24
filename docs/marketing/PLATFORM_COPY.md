@@ -13,7 +13,7 @@ publicly trusted Authenticode-signed release has been verified.
 - Platforms: Windows, macOS, and Linux source/build support
 - License: GNU AGPLv3
 - Price: commercial Vincent license sold through iisacc.com; source available under GNU AGPLv3
-- Privacy: account email and license key are used only for online license validation and a user-requested update grant; opening Preferences may explicitly read the stored email for an email-only fixed display. There is no telemetry, analytics, advertising, document upload, remote polling, or automatic/background update check. When the user-controlled nearby-discovery setting is enabled, Vincent exchanges an ephemeral anonymous presence beacon only within the current LAN; it includes no profile, account, device name, or document data
+- Privacy: account email and license key are used only for online license validation and a user-requested update grant; opening Preferences may explicitly read the stored email for an email-only fixed display. There is no telemetry, analytics, advertising, cloud document upload, remote polling, or automatic/background update check. When the user-controlled nearby-discovery setting is enabled, Vincent exchanges an ephemeral anonymous presence heartbeat only within the current LAN; it includes no profile, account, device name, or document data, only an invitation-capability Boolean and a temporary TCP port while the user explicitly shares a canvas. Selecting an opted-in nearby user from Members sends that target a one-hop invitation containing the inviter's profile name and temporary canvas endpoint. Acceptance or an explicit join transfers profile names and the complete canvas snapshot directly over the LAN without an Internet relay
 - Public project URL: https://github.com/iisacc-Justmoong/Vincent
 - Source release URL:
   https://github.com/iisacc-Justmoong/Vincent/releases/tag/v5.1
@@ -32,8 +32,13 @@ Vincent is a local-first raster drawing app for focused drawing, handwriting,
 layered editing, and PSD-compatible workflows. A purchased iisacc account
 license unlocks the canvas through online verification, while documents remain
 local with no telemetry, advertising, remote polling, or automatic update
-checks. An optional anonymous one-hop local-network beacon detects other nearby Vincent
-devices without sending profile, account, device-name, or document data.
+checks. An optional anonymous one-hop local-network heartbeat detects other
+nearby Vincent devices without sending profile, account, device-name, or
+document data. Users can explicitly share or join a canvas, or invite a
+specifically selected opted-in nearby user. Only that explicit invitation adds
+the inviter's profile name and endpoint; accepted sessions transfer profile
+names and canvas snapshots directly between the participating LAN devices
+without a cloud relay.
 
 ## Directory summary
 
@@ -41,8 +46,13 @@ Vincent 5.1 is a Qt 6 desktop raster editor for drawing, handwriting, layered
 canvas work, and PSD-compatible import and export. Its local-first design keeps
 documents on the user's device; the app sends account-license credentials only
 for activation and a user-requested update, with no telemetry, advertising, or
-automatic update checks. Its user-controlled one-hop LAN presence beacon is anonymous
-and contains no profile, account, device-name, or document data.
+automatic update checks. Its user-controlled one-hop LAN presence heartbeat is
+anonymous and contains no profile, account, device-name, or document data, only
+an invitation-capability Boolean and a temporary port while canvas sharing is
+active. A specifically targeted invitation adds the inviter's profile name only
+after a Members `+` selection; canvas and participant data move only after
+acceptance or explicit share/join actions and remain direct between participating
+LAN devices.
 The source is available under GNU AGPLv3.
 A publicly trusted Windows package is in preparation.
 
@@ -61,8 +71,12 @@ service. It is a native Qt 6 desktop application with pressure-aware brushes,
 layers, shapes, text, image import, and PSD-compatible workflows. Documents
 stay local. Vincent uses the purchaser's iisacc account email and license key
 only for activation or a user-requested update, and has no telemetry, advertising, or automatic update checks.
-Nearby Vincent discovery is confined to an anonymous one-hop LAN beacon and
-contains no profile, account, device-name, or document data.
+Nearby Vincent discovery is confined to an anonymous one-hop LAN heartbeat and
+contains no profile, account, device-name, or document data, only an invitation
+capability and a temporary port while canvas sharing is active. Selecting an
+opted-in nearby user can send that target the inviter's profile name and endpoint;
+accepted or explicitly joined devices exchange profile names and canvas snapshots
+directly over that LAN, without a cloud relay.
 
 Version 5.1 is available as complete AGPLv3 source. We are currently
 preparing the publicly trusted Windows distribution and would especially value

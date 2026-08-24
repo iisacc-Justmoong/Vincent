@@ -140,7 +140,8 @@ void tst_MacOSBuildWorkflowContract::localNetworkDiscoveryDeclaresPrivacyAndSand
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
     QVERIFY(infoPlistSource.contains(QStringLiteral("<key>NSLocalNetworkUsageDescription</key>")));
     QVERIFY(infoPlistSource.contains(QStringLiteral(
-        "Vincent uses your local network to find other nearby Vincent users.")));
+        "Vincent uses your local network to find nearby Vincent users and share a canvas when "
+        "you choose.")));
 
     const QString entitlementsPath =
         QFINDTESTDATA("../packaging/macos/Vincent.entitlements");

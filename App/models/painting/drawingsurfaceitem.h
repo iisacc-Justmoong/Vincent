@@ -65,6 +65,10 @@ public:
                                       const QVariantList& rasterLayers,
                                       bool includeBackgroundLayer = true);
     Q_INVOKABLE QVariantMap openRecentCanvas(const QString& fileUrl);
+    Q_INVOKABLE QByteArray exportCanvasSession(const QVariantList& objects,
+                                               const QVariantList& rasterLayers,
+                                               bool includeBackgroundLayer = true);
+    Q_INVOKABLE QVariantMap importCanvasSession(const QByteArray& bytes);
     Q_INVOKABLE QString cacheRasterSnapshotSource();
     Q_INVOKABLE QString cacheRasterThumbnailSource(qreal maximumWidth = 32, qreal maximumHeight = 32);
     Q_INVOKABLE QString cacheGrabbedThumbnailSource(QObject *grabResult);

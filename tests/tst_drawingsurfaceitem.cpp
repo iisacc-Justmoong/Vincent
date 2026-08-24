@@ -3278,15 +3278,16 @@ void tst_DrawingSurfaceItem::rendersSharedRasterVectorTimelineDocument()
     QVERIFY(item.document());
     *item.document() = std::move(mixed);
     QVERIFY(item.refresh());
-    QVERIFY(item.framePixels());
+    QTRY_VERIFY_WITH_TIMEOUT(item.framePixels(), 5000);
     QCOMPARE(item.framePixels()->pixels[0], 0xff102030U);
     QCOMPARE(item.framePixels()->pixels[5], 0xffffcc00U);
 
     item.setFrame(1);
     QCOMPARE(item.frame(), 1U);
-    QVERIFY(item.framePixels());
-    QCOMPARE(item.framePixels()->pixels[0], 0xffff3366U);
+    QTRY_VERIFY_WITH_TIMEOUT(item.framePixels() && item.framePixels()->pixels[0] == 0xffff3366U,
+                             5000);
     QCOMPARE(item.framePixels()->pixels[5], 0xffffcc00U);
+    QTRY_VERIFY_WITH_TIMEOUT(!item.rendering(), 5000);
 }
 
 void tst_DrawingSurfaceItem::rasterToolsPreserveMixedSharedCanvasLayers()
@@ -3324,7 +3325,8 @@ void tst_DrawingSurfaceItem::rasterToolsPreserveMixedSharedCanvasLayers()
     *item.document() = std::move(mixed);
     QVERIFY(item.refresh());
     QVERIFY(item.selectLayer(QStringLiteral("paint-layer")));
-    QCOMPARE(item.framePixels()->pixels[4 * 32 + 4], 0xffff3366U);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        item.framePixels() && item.framePixels()->pixels[4 * 32 + 4] == 0xffff3366U, 5000);
 
     const QColor shapeColor(QStringLiteral("#1976d2"));
     QVERIFY(item.commitShape(20, 20, 6, 6, QStringLiteral("rectangle"), shapeColor));
@@ -3333,8 +3335,11 @@ void tst_DrawingSurfaceItem::rasterToolsPreserveMixedSharedCanvasLayers()
     QVERIFY(paint);
     QCOMPARE(paint->pixels.pixels[4 * 32 + 4], 0x00000000U);
     QCOMPARE(paint->pixels.pixels[22 * 32 + 22], shapeColor.rgba());
-    QCOMPARE(item.framePixels()->pixels[4 * 32 + 4], 0xffff3366U);
-    QCOMPARE(item.framePixels()->pixels[22 * 32 + 22], shapeColor.rgba());
+    QTRY_VERIFY_WITH_TIMEOUT(item.framePixels() &&
+                                 item.framePixels()->pixels[4 * 32 + 4] == 0xffff3366U &&
+                                 item.framePixels()->pixels[22 * 32 + 22] == shapeColor.rgba(),
+                             5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!item.rendering(), 5000);
 }
 
 void tst_DrawingSurfaceItem::rasterToolsRespectSelectedLayerTransform()
@@ -3371,7 +3376,9 @@ void tst_DrawingSurfaceItem::rasterToolsRespectSelectedLayerTransform()
     QCOMPARE(paint->pixels.width, 8);
     QCOMPARE(paint->pixels.height, 8);
     QCOMPARE(paint->pixels.pixels[3 * 8 + 3], shapeColor.rgba());
-    QCOMPARE(item.framePixels()->pixels[8 * 32 + 13], shapeColor.rgba());
+    QTRY_VERIFY_WITH_TIMEOUT(
+        item.framePixels() && item.framePixels()->pixels[8 * 32 + 13] == shapeColor.rgba(), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!item.rendering(), 5000);
 }
 
 void tst_DrawingSurfaceItem::openingRasterReplacesMixedSharedCanvasDocument()
@@ -3422,7 +3429,10 @@ void tst_DrawingSurfaceItem::openingRasterReplacesMixedSharedCanvasDocument()
     const RasterAsset *opened = findRasterAsset(*item.document(), "canvas.raster.0");
     QVERIFY(opened);
     QCOMPARE(opened->pixels.pixels[8 * 16 + 8], QColor(QStringLiteral("#26c6da")).rgba());
-    QCOMPARE(item.framePixels()->pixels[8 * 16 + 8], QColor(QStringLiteral("#26c6da")).rgba());
+    QTRY_VERIFY_WITH_TIMEOUT(item.framePixels() && item.framePixels()->pixels[8 * 16 + 8] ==
+                                                       QColor(QStringLiteral("#26c6da")).rgba(),
+                             5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!item.rendering(), 5000);
 }
 
 void tst_DrawingSurfaceItem::roundTripsNativeSharedCanvasDocument()
@@ -3638,6 +3648,19 @@ void tst_DrawingSurfaceItem::recentCanvasPreservesVisualCanvasExtentAfterLateRes
     QVERIFY(directory.isValid());
     const QString recentPath = directory.filePath(QStringLiteral("recent-canvas.vrc"));
     QVERIFY(source.saveRecentCanvas(recentPath, {}, {}, true));
+    const QByteArray inMemorySnapshot = source.exportCanvasSession({}, {}, true);
+    QVERIFY(!inMemorySnapshot.isEmpty());
+
+    PaletteUtils memoryPaletteUtils;
+    CanvasDocumentViewModel memoryViewModel(&memoryPaletteUtils);
+    DrawingSurfaceItem memoryRestored;
+    memoryRestored.setWidth(1);
+    memoryRestored.setHeight(1);
+    memoryRestored.setDocumentViewModel(&memoryViewModel);
+    const QVariantMap memorySession = memoryRestored.importCanvasSession(inMemorySnapshot);
+    QVERIFY(memorySession.value(QStringLiteral("valid")).toBool());
+    QCOMPARE(memoryRestored.width(), 64.0);
+    QCOMPARE(memoryRestored.height(), 48.0);
 
     PaletteUtils restoredPaletteUtils;
     CanvasDocumentViewModel restoredViewModel(&restoredPaletteUtils);
@@ -3764,8 +3787,10 @@ void tst_DrawingSurfaceItem::rejectsCorruptRecentCanvasWithoutReplacingTheCurren
     item.setBrushColor(QColor(QStringLiteral("#ef5350")));
     item.beginStroke(2, 2, 1.0, false);
     item.endStroke(2, 2, 1.0, false);
-    QVERIFY(item.framePixels());
-    const std::vector<std::uint32_t> pixelsBefore = item.framePixels()->pixels;
+    QVERIFY(item.document());
+    const iiSharedCanvas::IiscEncodeResult documentBefore =
+        iiSharedCanvas::encodeIisc(*item.document());
+    QVERIFY(documentBefore.ok());
 
     QFile corrupt(corruptPath);
     QVERIFY(corrupt.open(QIODevice::ReadWrite));
@@ -3782,8 +3807,11 @@ void tst_DrawingSurfaceItem::rejectsCorruptRecentCanvasWithoutReplacingTheCurren
 
     const QVariantMap restored = item.openRecentCanvas(corruptPath);
     QVERIFY(!restored.value(QStringLiteral("valid")).toBool());
-    QVERIFY(item.framePixels());
-    QCOMPARE(item.framePixels()->pixels, pixelsBefore);
+    QVERIFY(item.document());
+    const iiSharedCanvas::IiscEncodeResult documentAfter =
+        iiSharedCanvas::encodeIisc(*item.document());
+    QVERIFY(documentAfter.ok());
+    QVERIFY(documentAfter.bytes == documentBefore.bytes);
     QCOMPARE(item.width(), 16.0);
     QCOMPARE(item.height(), 12.0);
 }

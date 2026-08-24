@@ -50,6 +50,12 @@ other-frame content separate while editing. Opening an ordinary bitmap is an
 explicit new-document operation and therefore replaces, rather than partially
 mutates, any previously opened mixed document.
 
+iiSharedCanvas display tiles now render asynchronously. Vincent's flat-file
+export and embedded raster-layer snapshot paths therefore render the current
+authoritative document synchronously with `renderFrameRegion()` instead of
+assuming `CanvasItem::framePixels()` is already populated. Display scheduling
+cannot make a just-saved file empty or stale.
+
 When an infinite region grows left or above its prior origin, QML shifts
 session objects by the reported margin and expands every added raster-layer
 item to the same origin and extent. It adjusts the center-origin pan offset by
@@ -89,6 +95,48 @@ are extracted only to one owner-only temporary directory held by the restored
 surface and are removed with that surface, so the `.vrc` remains the sole
 persistent recent-session artifact.
 
-Version 0.1 rerenders synchronously after edits. Large-document memory budgets,
-partial repaint/decode, background rendering, and cross-platform package
+## Local-network canvas sessions
+
+Preferences → Members exposes explicit **Share canvas**, **Join nearby…**, and
+**Stop sharing/Leave canvas** actions. Its `+` menu can also invite a specifically
+selected nearby Vincent user who enabled **Allow inviting other users**. The
+anonymous heartbeat carries no profile or canvas bytes; it adds only an
+invitation-capability Boolean and the host's temporary TCP port while sharing is
+active. Selecting an invitee sends a bounded, target-session-addressed one-hop
+datagram with an invitation UUID, temporary endpoint, and normalized inviter
+profile name. It contains no profile image, account, device name, or document
+data. Duplicate invitation IDs are suppressed across network interfaces.
+
+The recipient queues at most 16 invitations and shows the first through the
+toolbar Profile button's notification badge and LVRS context menu. **Accept**
+passes `true`, removes the invitation, and joins the advertised endpoint;
+**Decline** passes `false` and removes it without connecting. Disabling
+invitations clears the queue. Canvas profile lists and document data otherwise
+cross the network only after a client joins. This is direct, unencrypted LAN TCP
+with no Internet relay or shared secret, so the feature is intended for a
+trusted local network.
+
+`LocalCanvasSession` transfers the same complete, SHA-256-checked `.vrc` bytes
+used by recent-session persistence. This includes the canonical iiSharedCanvas
+document, additional raster-layer and inserted-image PNGs, editable text/shape
+metadata, object ordering, and background presence. QML exports it in memory;
+no temporary session file is needed for transport.
+
+The host is authoritative and assigns a monotonically increasing revision to
+each accepted whole-session snapshot. A client proposal is accepted only when
+its base revision still matches; otherwise the host returns its latest state.
+Edits are coalesced for 350 ms, with one in-flight and one newest queued client
+proposal. This prevents unbounded update queues but is not an object-level CRDT:
+simultaneous edits are resolved to the first snapshot the host accepts, and a
+stale editor is resynchronized to that state.
+
+Protocol frames are versioned and size bounded, non-LAN IPv4 addresses are
+rejected, and connection or incomplete-handshake attempts time out after eight
+seconds. Peer/session UUIDs and profile names are validated, duplicate peers
+are rejected, and hosts accept at most 16 remote participants. The host
+can remove a participant, and stopping sharing disconnects all clients while
+withdrawing the discovery port.
+
+Large-document memory budgets, partial snapshot deltas, encrypted/authenticated
+LAN sessions, object-level concurrent merge, and physical multi-device package
 validation remain product-hardening gates.

@@ -29,6 +29,9 @@ Item {
     property color backgroundColor: LV.Theme.panelBackground03
     property string currentTool: "brush"
     property string currentShape: "rectangle"
+    property var pendingInvitation: ({})
+    property int pendingInvitationCount: 0
+    readonly property bool hasPendingInvitation: pendingInvitationCount > 0
     property int canvasWidth: fallbackNewCanvasWidth
     property int canvasHeight: fallbackNewCanvasHeight
     readonly property bool dialogActive: newCanvasDialog.visible || openDialog.visible || saveDialog.visible
@@ -98,6 +101,13 @@ Item {
     signal toolSelected(string tool)
     signal shapeSelected(string shapeKind)
     signal presentationModeRequested
+    signal invitationResponseRequested(bool accepted)
+
+    onHasPendingInvitationChanged: {
+        if (!hasPendingInvitation) {
+            profileInvitationMenu.close();
+        }
+    }
 
     function openFileDialog() {
         openDialog.open();
@@ -820,6 +830,94 @@ Item {
         }
     }
 
+    Component {
+        id: profileInvitationMenuItemDelegate
+
+        Item {
+            property var modelData: ({})
+            readonly property var invitation: modelData.entry || ({})
+
+            implicitWidth: profileInvitationMenu.minimumItemWidth
+            implicitHeight: invitationContent.implicitHeight
+
+            LV.VStack {
+                id: invitationContent
+
+                width: parent.width
+                height: implicitHeight
+                alignment: Qt.AlignLeft
+                spacing: LV.Theme.gap8
+
+                LV.HStack {
+                    Layout.fillWidth: true
+                    spacing: LV.Theme.gap8
+
+                    LV.IconButton {
+                        tone: LV.AbstractButton.Borderless
+                        iconName: "user"
+                        enabled: false
+                        Accessible.name: qsTr("Inviter profile")
+                    }
+
+                    LV.VStack {
+                        Layout.fillWidth: true
+                        alignment: Qt.AlignLeft
+                        spacing: LV.Theme.gap2
+
+                        LV.Label {
+                            Layout.fillWidth: true
+                            text: invitation.profileName || qsTr("Unnamed member")
+                            style: body
+                            elide: Text.ElideRight
+                        }
+
+                        LV.Label {
+                            Layout.fillWidth: true
+                            text: qsTr("invited you to a canvas")
+                            style: description
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                LV.HStack {
+                    Layout.fillWidth: true
+                    spacing: LV.Theme.gap8
+
+                    LV.LabelButton {
+                        text: qsTr("Decline")
+                        tone: LV.AbstractButton.Default
+                        onClicked: {
+                            profileInvitationMenu.close();
+                            toolbar.invitationResponseRequested(false);
+                        }
+                    }
+
+                    LV.Spacer {}
+
+                    LV.LabelButton {
+                        text: qsTr("Accept")
+                        tone: LV.AbstractButton.Primary
+                        onClicked: {
+                            profileInvitationMenu.close();
+                            toolbar.invitationResponseRequested(true);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    LV.ContextMenu {
+        id: profileInvitationMenu
+
+        itemWidth: LV.Theme.scaleMetric(240)
+        itemDelegate: profileInvitationMenuItemDelegate
+        showIconSlot: false
+        autoCloseOnTrigger: false
+        items: toolbar.hasPendingInvitation ? [toolbar.pendingInvitation] : []
+    }
+
     Controls.Popup {
         id: brushSettingsMenu
         width: 340
@@ -1166,10 +1264,10 @@ Item {
 
         LV.Spacer {}
 
-        ToolbarCircleButton {
+        LV.IconButton {
             id: presentationModeButton
-            circleBorderWidth: 0
-            circleIconName: "screens"
+            tone: LV.AbstractButton.Borderless
+            iconName: "screens"
             Accessible.name: qsTr("Presentation mode")
             onClicked: toolbar.presentationModeRequested()
 
@@ -1177,12 +1275,34 @@ Item {
             Controls.ToolTip.text: qsTr("Presentation mode")
         }
 
-        ToolbarCircleButton {
+        LV.IconButton {
             id: profileButton
-            circleColor: LV.Theme.panelBackground12
-            circleBorderWidth: 0
-            circleIconName: "user"
+            tone: LV.AbstractButton.Borderless
+            iconName: "user"
             Accessible.name: qsTr("Profile")
+            Accessible.description: toolbar.hasPendingInvitation ? qsTr("Canvas invitation pending") : ""
+            onClicked: {
+                if (toolbar.hasPendingInvitation) {
+                    profileInvitationMenu.openFor(profileButton, profileButton.width - profileInvitationMenu.implicitWidth, profileButton.height);
+                }
+            }
+
+            Rectangle {
+                id: profileInvitationBadge
+
+                visible: toolbar.hasPendingInvitation
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: -LV.Theme.gap2
+                anchors.rightMargin: -LV.Theme.gap2
+                width: LV.Theme.gap8
+                height: width
+                radius: width / 2
+                color: LV.Theme.danger
+                border.width: LV.Theme.scaleMetric(1)
+                border.color: toolbar.backgroundColor
+                antialiasing: true
+            }
 
             Controls.ToolTip.visible: hovered
             Controls.ToolTip.text: qsTr("Profile")

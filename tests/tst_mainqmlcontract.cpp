@@ -7,7 +7,7 @@ class tst_MainQmlContract : public QObject
 {
     Q_OBJECT
 
-private slots:
+  private slots:
     void applicationWindowKeepsNativeControlsWhileUsingSolidVisualChrome();
     void applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragRegion();
     void applicationWindowPassesOnlyTheActiveMacOsDragHeightToCanvasPage();
@@ -28,10 +28,8 @@ private slots:
 void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnEscape()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
-    const QString painterPageQmlPath =
-        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
-    const QString drawingSurfaceQmlPath =
-        QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
     const QString toolbarQmlPath = QFINDTESTDATA("../App/qml/brush/CanvasToolBar.qml");
     const QString laserPointerQmlPath =
         QFINDTESTDATA("../App/qml/canvas/PresentationLaserPointer.qml");
@@ -44,9 +42,11 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
              "PresentationLaserPointer.qml test data was not found");
     QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
 
-    auto readSource = [](const QString &path) {
+    auto readSource = [](const QString& path)
+    {
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
             return QString{};
         }
         return QString::fromUtf8(file.readAll());
@@ -66,13 +66,12 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(!cmakeSource.isEmpty());
 
     QVERIFY(toolbarSource.contains(QStringLiteral("signal presentationModeRequested")));
-    QVERIFY(toolbarSource.contains(
-        QStringLiteral("onClicked: toolbar.presentationModeRequested()")));
+    QVERIFY(
+        toolbarSource.contains(QStringLiteral("onClicked: toolbar.presentationModeRequested()")));
 
     QVERIFY(mainSource.contains(QStringLiteral("property bool presentationMode: false")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("property int prePresentationWindowVisibility: "
-                       "QtQuickWindow.Window.Windowed")));
+    QVERIFY(mainSource.contains(QStringLiteral("property int prePresentationWindowVisibility: "
+                                               "QtQuickWindow.Window.Windowed")));
     QVERIFY(mainSource.contains(QStringLiteral("function enterPresentationMode()")));
     QVERIFY(mainSource.contains(
         QStringLiteral("window.prePresentationWindowVisibility = window.visibility;")));
@@ -80,8 +79,8 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(mainSource.contains(QStringLiteral("window.showFullScreen();")));
     QVERIFY(mainSource.contains(QStringLiteral("function exitPresentationMode()")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.exitPresentationMode();")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("window.restorePrePresentationWindowVisibility();")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("window.restorePrePresentationWindowVisibility();")));
     QVERIFY(mainSource.contains(QStringLiteral("id: exitPresentationModeAction")));
     QVERIFY(mainSource.contains(QStringLiteral("shortcut: \"Escape\"")));
     QVERIFY(mainSource.contains(QStringLiteral("enabled: window.presentationMode")));
@@ -111,35 +110,34 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(pageSource.contains(QStringLiteral("visible: painterPage.presentationMode")));
     QVERIFY(pageSource.contains(QStringLiteral("anchors.fill: parent")));
     QVERIFY(pageSource.contains(QStringLiteral("z: 20")));
-    QVERIFY(pageSource.contains(QStringLiteral(
-        "onWheelZoomRequested: (angleDeltaY, pixelDeltaY) => "
-        "painterPage.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("onWheelZoomRequested: (angleDeltaY, pixelDeltaY) => "
+                       "painterPage.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
 
-    QVERIFY(cmakeSource.contains(
-        QStringLiteral("App/qml/canvas/PresentationLaserPointer.qml")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("readonly property int trailLifetimeMs: 2000")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("readonly property int repaintIntervalMs: 16")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("App/qml/canvas/PresentationLaserPointer.qml")));
+    QVERIFY(
+        laserPointerSource.contains(QStringLiteral("readonly property int trailLifetimeMs: 2000")));
+    QVERIFY(
+        laserPointerSource.contains(QStringLiteral("readonly property int repaintIntervalMs: 16")));
     QVERIFY(laserPointerSource.contains(
         QStringLiteral("readonly property int maximumTrailPointCount: 256")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property var trailPoints: []")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property bool laserActive: false")));
-    QVERIFY(laserPointerSource.contains(QStringLiteral(
-        "signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function beginLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function updateLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function endLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function pruneExpiredTrailPoints()")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function clearLaserTrail()")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("Timer {")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("interval: laserPointer.repaintIntervalMs")));
+    QVERIFY(
+        laserPointerSource.contains(QStringLiteral("interval: laserPointer.repaintIntervalMs")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("repeat: true")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("Canvas {")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("const ageMs = now - point.createdAt;")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("1 - ageMs / laserPointer.trailLifetimeMs")));
+    QVERIFY(
+        laserPointerSource.contains(QStringLiteral("1 - ageMs / laserPointer.trailLifetimeMs")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("color: \"#ff2b2b\"")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("MouseArea {")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("acceptedButtons: Qt.LeftButton")));
@@ -153,8 +151,7 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(laserPointerSource.contains(QStringLiteral("wheel.accepted = true;")));
     QVERIFY(!laserPointerSource.contains(QStringLiteral("signal panRequested")));
     QVERIFY(!laserPointerSource.contains(QStringLiteral("beginPanDrag")));
-    QVERIFY(laserPointerSource.contains(
-        QStringLiteral("onVisibleChanged: if (!visible)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("onVisibleChanged: if (!visible)")));
 
     QVERIFY(surfaceSource.contains(QStringLiteral("property bool presentationMode: false")));
     QVERIFY(surfaceSource.contains(QStringLiteral("enabled: !surface.presentationMode")));
@@ -164,69 +161,56 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
         QStringLiteral("readonly property real presentationMaximumZoomMultiplier: 8")));
     QVERIFY(surfaceSource.contains(
         QStringLiteral("property real presentationFittedCanvasZoomScale: 1")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.presentationPreviousCanvasZoomScale = "
-                       "surface.canvasZoomScale;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.presentationPreviousCanvasPanOffsetX = "
-                       "surface.canvasPanOffsetX;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.presentationPreviousCanvasPanOffsetY = "
-                       "surface.canvasPanOffsetY;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.presentationPreviousCanvasZoomScale = "
+                                                  "surface.canvasZoomScale;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.presentationPreviousCanvasPanOffsetX = "
+                                                  "surface.canvasPanOffsetX;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.presentationPreviousCanvasPanOffsetY = "
+                                                  "surface.canvasPanOffsetY;")));
     QVERIFY(surfaceSource.contains(
         QStringLiteral("function fittedPresentationCanvasZoomScale(canvasWidth, canvasHeight)")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("function fitCanvasZoomToPresentationViewport()")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("function zoomPresentationCanvas(zoomFactor)")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("function fitCanvasZoomToPresentationViewport()")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function zoomPresentationCanvas(zoomFactor)")));
     QVERIFY(surfaceSource.contains(
         QStringLiteral("surface.presentationFittedCanvasZoomScale = fittedScale;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasPanOffsetX = 0;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasPanOffsetY = 0;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.presentationFittedCanvasZoomScale * "
-                       "surface.presentationMinimumZoomMultiplier")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.presentationFittedCanvasZoomScale * "
-                       "surface.presentationMaximumZoomMultiplier")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasZoomScale * normalizedZoomFactor")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.canvasPanOffsetX = 0;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.canvasPanOffsetY = 0;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.presentationFittedCanvasZoomScale * "
+                                                  "surface.presentationMinimumZoomMultiplier")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.presentationFittedCanvasZoomScale * "
+                                                  "surface.presentationMaximumZoomMultiplier")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("surface.canvasZoomScale * normalizedZoomFactor")));
     QVERIFY(surfaceSource.contains(
         QStringLiteral("const fittedScale = fittedPresentationCanvasZoomScale(")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.canvasZoomScale = fittedScale;")));
     QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasZoomScale = fittedScale;")));
-    QVERIFY(surfaceSource.contains(QStringLiteral(
-        "return Math.max(surface.minimumCanvasZoomScale, Math.min(")));
-    QVERIFY(!surfaceSource.contains(QStringLiteral(
-        "return boundedCanvasZoomScale(Math.min(surface.workspaceCanvasWidth")));
+        QStringLiteral("return Math.max(surface.minimumCanvasZoomScale, Math.min(")));
+    QVERIFY(!surfaceSource.contains(
+        QStringLiteral("return boundedCanvasZoomScale(Math.min(surface.workspaceCanvasWidth")));
     QVERIFY(surfaceSource.contains(
         QStringLiteral("readonly property int workspaceCanvasHorizontalInset: "
                        "surface.presentationMode ? 0 :")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("readonly property int workspaceCanvasTopInset: "
-                       "surface.presentationMode ? 0 :")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("readonly property int workspaceCanvasBottomInset: "
-                       "surface.presentationMode ? 0 :")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasZoomScale = "
-                       "surface.presentationPreviousCanvasZoomScale;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasPanOffsetX = "
-                       "surface.presentationPreviousCanvasPanOffsetX;")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("surface.canvasPanOffsetY = "
-                       "surface.presentationPreviousCanvasPanOffsetY;")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("readonly property int workspaceCanvasTopInset: "
+                                                  "surface.presentationMode ? 0 :")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("readonly property int workspaceCanvasBottomInset: "
+                                              "surface.presentationMode ? 0 :")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("surface.canvasZoomScale = "
+                                                  "surface.presentationPreviousCanvasZoomScale;")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("surface.canvasPanOffsetX = "
+                                              "surface.presentationPreviousCanvasPanOffsetX;")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("surface.canvasPanOffsetY = "
+                                              "surface.presentationPreviousCanvasPanOffsetY;")));
 }
 
 void tst_MainQmlContract::canvasWheelZoomIsAvailableInEveryToolMode()
 {
-    const QString painterPageQmlPath =
-        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
-    const QString drawingSurfaceQmlPath =
-        QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
     const QString laserPointerQmlPath =
         QFINDTESTDATA("../App/qml/canvas/PresentationLaserPointer.qml");
     QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
@@ -234,9 +218,11 @@ void tst_MainQmlContract::canvasWheelZoomIsAvailableInEveryToolMode()
     QVERIFY2(!laserPointerQmlPath.isEmpty(),
              "PresentationLaserPointer.qml test data was not found");
 
-    auto readSource = [](const QString &path) {
+    auto readSource = [](const QString& path)
+    {
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
             return QString{};
         }
         return QString::fromUtf8(file.readAll());
@@ -261,26 +247,25 @@ void tst_MainQmlContract::canvasWheelZoomIsAvailableInEveryToolMode()
         "surface.canvasZoomScale = surface.boundedCanvasZoomScale(surface.canvasZoomScale * "
         "normalizedZoomFactor);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("surface.ensureInfiniteCanvasForViewport();")));
-    QVERIFY(surfaceSource.contains(
-        QStringLiteral("objectName: \"canvasWheelZoomHandler\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("objectName: \"canvasWheelZoomHandler\"")));
     QVERIFY(surfaceSource.contains(QStringLiteral("target: null")));
-    QVERIFY(surfaceSource.contains(QStringLiteral(
-        "acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad")));
     QVERIFY(surfaceSource.contains(QStringLiteral("cursorShape: surface.canvasCursorShape()")));
-    QVERIFY(surfaceSource.contains(QStringLiteral(
-        "const handled = surface.zoomCanvasFromWheel(wheel.angleDelta.y, "
-        "wheel.pixelDelta.y);")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("const handled = surface.zoomCanvasFromWheel(wheel.angleDelta.y, "
+                       "wheel.pixelDelta.y);")));
     QVERIFY(surfaceSource.contains(QStringLiteral("wheel.accepted = handled;")));
     QCOMPARE(surfaceSource.count(QStringLiteral("surface.handleCanvasWheel(wheel);")), 3);
-    QVERIFY(!surfaceSource.contains(QStringLiteral(
-        "surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);")));
+    QVERIFY(!surfaceSource.contains(
+        QStringLiteral("surface.brushDeltaRequested(wheel.angleDelta.y > 0 ? 1 : -1);")));
 
     QVERIFY(pageSource.contains(
         QStringLiteral("function zoomCanvasFromWheel(angleDeltaY, pixelDeltaY)")));
-    QVERIFY(pageSource.contains(QStringLiteral(
-        "drawingSurface.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY);")));
-    QVERIFY(laserPointerSource.contains(QStringLiteral(
-        "signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("drawingSurface.zoomCanvasFromWheel(angleDeltaY, pixelDeltaY);")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)")));
     QVERIFY(!laserPointerSource.contains(
         QStringLiteral("function wheelZoomFactor(angleDeltaY, pixelDeltaY)")));
 }
@@ -332,20 +317,15 @@ void tst_MainQmlContract::manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque
     QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.updateNow()")));
     QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.cancelUpdate()")));
     QVERIFY(mainSource.contains(QStringLiteral("VincentUpdateManager.progress")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("enabled: VincentUpdateManager.selfUpdateSupported")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("visible: VincentUpdateManager.selfUpdateSupported")));
-    QVERIFY(updateManagerSource.contains(
-        QStringLiteral("GetCurrentPackageFullName")));
-    QVERIFY(updateManagerSource.contains(
-        QStringLiteral("APPMODEL_ERROR_NO_PACKAGE")));
-    QVERIFY(updateManagerSource.contains(
-        QStringLiteral("_MASReceipt/receipt")));
-    QVERIFY(updateManagerSource.contains(
-        QStringLiteral("IISACCDistributionChannel")));
-    QVERIFY(updateManagerSource.contains(
-        QStringLiteral("Vincent will not quit automatically")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("enabled: VincentUpdateManager.selfUpdateSupported")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("visible: VincentUpdateManager.selfUpdateSupported")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("GetCurrentPackageFullName")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("APPMODEL_ERROR_NO_PACKAGE")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("_MASReceipt/receipt")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("IISACCDistributionChannel")));
+    QVERIFY(updateManagerSource.contains(QStringLiteral("Vincent will not quit automatically")));
     QVERIFY(updateManagerSource.contains(QStringLiteral("platform safety policy")));
     QVERIFY(!updateManagerSource.contains(QStringLiteral("platform signature")));
     QVERIFY(updateManagerSource.contains(
@@ -356,14 +336,13 @@ void tst_MainQmlContract::manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque
         QStringLiteral("bool VincentUpdateManager::checkForUpdates()"), canCancelStart);
     QVERIFY(canCancelStart >= 0);
     QVERIFY(canCancelEnd > canCancelStart);
-    const QString canCancelBlock = updateManagerSource.mid(
-        canCancelStart, canCancelEnd - canCancelStart);
+    const QString canCancelBlock =
+        updateManagerSource.mid(canCancelStart, canCancelEnd - canCancelStart);
     QVERIFY(canCancelBlock.contains(QStringLiteral("State::Authorizing")));
     QVERIFY(canCancelBlock.contains(QStringLiteral("State::Downloading")));
     QVERIFY(canCancelBlock.contains(QStringLiteral("State::Verifying")));
     QVERIFY(canCancelBlock.contains(QStringLiteral("State::LaunchingInstaller")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("dismissOnBackground: !VincentUpdateManager.busy")));
+    QVERIFY(mainSource.contains(QStringLiteral("dismissOnBackground: !VincentUpdateManager.busy")));
 
     QVERIFY(!mainSource.contains(QStringLiteral("licenseKey")));
     QVERIFY(!mainSource.contains(QStringLiteral("signedUrl")));
@@ -372,7 +351,8 @@ void tst_MainQmlContract::manualUpdateFlowIsExplicitLvrsModalAndCredentialOpaque
     QVERIFY(!mainSource.contains(QStringLiteral("onInstallerLaunched: Qt.quit")));
 
     const qsizetype startupStart = mainSource.indexOf(QStringLiteral("Component.onCompleted:"));
-    const qsizetype startupEnd = mainSource.indexOf(QStringLiteral("\n    function "), startupStart);
+    const qsizetype startupEnd =
+        mainSource.indexOf(QStringLiteral("\n    function "), startupStart);
     QVERIFY(startupStart >= 0);
     QVERIFY(startupEnd > startupStart);
     const QString startupBlock = mainSource.mid(startupStart, startupEnd - startupStart);
@@ -406,12 +386,15 @@ void tst_MainQmlContract::applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragR
     QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString mainSource = QString::fromUtf8(mainQml.readAll());
 
-    QVERIFY(mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os === \"osx\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("&& visibility !== QtQuickWindow.Window.FullScreen")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os === \"osx\"")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("&& visibility !== QtQuickWindow.Window.FullScreen")));
     QVERIFY(!mainSource.contains(QStringLiteral("Qt.platform.os !== \"windows\"")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleHeight: 0")));
-    QVERIFY(!mainSource.contains(QStringLiteral("onTitlebarDragRequested: window.requestWindowMove()")));
+    QVERIFY(!mainSource.contains(
+        QStringLiteral("onTitlebarDragRequested: window.requestWindowMove()")));
     QVERIFY(!mainSource.contains(QStringLiteral("MouseArea")));
     QVERIFY(!mainSource.contains(QStringLiteral("DragHandler")));
 }
@@ -474,15 +457,18 @@ void tst_MainQmlContract::applicationWindowUsesDeferredCanvasIncubation()
 void tst_MainQmlContract::applicationWindowTemporarilyDisablesLicenseEnforcement()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
-    const QString activationPagePath = QFINDTESTDATA("../App/qml/license/LicenseActivationPage.qml");
+    const QString activationPagePath =
+        QFINDTESTDATA("../App/qml/license/LicenseActivationPage.qml");
     const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
     QVERIFY2(!activationPagePath.isEmpty(), "LicenseActivationPage.qml test data was not found");
     QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
 
-    auto readSource = [](const QString &path) {
+    auto readSource = [](const QString& path)
+    {
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
             return QString{};
         }
         return QString::fromUtf8(file.readAll());
@@ -495,21 +481,24 @@ void tst_MainQmlContract::applicationWindowTemporarilyDisablesLicenseEnforcement
     QVERIFY(!activationSource.isEmpty());
     QVERIFY(!appEntrySource.isEmpty());
 
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "!VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("!VincentLicenseManager.enforcementEnabled || VincentLicenseManager.licensed")));
-    QVERIFY(mainSource.contains(QStringLiteral("active: window.canvasIncubationRequested && window.licenseGranted")));
+        QStringLiteral("active: window.canvasIncubationRequested && window.licenseGranted")));
     QVERIFY(mainSource.contains(QStringLiteral("LicenseViews.LicenseActivationPage")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("visible: VincentLicenseManager.enforcementEnabled && !window.licenseGranted")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "visible: VincentLicenseManager.enforcementEnabled && !window.licenseGranted")));
     QVERIFY(mainSource.contains(QStringLiteral("objectName: \"licensePersistenceWarning\"")));
-    QVERIFY(!mainSource.contains(
-        QStringLiteral("width: Math.min(560, Math.max(320, parent.width")));
-    QVERIFY(!mainSource.contains(
-        QStringLiteral("width: Math.min(620, Math.max(320, parent.width")));
+    QVERIFY(
+        !mainSource.contains(QStringLiteral("width: Math.min(560, Math.max(320, parent.width")));
+    QVERIFY(
+        !mainSource.contains(QStringLiteral("width: Math.min(620, Math.max(320, parent.width")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("VincentLicenseManager.enforcementEnabled && window.licenseGranted && VincentLicenseManager.resultCode === "
+        QStringLiteral("VincentLicenseManager.enforcementEnabled && window.licenseGranted && "
+                       "VincentLicenseManager.resultCode === "
                        "\"secure_storage_unavailable\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "visible: window.licenseGranted && painterPageLoader.status !== Loader.Ready")));
 
     QVERIFY(activationSource.contains(QStringLiteral("LV.AppCard")));
     QVERIFY(!activationSource.contains(
@@ -519,13 +508,20 @@ void tst_MainQmlContract::applicationWindowTemporarilyDisablesLicenseEnforcement
     QVERIFY(activationSource.contains(QStringLiteral("objectName: \"licenseKeyInput\"")));
     QVERIFY(activationSource.contains(QStringLiteral("maximumLength: 254")));
     QVERIFY(activationSource.contains(QStringLiteral("echoMode: TextInput.Password")));
-    QVERIFY(activationSource.contains(QStringLiteral("Qt.ImhSensitiveData | Qt.ImhNoPredictiveText")));
-    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Verified account email\")")));
-    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Vincent license key\")")));
-    QVERIFY(activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Activate Vincent\")")));
-    QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.validateLicense(emailInput.text, licenseKeyInput.text)")));
-    QVERIFY(activationSource.contains(QStringLiteral("visible: VincentLicenseManager.hasStoredLicense")));
-    QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.retryStoredLicense()")));
+    QVERIFY(
+        activationSource.contains(QStringLiteral("Qt.ImhSensitiveData | Qt.ImhNoPredictiveText")));
+    QVERIFY(activationSource.contains(
+        QStringLiteral("Accessible.name: qsTr(\"Verified account email\")")));
+    QVERIFY(activationSource.contains(
+        QStringLiteral("Accessible.name: qsTr(\"Vincent license key\")")));
+    QVERIFY(
+        activationSource.contains(QStringLiteral("Accessible.name: qsTr(\"Activate Vincent\")")));
+    QVERIFY(activationSource.contains(QStringLiteral(
+        "VincentLicenseManager.validateLicense(emailInput.text, licenseKeyInput.text)")));
+    QVERIFY(activationSource.contains(
+        QStringLiteral("visible: VincentLicenseManager.hasStoredLicense")));
+    QVERIFY(
+        activationSource.contains(QStringLiteral("VincentLicenseManager.retryStoredLicense()")));
     QVERIFY(activationSource.contains(QStringLiteral("VincentLicenseManager.forgetLicense()")));
     QVERIFY(activationSource.contains(QStringLiteral("objectName: \"retryStoredLicenseButton\"")));
     QVERIFY(activationSource.contains(QStringLiteral("objectName: \"forgetStoredLicenseButton\"")));
@@ -536,7 +532,8 @@ void tst_MainQmlContract::applicationWindowTemporarilyDisablesLicenseEnforcement
 
     QVERIFY(appEntrySource.contains(
         QStringLiteral("new LicenseManager(LicenseManager::EnforcementMode::Disabled, &engine)")));
-    QVERIFY(appEntrySource.contains(QStringLiteral("setContextProperty(\"VincentLicenseManager\", licenseManager)")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("setContextProperty(\"VincentLicenseManager\", licenseManager)")));
 }
 
 void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
@@ -588,7 +585,8 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Fit Canvas to Window\")")));
     QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Reset Canvas View\")")));
     QVERIFY(mainSource.contains(QStringLiteral("title: qsTr(\"Keyboard Shortcuts\")")));
-    QVERIFY(mainSource.contains(QStringLiteral("text: qsTr(\"Vincent %1\").arg(Qt.application.version)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("text: qsTr(\"Vincent %1\").arg(Qt.application.version)")));
 }
 
 void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere()
@@ -614,7 +612,8 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QFile appEntry(appEntryPath);
     QVERIFY(appEntry.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString appEntrySource = QString::fromUtf8(appEntry.readAll());
-    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setApplicationVersion(QStringLiteral(VINCENT_VERSION))")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("QGuiApplication::setApplicationVersion(QStringLiteral(VINCENT_VERSION))")));
     QVERIFY(!appEntrySource.contains(QStringLiteral("AA_DontUseNativeMenuBar")));
 }
 
@@ -629,11 +628,13 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
 
     QVERIFY(mainSource.contains(
         QStringLiteral("readonly property string menuCommandModifier: \"Ctrl\"")));
-    QVERIFY(!mainSource.contains(QStringLiteral(
-        "Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property string shortcutSaveImageAs: menuCommandModifier + \"+S\"")));
+    QVERIFY(
+        !mainSource.contains(QStringLiteral("Qt.platform.os === \"osx\" ? \"Meta\" : \"Ctrl\"")));
     QVERIFY(mainSource.contains(QStringLiteral(
-        "readonly property string shortcutRedo: Qt.platform.os === \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\"")));
+        "readonly property string shortcutSaveImageAs: menuCommandModifier + \"+S\"")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("readonly property string shortcutRedo: Qt.platform.os "
+                                           "=== \"windows\" ? \"Ctrl+Y\" : \"Ctrl+Shift+Z\"")));
     QVERIFY(mainSource.contains(
         QStringLiteral("readonly property string shortcutToggleFullScreen: Qt.platform.os === "
                        "\"osx\" ? \"Meta+Ctrl+F\" : \"F11\"")));
@@ -644,62 +645,66 @@ void tst_MainQmlContract::applicationMenuAssignsShortcutContracts()
     QVERIFY(mainSource.contains(QStringLiteral("return \"Control\";")));
     QVERIFY(mainSource.contains(QStringLiteral("case \"Alt\":")));
     QVERIFY(mainSource.contains(QStringLiteral("return \"Option\";")));
-    QVERIFY(mainSource.contains(QStringLiteral("function shortcutReference(commandName, shortcutText)")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "return commandName + \" - \" + window.nativeShortcutText(shortcutText);")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("function shortcutReference(commandName, shortcutText)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("return commandName + \" - \" + window.nativeShortcutText(shortcutText);")));
 
     const QStringList actionShortcutContracts = {
-            QStringLiteral("shortcutNewCanvas|newCanvasAction"),
-            QStringLiteral("shortcutOpenImage|openImageAction"),
-            QStringLiteral("shortcutSaveImageAs|saveImageAsAction"),
-            QStringLiteral("shortcutClearCanvas|clearCanvasAction"),
-            QStringLiteral("shortcutQuit|quitAction"),
-            QStringLiteral("shortcutUndo|undoAction"),
-            QStringLiteral("shortcutRedo|redoAction"),
-            QStringLiteral("shortcutPasteImage|pasteImageAction"),
-            QStringLiteral("shortcutAddLayer|addLayerAction"),
-            QStringLiteral("shortcutDeleteCurrentLayer|deleteCurrentLayerAction"),
-            QStringLiteral("shortcutBrushTool|brushToolAction"),
-            QStringLiteral("shortcutEraserTool|eraserToolAction"),
-            QStringLiteral("shortcutHandPanTool|handPanToolAction"),
-            QStringLiteral("shortcutMoveTool|moveToolAction"),
-            QStringLiteral("shortcutZoomTool|zoomToolAction"),
-            QStringLiteral("shortcutShapeTool|shapeToolAction"),
-            QStringLiteral("shortcutFillTool|fillToolAction"),
-            QStringLiteral("shortcutTextTool|textToolAction"),
-            QStringLiteral("shortcutRectangleShape|rectangleShapeAction"),
-            QStringLiteral("shortcutEllipseShape|ellipseShapeAction"),
-            QStringLiteral("shortcutTriangleShape|triangleShapeAction"),
-            QStringLiteral("shortcutDiamondShape|diamondShapeAction"),
-            QStringLiteral("shortcutStarShape|starShapeAction"),
-            QStringLiteral("shortcutRectangleBubbleShape|rectangleBubbleShapeAction"),
-            QStringLiteral("shortcutEllipseBubbleShape|ellipseBubbleShapeAction"),
-            QStringLiteral("shortcutDecreaseBrushSize|decreaseBrushSizeAction"),
-            QStringLiteral("shortcutIncreaseBrushSize|increaseBrushSizeAction"),
-            QStringLiteral("shortcutFitCanvasToWindow|fitCanvasToWindowAction"),
-            QStringLiteral("shortcutResetCanvasView|resetCanvasViewAction"),
-            QStringLiteral("shortcutMinimizeWindow|minimizeWindowAction"),
-            QStringLiteral("shortcutToggleFullScreen|toggleFullScreenAction"),
+        QStringLiteral("shortcutNewCanvas|newCanvasAction"),
+        QStringLiteral("shortcutOpenImage|openImageAction"),
+        QStringLiteral("shortcutSaveImageAs|saveImageAsAction"),
+        QStringLiteral("shortcutClearCanvas|clearCanvasAction"),
+        QStringLiteral("shortcutQuit|quitAction"),
+        QStringLiteral("shortcutUndo|undoAction"),
+        QStringLiteral("shortcutRedo|redoAction"),
+        QStringLiteral("shortcutPasteImage|pasteImageAction"),
+        QStringLiteral("shortcutAddLayer|addLayerAction"),
+        QStringLiteral("shortcutDeleteCurrentLayer|deleteCurrentLayerAction"),
+        QStringLiteral("shortcutBrushTool|brushToolAction"),
+        QStringLiteral("shortcutEraserTool|eraserToolAction"),
+        QStringLiteral("shortcutHandPanTool|handPanToolAction"),
+        QStringLiteral("shortcutMoveTool|moveToolAction"),
+        QStringLiteral("shortcutZoomTool|zoomToolAction"),
+        QStringLiteral("shortcutShapeTool|shapeToolAction"),
+        QStringLiteral("shortcutFillTool|fillToolAction"),
+        QStringLiteral("shortcutTextTool|textToolAction"),
+        QStringLiteral("shortcutRectangleShape|rectangleShapeAction"),
+        QStringLiteral("shortcutEllipseShape|ellipseShapeAction"),
+        QStringLiteral("shortcutTriangleShape|triangleShapeAction"),
+        QStringLiteral("shortcutDiamondShape|diamondShapeAction"),
+        QStringLiteral("shortcutStarShape|starShapeAction"),
+        QStringLiteral("shortcutRectangleBubbleShape|rectangleBubbleShapeAction"),
+        QStringLiteral("shortcutEllipseBubbleShape|ellipseBubbleShapeAction"),
+        QStringLiteral("shortcutDecreaseBrushSize|decreaseBrushSizeAction"),
+        QStringLiteral("shortcutIncreaseBrushSize|increaseBrushSizeAction"),
+        QStringLiteral("shortcutFitCanvasToWindow|fitCanvasToWindowAction"),
+        QStringLiteral("shortcutResetCanvasView|resetCanvasViewAction"),
+        QStringLiteral("shortcutMinimizeWindow|minimizeWindowAction"),
+        QStringLiteral("shortcutToggleFullScreen|toggleFullScreenAction"),
     };
 
     QVERIFY(mainSource.contains(QStringLiteral("Controls.Action {")));
     QVERIFY(!mainSource.contains(QStringLiteral("Shortcut {")));
 
-    for (const QString &actionShortcutContract : actionShortcutContracts) {
+    for (const QString& actionShortcutContract : actionShortcutContracts)
+    {
         const QStringList parts = actionShortcutContract.split(QLatin1Char('|'));
         QCOMPARE(parts.size(), 2);
         const QString shortcutContract = parts.at(0);
         const QString actionId = parts.at(1);
 
-        QVERIFY2(mainSource.contains(QStringLiteral("readonly property string ") + shortcutContract),
-                 qPrintable(shortcutContract + QStringLiteral(" property is missing")));
+        QVERIFY2(
+            mainSource.contains(QStringLiteral("readonly property string ") + shortcutContract),
+            qPrintable(shortcutContract + QStringLiteral(" property is missing")));
         QVERIFY2(mainSource.contains(QStringLiteral("id: ") + actionId),
                  qPrintable(actionId + QStringLiteral(" action is missing")));
         QVERIFY2(mainSource.contains(QStringLiteral("shortcut: window.") + shortcutContract),
                  qPrintable(shortcutContract + QStringLiteral(" action shortcut is missing")));
         QVERIFY2(mainSource.contains(QStringLiteral("action: ") + actionId),
                  qPrintable(actionId + QStringLiteral(" menu binding is missing")));
-        QVERIFY2(mainSource.contains(QStringLiteral(", window.") + shortcutContract + QStringLiteral(")")),
+        QVERIFY2(mainSource.contains(QStringLiteral(", window.") + shortcutContract +
+                                     QStringLiteral(")")),
                  qPrintable(shortcutContract + QStringLiteral(" help reference is missing")));
     }
 }
@@ -709,8 +714,7 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
     const QString preferencesQmlPath =
         QFINDTESTDATA("../App/qml/preferences/PreferencesWindow.qml");
-    const QString painterPageQmlPath =
-        QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
     const QString rootCMakePath = QFINDTESTDATA("../CMakeLists.txt");
     const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
@@ -719,9 +723,11 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY2(!rootCMakePath.isEmpty(), "CMakeLists.txt test data was not found");
     QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
 
-    auto readSource = [](const QString &path) {
+    auto readSource = [](const QString& path)
+    {
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
             return QString{};
         }
         return QString::fromUtf8(file.readAll());
@@ -738,10 +744,9 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(!cmakeSource.isEmpty());
     QVERIFY(!appEntrySource.isEmpty());
 
-    QVERIFY(mainSource.contains(
-        QStringLiteral("import \"./preferences\" as PreferencesViews")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("readonly property string shortcutPreferences: menuCommandModifier + \"+,\"")));
+    QVERIFY(mainSource.contains(QStringLiteral("import \"./preferences\" as PreferencesViews")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "readonly property string shortcutPreferences: menuCommandModifier + \"+,\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function requestPreferences()")));
     const qsizetype refreshAccountEmailIndex =
         mainSource.indexOf(QStringLiteral("VincentAccountManager.refresh();"));
@@ -771,47 +776,76 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(mainSource.contains(QStringLiteral("PreferencesViews.PreferencesWindow {")));
     QVERIFY(mainSource.contains(QStringLiteral("id: preferencesWindow")));
     QVERIFY(mainSource.contains(QStringLiteral("transientParent: window")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("updateCheckEnabled: checkForUpdatesAction.enabled")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("accountEmail: VincentAccountManager.accountEmail")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("updateCheckEnabled: checkForUpdatesAction.enabled")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("accountEmail: VincentAccountManager.accountEmail")));
     QVERIFY(mainSource.contains(
         QStringLiteral("accountEmailLoading: VincentAccountManager.accountEmailLoading")));
     QVERIFY(!mainSource.contains(QStringLiteral("VincentLicenseManager.accountEmail")));
     QVERIFY(appEntrySource.contains(QStringLiteral("new AccountManager(licenseManager, &engine)")));
     QVERIFY(appEntrySource.contains(
         QStringLiteral("setContextProperty(\"VincentAccountManager\", accountManager)")));
-    QVERIFY(cmakeSource.contains(QStringLiteral("find_package(iiLicenseManager 0.2 CONFIG REQUIRED)")));
+    QVERIFY(
+        cmakeSource.contains(QStringLiteral("find_package(iiLicenseManager 0.2 CONFIG REQUIRED)")));
     QVERIFY(cmakeSource.contains(QStringLiteral("iiLicenseManager::iiLicenseManager")));
     QVERIFY(mainSource.contains(QStringLiteral(
         "startWithRecentCanvas: VincentApplicationPreferences.startWithRecentCanvas")));
     QVERIFY(mainSource.contains(QStringLiteral(
         "discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "currentCanvasMemberProfiles: window.canvasPage ? "
-        "window.canvasPage.collaboratorProfiles : []")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "currentUserIsCanvasHost: window.canvasPage ? "
-        "window.canvasPage.currentUserIsCanvasHost : true")));
-    QVERIFY(appEntrySource.contains(QStringLiteral(
-        "setContextProperty(\"VincentMemberProfileListBuilder\",")));
-    QVERIFY(mainSource.contains(QStringLiteral("onAddCanvasMemberRequested:")));
-    QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.requestAddCollaborator();")));
+    QVERIFY(mainSource.contains(QStringLiteral("currentCanvasMemberProfiles: window.canvasPage ? "
+                                               "window.canvasPage.collaboratorProfiles : []")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("currentUserIsCanvasHost: window.canvasPage ? "
+                                           "window.canvasPage.currentUserIsCanvasHost : true")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("localCanvasState: VincentLocalCanvasSession.state")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("localCanvasError: VincentLocalCanvasSession.errorString")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("localCanvasParticipantCount: VincentLocalCanvasSession.participantCount")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("availableLocalCanvases: VincentLocalCanvasSession.availableCanvases")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("availableLocalInvitees: VincentLocalCanvasSession.availableInvitees")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("setContextProperty(\"VincentMemberProfileListBuilder\",")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("setContextProperty(\"VincentLocalCanvasSession\", localCanvasSession)")));
+    QVERIFY(mainSource.contains(QStringLiteral("onCanInviteOtherUsersChanged: {")));
+    QVERIFY(mainSource.contains(QStringLiteral("if (canInviteOtherUsers) {")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentApplicationPreferences.setDiscoverNearbyVincentUsers(true);")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentLocalCanvasSession.setInvitationsAllowed(canInviteOtherUsers);")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("onInviteCanvasMemberRequested: function (sessionId)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentLocalCanvasSession.invitePeer(sessionId, profileName);")));
     QVERIFY(mainSource.contains(QStringLiteral("onDeleteCanvasMemberRequested:")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentLocalCanvasSession.removeParticipant(String(profile.peerId));")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onStartWithRecentCanvasRequested: enabled => "
+                       "VincentApplicationPreferences.setStartWithRecentCanvas(enabled)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onDiscoverNearbyVincentUsersRequested: function (enabled)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled);")));
+    QVERIFY(mainSource.contains(QStringLiteral("VincentLocalCanvasSession.stopSession();")));
     QVERIFY(mainSource.contains(QStringLiteral(
-        "window.canvasPage.requestRemoveCollaborator(profile, index);")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "onStartWithRecentCanvasRequested: enabled => "
-        "VincentApplicationPreferences.setStartWithRecentCanvas(enabled)")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "onDiscoverNearbyVincentUsersRequested: enabled => "
-        "VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled)")));
+        "onProfileNameChanged: VincentLocalCanvasSession.setLocalProfileName(profileName)")));
+    QVERIFY(mainSource.contains(QStringLiteral("onHostCanvasRequested:")));
+    QVERIFY(mainSource.contains(QStringLiteral("onJoinCanvasRequested: function (sessionId)")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("VincentLocalCanvasSession.joinCanvas(sessionId, profileName);")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onLeaveCanvasRequested: VincentLocalCanvasSession.stopSession()")));
     QVERIFY(mainSource.contains(
         QStringLiteral("onRestorePurchasesRequested: window.requestRestorePurchases()")));
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()")));
     QVERIFY(mainSource.contains(
-        QStringLiteral("function requestUpdateCheckFromPreferences()")));
+        QStringLiteral("onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()")));
+    QVERIFY(mainSource.contains(QStringLiteral("function requestUpdateCheckFromPreferences()")));
     const qsizetype hidePreferencesForUpdateIndex =
         mainSource.indexOf(QStringLiteral("preferencesWindow.hide();"));
     const qsizetype triggerUpdateFromPreferencesIndex =
@@ -821,44 +855,46 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(mainSource.contains(QStringLiteral(
         "readonly property url accountDashboardUrl: \"https://iisacc.com/Account/Dashboard\"")));
     QVERIFY(mainSource.contains(QStringLiteral("function requestRestorePurchases()")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("Qt.openUrlExternally(window.accountDashboardUrl)")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("Qt.openUrlExternally(window.accountDashboardUrl)")));
     QVERIFY(mainSource.contains(QStringLiteral("function acceptCanvasPage(page)")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("VincentApplicationPreferences.startWithRecentCanvas")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("VincentApplicationPreferences.startWithRecentCanvas")));
     QVERIFY(mainSource.contains(QStringLiteral("VincentApplicationPreferences.recentCanvasUrl")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("VincentApplicationPreferences.clearRecentCanvas();")));
-    QVERIFY(mainSource.contains(
-        QStringLiteral("onPageReady: window.acceptCanvasPage(painterPage)")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("VincentApplicationPreferences.clearRecentCanvas();")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("onPageReady: window.acceptCanvasPage(painterPage)")));
     QVERIFY(mainSource.contains(QStringLiteral("page.openRecentCanvas(recentCanvasUrl)")));
     QVERIFY(!mainSource.contains(QStringLiteral("onCanvasFileActivated:")));
     QVERIFY(mainSource.contains(QStringLiteral("onClosing: event =>")));
     QVERIFY(mainSource.contains(QStringLiteral("window.canvasPage.flushRecentCanvasSave();")));
 
-    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationName(QStringLiteral(\"iisacc\"))")));
-    QVERIFY(appEntrySource.contains(QStringLiteral("QGuiApplication::setOrganizationDomain(QStringLiteral(\"iisacc.com\"))")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("QGuiApplication::setOrganizationName(QStringLiteral(\"iisacc\"))")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("QGuiApplication::setOrganizationDomain(QStringLiteral(\"iisacc.com\"))")));
     QVERIFY(appEntrySource.contains(QStringLiteral("new ApplicationPreferences(&engine)")));
-    QVERIFY(appEntrySource.contains(QStringLiteral(
-        "setContextProperty(\"VincentApplicationPreferences\",")));
+    QVERIFY(appEntrySource.contains(
+        QStringLiteral("setContextProperty(\"VincentApplicationPreferences\",")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("LV.Window {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"preferencesWindow\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("visible: false")));
     QVERIFY(preferencesSource.contains(QStringLiteral("title: qsTr(\"Preferences\")")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool initialCenteringApplied: false")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property bool initialCenteringApplied: false")));
     QVERIFY(preferencesSource.contains(QStringLiteral("function applyInitialCentering()")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "if (initialCenteringApplied || !transientParent)")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "const parentCenterX = transientParent.x + transientParent.width / 2;")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "const parentCenterY = transientParent.y + transientParent.height / 2;")));
     QVERIFY(preferencesSource.contains(
-        QStringLiteral("x = Math.round(parentCenterX - width / 2);")));
+        QStringLiteral("if (initialCenteringApplied || !transientParent)")));
     QVERIFY(preferencesSource.contains(
-        QStringLiteral("y = Math.round(parentCenterY - height / 2);")));
+        QStringLiteral("const parentCenterX = transientParent.x + transientParent.width / 2;")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("const parentCenterY = transientParent.y + transientParent.height / 2;")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("x = Math.round(parentCenterX - width / 2);")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("y = Math.round(parentCenterY - height / 2);")));
     QVERIFY(preferencesSource.contains(QStringLiteral("initialCenteringApplied = true;")));
     QVERIFY(preferencesSource.contains(QStringLiteral("function showGeneralSection()")));
     QVERIFY(preferencesSource.contains(QStringLiteral("generalSectionButton.checked = true;")));
@@ -866,54 +902,64 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         "readonly property url profileImageSource: VincentProfileImageProcessor.imageSource")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("property alias profileName: profileNameField.text")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "property alias canInviteOtherUsers: inviteOtherUsersCheckBox.checked")));
     QVERIFY(preferencesSource.contains(
-        QStringLiteral("property string accountEmail: \"\"")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool accountEmailLoading: false")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool startWithRecentCanvas: false")));
+        QStringLiteral("property alias canInviteOtherUsers: inviteOtherUsersCheckBox.checked")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property string accountEmail: \"\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property bool accountEmailLoading: false")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property bool startWithRecentCanvas: false")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("property bool discoverNearbyVincentUsers: true")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property bool restorePurchasesEnabled: true")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property bool updateCheckEnabled: false")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property var currentCanvasMemberProfiles: []")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property bool currentUserIsCanvasHost: true")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property string localCanvasState: \"idle\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property string localCanvasError: \"\"")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("property int localCanvasParticipantCount: 0")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property var availableLocalCanvases: []")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("property var availableLocalInvitees: []")));
     QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool restorePurchasesEnabled: true")));
+        QStringLiteral("readonly property bool localCanvasActive: localCanvasState !== \"idle\"")));
     QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool updateCheckEnabled: false")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("property var currentCanvasMemberProfiles: []")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("property bool currentUserIsCanvasHost: true")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "readonly property var displayedCanvasMemberProfiles: "
-        "VincentMemberProfileListBuilder.build(")));
+        QStringLiteral("readonly property var displayedCanvasMemberProfiles: "
+                       "VincentMemberProfileListBuilder.build(")));
     QVERIFY(preferencesSource.contains(QStringLiteral("signal restorePurchasesRequested")));
     QVERIFY(preferencesSource.contains(QStringLiteral("signal checkForUpdatesRequested")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("signal startWithRecentCanvasRequested(bool enabled)")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("signal discoverNearbyVincentUsersRequested(bool enabled)")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("signal addCanvasMemberRequested")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "signal deleteCanvasMemberRequested(var profile, int index)")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("signal inviteCanvasMemberRequested(string sessionId)")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("signal deleteCanvasMemberRequested(var profile, int index)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("signal hostCanvasRequested")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("signal joinCanvasRequested(string sessionId)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("signal leaveCanvasRequested")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("Dialogs.FileDialog {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageDialog")));
     QVERIFY(preferencesSource.contains(QStringLiteral("title: qsTr(\"Choose profile image\")")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "onAccepted: VincentProfileImageProcessor.processProfileImage(selectedFile)")));
-    QVERIFY(!preferencesSource.contains(QStringLiteral(
-        "preferencesWindow.profileImageSource = selectedFile")));
+    QVERIFY(!preferencesSource.contains(
+        QStringLiteral("preferencesWindow.profileImageSource = selectedFile")));
 
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.LabelSegmentedControl {")), 1);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: preferencesSectionHeader")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("objectName: \"preferencesSectionHeader\"")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"preferencesSectionHeader\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("anchors.top: parent.top")));
     QVERIFY(preferencesSource.contains(QStringLiteral("anchors.topMargin: LV.Theme.gap24")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
-    QCOMPARE(preferencesSource.count(QStringLiteral("LV.LabelButton {")), 5);
+    QCOMPARE(preferencesSource.count(QStringLiteral("LV.LabelButton {")), 8);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: generalSectionButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"General\")")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSectionButton")));
@@ -933,8 +979,8 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QCOMPARE(preferencesSource.count(QStringLiteral("checked: true")), 1);
     QCOMPARE(preferencesSource.count(QStringLiteral("checkable: true")), 3);
     QCOMPARE(preferencesSource.count(QStringLiteral("autoExclusive: true")), 5);
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("anchors.top: preferencesSectionHeader.bottom")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("anchors.top: preferencesSectionHeader.bottom")));
     QVERIFY(!preferencesSource.contains(QStringLiteral("id: profileSectionHeader")));
     QVERIFY(!preferencesSource.contains(QStringLiteral("id: profileSectionIcon")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileSettings")));
@@ -965,12 +1011,11 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
         QStringLiteral("checked: preferencesWindow.startWithRecentCanvas")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("preferencesWindow.startWithRecentCanvasRequested(true)")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "id: discoverNearbyVincentUsersCheckBox")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "text: qsTr(\"Discover nearby Vincent users\")")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "checked: preferencesWindow.discoverNearbyVincentUsers")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: discoverNearbyVincentUsersCheckBox")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("text: qsTr(\"Discover nearby Vincent users\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("checked: preferencesWindow.discoverNearbyVincentUsers")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "onToggled: preferencesWindow.discoverNearbyVincentUsersRequested(checked)")));
     QCOMPARE(preferencesSource.count(QStringLiteral("onToggled:")), 3);
@@ -981,19 +1026,33 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.Spacer {")), 1);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: restorePurchasesButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Restore Purchases\")")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "enabled: preferencesWindow.restorePurchasesEnabled")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "onClicked: preferencesWindow.restorePurchasesRequested()")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("enabled: preferencesWindow.restorePurchasesEnabled")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("onClicked: preferencesWindow.restorePurchasesRequested()")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: checkForUpdatesButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Check for Updates…\")")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "enabled: preferencesWindow.updateCheckEnabled")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "onClicked: preferencesWindow.checkForUpdatesRequested()")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("enabled: preferencesWindow.updateCheckEnabled")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("onClicked: preferencesWindow.checkForUpdatesRequested()")));
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.List {")), 1);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: membersSettings")));
     QVERIFY(preferencesSource.contains(QStringLiteral("visible: membersSectionButton.checked")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: localCanvasJoinMenu")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("items: preferencesWindow.localCanvasJoinItems()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: localCanvasActions")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: localCanvasStatusLabel")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: shareCanvasButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Share canvas\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("onClicked: preferencesWindow.hostCanvasRequested()")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: joinCanvasButton")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("text: qsTr(\"Join nearby…\")")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: leaveCanvasButton")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("onClicked: preferencesWindow.leaveCanvasRequested()")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: memberProfileDelegate")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: memberList")));
     QVERIFY(preferencesSource.contains(QStringLiteral("objectName: \"memberList\"")));
@@ -1006,19 +1065,17 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     const QString membersSettingsSource =
         preferencesSource.mid(membersSettingsIndex, memberListIndex - membersSettingsIndex);
     const QString memberListSource = preferencesSource.mid(memberListIndex);
-    QVERIFY(membersSettingsSource.contains(
-        QStringLiteral("anchors.topMargin: LV.Theme.gap20")));
-    QVERIFY(memberListSource.contains(QStringLiteral("anchors.top: parent.top")));
+    QVERIFY(membersSettingsSource.contains(QStringLiteral("anchors.topMargin: LV.Theme.gap20")));
+    QVERIFY(memberListSource.contains(QStringLiteral("anchors.top: localCanvasActions.bottom")));
+    QVERIFY(memberListSource.contains(QStringLiteral("anchors.topMargin: LV.Theme.gap12")));
     QVERIFY(memberListSource.contains(QStringLiteral("anchors.bottom: parent.bottom")));
-    QVERIFY(memberListSource.contains(
-        QStringLiteral("anchors.bottomMargin: LV.Theme.gap24")));
+    QVERIFY(memberListSource.contains(QStringLiteral("anchors.bottomMargin: LV.Theme.gap24")));
     QVERIFY(memberListSource.contains(
         QStringLiteral("anchors.horizontalCenter: parent.horizontalCenter")));
     QVERIFY(!memberListSource.contains(QStringLiteral("height: implicitHeight")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("listWidth: LV.Theme.scaleMetric(237)")));
-    QVERIFY(preferencesSource.contains(
-        QStringLiteral("minimumListHeight: LV.Theme.scaleMetric(231)")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("listWidth: LV.Theme.scaleMetric(237)")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("minimumListHeight: LV.Theme.scaleMetric(231)")));
     QVERIFY(preferencesSource.contains(
         QStringLiteral("model: preferencesWindow.displayedCanvasMemberProfiles")));
     QVERIFY(preferencesSource.contains(QStringLiteral("labelRole: \"displayName\"")));
@@ -1032,67 +1089,98 @@ void tst_MainQmlContract::applicationProvidesProfilePreferencesWindow()
     QVERIFY(preferencesSource.contains(QStringLiteral("iconName: \"\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("iconGlyph: \" \"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("enabled: false")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "preferencesWindow.addCanvasMemberRequested();")));
+    QVERIFY(preferencesSource.contains(QStringLiteral("id: localCanvasInviteMenu")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("items: preferencesWindow.localCanvasInviteItems()")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("preferencesWindow.inviteCanvasMemberRequested(String(item.sessionId));")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("localCanvasInviteMenu.openFor(memberList, 0, memberList.height)")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "const sourceProfile = memberList.roleValue(selectedProfile, \"sourceProfile\",")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "const sourceIndex = memberList.roleValue(selectedProfile, \"sourceIndex\", -1);")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "preferencesWindow.deleteCanvasMemberRequested(sourceProfile, sourceIndex);")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("property var collaboratorProfiles: []")));
+    QVERIFY(
+        painterPageSource.contains(QStringLiteral("property bool currentUserIsCanvasHost: true")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("property var localCanvasSession: null")));
+    QVERIFY(mainSource.contains(QStringLiteral("localCanvasSession: VincentLocalCanvasSession")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("collaboratorProfiles: VincentLocalCanvasSession.participantProfiles")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("currentUserIsCanvasHost: VincentLocalCanvasSession.currentUserIsHost")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("pendingInvitation: VincentLocalCanvasSession.pendingInvitation")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "pendingInvitationCount: VincentLocalCanvasSession.pendingInvitationCount")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("onInvitationResponseRequested: accepted => "
+                       "VincentLocalCanvasSession.respondToPendingInvitation(accepted, "
+                       "preferencesWindow.profileName)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("signal collaboratorInvitationRequested")));
     QVERIFY(painterPageSource.contains(
-        QStringLiteral("property var collaboratorProfiles: []")));
+        QStringLiteral("signal invitationResponseRequested(bool accepted)")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("property var pendingInvitation: ({})")));
+    QVERIFY(painterPageSource.contains(QStringLiteral("property int pendingInvitationCount: 0")));
     QVERIFY(painterPageSource.contains(
-        QStringLiteral("property bool currentUserIsCanvasHost: true")));
+        QStringLiteral("pendingInvitation: painterPage.pendingInvitation")));
     QVERIFY(painterPageSource.contains(
-        QStringLiteral("signal collaboratorInvitationRequested")));
-    QVERIFY(painterPageSource.contains(QStringLiteral(
-        "signal collaboratorRemovalRequested(var profile, int index)")));
+        QStringLiteral("pendingInvitationCount: painterPage.pendingInvitationCount")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("onInvitationResponseRequested: accepted => "
+                       "painterPage.invitationResponseRequested(accepted)")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("signal collaboratorRemovalRequested(var profile, int index)")));
     QVERIFY(painterPageSource.contains(QStringLiteral("function requestAddCollaborator()")));
-    QVERIFY(painterPageSource.contains(QStringLiteral(
-        "function requestRemoveCollaborator(profile, index)")));
+    QVERIFY(painterPageSource.contains(
+        QStringLiteral("function requestRemoveCollaborator(profile, index)")));
 
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageButton")));
     QVERIFY(preferencesSource.contains(QStringLiteral("tone: LV.AbstractButton.Borderless")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("shapeStyle: profileImageButton.shapeCylinder")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "readonly property int avatarInset: Math.max(0, Math.round((avatarSize - iconSize) / 2))")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("shapeStyle: profileImageButton.shapeCylinder")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("readonly property int avatarInset: Math.max(0, "
+                                                  "Math.round((avatarSize - iconSize) / 2))")));
     QVERIFY(preferencesSource.contains(QStringLiteral("horizontalPadding: avatarInset")));
     QVERIFY(preferencesSource.contains(QStringLiteral("verticalPadding: avatarInset")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("iconSource: preferencesWindow.profileImageSource")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("iconSource: preferencesWindow.profileImageSource")));
     QVERIFY(preferencesSource.contains(QStringLiteral("LV.ContextMenu {")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageMenuItemDelegate")));
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileImageMenu")));
-    QVERIFY(preferencesSource.contains(QStringLiteral("itemDelegate: profileImageMenuItemDelegate")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("itemDelegate: profileImageMenuItemDelegate")));
     QVERIFY(preferencesSource.contains(QStringLiteral("showIconSlot: false")));
     QVERIFY(preferencesSource.contains(QStringLiteral("Accessible.name: label")));
     QVERIFY(preferencesSource.contains(QStringLiteral("label: qsTr(\"Select profile image\")")));
     QVERIFY(preferencesSource.contains(QStringLiteral("action: \"select\"")));
     QVERIFY(preferencesSource.contains(QStringLiteral("label: qsTr(\"Delete profile image\")")));
     QVERIFY(preferencesSource.contains(QStringLiteral("action: \"delete\"")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "enabled: preferencesWindow.profileImageSource.toString().length > 0")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("enabled: preferencesWindow.profileImageSource.toString().length > 0")));
     QVERIFY(preferencesSource.contains(QStringLiteral("onItemTriggered: function (index, item)")));
     QVERIFY(preferencesSource.contains(QStringLiteral("Qt.callLater(function ()")));
     QVERIFY(preferencesSource.contains(QStringLiteral("profileImageDialog.open();")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "VincentProfileImageProcessor.clearProfileImage();")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("VincentProfileImageProcessor.clearProfileImage();")));
     QVERIFY(preferencesSource.contains(QStringLiteral(
         "onClicked: profileImageMenu.openFor(profileImageButton, 0, profileImageButton.height)")));
     QVERIFY(!preferencesSource.contains(QStringLiteral("onClicked: profileImageDialog.open()")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "Accessible.name: qsTr(\"Profile image options\")")));
+    QVERIFY(preferencesSource.contains(
+        QStringLiteral("Accessible.name: qsTr(\"Profile image options\")")));
 
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.InputField {")), 1);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: profileNameField")));
     QVERIFY(preferencesSource.contains(QStringLiteral("placeholder: qsTr(\"Profile name\")")));
     QCOMPARE(preferencesSource.count(QStringLiteral("LV.CheckBox {")), 2);
     QVERIFY(preferencesSource.contains(QStringLiteral("id: inviteOtherUsersCheckBox")));
-    QVERIFY(preferencesSource.contains(QStringLiteral(
-        "text: qsTr(\"Allow inviting other users\")")));
+    QVERIFY(
+        preferencesSource.contains(QStringLiteral("text: qsTr(\"Allow inviting other users\")")));
     QVERIFY(!preferencesSource.contains(QStringLiteral("preferencesPlaceholderButton")));
-    QVERIFY(cmakeSource.contains(
-        QStringLiteral("App/qml/preferences/PreferencesWindow.qml")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("App/qml/preferences/PreferencesWindow.qml")));
 }
 
 void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts()
@@ -1106,9 +1194,11 @@ void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts(
     QVERIFY2(!toolbarQmlPath.isEmpty(), "CanvasToolBar.qml test data was not found");
     QVERIFY2(!surfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
 
-    auto readSource = [](const QString &path) {
+    auto readSource = [](const QString& path)
+    {
         QFile file(path);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
             return QString{};
         }
         return QString::fromUtf8(file.readAll());
@@ -1123,13 +1213,16 @@ void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts(
     QVERIFY(!toolbarSource.isEmpty());
     QVERIFY(!surfaceSource.isEmpty());
 
-    QVERIFY(pageSource.contains(QStringLiteral("readonly property bool dialogActive: canvasToolBar.dialogActive")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("readonly property bool dialogActive: canvasToolBar.dialogActive")));
     QVERIFY(pageSource.contains(
         QStringLiteral("readonly property bool textEditingActive: drawingSurface.textEditingActive "
                        "|| painterPage.layerRenameActive")));
-    QVERIFY(pageSource.contains(QStringLiteral("toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive")));
+    QVERIFY(pageSource.contains(QStringLiteral(
+        "toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive")));
     QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasCommandsEnabled")));
-    QVERIFY(mainSource.contains(QStringLiteral("readonly property bool canvasEditingCommandsEnabled")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("readonly property bool canvasEditingCommandsEnabled")));
     QVERIFY(mainSource.contains(QStringLiteral("enabled: window.canvasCommandsEnabled")));
     QVERIFY(mainSource.contains(QStringLiteral("enabled: window.canvasEditingCommandsEnabled")));
 
@@ -1139,21 +1232,19 @@ void tst_MainQmlContract::applicationActionsAreTheOnlyOwnersOfPortableShortcuts(
     QVERIFY(!toolbarSource.contains(QStringLiteral("Meta+Shift+K")));
 
     const QStringList latinToolSequences = {
-            QStringLiteral("sequences: [\"B\", \"ㅠ\"]"),
-            QStringLiteral("sequences: [\"E\", \"ㄷ\"]"),
-            QStringLiteral("sequences: [\"H\", \"ㅗ\"]"),
-            QStringLiteral("sequences: [\"V\", \"ㅍ\"]"),
-            QStringLiteral("sequences: [\"Z\", \"ㅋ\"]"),
-            QStringLiteral("sequences: [\"U\", \"ㅕ\"]"),
-            QStringLiteral("sequences: [\"G\", \"ㅎ\"]"),
-            QStringLiteral("sequences: [\"T\", \"ㅅ\"]"),
+        QStringLiteral("sequences: [\"B\", \"ㅠ\"]"), QStringLiteral("sequences: [\"E\", \"ㄷ\"]"),
+        QStringLiteral("sequences: [\"H\", \"ㅗ\"]"), QStringLiteral("sequences: [\"V\", \"ㅍ\"]"),
+        QStringLiteral("sequences: [\"Z\", \"ㅋ\"]"), QStringLiteral("sequences: [\"U\", \"ㅕ\"]"),
+        QStringLiteral("sequences: [\"G\", \"ㅎ\"]"), QStringLiteral("sequences: [\"T\", \"ㅅ\"]"),
     };
-    for (const QString &sequence : latinToolSequences) {
+    for (const QString& sequence : latinToolSequences)
+    {
         QVERIFY2(!surfaceSource.contains(sequence), qPrintable(sequence));
     }
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"ㅠ\"]")));
     QVERIFY(surfaceSource.contains(QStringLiteral("sequences: [\"ㄷ\"]")));
-    QVERIFY(surfaceSource.contains(QStringLiteral("enabled: surface.toolShortcutsEnabled && !surface.textEditingActive")));
+    QVERIFY(surfaceSource.contains(
+        QStringLiteral("enabled: surface.toolShortcutsEnabled && !surface.textEditingActive")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [\"[\"]")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [\"]\"]")));
     QVERIFY(!surfaceSource.contains(QStringLiteral("sequences: [StandardKey.Undo]")));

@@ -47,6 +47,8 @@ target_sources(Vincent PRIVATE
         models/license/accountmanager.h
         models/license/licensecredentialstore.cpp
         models/license/licensecredentialstore.h
+        models/network/localcanvassession.cpp
+        models/network/localcanvassession.h
         models/network/nearbyvincentdiscovery.cpp
         models/network/nearbyvincentdiscovery.h
         models/painting/drawingsurfaceitem.cpp

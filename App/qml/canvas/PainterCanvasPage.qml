@@ -26,8 +26,11 @@ Item {
 
     property int topChromeReservedHeight: 0
     property var vm: null
+    property var localCanvasSession: null
     property var collaboratorProfiles: []
     property bool currentUserIsCanvasHost: true
+    property var pendingInvitation: ({})
+    property int pendingInvitationCount: 0
     property bool layerRenameActive: false
     property string layerRenameKey: ""
     property string layerRenameActivationKey: ""
@@ -38,12 +41,14 @@ Item {
     property real layerRenameEditorHeight: 20
     property bool recentCanvasTrackingEnabled: false
     property bool recentCanvasSaveInProgress: false
+    property bool applyingRemoteCanvasSnapshot: false
 
     signal pageReady
     signal clipboardImagePasteFailed(string errorCode)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
     signal presentationModeRequested
+    signal invitationResponseRequested(bool accepted)
     signal collaboratorInvitationRequested
     signal collaboratorRemovalRequested(var profile, int index)
 
@@ -104,6 +109,69 @@ Item {
         interval: 1200
         repeat: false
         onTriggered: painterPage.saveRecentCanvasNow()
+    }
+
+    Timer {
+        id: localCanvasPublishTimer
+
+        interval: 350
+        repeat: false
+        onTriggered: painterPage.publishLocalCanvasSnapshotNow()
+    }
+
+    function handleCanvasSessionChanged() {
+        painterPage.scheduleRecentCanvasSave();
+        painterPage.scheduleLocalCanvasPublish();
+    }
+
+    function scheduleLocalCanvasPublish() {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.active || painterPage.applyingRemoteCanvasSnapshot) {
+            return;
+        }
+        localCanvasPublishTimer.restart();
+    }
+
+    function publishLocalCanvasSnapshotNow() {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.active || painterPage.applyingRemoteCanvasSnapshot || !drawingSurface.canvasItemReady) {
+            return false;
+        }
+        if (drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive) {
+            localCanvasPublishTimer.restart();
+            return false;
+        }
+        return painterPage.localCanvasSession.publishSnapshot(drawingSurface.canvasSessionSnapshot());
+    }
+
+    function applyRemoteCanvasSnapshot(snapshot) {
+        localCanvasPublishTimer.stop();
+        painterPage.applyingRemoteCanvasSnapshot = true;
+        const applied = drawingSurface.applyCanvasSessionSnapshot(snapshot);
+        if (!applied) {
+            painterPage.applyingRemoteCanvasSnapshot = false;
+        }
+        return applied;
+    }
+
+    function finishRemoteCanvasRestore(success) {
+        if (!painterPage.applyingRemoteCanvasSnapshot) {
+            return;
+        }
+        painterPage.applyingRemoteCanvasSnapshot = false;
+        if (success) {
+            painterPage.scheduleRecentCanvasSave();
+        }
+    }
+
+    Connections {
+        target: painterPage.localCanvasSession
+
+        function onSnapshotRequested() {
+            painterPage.publishLocalCanvasSnapshotNow();
+        }
+
+        function onSnapshotReceived(snapshot, revision, originPeerId) {
+            painterPage.applyRemoteCanvasSnapshot(snapshot);
+        }
     }
 
     function scheduleRecentCanvasSave() {
@@ -481,7 +549,8 @@ Item {
                 canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : 1
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
-                onSessionChanged: painterPage.scheduleRecentCanvasSave()
+                onSessionChanged: painterPage.handleCanvasSessionChanged()
+                onSessionRestoreFinished: success => painterPage.finishRemoteCanvasRestore(success)
                 onImageDropSucceeded: {
                     painterPage.setToolMode("move");
                     Qt.callLater(painterPage.syncLayerHierarchySelection);
@@ -581,6 +650,8 @@ Item {
             currentShape: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
             canvasWidth: painterPage.vm ? painterPage.vm.canvasWidth : painterPage.fallbackNewCanvasWidth
             canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : painterPage.fallbackNewCanvasHeight
+            pendingInvitation: painterPage.pendingInvitation
+            pendingInvitationCount: painterPage.pendingInvitationCount
             onNewCanvasRequested: (canvasWidth, canvasHeight, infiniteCanvas) => painterPage.newCanvas(canvasWidth, canvasHeight, infiniteCanvas)
             onClearCanvasRequested: painterPage.clearCanvas()
             onBrushSizeChangeRequested: size => painterPage.setBrushSize(size)
@@ -590,6 +661,7 @@ Item {
             onToolSelected: tool => painterPage.setToolMode(tool)
             onShapeSelected: shapeKind => painterPage.setShapeKind(shapeKind)
             onPresentationModeRequested: painterPage.presentationModeRequested()
+            onInvitationResponseRequested: accepted => painterPage.invitationResponseRequested(accepted)
             onSaveRequested: fileUrl => painterPage.saveCanvasAs(fileUrl)
             onOpenRequested: fileUrl => painterPage.openRaster(fileUrl)
         }

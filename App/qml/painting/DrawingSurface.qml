@@ -182,6 +182,7 @@ Rectangle {
 
     signal toolShortcutRequested(string tool)
     signal sessionChanged
+    signal sessionRestoreFinished(bool success)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
 
@@ -411,7 +412,21 @@ Rectangle {
         cancelActiveShape();
         resetCanvasPan();
         const session = canvasSurface.openRecentCanvas(fileUrl ? fileUrl.toString() : "");
+        return restoreCanvasSession(session);
+    }
+
+    function applyCanvasSessionSnapshot(snapshot) {
+        cancelPendingRecentCanvasRestore();
+        cancelActiveText();
+        cancelActiveShape();
+        resetCanvasPan();
+        const session = canvasSurface.importCanvasSession(snapshot);
+        return restoreCanvasSession(session);
+    }
+
+    function restoreCanvasSession(session) {
         if (!session || !session.valid) {
+            sessionRestoreFinished(false);
             return false;
         }
 
@@ -427,6 +442,7 @@ Rectangle {
             const restoredObject = restoredObjects[index];
             const objectId = restoredObject ? Number(restoredObject.id) : 0;
             if (!restoredObject || objectId <= 0 || seenObjectIds[String(objectId)]) {
+                sessionRestoreFinished(false);
                 return false;
             }
             seenObjectIds[String(objectId)] = true;
@@ -461,6 +477,7 @@ Rectangle {
             Qt.callLater(function () {
                 if (restoreGeneration === surface.recentCanvasRestoreGeneration) {
                     surface.recentCanvasRestoreInProgress = false;
+                    surface.sessionRestoreFinished(true);
                 }
             });
         });
@@ -650,6 +667,13 @@ Rectangle {
 
     function saveRecentCanvas(fileUrl) {
         return canvasSurface.saveRecentCanvas(fileUrl ? fileUrl.toString() : "", surface.drawableObjects, rasterLayerDescriptors(), surface.backgroundLayerPresent);
+    }
+
+    function canvasSessionSnapshot() {
+        commitActiveText();
+        commitActiveShape();
+        commitDrawableObjectTransform();
+        return canvasSurface.exportCanvasSession(surface.drawableObjects, rasterLayerDescriptors(), surface.backgroundLayerPresent);
     }
 
     function psdCompatibilityManifest() {

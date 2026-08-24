@@ -138,6 +138,30 @@ vincent_configure_local_runtime_paths(tests_nearbyvincentdiscovery)
 
 add_test(NAME tests_nearbyvincentdiscovery COMMAND tests_nearbyvincentdiscovery)
 
+add_executable(tests_localcanvassession
+        tst_localcanvassession.cpp
+        ../App/models/document/recentcanvascontainer.cpp
+        ../App/models/document/recentcanvascontainer.h
+        ../App/models/network/localcanvassession.cpp
+        ../App/models/network/localcanvassession.h
+        ../App/models/network/nearbyvincentdiscovery.cpp
+        ../App/models/network/nearbyvincentdiscovery.h
+)
+
+target_include_directories(tests_localcanvassession PRIVATE
+        ${CMAKE_SOURCE_DIR}/App/models/document
+        ${CMAKE_SOURCE_DIR}/App/models/network
+)
+
+target_link_libraries(tests_localcanvassession PRIVATE
+        Qt6::Core
+        Qt6::Network
+        Qt6::Test
+)
+vincent_configure_local_runtime_paths(tests_localcanvassession)
+
+add_test(NAME tests_localcanvassession COMMAND tests_localcanvassession)
+
 add_executable(tests_temporarycamerainput
         tst_temporarycamerainput.cpp
         ../App/models/input/temporarycamerainput.cpp

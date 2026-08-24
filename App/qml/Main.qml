@@ -1050,16 +1050,41 @@ LV.ApplicationWindow {
         discoverNearbyVincentUsers: VincentApplicationPreferences.discoverNearbyVincentUsers
         currentCanvasMemberProfiles: window.canvasPage ? window.canvasPage.collaboratorProfiles : []
         currentUserIsCanvasHost: window.canvasPage ? window.canvasPage.currentUserIsCanvasHost : true
+        localCanvasState: VincentLocalCanvasSession.state
+        localCanvasError: VincentLocalCanvasSession.errorString
+        localCanvasParticipantCount: VincentLocalCanvasSession.participantCount
+        availableLocalCanvases: VincentLocalCanvasSession.availableCanvases
+        availableLocalInvitees: VincentLocalCanvasSession.availableInvitees
         updateCheckEnabled: checkForUpdatesAction.enabled
         onStartWithRecentCanvasRequested: enabled => VincentApplicationPreferences.setStartWithRecentCanvas(enabled)
-        onDiscoverNearbyVincentUsersRequested: enabled => VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled)
-        onAddCanvasMemberRequested: {
-            if (window.canvasPage)
-                window.canvasPage.requestAddCollaborator();
+        onDiscoverNearbyVincentUsersRequested: function (enabled) {
+            VincentApplicationPreferences.setDiscoverNearbyVincentUsers(enabled);
+            if (!enabled)
+                VincentLocalCanvasSession.stopSession();
+        }
+        onProfileNameChanged: VincentLocalCanvasSession.setLocalProfileName(profileName)
+        onCanInviteOtherUsersChanged: {
+            if (canInviteOtherUsers) {
+                VincentApplicationPreferences.setDiscoverNearbyVincentUsers(true);
+            }
+            VincentLocalCanvasSession.setInvitationsAllowed(canInviteOtherUsers);
+        }
+        onHostCanvasRequested: {
+            VincentApplicationPreferences.setDiscoverNearbyVincentUsers(true);
+            VincentLocalCanvasSession.startHosting(profileName);
+        }
+        onJoinCanvasRequested: function (sessionId) {
+            VincentApplicationPreferences.setDiscoverNearbyVincentUsers(true);
+            VincentLocalCanvasSession.joinCanvas(sessionId, profileName);
+        }
+        onLeaveCanvasRequested: VincentLocalCanvasSession.stopSession()
+        onInviteCanvasMemberRequested: function (sessionId) {
+            VincentApplicationPreferences.setDiscoverNearbyVincentUsers(true);
+            VincentLocalCanvasSession.invitePeer(sessionId, profileName);
         }
         onDeleteCanvasMemberRequested: function (profile, index) {
-            if (window.canvasPage)
-                window.canvasPage.requestRemoveCollaborator(profile, index);
+            if (profile && profile.peerId)
+                VincentLocalCanvasSession.removeParticipant(String(profile.peerId));
         }
         onRestorePurchasesRequested: window.requestRestorePurchases()
         onCheckForUpdatesRequested: window.requestUpdateCheckFromPreferences()
@@ -1073,8 +1098,14 @@ LV.ApplicationWindow {
         sourceComponent: CanvasViews.PainterCanvasPage {
             id: painterPage
             topChromeReservedHeight: window.windowDragHandleEnabled ? window.windowDragHandleHeight : 0
+            localCanvasSession: VincentLocalCanvasSession
+            collaboratorProfiles: VincentLocalCanvasSession.participantProfiles
+            currentUserIsCanvasHost: VincentLocalCanvasSession.currentUserIsHost
+            pendingInvitation: VincentLocalCanvasSession.pendingInvitation
+            pendingInvitationCount: VincentLocalCanvasSession.pendingInvitationCount
             onPageReady: window.acceptCanvasPage(painterPage)
             onPresentationModeRequested: window.enterPresentationMode()
+            onInvitationResponseRequested: accepted => VincentLocalCanvasSession.respondToPendingInvitation(accepted, preferencesWindow.profileName)
             onClipboardImagePasteFailed: errorCode => window.showClipboardPasteFailure(errorCode)
             onImageDropSucceeded: {
                 window.clipboardPasteFailureMessage = "";
