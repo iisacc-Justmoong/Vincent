@@ -10,9 +10,10 @@ Item {
     readonly property int trailLifetimeMs: 2000
     readonly property int repaintIntervalMs: 16
     readonly property int maximumTrailPointCount: 256
+    readonly property int trailOpacityStepCount: 24
     readonly property real minimumTrailSampleDistance: 2
     readonly property real trailLineWidth: 6
-    readonly property real trailGlowRadius: 8
+    readonly property real trailGlowWidth: 16
     readonly property color laserColor: "#ff2b2b"
 
     property var trailPoints: []
@@ -22,23 +23,29 @@ Item {
 
     signal wheelZoomRequested(real angleDeltaY, real pixelDeltaY)
 
-    function appendTrailPoint(x, y, forceSample) {
+    function appendTrailPoint(x, y, forceSample, startsStroke) {
         const now = Date.now();
         const points = laserPointer.trailPoints.slice();
-        if (!forceSample && points.length > 0) {
+        if (points.length > 0) {
             const previousPoint = points[points.length - 1];
             const deltaX = x - previousPoint.x;
             const deltaY = y - previousPoint.y;
-            const minimumDistanceSquared = laserPointer.minimumTrailSampleDistance * laserPointer.minimumTrailSampleDistance;
-            if (deltaX * deltaX + deltaY * deltaY < minimumDistanceSquared) {
+            if (!startsStroke && deltaX === 0 && deltaY === 0) {
                 return;
+            }
+            if (!forceSample) {
+                const minimumDistanceSquared = laserPointer.minimumTrailSampleDistance * laserPointer.minimumTrailSampleDistance;
+                if (deltaX * deltaX + deltaY * deltaY < minimumDistanceSquared) {
+                    return;
+                }
             }
         }
 
         points.push({
             x: x,
             y: y,
-            createdAt: now
+            createdAt: now,
+            startsStroke: startsStroke === true
         });
         if (points.length > laserPointer.maximumTrailPointCount) {
             points.splice(0, points.length - laserPointer.maximumTrailPointCount);
@@ -51,7 +58,7 @@ Item {
         laserPointer.currentPointX = x;
         laserPointer.currentPointY = y;
         laserPointer.laserActive = true;
-        laserPointer.appendTrailPoint(x, y, true);
+        laserPointer.appendTrailPoint(x, y, true, true);
     }
 
     function updateLaserPoint(x, y) {
@@ -60,7 +67,7 @@ Item {
         }
         laserPointer.currentPointX = x;
         laserPointer.currentPointY = y;
-        laserPointer.appendTrailPoint(x, y, false);
+        laserPointer.appendTrailPoint(x, y, false, false);
     }
 
     function endLaserPoint(x, y) {
@@ -69,9 +76,69 @@ Item {
         }
         laserPointer.currentPointX = x;
         laserPointer.currentPointY = y;
-        laserPointer.appendTrailPoint(x, y, true);
+        laserPointer.appendTrailPoint(x, y, true, false);
         laserPointer.laserActive = false;
         trailCanvas.requestPaint();
+    }
+
+    function trailPointOpacity(point, now) {
+        const ageMs = now - point.createdAt;
+        return Math.max(0, Math.min(1, 1 - ageMs / laserPointer.trailLifetimeMs));
+    }
+
+    function appendSmoothTrailRun(context, runPoints) {
+        if (runPoints.length < 2) {
+            return;
+        }
+
+        context.moveTo(runPoints[0].x, runPoints[0].y);
+        for (let pointIndex = 0; pointIndex < runPoints.length - 1; ++pointIndex) {
+            const previousPoint = runPoints[Math.max(0, pointIndex - 1)];
+            const point = runPoints[pointIndex];
+            const nextPoint = runPoints[pointIndex + 1];
+            const followingPoint = runPoints[Math.min(runPoints.length - 1, pointIndex + 2)];
+            const firstControlPointX = point.x + (nextPoint.x - previousPoint.x) / 6;
+            const firstControlPointY = point.y + (nextPoint.y - previousPoint.y) / 6;
+            const secondControlPointX = nextPoint.x - (followingPoint.x - point.x) / 6;
+            const secondControlPointY = nextPoint.y - (followingPoint.y - point.y) / 6;
+            context.bezierCurveTo(firstControlPointX, firstControlPointY, secondControlPointX, secondControlPointY, nextPoint.x, nextPoint.y);
+        }
+    }
+
+    function strokeTrailLayer(context, points, now, lineWidth, maximumOpacity) {
+        if (points.length < 2) {
+            return;
+        }
+
+        const opacityIncrement = maximumOpacity / laserPointer.trailOpacityStepCount;
+        context.lineWidth = lineWidth;
+
+        for (let stepIndex = 1; stepIndex <= laserPointer.trailOpacityStepCount; ++stepIndex) {
+            const minimumOpacity = stepIndex / laserPointer.trailOpacityStepCount;
+            const accumulatedOpacity = opacityIncrement * (stepIndex - 1);
+            let runPoints = [];
+            context.beginPath();
+
+            for (let pointIndex = 1; pointIndex < points.length; ++pointIndex) {
+                const point = points[pointIndex];
+                const previousPoint = points[pointIndex - 1];
+                const segmentOpacity = Math.min(laserPointer.trailPointOpacity(previousPoint, now), laserPointer.trailPointOpacity(point, now));
+                if (point.startsStroke || segmentOpacity < minimumOpacity) {
+                    laserPointer.appendSmoothTrailRun(context, runPoints);
+                    runPoints = [];
+                    continue;
+                }
+
+                if (runPoints.length === 0) {
+                    runPoints.push(previousPoint);
+                }
+                runPoints.push(point);
+            }
+            laserPointer.appendSmoothTrailRun(context, runPoints);
+
+            context.globalAlpha = opacityIncrement / (1 - accumulatedOpacity);
+            context.stroke();
+        }
     }
 
     function cancelLaserPoint() {
@@ -118,40 +185,11 @@ Item {
 
             const now = Date.now();
             const points = laserPointer.trailPoints;
-            context.lineCap = "round";
-            context.lineJoin = "round";
+            context.lineCap = "butt";
+            context.lineJoin = "bevel";
             context.strokeStyle = laserPointer.laserColor;
-            context.fillStyle = laserPointer.laserColor;
-
-            for (let index = 0; index < points.length; ++index) {
-                const point = points[index];
-                const ageMs = now - point.createdAt;
-                const opacity = Math.max(0, Math.min(1, 1 - ageMs / laserPointer.trailLifetimeMs));
-                if (opacity <= 0) {
-                    continue;
-                }
-
-                if (index > 0) {
-                    const previousPoint = points[index - 1];
-                    const previousAgeMs = now - previousPoint.createdAt;
-                    const previousOpacity = Math.max(0, Math.min(1, 1 - previousAgeMs / laserPointer.trailLifetimeMs));
-                    context.beginPath();
-                    context.moveTo(previousPoint.x, previousPoint.y);
-                    context.lineTo(point.x, point.y);
-                    context.lineWidth = laserPointer.trailLineWidth;
-                    context.globalAlpha = Math.min(opacity, previousOpacity) * 0.55;
-                    context.stroke();
-                }
-
-                context.beginPath();
-                context.arc(point.x, point.y, laserPointer.trailGlowRadius, 0, Math.PI * 2);
-                context.globalAlpha = opacity * 0.18;
-                context.fill();
-                context.beginPath();
-                context.arc(point.x, point.y, laserPointer.trailLineWidth / 2, 0, Math.PI * 2);
-                context.globalAlpha = opacity * 0.82;
-                context.fill();
-            }
+            laserPointer.strokeTrailLayer(context, points, now, laserPointer.trailGlowWidth, 0.18);
+            laserPointer.strokeTrailLayer(context, points, now, laserPointer.trailLineWidth, 0.55);
             context.globalAlpha = 1;
         }
     }

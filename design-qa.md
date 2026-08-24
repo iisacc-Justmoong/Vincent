@@ -193,3 +193,47 @@ final result: passed
 - No actionable P0, P1, or P2 finding remains.
 
 final result: passed
+
+# Design QA: Presentation laser single-dot and smooth-trajectory correction
+
+## Evidence and normalization
+
+- Source visual truth: `/var/folders/j3/5qyn3r610nsfxzwk8_q8w9gm0000gn/T/codex-clipboard-fcb57daa-3e04-4f94-b5f2-cb22826fba5b.png`, together with the explicit requirement that the cursor position own exactly one dot and the trajectory own none.
+- Source dimensions: 1588 × 1026 px.
+- Pre-fix deterministic reproduction: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/busy-path-before-fix.png`, 1366 × 768 px.
+- Pre-smoothing deterministic reproduction with the corrected point ownership but `lineTo` trajectory: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/busy-path-before-smoothing.png`, 1366 × 768 px.
+- Post-fix active-pointer implementation: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/busy-path-after-fix-active.png`, 1366 × 768 px.
+- Post-fix released-pointer implementation: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/busy-path-after-fix-released.png`, 1366 × 768 px.
+- Compiled `build/Vincent.app` released-pointer evidence: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/compiled-app-released-no-dots.jpg`, 1366 × 768 px.
+- Full-view three-state comparison: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/laser-pointer-single-dot-comparison.png`, 4098 × 768 px.
+- Controlled polyline/active-curve/released-curve comparison: `/Users/ymy/.codex/visualizations/2026/08/24/01a03156-7a59-7700-8094-3c88247fe505/laser-pointer-smooth-curve-comparison.png`, 4098 × 768 px.
+- Viewport and density: the implementation component was rendered at 1366 × 768 logical and physical pixels with the Qt offscreen software backend. The 1588 × 1026 source was proportionally scaled and center-cropped to 1366 × 768 before comparison.
+- Compared state: several recent, crossing laser gestures in presentation mode; the middle panel retains the active cursor and the right panel represents the exact same trail immediately after release.
+- Focused evidence: the active-pointer implementation is large enough to inspect every join, cap, intersection, and the sole cursor endpoint without a separate crop.
+
+## Findings
+
+- [Resolved P1] The prior implementation used round joins in 24 opacity passes. Curved or rapidly changing paths therefore reconstructed a circular core and glow at many sampled vertices even though explicit `arc()` calls had been removed.
+- [Resolved P1] Removing the sample dots exposed a separate `lineTo` polyline defect: sparse event samples appeared as joined straight sections and could not express the continuously curved mouse trajectory.
+- Every contiguous run now uses Catmull–Rom-derived cubic Bézier segments whose endpoints are the sampled mouse coordinates. The controlled comparison shows the same input coordinates changing from angular joins to continuous curves.
+- The trail retains butt caps and bevel joins. No circular cap, join, arc, fill, or repeated point item remains in the trajectory.
+- `activeLaserPoint` is instantiated once and positioned only from `currentPointX`/`currentPointY`. The active capture contains exactly one composite laser dot at that cursor coordinate.
+- The released capture contains zero dots. An exact duplicate release coordinate is rejected before it can create a zero-length terminal segment.
+- The rebuilt native app was relaunched, entered Presentation mode, and received four independent full-canvas drags. Its released-state capture retained only fading strokes with no red endpoint or sample dots.
+- Typography and copy: not applicable to this pointer-only overlay; no text surface changed.
+- Spacing and layout rhythm: the full-canvas overlay geometry and 6 px core/16 px glow widths are unchanged.
+- Colors and tokens: the existing `#ff2b2b` laser color and opacity envelope are unchanged.
+- Image quality: antialiased core and glow strokes remain sharp at 1×; intersections may naturally accumulate stroke color, but no intersection is represented by a point primitive.
+
+## Comparison history
+
+1. The earlier QA pass used a straight drag, which concealed the round-join defect and was incorrectly marked passed.
+2. The current user-provided busy-path source exposed the remaining P1 repeated-dot mismatch.
+3. The deterministic pre-fix reproduction confirmed circular join geometry at path reversals.
+4. Round joins were replaced with bevel joins, the flat cap was retained, and duplicate zero-length release samples were rejected.
+5. The post-fix active and released captures show exactly one cursor-owned dot and then zero dots, with no trajectory-owned dots; trajectory fidelity was still unresolved at this stage.
+6. A further report identified the remaining angular polyline effect, so the point-corrected render was retained as a controlled pre-smoothing baseline.
+7. The same input samples were rerendered through cubic Bézier interpolation. Bends now follow a continuous curve while the active point remains attached to the unmodified current cursor coordinate.
+8. The released curve capture retains zero dots. No actionable P0/P1/P2 finding remains.
+
+final result: passed

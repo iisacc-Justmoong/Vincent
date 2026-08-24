@@ -121,6 +121,10 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
         laserPointerSource.contains(QStringLiteral("readonly property int repaintIntervalMs: 16")));
     QVERIFY(laserPointerSource.contains(
         QStringLiteral("readonly property int maximumTrailPointCount: 256")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("readonly property int trailOpacityStepCount: 24")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("readonly property real trailGlowWidth: 16")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property var trailPoints: []")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("property bool laserActive: false")));
     QVERIFY(laserPointerSource.contains(
@@ -128,6 +132,16 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(laserPointerSource.contains(QStringLiteral("function beginLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function updateLaserPoint(x, y)")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function endLaserPoint(x, y)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "function appendSmoothTrailRun(context, runPoints)")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "function strokeTrailLayer(context, points, now, lineWidth, maximumOpacity)")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("startsStroke: startsStroke === true")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("if (!startsStroke && deltaX === 0 && deltaY === 0)")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("laserPointer.appendTrailPoint(x, y, true, true);")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function pruneExpiredTrailPoints()")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("function clearLaserTrail()")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("Timer {")));
@@ -138,6 +152,29 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(laserPointerSource.contains(QStringLiteral("const ageMs = now - point.createdAt;")));
     QVERIFY(
         laserPointerSource.contains(QStringLiteral("1 - ageMs / laserPointer.trailLifetimeMs")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("context.bezierCurveTo(")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "laserPointer.appendSmoothTrailRun(context, runPoints);")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("context.lineTo(point.x, point.y);")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("context.lineCap = \"butt\";")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral("context.lineJoin = \"bevel\";")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("context.lineCap = \"round\";")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("context.lineJoin = \"round\";")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "laserPointer.strokeTrailLayer(context, points, now, "
+        "laserPointer.trailGlowWidth, 0.18);")));
+    QVERIFY(laserPointerSource.contains(QStringLiteral(
+        "laserPointer.strokeTrailLayer(context, points, now, "
+        "laserPointer.trailLineWidth, 0.55);")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("context.arc(")));
+    QVERIFY(!laserPointerSource.contains(QStringLiteral("context.fill()")));
+    QCOMPARE(laserPointerSource.count(QStringLiteral("id: activeLaserPoint")), 1);
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("visible: laserPointer.laserActive")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("x: laserPointer.currentPointX - width / 2")));
+    QVERIFY(laserPointerSource.contains(
+        QStringLiteral("y: laserPointer.currentPointY - height / 2")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("color: \"#ff2b2b\"")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("MouseArea {")));
     QVERIFY(laserPointerSource.contains(QStringLiteral("acceptedButtons: Qt.LeftButton")));

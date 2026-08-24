@@ -29,7 +29,7 @@ This document captures Vincent 5.1 after moving its native painting surface to i
 
 1. The root `CMakeLists.txt` sets up Qt 6, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager 0.2, iiLicenseManager 0.2, `psd_sdk`, install paths, packaging metadata, and the `Vincent` executable target.
 2. `App/CMakeLists.txt` attaches the C++ sources and headers to the `Vincent` target.
-3. `qt_add_qml_module` registers the `Vincent` QML module and exposes `Main.qml`, `PreferencesWindow.qml`, `PainterCanvasPage.qml`, `CanvasToolBar.qml`, `HslTriangleColorPicker.qml`, and `DrawingSurface.qml`.
+3. `qt_add_qml_module` registers the `Vincent` QML module and exposes `Main.qml`, `PreferencesWindow.qml`, `PainterCanvasPage.qml`, `PresentationLaserPointer.qml`, `CanvasToolBar.qml`, `HslTriangleColorPicker.qml`, and `DrawingSurface.qml`.
 4. The executable links against Qt Core, Network, QML, Quick, Quick Controls 2, SVG, `iiSharedCanvas::iiSharedCanvas`, its iiPaintEngine dependency, `iiUpdateManager::iiUpdateManager`, `iiLicenseManager::iiLicenseManager`, and a static QtKeychain 0.17.0 on macOS/Windows, then LVRS configures runtime QML import handling. QtKeychain is pinned to commit `875f77d9f61bd97fd84cca47ce3bc71186dfbd09`, built without translations or its own tests, and uses no insecure fallback.
 5. On Windows, the `Vincent` target uses the GUI subsystem so it starts without a console window; its lifetime remains owned by the `QGuiApplication` event loop and top-level window. Its compiled resources provide the icon, file/product version, `asInvoker` manifest, Windows 10/11 compatibility, Per-Monitor V2 DPI awareness, and long-path awareness.
 6. A Windows post-build step copies LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, iiLicenseManager, and the runtime DLLs next to the selected MinGW compiler into `build/` so direct build-tree launches resolve a consistent toolchain. Release packaging keeps LVRS QML embedded in the LVRS binary and removes any duplicate loose `qml/LVRS` deployment tree.
@@ -151,6 +151,14 @@ This document captures Vincent 5.1 after moving its native painting surface to i
 - Routes toolbar actions into either view-model property updates or `DrawingSurface` commands.
 - Debounces `DrawingSurface.sessionChanged` for 1.2 seconds, writes the current complete session to `ApplicationPreferences.recentCanvasStorageUrl`, and marks the snapshot available only after the atomic write succeeds. External file paths never become the Recent canvas identity; opening or exporting simply schedules a fresh internal snapshot of the resulting live session.
 - While hosting, separately debounces the host user's own edits for 350 ms and publishes the in-memory full `.vrc` snapshot. A participant command applies synchronously to the host canvas and queues authoritative publication for the next event cycle so a newly added QML raster layer is ready for export. Joined clients remain command-blocked until the first authoritative QML restore succeeds, never publish or persist their restored remote state, and clear readiness on disconnect or restore failure. Remote snapshots suppress all local republishing during asynchronous restore.
+
+### `PresentationLaserPointer.qml`
+
+- Consumes pointer input over the full presentation surface while forwarding wheel zoom and preventing presentation gestures from mutating the drawing canvas.
+- Keeps one three-ring red laser-point item only at `currentPointX`/`currentPointY`, which are updated directly from the actively pressed cursor without smoothing or lag. Historical samples never instantiate point items and produce no circles or fills.
+- Converts each contiguous run of historical mouse samples into Catmull–Rom-derived cubic Bézier segments that pass through every sampled coordinate. This preserves the pointer trajectory as a continuous curve rather than a `lineTo` polyline.
+- Renders the curved core and glow layers with flat caps and bevel joins, preventing both sample-node circles and round-join circles. It ignores an exact duplicate release coordinate so a zero-length terminal segment cannot form another point.
+- Marks the first sample of every press as a new stroke so repeated gestures never gain an artificial connector, while retaining the per-segment two-second fade, 256-sample bound, and 16 ms repaint cadence.
 
 ### `CanvasToolBar.qml`
 
