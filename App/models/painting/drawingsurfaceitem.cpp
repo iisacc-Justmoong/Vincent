@@ -63,7 +63,8 @@
 #include <optional>
 #include <span>
 
-namespace {
+namespace
+{
 
 constexpr qreal minimumTextFontPixelSize = 8.0;
 constexpr qreal maximumTextFontPixelSize = 144.0;
@@ -81,113 +82,114 @@ constexpr int ellipseBubbleArcSegmentCount = 32;
 constexpr int maximumInsertedImageDimension = 32768;
 constexpr qint64 maximumInsertedImagePixelCount = 64LL * 1024LL * 1024LL;
 constexpr qint64 maximumRemoteImageDownloadBytes = 64LL * 1024LL * 1024LL;
+constexpr qsizetype maximumRemoteStrokePointCount = 4096;
 constexpr int remoteImageDownloadTimeoutMs = 30000;
 
-QString localFileSource(const QString &fileUrl)
+QString localFileSource(const QString& fileUrl)
 {
     const QUrl url(fileUrl);
-    if (url.isValid() && url.isLocalFile()) {
+    if (url.isValid() && url.isLocalFile())
+    {
         return url.toString();
     }
     return QUrl::fromLocalFile(fileUrl).toString();
 }
 
-QString localFilePath(const QString &fileUrl)
+QString localFilePath(const QString& fileUrl)
 {
     const QUrl url(fileUrl);
-    if (url.isValid() && url.isLocalFile()) {
+    if (url.isValid() && url.isLocalFile())
+    {
         return url.toLocalFile();
     }
     return fileUrl;
 }
 
-bool hasPsdSuffix(const QString &fileUrl)
+bool hasPsdSuffix(const QString& fileUrl)
 {
     return localFilePath(fileUrl).endsWith(QStringLiteral(".psd"), Qt::CaseInsensitive);
 }
 
-bool hasIiscSuffix(const QString &fileUrl)
+bool hasIiscSuffix(const QString& fileUrl)
 {
     return localFilePath(fileUrl).endsWith(QStringLiteral(".iisc"), Qt::CaseInsensitive);
 }
 
-std::optional<QTransform> documentToSelectedRasterTransform(
-    const iiSharedCanvas::CanvasItem &item)
+std::optional<QTransform> documentToSelectedRasterTransform(const iiSharedCanvas::CanvasItem& item)
 {
-    const iiSharedCanvas::Document *document = item.document();
+    const iiSharedCanvas::Document* document = item.document();
     const QByteArray selectedLayerId = item.selectedLayerId().toUtf8();
-    if (!document || selectedLayerId.isEmpty()) {
+    if (!document || selectedLayerId.isEmpty())
+    {
         return std::nullopt;
     }
 
-    const iiSharedCanvas::Layer *layer = iiSharedCanvas::findLayer(
+    const iiSharedCanvas::Layer* layer = iiSharedCanvas::findLayer(
         *document,
         std::string(selectedLayerId.constData(), static_cast<std::size_t>(selectedLayerId.size())));
-    if (!layer) {
+    if (!layer)
+    {
         return std::nullopt;
     }
 
-    const AffineTransform &transform = layer->transform;
-    const QTransform rasterToDocument(transform.m11,
-                                      transform.m12,
-                                      transform.m21,
-                                      transform.m22,
-                                      transform.translationX,
-                                      transform.translationY);
+    const AffineTransform& transform = layer->transform;
+    const QTransform rasterToDocument(transform.m11, transform.m12, transform.m21, transform.m22,
+                                      transform.translationX, transform.translationY);
     bool invertible = false;
     const QTransform documentToRaster = rasterToDocument.inverted(&invertible);
-    if (!invertible) {
+    if (!invertible)
+    {
         return std::nullopt;
     }
 
     const iiSharedCanvas::CanvasOrigin origin = iiSharedCanvas::canvasOrigin(*document);
-    return QTransform(documentToRaster.m11(),
-                      documentToRaster.m12(),
-                      documentToRaster.m21(),
+    return QTransform(documentToRaster.m11(), documentToRaster.m12(), documentToRaster.m21(),
                       documentToRaster.m22(),
-                      documentToRaster.m11() * origin.x
-                          + documentToRaster.m21() * origin.y
-                          + documentToRaster.dx() - origin.x,
-                      documentToRaster.m12() * origin.x
-                          + documentToRaster.m22() * origin.y
-                          + documentToRaster.dy() - origin.y);
+                      documentToRaster.m11() * origin.x + documentToRaster.m21() * origin.y +
+                          documentToRaster.dx() - origin.x,
+                      documentToRaster.m12() * origin.x + documentToRaster.m22() * origin.y +
+                          documentToRaster.dy() - origin.y);
 }
 
-QImage imageFromFileUrl(const QString &fileUrl)
+QImage imageFromFileUrl(const QString& fileUrl)
 {
     const QString filePath = localFilePath(fileUrl);
-    if (PsdImageReader::canReadPath(filePath)) {
+    if (PsdImageReader::canReadPath(filePath))
+    {
         return PsdImageReader::readMergedImage(filePath);
     }
 
     return QImage(filePath);
 }
 
-QString cachedPsdPreviewSource(const QString &fileUrl, const QImage &image)
+QString cachedPsdPreviewSource(const QString& fileUrl, const QImage& image)
 {
     const QString filePath = localFilePath(fileUrl);
-    if (!PsdImageReader::canReadPath(filePath) || image.isNull()) {
+    if (!PsdImageReader::canReadPath(filePath) || image.isNull())
+    {
         return localFileSource(fileUrl);
     }
 
     QFileInfo fileInfo(filePath);
-    const QByteArray key = (filePath
-                            + QStringLiteral("|")
-                            + QString::number(fileInfo.size())
-                            + QStringLiteral("|")
-                            + QString::number(fileInfo.lastModified().toMSecsSinceEpoch()))
+    const QByteArray key =
+        (filePath + QStringLiteral("|") + QString::number(fileInfo.size()) + QStringLiteral("|") +
+         QString::number(fileInfo.lastModified().toMSecsSinceEpoch()))
             .toUtf8();
-    const QString digest = QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex());
-    const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
-        ? QDir::tempPath()
-        : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    const QString digest =
+        QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha256).toHex());
+    const QString cacheRoot =
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
+            ? QDir::tempPath()
+            : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QDir cacheDir(cacheRoot + QStringLiteral("/psd-previews"));
-    if (!cacheDir.exists()) {
+    if (!cacheDir.exists())
+    {
         cacheDir.mkpath(QStringLiteral("."));
     }
 
     const QString previewPath = cacheDir.filePath(digest + QStringLiteral(".png"));
-    if (!QFileInfo::exists(previewPath)) {
+    if (!QFileInfo::exists(previewPath))
+    {
         image.save(previewPath, "PNG");
     }
     return QUrl::fromLocalFile(previewPath).toString();
@@ -195,44 +197,30 @@ QString cachedPsdPreviewSource(const QString &fileUrl, const QImage &image)
 
 bool isTabletEvent(QEvent::Type type)
 {
-    return type == QEvent::TabletPress
-        || type == QEvent::TabletMove
-        || type == QEvent::TabletRelease;
+    return type == QEvent::TabletPress || type == QEvent::TabletMove ||
+           type == QEvent::TabletRelease;
 }
 
-QTabletEvent makeSyntheticTabletStrokeEvent(QEvent::Type eventType,
-                                            qreal pointX,
-                                            qreal pointY,
-                                            qreal rawPressure,
-                                            Qt::MouseButton button,
+QTabletEvent makeSyntheticTabletStrokeEvent(QEvent::Type eventType, qreal pointX, qreal pointY,
+                                            qreal rawPressure, Qt::MouseButton button,
                                             Qt::MouseButtons buttons)
 {
     const QPointF position(pointX, pointY);
-    return QTabletEvent(eventType,
-                        QPointingDevice::primaryPointingDevice(),
-                        position,
-                        position,
-                        rawPressure,
-                        0.0F,
-                        0.0F,
-                        0.0F,
-                        0.0,
-                        0.0F,
-                        Qt::NoModifier,
-                        button,
-                        buttons);
+    return QTabletEvent(eventType, QPointingDevice::primaryPointingDevice(), position, position,
+                        rawPressure, 0.0F, 0.0F, 0.0F, 0.0, 0.0F, Qt::NoModifier, button, buttons);
 }
 
-QImage transparentCanvasImage(const QSize &size)
+QImage transparentCanvasImage(const QSize& size)
 {
     QImage image(size, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     return image;
 }
 
-QImage opaqueCanvasBackgroundImage(const QImage &rasterImage)
+QImage opaqueCanvasBackgroundImage(const QImage& rasterImage)
 {
-    if (rasterImage.isNull()) {
+    if (rasterImage.isNull())
+    {
         return {};
     }
 
@@ -247,9 +235,10 @@ QImage opaqueCanvasBackgroundImage(const QImage &rasterImage)
 
 QString writableCacheDirectoryPath(const QString& subdirectoryName)
 {
-    const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
-        ? QDir::tempPath()
-        : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    const QString cacheRoot =
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation).isEmpty()
+            ? QDir::tempPath()
+            : QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     QDir cacheDir(cacheRoot + QLatin1Char('/') + subdirectoryName);
     if (!cacheDir.exists() && !cacheDir.mkpath(QStringLiteral(".")))
     {
@@ -258,7 +247,7 @@ QString writableCacheDirectoryPath(const QString& subdirectoryName)
     return cacheDir.absolutePath();
 }
 
-QString writableCacheFilePath(const QString &subdirectoryName, const QString &fileTemplate)
+QString writableCacheFilePath(const QString& subdirectoryName, const QString& fileTemplate)
 {
     const QString cacheDirectoryPath = writableCacheDirectoryPath(subdirectoryName);
     if (cacheDirectoryPath.isEmpty())
@@ -269,7 +258,8 @@ QString writableCacheFilePath(const QString &subdirectoryName, const QString &fi
 
     QTemporaryFile file(cacheDir.filePath(fileTemplate));
     file.setAutoRemove(false);
-    if (!file.open()) {
+    if (!file.open())
+    {
         return {};
     }
 
@@ -285,22 +275,25 @@ QSize boundedThumbnailMaximumSize(qreal maximumWidth, qreal maximumHeight)
     return QSize(width, height);
 }
 
-void paintThumbnailChecker(QPainter &painter, const QSize &size)
+void paintThumbnailChecker(QPainter& painter, const QSize& size)
 {
     constexpr int checkerSize = 4;
     const QColor light(255, 255, 255, 220);
     const QColor dark(185, 190, 198, 220);
-    for (int y = 0; y < size.height(); y += checkerSize) {
-        for (int x = 0; x < size.width(); x += checkerSize) {
+    for (int y = 0; y < size.height(); y += checkerSize)
+    {
+        for (int x = 0; x < size.width(); x += checkerSize)
+        {
             const bool alternate = ((x / checkerSize) + (y / checkerSize)) % 2 == 0;
             painter.fillRect(QRect(x, y, checkerSize, checkerSize), alternate ? light : dark);
         }
     }
 }
 
-QImage thumbnailImage(const QImage &sourceImage, const QSize &maximumSize)
+QImage thumbnailImage(const QImage& sourceImage, const QSize& maximumSize)
 {
-    if (maximumSize.isEmpty()) {
+    if (maximumSize.isEmpty())
+    {
         return {};
     }
 
@@ -311,13 +304,16 @@ QImage thumbnailImage(const QImage &sourceImage, const QSize &maximumSize)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     paintThumbnailChecker(painter, maximumSize);
 
-    if (!sourceImage.isNull()) {
-        const QImage layerImage = sourceImage.format() == QImage::Format_ARGB32_Premultiplied
-            ? sourceImage
-            : sourceImage.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    if (!sourceImage.isNull())
+    {
+        const QImage layerImage =
+            sourceImage.format() == QImage::Format_ARGB32_Premultiplied
+                ? sourceImage
+                : sourceImage.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         QSize scaledSize = layerImage.size().scaled(maximumSize, Qt::KeepAspectRatio);
         scaledSize = QSize(qMax(1, scaledSize.width()), qMax(1, scaledSize.height()));
-        const QImage scaledLayer = layerImage.scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        const QImage scaledLayer =
+            layerImage.scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
         const QPointF topLeft((maximumSize.width() - scaledSize.width()) / 2.0,
                               (maximumSize.height() - scaledSize.height()) / 2.0);
         painter.drawImage(topLeft, scaledLayer);
@@ -327,9 +323,10 @@ QImage thumbnailImage(const QImage &sourceImage, const QSize &maximumSize)
     return thumbnail;
 }
 
-QString cachedPngSourceForImage(const QString &subdirectoryName, const QImage &image)
+QString cachedPngSourceForImage(const QString& subdirectoryName, const QImage& image)
 {
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
@@ -340,9 +337,10 @@ QString cachedPngSourceForImage(const QString &subdirectoryName, const QImage &i
     cacheKey.append('|');
     cacheKey.append(QByteArray::number(static_cast<int>(image.format())));
     cacheKey.append('|');
-    cacheKey.append(reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes());
+    cacheKey.append(reinterpret_cast<const char*>(image.constBits()), image.sizeInBytes());
 
-    const QString digest = QString::fromLatin1(QCryptographicHash::hash(cacheKey, QCryptographicHash::Sha256).toHex());
+    const QString digest =
+        QString::fromLatin1(QCryptographicHash::hash(cacheKey, QCryptographicHash::Sha256).toHex());
     const QString cacheDirectoryPath = writableCacheDirectoryPath(subdirectoryName);
     if (cacheDirectoryPath.isEmpty())
     {
@@ -541,14 +539,17 @@ QVariantMap sanitizedRecentCanvasObject(const QVariantMap& object)
     return sanitized;
 }
 
-QSize fittedOpenedRasterSize(const QSize &imageSize, const QSize &maximumSize)
+QSize fittedOpenedRasterSize(const QSize& imageSize, const QSize& maximumSize)
 {
-    if (imageSize.isEmpty()) {
+    if (imageSize.isEmpty())
+    {
         return {};
     }
 
     const QSize boundedMaximum(qMax(1, maximumSize.width()), qMax(1, maximumSize.height()));
-    if (imageSize.width() <= boundedMaximum.width() && imageSize.height() <= boundedMaximum.height()) {
+    if (imageSize.width() <= boundedMaximum.width() &&
+        imageSize.height() <= boundedMaximum.height())
+    {
         return imageSize;
     }
 
@@ -847,24 +848,24 @@ QVariantMap imageObjectForLocalDrop(const QUrl& url, qreal maximumObjectWidth,
                                      maximumObjectHeight);
 }
 
-QString normalizedShapeKind(const QString &shapeKind)
+QString normalizedShapeKind(const QString& shapeKind)
 {
     const QString normalized = shapeKind.trimmed().toLower();
-    if (normalized == QStringLiteral("triagle")) {
+    if (normalized == QStringLiteral("triagle"))
+    {
         return QStringLiteral("triangle");
     }
-    if (normalized == QStringLiteral("ellipse")
-        || normalized == QStringLiteral("triangle")
-        || normalized == QStringLiteral("diamond")
-        || normalized == QStringLiteral("star")
-        || normalized == QStringLiteral("rectanglebubble")
-        || normalized == QStringLiteral("ellipsebubble")) {
+    if (normalized == QStringLiteral("ellipse") || normalized == QStringLiteral("triangle") ||
+        normalized == QStringLiteral("diamond") || normalized == QStringLiteral("star") ||
+        normalized == QStringLiteral("rectanglebubble") ||
+        normalized == QStringLiteral("ellipsebubble"))
+    {
         return normalized;
     }
     return QStringLiteral("rectangle");
 }
 
-QPainterPath starPath(const QRectF &rect)
+QPainterPath starPath(const QRectF& rect)
 {
     QPainterPath path;
     const QPointF center = rect.center();
@@ -873,16 +874,19 @@ QPainterPath starPath(const QRectF &rect)
     const qreal innerRadiusX = outerRadiusX * 0.45;
     const qreal innerRadiusY = outerRadiusY * 0.45;
 
-    for (int index = 0; index < 10; ++index) {
+    for (int index = 0; index < 10; ++index)
+    {
         const bool outerPoint = index % 2 == 0;
         const qreal radiusX = outerPoint ? outerRadiusX : innerRadiusX;
         const qreal radiusY = outerPoint ? outerRadiusY : innerRadiusY;
         const qreal angle = -M_PI_2 + index * M_PI / 5.0;
-        const QPointF point(center.x() + qCos(angle) * radiusX,
-                            center.y() + qSin(angle) * radiusY);
-        if (index == 0) {
+        const QPointF point(center.x() + qCos(angle) * radiusX, center.y() + qSin(angle) * radiusY);
+        if (index == 0)
+        {
             path.moveTo(point);
-        } else {
+        }
+        else
+        {
             path.lineTo(point);
         }
     }
@@ -901,21 +905,23 @@ qreal speechBubbleBodyHeight(qreal height)
     return qMax(minimumShapeDimension, height - speechBubbleTailHeight(height));
 }
 
-QPointF ellipsePoint(const QRectF &rect, qreal angle)
+QPointF ellipsePoint(const QRectF& rect, qreal angle)
 {
     return QPointF(rect.center().x() + qCos(angle) * rect.width() / 2.0,
                    rect.center().y() + qSin(angle) * rect.height() / 2.0);
 }
 
-void appendEllipseArc(QPainterPath &path, const QRectF &rect, qreal startAngle, qreal endAngle)
+void appendEllipseArc(QPainterPath& path, const QRectF& rect, qreal startAngle, qreal endAngle)
 {
-    for (int index = 1; index <= ellipseBubbleArcSegmentCount; ++index) {
-        const qreal angle = startAngle + (endAngle - startAngle) * index / ellipseBubbleArcSegmentCount;
+    for (int index = 1; index <= ellipseBubbleArcSegmentCount; ++index)
+    {
+        const qreal angle =
+            startAngle + (endAngle - startAngle) * index / ellipseBubbleArcSegmentCount;
         path.lineTo(ellipsePoint(rect, angle));
     }
 }
 
-QPainterPath rectangleBubblePath(const QRectF &rect)
+QPainterPath rectangleBubblePath(const QRectF& rect)
 {
     const qreal bodyBottom = rect.top() + speechBubbleBodyHeight(rect.height());
     const qreal tailLeftX = rect.left() + rect.width() * speechBubbleTailLeftBaseXRatio;
@@ -934,7 +940,7 @@ QPainterPath rectangleBubblePath(const QRectF &rect)
     return path;
 }
 
-QPainterPath ellipseBubblePath(const QRectF &rect)
+QPainterPath ellipseBubblePath(const QRectF& rect)
 {
     QRectF bodyRect = rect;
     bodyRect.setHeight(speechBubbleBodyHeight(rect.height()));
@@ -944,29 +950,33 @@ QPainterPath ellipseBubblePath(const QRectF &rect)
 
     QPainterPath path;
     path.moveTo(tailLeftPoint);
-    appendEllipseArc(path, bodyRect, ellipseBubbleTailLeftAngle, ellipseBubbleTailRightAngle + M_PI * 2.0);
+    appendEllipseArc(path, bodyRect, ellipseBubbleTailLeftAngle,
+                     ellipseBubbleTailRightAngle + M_PI * 2.0);
     path.lineTo(tailTip);
     path.closeSubpath();
     return path;
 }
 
-QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
+QPainterPath shapePath(const QRectF& rect, const QString& shapeKind)
 {
     QPainterPath path;
     const QString kind = normalizedShapeKind(shapeKind);
 
-    if (kind == QStringLiteral("ellipse")) {
+    if (kind == QStringLiteral("ellipse"))
+    {
         path.addEllipse(rect);
         return path;
     }
-    if (kind == QStringLiteral("triangle")) {
+    if (kind == QStringLiteral("triangle"))
+    {
         path.moveTo(rect.center().x(), rect.top());
         path.lineTo(rect.right(), rect.bottom());
         path.lineTo(rect.left(), rect.bottom());
         path.closeSubpath();
         return path;
     }
-    if (kind == QStringLiteral("diamond")) {
+    if (kind == QStringLiteral("diamond"))
+    {
         path.moveTo(rect.center().x(), rect.top());
         path.lineTo(rect.right(), rect.center().y());
         path.lineTo(rect.center().x(), rect.bottom());
@@ -974,13 +984,16 @@ QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
         path.closeSubpath();
         return path;
     }
-    if (kind == QStringLiteral("star")) {
+    if (kind == QStringLiteral("star"))
+    {
         return starPath(rect);
     }
-    if (kind == QStringLiteral("rectanglebubble")) {
+    if (kind == QStringLiteral("rectanglebubble"))
+    {
         return rectangleBubblePath(rect);
     }
-    if (kind == QStringLiteral("ellipsebubble")) {
+    if (kind == QStringLiteral("ellipsebubble"))
+    {
         return ellipseBubblePath(rect);
     }
 
@@ -988,24 +1001,26 @@ QPainterPath shapePath(const QRectF &rect, const QString &shapeKind)
     return path;
 }
 
-void drawTextObject(QPainter &painter, const QVariantMap &object)
+void drawTextObject(QPainter& painter, const QVariantMap& object)
 {
     const QString text = object.value(QStringLiteral("text")).toString();
-    if (text.trimmed().isEmpty()) {
+    if (text.trimmed().isEmpty())
+    {
         return;
     }
 
-    QRectF textRect(object.value(QStringLiteral("x")).toReal(),
-                    object.value(QStringLiteral("y")).toReal(),
-                    qMax<qreal>(minimumTextBoxWidth, object.value(QStringLiteral("width")).toReal()),
-                    qMax<qreal>(minimumTextFontPixelSize, object.value(QStringLiteral("height")).toReal()));
-    if (textRect.isEmpty()) {
+    QRectF textRect(
+        object.value(QStringLiteral("x")).toReal(), object.value(QStringLiteral("y")).toReal(),
+        qMax<qreal>(minimumTextBoxWidth, object.value(QStringLiteral("width")).toReal()),
+        qMax<qreal>(minimumTextFontPixelSize, object.value(QStringLiteral("height")).toReal()));
+    if (textRect.isEmpty())
+    {
         return;
     }
 
-    const int fontPixelSize = qRound(qBound<qreal>(minimumTextFontPixelSize,
-                                                  object.value(QStringLiteral("fontPixelSize")).toReal(),
-                                                  maximumTextFontPixelSize));
+    const int fontPixelSize = qRound(qBound<qreal>(
+        minimumTextFontPixelSize, object.value(QStringLiteral("fontPixelSize")).toReal(),
+        maximumTextFontPixelSize));
     QFont font;
     font.setPixelSize(fontPixelSize);
 
@@ -1025,19 +1040,21 @@ void drawTextObject(QPainter &painter, const QVariantMap &object)
 
     QAbstractTextDocumentLayout::PaintContext paintContext;
     const QColor color(object.value(QStringLiteral("color")).toString());
-    paintContext.palette.setColor(QPalette::Text, color.isValid() ? color : QColor(QStringLiteral("#1a1a1a")));
+    paintContext.palette.setColor(QPalette::Text,
+                                  color.isValid() ? color : QColor(QStringLiteral("#1a1a1a")));
     textDocument.documentLayout()->draw(&painter, paintContext);
     painter.restore();
 }
 
-void drawShapeObject(QPainter &painter, const QVariantMap &object)
+void drawShapeObject(QPainter& painter, const QVariantMap& object)
 {
     QRectF shapeRect(object.value(QStringLiteral("x")).toReal(),
                      object.value(QStringLiteral("y")).toReal(),
                      object.value(QStringLiteral("width")).toReal(),
                      object.value(QStringLiteral("height")).toReal());
     shapeRect = shapeRect.normalized();
-    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension) {
+    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension)
+    {
         return;
     }
 
@@ -1051,10 +1068,11 @@ void drawShapeObject(QPainter &painter, const QVariantMap &object)
     painter.restore();
 }
 
-void drawImageObject(QPainter &painter, const QVariantMap &object)
+void drawImageObject(QPainter& painter, const QVariantMap& object)
 {
     const QImage image = imageFromFileUrl(object.value(QStringLiteral("source")).toString());
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return;
     }
 
@@ -1063,7 +1081,8 @@ void drawImageObject(QPainter &painter, const QVariantMap &object)
                      object.value(QStringLiteral("width")).toReal(),
                      object.value(QStringLiteral("height")).toReal());
     imageRect = imageRect.normalized();
-    if (imageRect.width() < 1.0 || imageRect.height() < 1.0) {
+    if (imageRect.width() < 1.0 || imageRect.height() < 1.0)
+    {
         return;
     }
 
@@ -1073,25 +1092,27 @@ void drawImageObject(QPainter &painter, const QVariantMap &object)
     painter.restore();
 }
 
-void drawRasterLayerObject(QPainter &painter,
-                           const QVariantMap &object,
-                           const QHash<int, QImage> &rasterLayersByObjectId)
+void drawRasterLayerObject(QPainter& painter, const QVariantMap& object,
+                           const QHash<int, QImage>& rasterLayersByObjectId)
 {
     const int objectId = object.value(QStringLiteral("id")).toInt();
     const QImage image = rasterLayersByObjectId.value(objectId);
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return;
     }
 
-    const bool visible = !object.contains(QStringLiteral("visible"))
-        || object.value(QStringLiteral("visible")).toBool();
-    if (!visible) {
+    const bool visible = !object.contains(QStringLiteral("visible")) ||
+                         object.value(QStringLiteral("visible")).toBool();
+    if (!visible)
+    {
         return;
     }
 
-    const qreal opacity = object.contains(QStringLiteral("opacity"))
-        ? qBound<qreal>(0.0, object.value(QStringLiteral("opacity")).toReal(), 1.0)
-        : 1.0;
+    const qreal opacity =
+        object.contains(QStringLiteral("opacity"))
+            ? qBound<qreal>(0.0, object.value(QStringLiteral("opacity")).toReal(), 1.0)
+            : 1.0;
 
     painter.save();
     painter.setOpacity(opacity);
@@ -1099,34 +1120,37 @@ void drawRasterLayerObject(QPainter &painter,
     painter.restore();
 }
 
-void drawObject(QPainter &painter,
-                const QVariant &objectValue,
-                const QHash<int, QImage> &rasterLayersByObjectId = {})
+void drawObject(QPainter& painter, const QVariant& objectValue,
+                const QHash<int, QImage>& rasterLayersByObjectId = {})
 {
     const QVariantMap object = objectValue.toMap();
     const QString type = object.value(QStringLiteral("type")).toString();
-    if (type == QStringLiteral("layer")) {
+    if (type == QStringLiteral("layer"))
+    {
         drawRasterLayerObject(painter, object, rasterLayersByObjectId);
         return;
     }
-    if (type == QStringLiteral("text")) {
+    if (type == QStringLiteral("text"))
+    {
         drawTextObject(painter, object);
         return;
     }
-    if (type == QStringLiteral("shape")) {
+    if (type == QStringLiteral("shape"))
+    {
         drawShapeObject(painter, object);
         return;
     }
-    if (type == QStringLiteral("image")) {
+    if (type == QStringLiteral("image"))
+    {
         drawImageObject(painter, object);
     }
 }
 
-QImage compositeImageWithObjects(QImage image,
-                                 const QVariantList &objects,
-                                 const QHash<int, QImage> &rasterLayersByObjectId = {})
+QImage compositeImageWithObjects(QImage image, const QVariantList& objects,
+                                 const QHash<int, QImage>& rasterLayersByObjectId = {})
 {
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
@@ -1134,14 +1158,15 @@ QImage compositeImageWithObjects(QImage image,
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    for (const QVariant &object : objects) {
+    for (const QVariant& object : objects)
+    {
         drawObject(painter, object, rasterLayersByObjectId);
     }
     painter.end();
     return image;
 }
 
-QImage rasterizedObjectLayer(const QVariant &objectValue, const QRect &bounds)
+QImage rasterizedObjectLayer(const QVariant& objectValue, const QRect& bounds)
 {
     QImage image(bounds.size(), QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
@@ -1156,24 +1181,26 @@ QImage rasterizedObjectLayer(const QVariant &objectValue, const QRect &bounds)
     return image;
 }
 
-QRect drawableObjectThumbnailBounds(const QVariantMap &object)
+QRect drawableObjectThumbnailBounds(const QVariantMap& object)
 {
     const QRectF objectRect(object.value(QStringLiteral("x")).toReal(),
                             object.value(QStringLiteral("y")).toReal(),
                             object.value(QStringLiteral("width")).toReal(),
                             object.value(QStringLiteral("height")).toReal());
     QRect bounds = objectRect.normalized().toAlignedRect();
-    if (bounds.width() < 1 || bounds.height() < 1) {
+    if (bounds.width() < 1 || bounds.height() < 1)
+    {
         bounds = QRect(qFloor(objectRect.x()), qFloor(objectRect.y()), 1, 1);
     }
     return bounds;
 }
 
-QImage rasterizedRasterLayer(const QImage &layerImage, const QRect &bounds)
+QImage rasterizedRasterLayer(const QImage& layerImage, const QRect& bounds)
 {
     QImage image(bounds.size(), QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
-    if (layerImage.isNull()) {
+    if (layerImage.isNull())
+    {
         return image;
     }
 
@@ -1184,14 +1211,15 @@ QImage rasterizedRasterLayer(const QImage &layerImage, const QRect &bounds)
     return image;
 }
 
-QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
-                                                  const QVariantList &objects,
-                                                  const PsdCompatibilityDocument &document,
-                                                  const QHash<int, QImage> &rasterLayersByObjectId,
+QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage& rasterImage,
+                                                  const QVariantList& objects,
+                                                  const PsdCompatibilityDocument& document,
+                                                  const QHash<int, QImage>& rasterLayersByObjectId,
                                                   bool includeBackgroundLayer)
 {
     const QList<PsdLayerRecord> records = document.layers();
-    if (records.isEmpty() && objects.isEmpty()) {
+    if (records.isEmpty() && objects.isEmpty())
+    {
         return {};
     }
 
@@ -1199,25 +1227,32 @@ QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
     layers.reserve(records.size());
 
     int recordIndex = 0;
-    if (includeBackgroundLayer && !records.isEmpty()) {
-        layers.append(PsdImageWriter::Layer{records.constFirst().name(), records.constFirst().bounds(), rasterImage});
+    if (includeBackgroundLayer && !records.isEmpty())
+    {
+        layers.append(PsdImageWriter::Layer{records.constFirst().name(),
+                                            records.constFirst().bounds(), rasterImage});
         recordIndex = 1;
     }
 
-    for (const QVariant &objectValue : objects) {
-        if (objectValue.toMap().isEmpty()) {
+    for (const QVariant& objectValue : objects)
+    {
+        if (objectValue.toMap().isEmpty())
+        {
             continue;
         }
-        if (recordIndex >= records.size()) {
+        if (recordIndex >= records.size())
+        {
             break;
         }
 
         const PsdLayerRecord record = records.at(recordIndex);
         const QVariantMap object = objectValue.toMap();
-        const QImage rasterLayerImage = object.value(QStringLiteral("type")).toString() == QStringLiteral("layer")
-            ? rasterizedRasterLayer(rasterLayersByObjectId.value(object.value(QStringLiteral("id")).toInt()),
-                                    record.bounds())
-            : rasterizedObjectLayer(objectValue, record.bounds());
+        const QImage rasterLayerImage =
+            object.value(QStringLiteral("type")).toString() == QStringLiteral("layer")
+                ? rasterizedRasterLayer(
+                      rasterLayersByObjectId.value(object.value(QStringLiteral("id")).toInt()),
+                      record.bounds())
+                : rasterizedObjectLayer(objectValue, record.bounds());
         layers.append(PsdImageWriter::Layer{record.name(), record.bounds(), rasterLayerImage});
         ++recordIndex;
     }
@@ -1225,44 +1260,37 @@ QList<PsdImageWriter::Layer> psdLayersFromSession(const QImage &rasterImage,
     return layers;
 }
 
-bool writeLayeredPsdFile(const QString &filePath,
-                         const QImage &rasterImage,
-                         const QVariantList &objects,
-                         const QHash<int, QImage> &rasterLayersByObjectId,
+bool writeLayeredPsdFile(const QString& filePath, const QImage& rasterImage,
+                         const QVariantList& objects,
+                         const QHash<int, QImage>& rasterLayersByObjectId,
                          bool includeBackgroundLayer)
 {
-    const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(rasterImage.size(),
-                                                                                          objects,
-                                                                                          includeBackgroundLayer);
-    if (!document.isPsdCanvasSizeCompatible()) {
+    const PsdCompatibilityDocument document = PsdCompatibilityDocument::fromVincentSession(
+        rasterImage.size(), objects, includeBackgroundLayer);
+    if (!document.isPsdCanvasSizeCompatible())
+    {
         return false;
     }
 
-    const QImage baseImage = includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
-    const QImage mergedImage = compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
-    return PsdImageWriter::writeLayeredImage(filePath,
-                                            mergedImage,
-                                            psdLayersFromSession(baseImage,
-                                                                 objects,
-                                                                 document,
-                                                                 rasterLayersByObjectId,
-                                                                 includeBackgroundLayer),
-                                            document.toManifest());
+    const QImage baseImage =
+        includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
+    const QImage mergedImage =
+        compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
+    return PsdImageWriter::writeLayeredImage(filePath, mergedImage,
+                                             psdLayersFromSession(baseImage, objects, document,
+                                                                  rasterLayersByObjectId,
+                                                                  includeBackgroundLayer),
+                                             document.toManifest());
 }
 
 } // namespace
 
-DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem *parent)
-    : iiSharedCanvas::CanvasItem(parent)
-    , m_viewModelBridge(new CanvasViewModelBridge())
+DrawingSurfaceItem::DrawingSurfaceItem(QQuickItem* parent)
+    : iiSharedCanvas::CanvasItem(parent), m_viewModelBridge(new CanvasViewModelBridge())
 {
-    connect(this,
-            &iiSharedCanvas::CanvasItem::undoRedoChanged,
-            this,
+    connect(this, &iiSharedCanvas::CanvasItem::undoRedoChanged, this,
             &DrawingSurfaceItem::emitUndoRedoSignals);
-    connect(this,
-            &iiSharedCanvas::CanvasItem::strokeCountChanged,
-            this,
+    connect(this, &iiSharedCanvas::CanvasItem::strokeCountChanged, this,
             &DrawingSurfaceItem::rasterContentChanged);
 }
 
@@ -1271,7 +1299,7 @@ DrawingSurfaceItem::~DrawingSurfaceItem()
     delete m_viewModelBridge;
 }
 
-QObject *DrawingSurfaceItem::documentViewModel() const
+QObject* DrawingSurfaceItem::documentViewModel() const
 {
     return m_viewModelBridge->documentViewModel();
 }
@@ -1291,9 +1319,15 @@ bool DrawingSurfaceItem::hasBackground() const
     return m_hasBackground;
 }
 
-void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
+bool DrawingSurfaceItem::remoteInputMode() const noexcept
 {
-    if (m_viewModelBridge->documentViewModel() == documentViewModel) {
+    return m_remoteInputMode;
+}
+
+void DrawingSurfaceItem::setDocumentViewModel(QObject* documentViewModel)
+{
+    if (m_viewModelBridge->documentViewModel() == documentViewModel)
+    {
         return;
     }
 
@@ -1335,50 +1369,69 @@ void DrawingSurfaceItem::setDocumentViewModel(QObject *documentViewModel)
     setStabilizerStrength(nextToolState.stabilizerStrength);
     setToolMode(nextToolMode);
     syncCanvasSize();
-    if (!documentReady()) {
+    if (!documentReady())
+    {
         createRasterDocument(canvasSize().width(), canvasSize().height());
     }
     emit documentViewModelChanged();
 }
 
-void DrawingSurfaceItem::setViewId(const QString &viewId)
+void DrawingSurfaceItem::setViewId(const QString& viewId)
 {
-    if (m_viewId == viewId) {
+    if (m_viewId == viewId)
+    {
         return;
     }
     m_viewId = viewId;
     emit viewIdChanged();
 }
 
-void DrawingSurfaceItem::newCanvas(bool useInfiniteCanvas,
-                                   int originX,
-                                   int originY,
-                                   int chunkSize)
+void DrawingSurfaceItem::setRemoteInputMode(bool enabled)
 {
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode == enabled)
+    {
+        return;
+    }
+    m_remoteInputMode = enabled;
+    if (!enabled)
+    {
+        clearRemoteStrokeCapture();
+    }
+    emit remoteInputModeChanged();
+}
+
+void DrawingSurfaceItem::newCanvas(bool useInfiniteCanvas, int originX, int originY, int chunkSize)
+{
+    if (!canMutateDocument())
+    {
         return;
     }
 
     syncCanvasSize();
-    bool created = useInfiniteCanvas
-        ? createInfiniteRasterDocument(canvasSize().width(), canvasSize().height(), chunkSize)
-        : createRasterDocument(canvasSize().width(), canvasSize().height());
-    if (created && useInfiniteCanvas && (originX != 0 || originY != 0)) {
-        iiSharedCanvas::Document *canvasDocument = document();
+    bool created =
+        useInfiniteCanvas
+            ? createInfiniteRasterDocument(canvasSize().width(), canvasSize().height(), chunkSize)
+            : createRasterDocument(canvasSize().width(), canvasSize().height());
+    if (created && useInfiniteCanvas && (originX != 0 || originY != 0))
+    {
+        iiSharedCanvas::Document* canvasDocument = document();
         const iiSharedCanvas::CanvasOrigin priorOrigin = canvasDocument->infiniteCanvas.origin;
         canvasDocument->infiniteCanvas.origin = {originX, originY};
-        if (!iiSharedCanvas::validate(*canvasDocument).ok() || !refresh()) {
+        if (!iiSharedCanvas::validate(*canvasDocument).ok() || !refresh())
+        {
             canvasDocument->infiniteCanvas.origin = priorOrigin;
             refresh();
             created = false;
         }
     }
-    if (created && m_hasBackground) {
+    if (created && m_hasBackground)
+    {
         m_hasBackground = false;
         m_backgroundSource.clear();
         emit backgroundChanged();
     }
-    if (created) {
+    if (created)
+    {
         emit rasterContentChanged();
     }
 }
@@ -1392,38 +1445,43 @@ void DrawingSurfaceItem::clearCanvas()
     newCanvas(wasInfinite, originX, originY, chunkSize);
 }
 
-bool DrawingSurfaceItem::openRaster(const QString &fileUrl, qreal maximumCanvasWidth, qreal maximumCanvasHeight)
+bool DrawingSurfaceItem::openRaster(const QString& fileUrl, qreal maximumCanvasWidth,
+                                    qreal maximumCanvasHeight)
 {
-    if (!canMutateDocument()) {
+    if (!canMutateDocument())
+    {
         return false;
     }
 
-    if (hasIiscSuffix(fileUrl)) {
+    if (hasIiscSuffix(fileUrl))
+    {
         return openSharedCanvasDocument(fileUrl);
     }
 
     QImage image = imageFromFileUrl(fileUrl);
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return false;
     }
 
     const bool hasMaximumCanvasSize = maximumCanvasWidth > 0 || maximumCanvasHeight > 0;
-    const QSize maximumSize(
-            maximumCanvasWidth > 0 ? qRound(maximumCanvasWidth) : image.width(),
-            maximumCanvasHeight > 0 ? qRound(maximumCanvasHeight) : image.height());
-    const QSize rasterSize = hasMaximumCanvasSize
-            ? fittedOpenedRasterSize(image.size(), maximumSize)
-            : image.size();
-    if (rasterSize.isEmpty()) {
+    const QSize maximumSize(maximumCanvasWidth > 0 ? qRound(maximumCanvasWidth) : image.width(),
+                            maximumCanvasHeight > 0 ? qRound(maximumCanvasHeight) : image.height());
+    const QSize rasterSize =
+        hasMaximumCanvasSize ? fittedOpenedRasterSize(image.size(), maximumSize) : image.size();
+    if (rasterSize.isEmpty())
+    {
         return false;
     }
 
-    if (image.size() != rasterSize) {
+    if (image.size() != rasterSize)
+    {
         image = image.scaled(rasterSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     }
 
     const bool opened = replaceRasterCanvas(image);
-    if (!opened) {
+    if (!opened)
+    {
         return false;
     }
 
@@ -1453,6 +1511,24 @@ QVariantMap DrawingSurfaceItem::imageObjectForFile(const QString& fileUrl, qreal
         object.insert(QStringLiteral("sourceFormat"), QStringLiteral("psd"));
     }
     return object;
+}
+
+QByteArray DrawingSurfaceItem::portableImageData(const QString& fileUrl) const
+{
+    const QImage image = imageFromFileUrl(fileUrl);
+    const QByteArray encoded = pngDataForRecentCanvas(image);
+    return encoded.size() <= maximumRemoteImageDownloadBytes ? encoded : QByteArray{};
+}
+
+QVariantMap DrawingSurfaceItem::remoteImageObject(const QByteArray& encodedData,
+                                                  qreal maximumObjectWidth,
+                                                  qreal maximumObjectHeight) const
+{
+    if (encodedData.size() > maximumRemoteImageDownloadBytes)
+    {
+        return imageImportResult(QStringLiteral("image-too-large"));
+    }
+    return imageObjectForEncodedData(encodedData, {}, maximumObjectWidth, maximumObjectHeight);
 }
 
 QVariantMap DrawingSurfaceItem::clipboardImageObject(qreal maximumObjectWidth,
@@ -1722,22 +1798,26 @@ void DrawingSurfaceItem::requestRemoteDroppedImage(const QUrl& url, qreal maximu
             });
 }
 
-QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const
+QVariantMap DrawingSurfaceItem::psdImportDocument(const QString& fileUrl) const
 {
     const QString filePath = localFilePath(fileUrl);
-    if (!PsdImageReader::canReadPath(filePath)) {
+    if (!PsdImageReader::canReadPath(filePath))
+    {
         return {};
     }
 
     const PsdImportedDocument imported = PsdImageReader::readDocument(filePath);
-    if (!imported.isValid()) {
+    if (!imported.isValid())
+    {
         return {};
     }
 
     QVariantList layers;
     layers.reserve(imported.layers.size());
-    for (const PsdImportedLayer &layer : imported.layers) {
-        if (layer.image.isNull()) {
+    for (const PsdImportedLayer& layer : imported.layers)
+    {
+        if (layer.image.isNull())
+        {
             continue;
         }
 
@@ -1751,15 +1831,17 @@ QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const
         layerMap.insert(QStringLiteral("height"), layer.bounds.height());
         layerMap.insert(QStringLiteral("blendModeKey"), layer.blendModeKey);
         layerMap.insert(QStringLiteral("opacity"), layer.opacity);
-        layerMap.insert(QStringLiteral("opacityRatio"), qBound<qreal>(0.0, layer.opacity / 255.0, 1.0));
+        layerMap.insert(QStringLiteral("opacityRatio"),
+                        qBound<qreal>(0.0, layer.opacity / 255.0, 1.0));
         layerMap.insert(QStringLiteral("visible"), layer.visible);
         layerMap.insert(QStringLiteral("hasUserMask"), layer.hasUserMask);
         layerMap.insert(QStringLiteral("hasVectorMask"), layer.hasVectorMask);
-        layerMap.insert(QStringLiteral("source"), cachedPngSourceForImage(QStringLiteral("psd-import-layers"), layer.image));
+        layerMap.insert(QStringLiteral("source"),
+                        cachedPngSourceForImage(QStringLiteral("psd-import-layers"), layer.image));
         layerMap.insert(QStringLiteral("thumbnailSource"),
-                        cachedPngSourceForImage(QStringLiteral("layer-thumbnails"),
-                                                thumbnailImage(layer.image,
-                                                               boundedThumbnailMaximumSize(32, 32))));
+                        cachedPngSourceForImage(
+                            QStringLiteral("layer-thumbnails"),
+                            thumbnailImage(layer.image, boundedThumbnailMaximumSize(32, 32))));
         layers.append(layerMap);
     }
 
@@ -1774,21 +1856,26 @@ QVariantMap DrawingSurfaceItem::psdImportDocument(const QString &fileUrl) const
     document.insert(QStringLiteral("vincentManifest"), imported.vincentManifest);
     document.insert(QStringLiteral("layers"), layers);
     document.insert(QStringLiteral("compatibilityWarnings"), imported.compatibilityWarnings);
-    if (!imported.mergedImage.isNull()) {
-        document.insert(QStringLiteral("mergedSource"),
-                        cachedPngSourceForImage(QStringLiteral("psd-previews"), imported.mergedImage));
+    if (!imported.mergedImage.isNull())
+    {
+        document.insert(
+            QStringLiteral("mergedSource"),
+            cachedPngSourceForImage(QStringLiteral("psd-previews"), imported.mergedImage));
     }
     return document;
 }
 
-bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
+bool DrawingSurfaceItem::saveToFile(const QString& fileUrl)
 {
-    if (hasIiscSuffix(fileUrl)) {
+    if (hasIiscSuffix(fileUrl))
+    {
         return saveSharedCanvasDocument(fileUrl);
     }
-    if (hasPsdSuffix(fileUrl)) {
+    if (hasPsdSuffix(fileUrl))
+    {
         syncCanvasSize();
-        return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()), {}, {}, true);
+        return writeLayeredPsdFile(localFilePath(fileUrl), currentRasterCanvasImage(canvasSize()),
+                                   {}, {}, true);
     }
 
     syncCanvasSize();
@@ -1796,18 +1883,20 @@ bool DrawingSurfaceItem::saveToFile(const QString &fileUrl)
     return !image.isNull() && image.save(localFilePath(fileUrl));
 }
 
-bool DrawingSurfaceItem::saveToFileWithObjects(const QString &fileUrl, const QVariantList &objects)
+bool DrawingSurfaceItem::saveToFileWithObjects(const QString& fileUrl, const QVariantList& objects)
 {
     return saveToFileWithObjectsAndRasterLayers(fileUrl, objects, {});
 }
 
-bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fileUrl,
-                                                              const QVariantList &objects,
-                                                              const QVariantList &rasterLayers,
+bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString& fileUrl,
+                                                              const QVariantList& objects,
+                                                              const QVariantList& rasterLayers,
                                                               bool includeBackgroundLayer)
 {
-    if (hasIiscSuffix(fileUrl)) {
-        if (!objects.isEmpty() || !rasterLayers.isEmpty()) {
+    if (hasIiscSuffix(fileUrl))
+    {
+        if (!objects.isEmpty() || !rasterLayers.isEmpty())
+        {
             return false;
         }
         return saveSharedCanvasDocument(fileUrl);
@@ -1815,52 +1904,60 @@ bool DrawingSurfaceItem::saveToFileWithObjectsAndRasterLayers(const QString &fil
 
     syncCanvasSize();
     const QImage rasterImage = currentRasterCanvasImage(canvasSize());
-    if (rasterImage.isNull()) {
+    if (rasterImage.isNull())
+    {
         return false;
     }
 
     QHash<int, QImage> rasterLayersByObjectId;
-    for (const QVariant &layerValue : rasterLayers) {
+    for (const QVariant& layerValue : rasterLayers)
+    {
         const QVariantMap layerDescriptor = layerValue.toMap();
         const int objectId = layerDescriptor.value(QStringLiteral("objectId")).toInt();
-        if (objectId <= 0) {
+        if (objectId <= 0)
+        {
             continue;
         }
 
         QImage layerImage;
-        if (auto *layerItem = qobject_cast<DrawingSurfaceItem *>(
-                    layerDescriptor.value(QStringLiteral("item")).value<QObject *>())) {
+        if (auto* layerItem = qobject_cast<DrawingSurfaceItem*>(
+                layerDescriptor.value(QStringLiteral("item")).value<QObject*>()))
+        {
             layerItem->syncCanvasSize();
             layerImage = layerItem->currentRasterCanvasImage(canvasSize());
         }
-        if (layerImage.isNull()) {
-            layerImage = imageFromFileUrl(layerDescriptor.value(QStringLiteral("snapshotSource")).toString());
+        if (layerImage.isNull())
+        {
+            layerImage = imageFromFileUrl(
+                layerDescriptor.value(QStringLiteral("snapshotSource")).toString());
         }
-        if (layerImage.isNull()) {
+        if (layerImage.isNull())
+        {
             continue;
         }
-        if (layerImage.size() != canvasSize()) {
+        if (layerImage.size() != canvasSize())
+        {
             QImage resizedLayer = transparentCanvasImage(canvasSize());
             QPainter painter(&resizedLayer);
             painter.drawImage(QPointF(0.0, 0.0), layerImage);
             painter.end();
             layerImage = resizedLayer;
         }
-        if (layerImage.format() != QImage::Format_ARGB32_Premultiplied) {
+        if (layerImage.format() != QImage::Format_ARGB32_Premultiplied)
+        {
             layerImage = layerImage.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         }
         rasterLayersByObjectId.insert(objectId, layerImage);
     }
 
-    if (hasPsdSuffix(fileUrl)) {
-        return writeLayeredPsdFile(localFilePath(fileUrl),
-                                   rasterImage,
-                                   objects,
-                                   rasterLayersByObjectId,
-                                   includeBackgroundLayer);
+    if (hasPsdSuffix(fileUrl))
+    {
+        return writeLayeredPsdFile(localFilePath(fileUrl), rasterImage, objects,
+                                   rasterLayersByObjectId, includeBackgroundLayer);
     }
 
-    const QImage baseImage = includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
+    const QImage baseImage =
+        includeBackgroundLayer ? opaqueCanvasBackgroundImage(rasterImage) : rasterImage;
     const QImage image = compositeImageWithObjects(baseImage, objects, rasterLayersByObjectId);
     return image.save(localFilePath(fileUrl));
 }
@@ -2204,16 +2301,19 @@ QString DrawingSurfaceItem::cacheRasterSnapshotSource()
 {
     syncCanvasSize();
     const QImage image = currentRasterCanvasImage(canvasSize());
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
     const QString snapshotPath = writableCacheFilePath(QStringLiteral("raster-layer-snapshots"),
                                                        QStringLiteral("layer-XXXXXX.png"));
-    if (snapshotPath.isEmpty()) {
+    if (snapshotPath.isEmpty())
+    {
         return {};
     }
-    if (!image.save(snapshotPath, "PNG")) {
+    if (!image.save(snapshotPath, "PNG"))
+    {
         QFile::remove(snapshotPath);
         return {};
     }
@@ -2224,95 +2324,110 @@ QString DrawingSurfaceItem::cacheRasterThumbnailSource(qreal maximumWidth, qreal
 {
     syncCanvasSize();
     const QImage image = currentRasterCanvasImage(canvasSize());
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
-    const QImage thumbnail = thumbnailImage(image, boundedThumbnailMaximumSize(maximumWidth, maximumHeight));
+    const QImage thumbnail =
+        thumbnailImage(image, boundedThumbnailMaximumSize(maximumWidth, maximumHeight));
     return cachedPngSourceForImage(QStringLiteral("layer-thumbnails"), thumbnail);
 }
 
-QString DrawingSurfaceItem::cacheGrabbedThumbnailSource(QObject *grabResult)
+QString DrawingSurfaceItem::cacheGrabbedThumbnailSource(QObject* grabResult)
 {
-    auto *result = qobject_cast<QQuickItemGrabResult *>(grabResult);
-    if (!result) {
+    auto* result = qobject_cast<QQuickItemGrabResult*>(grabResult);
+    if (!result)
+    {
         return {};
     }
 
     const QString thumbnailPath = writableCacheFilePath(QStringLiteral("layer-thumbnails"),
                                                         QStringLiteral("grab-XXXXXX.png"));
-    if (thumbnailPath.isEmpty()) {
+    if (thumbnailPath.isEmpty())
+    {
         return {};
     }
 
-    if (!result->saveToFile(thumbnailPath)) {
+    if (!result->saveToFile(thumbnailPath))
+    {
         QFile::remove(thumbnailPath);
         return {};
     }
     return QUrl::fromLocalFile(thumbnailPath).toString();
 }
 
-QString DrawingSurfaceItem::cacheDrawableObjectThumbnailSource(const QVariantMap &object,
+QString DrawingSurfaceItem::cacheDrawableObjectThumbnailSource(const QVariantMap& object,
                                                                qreal maximumWidth,
                                                                qreal maximumHeight) const
 {
-    if (object.isEmpty()) {
+    if (object.isEmpty())
+    {
         return {};
     }
 
     const QRect bounds = drawableObjectThumbnailBounds(object);
     const QImage image = rasterizedObjectLayer(object, bounds);
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return {};
     }
 
-    const QImage thumbnail = thumbnailImage(image, boundedThumbnailMaximumSize(maximumWidth, maximumHeight));
+    const QImage thumbnail =
+        thumbnailImage(image, boundedThumbnailMaximumSize(maximumWidth, maximumHeight));
     return cachedPngSourceForImage(QStringLiteral("layer-thumbnails"), thumbnail);
 }
 
-bool DrawingSurfaceItem::restoreRasterSnapshot(const QString &fileUrl)
+bool DrawingSurfaceItem::restoreRasterSnapshot(const QString& fileUrl)
 {
-    if (!canMutateDocument()) {
+    if (!canMutateDocument())
+    {
         return false;
     }
 
     QImage image = imageFromFileUrl(fileUrl);
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         return false;
     }
 
     syncCanvasSize();
-    if (image.size() != canvasSize()) {
+    if (image.size() != canvasSize())
+    {
         QImage resizedLayer = transparentCanvasImage(canvasSize());
         QPainter painter(&resizedLayer);
         painter.drawImage(QPointF(0.0, 0.0), image);
         painter.end();
         image = resizedLayer;
     }
-    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+    if (image.format() != QImage::Format_ARGB32_Premultiplied)
+    {
         image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     }
 
-    const bool restored = infiniteCanvas()
-        ? replaceSelectedRaster(image)
-        : replaceRasterCanvas(image);
-    if (restored) {
+    const bool restored =
+        infiniteCanvas() ? replaceSelectedRaster(image) : replaceRasterCanvas(image);
+    if (restored)
+    {
         emitUndoRedoSignals();
         emit rasterContentChanged();
     }
     return restored;
 }
 
-QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList &objects,
+QVariantMap DrawingSurfaceItem::psdCompatibilityManifest(const QVariantList& objects,
                                                          bool includeBackgroundLayer) const
 {
-    return PsdCompatibilityDocument::fromVincentSession(canvasSize(), objects, includeBackgroundLayer).toManifest();
+    return PsdCompatibilityDocument::fromVincentSession(canvasSize(), objects,
+                                                        includeBackgroundLayer)
+        .toManifest();
 }
 
 void DrawingSurfaceItem::undo()
 {
     const bool applied = iiSharedCanvas::CanvasItem::undo();
-    if (applied) {
+    if (applied)
+    {
         emit rasterContentChanged();
     }
 }
@@ -2320,7 +2435,8 @@ void DrawingSurfaceItem::undo()
 void DrawingSurfaceItem::redo()
 {
     const bool applied = iiSharedCanvas::CanvasItem::redo();
-    if (applied) {
+    if (applied)
+    {
         emit rasterContentChanged();
     }
 }
@@ -2330,7 +2446,8 @@ void DrawingSurfaceItem::resizeCanvasSurface(qreal canvasWidth, qreal canvasHeig
     const qreal boundedWidth = qMax<qreal>(1.0, qRound(canvasWidth));
     const qreal boundedHeight = qMax<qreal>(1.0, qRound(canvasHeight));
 
-    if (qFuzzyCompare(width(), boundedWidth) && qFuzzyCompare(height(), boundedHeight)) {
+    if (qFuzzyCompare(width(), boundedWidth) && qFuzzyCompare(height(), boundedHeight))
+    {
         syncCanvasSize();
         return;
     }
@@ -2343,105 +2460,281 @@ void DrawingSurfaceItem::resizeCanvasSurface(qreal canvasWidth, qreal canvasHeig
     syncCanvasSize();
 }
 
-void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
+void DrawingSurfaceItem::beginStroke(qreal pointX, qreal pointY, qreal rawPressure,
+                                     bool pressureSensitive)
 {
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        beginRemoteStrokeCapture(pointX, pointY, rawPressure, pressureSensitive);
+        return;
+    }
+    if (!canMutateDocument())
+    {
         return;
     }
 
-    if (pressureSensitive) {
-        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletPress,
-                                                            pointX,
-                                                            pointY,
-                                                            rawPressure,
-                                                            Qt::LeftButton,
-                                                            Qt::LeftButton);
+    if (pressureSensitive)
+    {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(
+            QEvent::TabletPress, pointX, pointY, rawPressure, Qt::LeftButton, Qt::LeftButton);
         iiSharedCanvas::CanvasItem::event(&event);
         return;
     }
 
-    QMouseEvent event = makeMouseEvent(QEvent::MouseButtonPress,
-                                       pointX,
-                                       pointY,
-                                       Qt::LeftButton,
-                                       Qt::LeftButton);
+    QMouseEvent event =
+        makeMouseEvent(QEvent::MouseButtonPress, pointX, pointY, Qt::LeftButton, Qt::LeftButton);
     iiSharedCanvas::CanvasItem::mousePressEvent(&event);
 }
 
-bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
+bool DrawingSurfaceItem::appendStrokePoint(qreal pointX, qreal pointY, qreal rawPressure,
+                                           bool pressureSensitive)
 {
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        if (!m_remoteStrokeActive || pressureSensitive != m_remoteStrokePressureSensitive)
+        {
+            return false;
+        }
+        return appendRemoteStrokeCapture(pointX, pointY, rawPressure);
+    }
+    if (!canMutateDocument())
+    {
         return false;
     }
 
-    if (pressureSensitive) {
-        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletMove,
-                                                            pointX,
-                                                            pointY,
-                                                            rawPressure,
-                                                            Qt::NoButton,
-                                                            Qt::LeftButton);
+    if (pressureSensitive)
+    {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(
+            QEvent::TabletMove, pointX, pointY, rawPressure, Qt::NoButton, Qt::LeftButton);
         iiSharedCanvas::CanvasItem::event(&event);
         return true;
     }
 
-    QMouseEvent event = makeMouseEvent(QEvent::MouseMove,
-                                       pointX,
-                                       pointY,
-                                       Qt::NoButton,
-                                       Qt::LeftButton);
+    QMouseEvent event =
+        makeMouseEvent(QEvent::MouseMove, pointX, pointY, Qt::NoButton, Qt::LeftButton);
     iiSharedCanvas::CanvasItem::mouseMoveEvent(&event);
     return true;
 }
 
-void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure, bool pressureSensitive)
+void DrawingSurfaceItem::endStroke(qreal pointX, qreal pointY, qreal rawPressure,
+                                   bool pressureSensitive)
 {
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        if (m_remoteStrokeActive && pressureSensitive == m_remoteStrokePressureSensitive)
+        {
+            endRemoteStrokeCapture(pointX, pointY, rawPressure);
+        }
+        return;
+    }
+    if (!canMutateDocument())
+    {
         return;
     }
 
-    if (pressureSensitive) {
-        QTabletEvent event = makeSyntheticTabletStrokeEvent(QEvent::TabletRelease,
-                                                            pointX,
-                                                            pointY,
-                                                            rawPressure,
-                                                            Qt::LeftButton,
-                                                            Qt::NoButton);
+    if (pressureSensitive)
+    {
+        QTabletEvent event = makeSyntheticTabletStrokeEvent(
+            QEvent::TabletRelease, pointX, pointY, rawPressure, Qt::LeftButton, Qt::NoButton);
         iiSharedCanvas::CanvasItem::event(&event);
         emit rasterContentChanged();
         return;
     }
 
-    QMouseEvent event = makeMouseEvent(QEvent::MouseButtonRelease,
-                                       pointX,
-                                       pointY,
-                                       Qt::LeftButton,
-                                       Qt::NoButton);
+    QMouseEvent event =
+        makeMouseEvent(QEvent::MouseButtonRelease, pointX, pointY, Qt::LeftButton, Qt::NoButton);
     iiSharedCanvas::CanvasItem::mouseReleaseEvent(&event);
     emit rasterContentChanged();
 }
 
-bool DrawingSurfaceItem::commitText(qreal pointX,
-                                    qreal pointY,
-                                    qreal boxWidth,
-                                    const QString &text,
-                                    qreal fontPixelSize,
-                                    const QColor &color)
+bool DrawingSurfaceItem::applyRemoteStroke(const QVariantMap& style, const QVariantList& points,
+                                           bool pressureSensitive)
 {
-    if (!canMutateDocument() || text.trimmed().isEmpty()) {
+    if (!canMutateDocument() || points.size() < 2 || points.size() > maximumRemoteStrokePointCount)
+    {
+        return false;
+    }
+
+    const QString remoteTool = style.value(QStringLiteral("tool")).toString();
+    const QColor remoteColor(style.value(QStringLiteral("color")).toString());
+    const qreal remoteSize = style.value(QStringLiteral("size")).toReal();
+    const qreal remoteFlow = style.value(QStringLiteral("flow")).toReal();
+    const qreal remoteOpacity = style.value(QStringLiteral("opacity")).toReal();
+    const qreal remoteHardness = style.value(QStringLiteral("hardness")).toReal();
+    const qreal remoteSpacing = style.value(QStringLiteral("spacing")).toReal();
+    const qreal remoteSpacingRatio = style.value(QStringLiteral("spacingRatio")).toReal();
+    const qreal remotePressureMinimum = style.value(QStringLiteral("pressureMinimum")).toReal();
+    const qreal remotePressureCenter = style.value(QStringLiteral("pressureCenter")).toReal();
+    const qreal remotePressureMaximum = style.value(QStringLiteral("pressureMaximum")).toReal();
+    const qreal remoteStabilizer = style.value(QStringLiteral("stabilizer")).toReal();
+    if ((remoteTool != QStringLiteral("brush") && remoteTool != QStringLiteral("eraser")) ||
+        !remoteColor.isValid() || !qIsFinite(remoteSize) || remoteSize <= 0 ||
+        !qIsFinite(remoteFlow) || remoteFlow < 0 || remoteFlow > 1 || !qIsFinite(remoteOpacity) ||
+        remoteOpacity < 0 || remoteOpacity > 1 || !qIsFinite(remoteHardness) ||
+        remoteHardness < 0 || remoteHardness > 1 || !qIsFinite(remoteSpacing) ||
+        remoteSpacing < 0 || !qIsFinite(remoteSpacingRatio) || remoteSpacingRatio < 0 ||
+        remoteSpacingRatio > 1 || !qIsFinite(remotePressureMinimum) ||
+        !qIsFinite(remotePressureCenter) || !qIsFinite(remotePressureMaximum) ||
+        remotePressureMinimum < 0 || remotePressureMinimum > remotePressureCenter ||
+        remotePressureCenter > remotePressureMaximum || remotePressureMaximum > 1 ||
+        !qIsFinite(remoteStabilizer) || remoteStabilizer < 0 || remoteStabilizer > 1)
+    {
+        return false;
+    }
+
+    for (const QVariant& pointValue : points)
+    {
+        const QVariantMap point = pointValue.toMap();
+        const qreal x = point.value(QStringLiteral("x")).toReal();
+        const qreal y = point.value(QStringLiteral("y")).toReal();
+        const qreal pressure = point.value(QStringLiteral("pressure")).toReal();
+        if (!qIsFinite(x) || !qIsFinite(y) || !qIsFinite(pressure) || pressure < 0 || pressure > 1)
+        {
+            return false;
+        }
+    }
+
+    const bool savedRemoteInputMode = m_remoteInputMode;
+    const QString savedTool = toolMode();
+    const QColor savedColor = brushColor();
+    const qreal savedSize = brushSize();
+    const qreal savedFlow = brushFlow();
+    const qreal savedOpacity = brushOpacity();
+    const qreal savedHardness = brushHardness();
+    const qreal savedSpacing = brushSpacing();
+    const qreal savedSpacingRatio = brushSpacingRatio();
+    const qreal savedPressureMinimum = pressureCurveMinimum();
+    const qreal savedPressureCenter = pressureCurveCenter();
+    const qreal savedPressureMaximum = pressureCurveMaximum();
+    const bool savedPressureOpacity = pressureToOpacityEnabled();
+    const qreal savedStabilizer = stabilizerStrength();
+
+    m_remoteInputMode = false;
+    setToolMode(remoteTool);
+    setBrushColor(remoteColor);
+    setBrushSize(remoteSize);
+    setBrushFlow(remoteFlow);
+    setBrushOpacity(remoteOpacity);
+    setBrushHardness(remoteHardness);
+    setBrushSpacing(remoteSpacing);
+    setBrushSpacingRatio(remoteSpacingRatio);
+    setPressureCurveMinimum(remotePressureMinimum);
+    setPressureCurveCenter(remotePressureCenter);
+    setPressureCurveMaximum(remotePressureMaximum);
+    setPressureToOpacityEnabled(style.value(QStringLiteral("pressureOpacity")).toBool());
+    setStabilizerStrength(remoteStabilizer);
+
+    const QVariantMap firstPoint = points.first().toMap();
+    beginStroke(firstPoint.value(QStringLiteral("x")).toReal(),
+                firstPoint.value(QStringLiteral("y")).toReal(),
+                firstPoint.value(QStringLiteral("pressure")).toReal(), pressureSensitive);
+    for (qsizetype index = 1; index + 1 < points.size(); ++index)
+    {
+        const QVariantMap point = points.at(index).toMap();
+        appendStrokePoint(point.value(QStringLiteral("x")).toReal(),
+                          point.value(QStringLiteral("y")).toReal(),
+                          point.value(QStringLiteral("pressure")).toReal(), pressureSensitive);
+    }
+    const QVariantMap lastPoint = points.last().toMap();
+    endStroke(lastPoint.value(QStringLiteral("x")).toReal(),
+              lastPoint.value(QStringLiteral("y")).toReal(),
+              lastPoint.value(QStringLiteral("pressure")).toReal(), pressureSensitive);
+
+    setToolMode(savedTool);
+    setBrushColor(savedColor);
+    setBrushSize(savedSize);
+    setBrushFlow(savedFlow);
+    setBrushOpacity(savedOpacity);
+    setBrushHardness(savedHardness);
+    setBrushSpacing(savedSpacing);
+    setBrushSpacingRatio(savedSpacingRatio);
+    setPressureCurveMinimum(savedPressureMinimum);
+    setPressureCurveCenter(savedPressureCenter);
+    setPressureCurveMaximum(savedPressureMaximum);
+    setPressureToOpacityEnabled(savedPressureOpacity);
+    setStabilizerStrength(savedStabilizer);
+    m_remoteInputMode = savedRemoteInputMode;
+    return true;
+}
+
+void DrawingSurfaceItem::beginRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure,
+                                                  bool pressureSensitive)
+{
+    clearRemoteStrokeCapture();
+    if ((toolMode() != QStringLiteral("brush") && toolMode() != QStringLiteral("eraser")) ||
+        !qIsFinite(pointX) || !qIsFinite(pointY) || !qIsFinite(rawPressure))
+    {
+        return;
+    }
+    m_remoteStrokeActive = true;
+    m_remoteStrokePressureSensitive = pressureSensitive;
+    appendRemoteStrokeCapture(pointX, pointY, rawPressure);
+}
+
+bool DrawingSurfaceItem::appendRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure)
+{
+    if (!m_remoteStrokeActive || !qIsFinite(pointX) || !qIsFinite(pointY) ||
+        !qIsFinite(rawPressure))
+    {
+        return false;
+    }
+    const QVariantMap point{{QStringLiteral("x"), pointX},
+                            {QStringLiteral("y"), pointY},
+                            {QStringLiteral("pressure"), qBound<qreal>(0.0, rawPressure, 1.0)}};
+    if (m_remoteStrokePoints.size() < maximumRemoteStrokePointCount)
+    {
+        m_remoteStrokePoints.append(point);
+    }
+    else
+    {
+        m_remoteStrokePoints.last() = point;
+    }
+    return true;
+}
+
+void DrawingSurfaceItem::endRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure)
+{
+    if (!m_remoteStrokeActive)
+    {
+        return;
+    }
+    appendRemoteStrokeCapture(pointX, pointY, rawPressure);
+    if (m_remoteStrokePoints.size() == 1)
+    {
+        m_remoteStrokePoints.append(m_remoteStrokePoints.first());
+    }
+    const QVariantList points = m_remoteStrokePoints;
+    const bool pressureSensitive = m_remoteStrokePressureSensitive;
+    clearRemoteStrokeCapture();
+    emit remoteStrokeRequested(points, pressureSensitive);
+}
+
+void DrawingSurfaceItem::clearRemoteStrokeCapture()
+{
+    m_remoteStrokeActive = false;
+    m_remoteStrokePressureSensitive = false;
+    m_remoteStrokePoints.clear();
+}
+
+bool DrawingSurfaceItem::commitText(qreal pointX, qreal pointY, qreal boxWidth, const QString& text,
+                                    qreal fontPixelSize, const QColor& color)
+{
+    if (!canMutateDocument() || text.trimmed().isEmpty())
+    {
         return false;
     }
 
     syncCanvasSize();
     const QSize targetSize = canvasSize();
-    if (targetSize.isEmpty()) {
+    if (targetSize.isEmpty())
+    {
         return false;
     }
 
     QImage image = selectedRasterCanvasImage();
-    const std::optional<QTransform> documentToRaster =
-        documentToSelectedRasterTransform(*this);
-    if (image.isNull() || !documentToRaster) {
+    const std::optional<QTransform> documentToRaster = documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster)
+    {
         return false;
     }
 
@@ -2451,9 +2744,8 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
     const qreal boundedY = qBound<qreal>(0.0, pointY, maxY);
     const qreal availableWidth = qMax<qreal>(1.0, targetSize.width() - boundedX);
     const qreal textWidth = qBound<qreal>(minimumTextBoxWidth, boxWidth, availableWidth);
-    const int boundedFontPixelSize = qRound(qBound<qreal>(minimumTextFontPixelSize,
-                                                          fontPixelSize,
-                                                          maximumTextFontPixelSize));
+    const int boundedFontPixelSize =
+        qRound(qBound<qreal>(minimumTextFontPixelSize, fontPixelSize, maximumTextFontPixelSize));
 
     QFont font;
     font.setPixelSize(boundedFontPixelSize);
@@ -2480,40 +2772,40 @@ bool DrawingSurfaceItem::commitText(qreal pointX,
     painter.end();
 
     const bool committed = replaceSelectedRaster(image);
-    if (committed) {
+    if (committed)
+    {
         emitUndoRedoSignals();
         emit rasterContentChanged();
     }
     return committed;
 }
 
-bool DrawingSurfaceItem::commitShape(qreal pointX,
-                                     qreal pointY,
-                                     qreal boxWidth,
-                                     qreal boxHeight,
-                                     const QString &shapeKind,
-                                     const QColor &color)
+bool DrawingSurfaceItem::commitShape(qreal pointX, qreal pointY, qreal boxWidth, qreal boxHeight,
+                                     const QString& shapeKind, const QColor& color)
 {
-    if (!canMutateDocument()) {
+    if (!canMutateDocument())
+    {
         return false;
     }
 
     syncCanvasSize();
     const QSize targetSize = canvasSize();
-    if (targetSize.isEmpty()) {
+    if (targetSize.isEmpty())
+    {
         return false;
     }
 
     QImage image = selectedRasterCanvasImage();
-    const std::optional<QTransform> documentToRaster =
-        documentToSelectedRasterTransform(*this);
-    if (image.isNull() || !documentToRaster) {
+    const std::optional<QTransform> documentToRaster = documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster)
+    {
         return false;
     }
     QRectF shapeRect(QPointF(pointX, pointY), QSizeF(boxWidth, boxHeight));
     shapeRect = shapeRect.normalized().intersected(
         QRectF(0.0, 0.0, targetSize.width(), targetSize.height()));
-    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension) {
+    if (shapeRect.width() < minimumShapeDimension || shapeRect.height() < minimumShapeDimension)
+    {
         return false;
     }
 
@@ -2527,46 +2819,52 @@ bool DrawingSurfaceItem::commitShape(qreal pointX,
     painter.end();
 
     const bool committed = replaceSelectedRaster(image);
-    if (committed) {
+    if (committed)
+    {
         emitUndoRedoSignals();
         emit rasterContentChanged();
     }
     return committed;
 }
 
-bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
+bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor& color)
 {
-    if (!canMutateDocument()) {
+    if (!canMutateDocument())
+    {
         return false;
     }
 
     syncCanvasSize();
     const QSize targetSize = canvasSize();
-    if (targetSize.isEmpty()) {
+    if (targetSize.isEmpty())
+    {
         return false;
     }
 
     QImage image = selectedRasterCanvasImage();
-    const std::optional<QTransform> documentToRaster =
-        documentToSelectedRasterTransform(*this);
-    if (image.isNull() || !documentToRaster) {
+    const std::optional<QTransform> documentToRaster = documentToSelectedRasterTransform(*this);
+    if (image.isNull() || !documentToRaster)
+    {
         return false;
     }
 
     const QPointF rasterPoint = documentToRaster->map(QPointF(pointX, pointY));
-    if (!qIsFinite(rasterPoint.x()) || !qIsFinite(rasterPoint.y())
-        || rasterPoint.x() < 0.0 || rasterPoint.x() >= image.width()
-        || rasterPoint.y() < 0.0 || rasterPoint.y() >= image.height()) {
+    if (!qIsFinite(rasterPoint.x()) || !qIsFinite(rasterPoint.y()) || rasterPoint.x() < 0.0 ||
+        rasterPoint.x() >= image.width() || rasterPoint.y() < 0.0 ||
+        rasterPoint.y() >= image.height())
+    {
         return false;
     }
     const int seedX = static_cast<int>(qFloor(rasterPoint.x()));
     const int seedY = static_cast<int>(qFloor(rasterPoint.y()));
     const QColor targetColor = image.pixelColor(seedX, seedY);
     QColor replacementColor = color.isValid() ? color : brushColor();
-    if (!replacementColor.isValid()) {
+    if (!replacementColor.isValid())
+    {
         replacementColor = QColor(Qt::transparent);
     }
-    if (targetColor.rgba() == replacementColor.rgba()) {
+    if (targetColor.rgba() == replacementColor.rgba())
+    {
         return false;
     }
 
@@ -2574,12 +2872,16 @@ bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
     pending.reserve(qMin(image.width() * image.height(), 4096));
     pending.append(QPoint(seedX, seedY));
 
-    while (!pending.isEmpty()) {
+    while (!pending.isEmpty())
+    {
         const QPoint point = pending.takeLast();
-        if (point.x() < 0 || point.x() >= image.width() || point.y() < 0 || point.y() >= image.height()) {
+        if (point.x() < 0 || point.x() >= image.width() || point.y() < 0 ||
+            point.y() >= image.height())
+        {
             continue;
         }
-        if (image.pixelColor(point).rgba() != targetColor.rgba()) {
+        if (image.pixelColor(point).rgba() != targetColor.rgba())
+        {
             continue;
         }
 
@@ -2591,72 +2893,122 @@ bool DrawingSurfaceItem::fillAt(qreal pointX, qreal pointY, const QColor &color)
     }
 
     const bool committed = replaceSelectedRaster(image);
-    if (committed) {
+    if (committed)
+    {
         emitUndoRedoSignals();
         emit rasterContentChanged();
     }
     return committed;
 }
 
-bool DrawingSurfaceItem::event(QEvent *event)
+bool DrawingSurfaceItem::event(QEvent* event)
 {
-    if (event && isTabletEvent(event->type()) && isOverlayToolActive()) {
+    if (event && isTabletEvent(event->type()) && isOverlayToolActive())
+    {
         event->accept();
         return true;
     }
-    if (event && isTabletEvent(event->type()) && !canMutateDocument()) {
+    if (event && isTabletEvent(event->type()) && m_remoteInputMode)
+    {
+        auto* tabletEvent = static_cast<QTabletEvent*>(event);
+        if (event->type() == QEvent::TabletPress)
+        {
+            beginRemoteStrokeCapture(tabletEvent->position().x(), tabletEvent->position().y(),
+                                     tabletEvent->pressure(), true);
+        }
+        else if (event->type() == QEvent::TabletMove)
+        {
+            appendRemoteStrokeCapture(tabletEvent->position().x(), tabletEvent->position().y(),
+                                      tabletEvent->pressure());
+        }
+        else if (event->type() == QEvent::TabletRelease)
+        {
+            endRemoteStrokeCapture(tabletEvent->position().x(), tabletEvent->position().y(),
+                                   tabletEvent->pressure());
+        }
+        event->accept();
+        return true;
+    }
+    if (event && isTabletEvent(event->type()) && !canMutateDocument())
+    {
         event->accept();
         return true;
     }
     return iiSharedCanvas::CanvasItem::event(event);
 }
 
-void DrawingSurfaceItem::mousePressEvent(QMouseEvent *event)
+void DrawingSurfaceItem::mousePressEvent(QMouseEvent* event)
 {
-    if (isOverlayToolActive()) {
+    if (isOverlayToolActive())
+    {
         event->accept();
         return;
     }
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        beginRemoteStrokeCapture(event->position().x(), event->position().y(), 1.0, false);
+        event->accept();
+        return;
+    }
+    if (!canMutateDocument())
+    {
         event->accept();
         return;
     }
     iiSharedCanvas::CanvasItem::mousePressEvent(event);
 }
 
-void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent *event)
+void DrawingSurfaceItem::mouseMoveEvent(QMouseEvent* event)
 {
-    if (isOverlayToolActive()) {
+    if (isOverlayToolActive())
+    {
         event->accept();
         return;
     }
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        appendRemoteStrokeCapture(event->position().x(), event->position().y(), 1.0);
+        event->accept();
+        return;
+    }
+    if (!canMutateDocument())
+    {
         event->accept();
         return;
     }
     iiSharedCanvas::CanvasItem::mouseMoveEvent(event);
 }
 
-void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent *event)
+void DrawingSurfaceItem::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (isOverlayToolActive()) {
+    if (isOverlayToolActive())
+    {
         event->accept();
         return;
     }
-    if (!canMutateDocument()) {
+    if (m_remoteInputMode)
+    {
+        endRemoteStrokeCapture(event->position().x(), event->position().y(), 1.0);
+        event->accept();
+        return;
+    }
+    if (!canMutateDocument())
+    {
         event->accept();
         return;
     }
     iiSharedCanvas::CanvasItem::mouseReleaseEvent(event);
 }
 
-void DrawingSurfaceItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+void DrawingSurfaceItem::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry)
 {
     iiSharedCanvas::CanvasItem::geometryChange(newGeometry, oldGeometry);
-    if (newGeometry.size() == oldGeometry.size()) {
+    if (newGeometry.size() == oldGeometry.size())
+    {
         return;
     }
-    if (m_isApplyingCanvasSurfaceSize) {
+    if (m_isApplyingCanvasSurfaceSize)
+    {
         return;
     }
     syncCanvasSize();
@@ -2704,10 +3056,11 @@ bool DrawingSurfaceItem::isZoomToolActive() const
 
 bool DrawingSurfaceItem::isOverlayToolActive() const
 {
-    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isPanToolActive() || isMoveToolActive() || isZoomToolActive();
+    return isTextToolActive() || isShapeToolActive() || isFillToolActive() || isPanToolActive() ||
+           isMoveToolActive() || isZoomToolActive();
 }
 
-QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
+QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize& targetSize)
 {
     QImage image;
     RasterLayer renderedPixels;
@@ -2726,25 +3079,27 @@ QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
     }
 
     const RasterLayer* pixels = renderedPixels.pixels.empty() ? framePixels() : &renderedPixels;
-    if (pixels && pixels->width > 0 && pixels->height > 0
-        && pixels->width <= std::numeric_limits<int>::max() / 4) {
-        const QImage view(reinterpret_cast<const uchar *>(pixels->pixels.data()),
-                          pixels->width,
-                          pixels->height,
-                          pixels->width * 4,
-                          QImage::Format_ARGB32);
+    if (pixels && pixels->width > 0 && pixels->height > 0 &&
+        pixels->width <= std::numeric_limits<int>::max() / 4)
+    {
+        const QImage view(reinterpret_cast<const uchar*>(pixels->pixels.data()), pixels->width,
+                          pixels->height, pixels->width * 4, QImage::Format_ARGB32);
         image = view.copy();
     }
-    if (image.isNull()) {
+    if (image.isNull())
+    {
         image = transparentCanvasImage(targetSize);
-    } else if (image.size() != targetSize) {
+    }
+    else if (image.size() != targetSize)
+    {
         QImage resized = transparentCanvasImage(targetSize);
         QPainter painter(&resized);
         painter.drawImage(QPointF(0.0, 0.0), image);
         painter.end();
         image = resized;
     }
-    if (image.format() != QImage::Format_ARGB32_Premultiplied) {
+    if (image.format() != QImage::Format_ARGB32_Premultiplied)
+    {
         image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
     }
     return image;
@@ -2752,30 +3107,30 @@ QImage DrawingSurfaceItem::currentRasterCanvasImage(const QSize &targetSize)
 
 QImage DrawingSurfaceItem::selectedRasterCanvasImage() const
 {
-    const RasterLayer *pixels = selectedRasterPixels();
-    if (!pixels || pixels->width <= 0 || pixels->height <= 0
-        || pixels->width > std::numeric_limits<int>::max() / 4) {
+    const RasterLayer* pixels = selectedRasterPixels();
+    if (!pixels || pixels->width <= 0 || pixels->height <= 0 ||
+        pixels->width > std::numeric_limits<int>::max() / 4)
+    {
         return {};
     }
 
     const std::size_t width = static_cast<std::size_t>(pixels->width);
     const std::size_t height = static_cast<std::size_t>(pixels->height);
-    if (width > std::numeric_limits<std::size_t>::max() / height
-        || pixels->pixels.size() != width * height) {
+    if (width > std::numeric_limits<std::size_t>::max() / height ||
+        pixels->pixels.size() != width * height)
+    {
         return {};
     }
 
-    const QImage view(reinterpret_cast<const uchar *>(pixels->pixels.data()),
-                      pixels->width,
-                      pixels->height,
-                      pixels->width * 4,
-                      QImage::Format_ARGB32);
+    const QImage view(reinterpret_cast<const uchar*>(pixels->pixels.data()), pixels->width,
+                      pixels->height, pixels->width * 4, QImage::Format_ARGB32);
     return view.copy();
 }
 
-bool DrawingSurfaceItem::replaceRasterCanvas(const QImage &source)
+bool DrawingSurfaceItem::replaceRasterCanvas(const QImage& source)
 {
-    if (source.isNull() || source.width() <= 0 || source.height() <= 0) {
+    if (source.isNull() || source.width() <= 0 || source.height() <= 0)
+    {
         return false;
     }
 
@@ -2784,74 +3139,80 @@ bool DrawingSurfaceItem::replaceRasterCanvas(const QImage &source)
     setWidth(image.width());
     setHeight(image.height());
     m_isApplyingCanvasSurfaceSize = false;
-    if (!createRasterDocument(image.width(), image.height())) {
+    if (!createRasterDocument(image.width(), image.height()))
+    {
         return false;
     }
 
     return replaceSelectedRaster(image);
 }
 
-bool DrawingSurfaceItem::replaceSelectedRaster(const QImage &source)
+bool DrawingSurfaceItem::replaceSelectedRaster(const QImage& source)
 {
-    const RasterLayer *selected = selectedRasterPixels();
-    if (source.isNull() || !selected
-        || source.width() != selected->width || source.height() != selected->height) {
+    const RasterLayer* selected = selectedRasterPixels();
+    if (source.isNull() || !selected || source.width() != selected->width ||
+        source.height() != selected->height)
+    {
         return false;
     }
 
     const QImage image = source.convertToFormat(QImage::Format_ARGB32);
 
     RasterLayer pixels = makeRasterLayer(image.width(), image.height());
-    for (int y = 0; y < image.height(); ++y) {
-        const auto *row = reinterpret_cast<const std::uint32_t *>(image.constScanLine(y));
-        std::copy_n(row,
-                    static_cast<std::size_t>(image.width()),
-                    pixels.pixels.begin()
-                        + static_cast<std::ptrdiff_t>(y) * image.width());
+    for (int y = 0; y < image.height(); ++y)
+    {
+        const auto* row = reinterpret_cast<const std::uint32_t*>(image.constScanLine(y));
+        std::copy_n(row, static_cast<std::size_t>(image.width()),
+                    pixels.pixels.begin() + static_cast<std::ptrdiff_t>(y) * image.width());
     }
     return replaceSelectedPixels(pixels);
 }
 
-bool DrawingSurfaceItem::openSharedCanvasDocument(const QString &fileUrl)
+bool DrawingSurfaceItem::openSharedCanvasDocument(const QString& fileUrl)
 {
     const QString filePath = localFilePath(fileUrl);
     QFile file(filePath);
     const iiSharedCanvas::SerializationLimits limits;
-    if (!file.open(QIODevice::ReadOnly)
-        || file.size() < static_cast<qint64>(iiSharedCanvas::IiscHeaderSize)
-        || static_cast<std::uint64_t>(file.size()) > limits.maximumContainerBytes) {
+    if (!file.open(QIODevice::ReadOnly) ||
+        file.size() < static_cast<qint64>(iiSharedCanvas::IiscHeaderSize) ||
+        static_cast<std::uint64_t>(file.size()) > limits.maximumContainerBytes)
+    {
         return false;
     }
 
     const QByteArray bytes = file.readAll();
-    if (bytes.size() != file.size()) {
+    if (bytes.size() != file.size())
+    {
         return false;
     }
     iiSharedCanvas::IiscDecodeResult decoded = iiSharedCanvas::decodeIisc(
-        std::span<const std::uint8_t>(
-            reinterpret_cast<const std::uint8_t *>(bytes.constData()),
-            static_cast<std::size_t>(bytes.size())),
+        std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(bytes.constData()),
+                                      static_cast<std::size_t>(bytes.size())),
         limits);
-    if (!decoded.ok()) {
+    if (!decoded.ok())
+    {
         return false;
     }
 
-    if (!document()
-        && !createDocument(decoded.document.extent.width,
-                           decoded.document.extent.height,
-                           decoded.document.timeline.frameCount)) {
+    if (!document() &&
+        !createDocument(decoded.document.extent.width, decoded.document.extent.height,
+                        decoded.document.timeline.frameCount))
+    {
         return false;
     }
-    iiSharedCanvas::Document *target = document();
+    iiSharedCanvas::Document* target = document();
     *target = std::move(decoded.document);
-    if (!bind(*target)) {
+    if (!bind(*target))
+    {
         return false;
     }
-    for (const iiSharedCanvas::Layer &layer : target->layers) {
-        const iiSharedCanvas::Asset *asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
-        if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster) {
-            selectLayer(QString::fromUtf8(layer.id.data(),
-                                          static_cast<qsizetype>(layer.id.size())));
+    for (const iiSharedCanvas::Layer& layer : target->layers)
+    {
+        const iiSharedCanvas::Asset* asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
+        if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster)
+        {
+            selectLayer(
+                QString::fromUtf8(layer.id.data(), static_cast<qsizetype>(layer.id.size())));
             break;
         }
     }
@@ -2864,23 +3225,27 @@ bool DrawingSurfaceItem::openSharedCanvasDocument(const QString &fileUrl)
     return true;
 }
 
-bool DrawingSurfaceItem::saveSharedCanvasDocument(const QString &fileUrl)
+bool DrawingSurfaceItem::saveSharedCanvasDocument(const QString& fileUrl)
 {
-    if (!document()) {
+    if (!document())
+    {
         return false;
     }
     const iiSharedCanvas::IiscEncodeResult encoded = iiSharedCanvas::encodeIisc(*document());
-    if (!encoded.ok()
-        || encoded.bytes.size() > static_cast<std::size_t>(std::numeric_limits<qint64>::max())) {
+    if (!encoded.ok() ||
+        encoded.bytes.size() > static_cast<std::size_t>(std::numeric_limits<qint64>::max()))
+    {
         return false;
     }
 
     QSaveFile file(localFilePath(fileUrl));
-    if (!file.open(QIODevice::WriteOnly)) {
+    if (!file.open(QIODevice::WriteOnly))
+    {
         return false;
     }
     const qint64 byteCount = static_cast<qint64>(encoded.bytes.size());
-    if (file.write(reinterpret_cast<const char *>(encoded.bytes.data()), byteCount) != byteCount) {
+    if (file.write(reinterpret_cast<const char*>(encoded.bytes.data()), byteCount) != byteCount)
+    {
         file.cancelWriting();
         return false;
     }
@@ -2898,18 +3263,10 @@ void DrawingSurfaceItem::emitUndoRedoSignals()
     emit canRedoChanged();
 }
 
-QMouseEvent DrawingSurfaceItem::makeMouseEvent(QEvent::Type eventType,
-                                               qreal pointX,
-                                               qreal pointY,
+QMouseEvent DrawingSurfaceItem::makeMouseEvent(QEvent::Type eventType, qreal pointX, qreal pointY,
                                                Qt::MouseButton button,
                                                Qt::MouseButtons buttons) const
 {
     const QPointF position{pointX, pointY};
-    return QMouseEvent{eventType,
-                       position,
-                       position,
-                       position,
-                       button,
-                       buttons,
-                       Qt::NoModifier};
+    return QMouseEvent{eventType, position, position, position, button, buttons, Qt::NoModifier};
 }

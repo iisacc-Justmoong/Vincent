@@ -23,6 +23,7 @@ class tst_CanvasToolBarQmlContract : public QObject
     void pressureCurveControlsUseThreePointGraphAtBottom();
     void brushSettingsExposePressureOpacityToggle();
     void recentCanvasUsesDebouncedInternalContainer();
+    void remoteParticipantsMutateOnlyTheHostCanvas();
 };
 
 void tst_CanvasToolBarQmlContract::recentCanvasUsesDebouncedInternalContainer()
@@ -85,6 +86,68 @@ void tst_CanvasToolBarQmlContract::recentCanvasUsesDebouncedInternalContainer()
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.importCanvasSession(snapshot)")));
     QVERIFY(surfaceSource.contains(QStringLiteral("function canvasSessionSnapshot()")));
     QVERIFY(surfaceSource.contains(QStringLiteral("canvasSurface.exportCanvasSession(")));
+}
+
+void tst_CanvasToolBarQmlContract::remoteParticipantsMutateOnlyTheHostCanvas()
+{
+    const QString painterPageQmlPath = QFINDTESTDATA("../App/qml/canvas/PainterCanvasPage.qml");
+    const QString drawingSurfaceQmlPath = QFINDTESTDATA("../App/qml/painting/DrawingSurface.qml");
+    QVERIFY2(!painterPageQmlPath.isEmpty(), "PainterCanvasPage.qml test data was not found");
+    QVERIFY2(!drawingSurfaceQmlPath.isEmpty(), "DrawingSurface.qml test data was not found");
+
+    QFile painterPageQml(painterPageQmlPath);
+    QFile drawingSurfaceQml(drawingSurfaceQmlPath);
+    QVERIFY(painterPageQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(drawingSurfaceQml.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString pageSource = QString::fromUtf8(painterPageQml.readAll());
+    const QString surfaceSource = QString::fromUtf8(drawingSurfaceQml.readAll());
+
+    QVERIFY(
+        pageSource.contains(QStringLiteral("readonly property bool participantUsesHostCanvas:")));
+    QVERIFY(pageSource.contains(QStringLiteral("localCanvasSession.connected")));
+    QVERIFY(pageSource.contains(QStringLiteral("localCanvasSession.hosting")));
+    QVERIFY(pageSource.contains(QStringLiteral("localCanvasSession.submitEditCommand(command)")));
+    QVERIFY(pageSource.contains(QStringLiteral("property bool participantCanvasReady: false")));
+    QVERIFY(pageSource.contains(QStringLiteral("function submitParticipantEditCommand(command)")));
+    QVERIFY(pageSource.contains(QStringLiteral("!painterPage.participantCanvasReady")));
+    QVERIFY(pageSource.contains(QStringLiteral(
+        "participantCanvasReady = Boolean(success && painterPage.participantUsesHostCanvas)")));
+    QVERIFY(pageSource.contains(QStringLiteral("function onStateChanged()")));
+    QVERIFY(pageSource.contains(QStringLiteral(
+        "onHostEditCommandRequested: command => painterPage.submitParticipantEditCommand(command)")));
+    QVERIFY(pageSource.contains(
+        QStringLiteral("function onEditCommandReceived(command, originPeerId)")));
+    QVERIFY(pageSource.contains(QStringLiteral("drawingSurface.applyHostEditCommand(command)")));
+    QVERIFY(pageSource.contains(QStringLiteral("id: participantCanvasPublishTimer")));
+    QVERIFY(pageSource.contains(QStringLiteral("interval: 0")));
+    QVERIFY(pageSource.contains(QStringLiteral("function scheduleParticipantCanvasPublish()")));
+    QVERIFY(pageSource.contains(QStringLiteral("function publishParticipantCanvasSnapshotNow()")));
+    QVERIFY(pageSource.contains(QStringLiteral("const snapshot = drawingSurface.canvasSessionSnapshot();")));
+    QVERIFY(pageSource.contains(QStringLiteral("localCanvasSession.publishSnapshot(snapshot)")));
+
+    QVERIFY(surfaceSource.contains(QStringLiteral("property bool hostCanvasInputClient: false")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("signal hostEditCommandRequested(var command)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function requestHostEditCommand(command)")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("function applyHostEditCommand(command)")));
+    QVERIFY(
+        surfaceSource.contains(QStringLiteral("remoteInputMode: surface.hostCanvasInputClient")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("onRemoteStrokeRequested:")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"stroke\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"fill\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"add-text\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"add-shape\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"transform-object\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"new-canvas\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"ensure-region\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"clear-canvas\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"add-layer\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"delete-layer\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"rename-layer\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"reorder-layers\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"insert-image\"")));
+    QVERIFY(surfaceSource.contains(QStringLiteral("type: \"open-raster\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("type: \"undo\"")));
+    QVERIFY(pageSource.contains(QStringLiteral("type: \"redo\"")));
 }
 
 void tst_CanvasToolBarQmlContract::modifierSpaceUsesApplicationWideCameraModes()

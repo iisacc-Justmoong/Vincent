@@ -4,6 +4,8 @@
 #include "recentcanvascontainer.h"
 
 #include <QAbstractSocket>
+#include <QCborParserError>
+#include <QCborValue>
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -20,6 +22,7 @@
 #include <QtEndian>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <optional>
@@ -31,10 +34,14 @@ constexpr char frameMagic[] = {'V', 'C', 'A', 'N'};
 constexpr quint8 protocolVersion = 1;
 constexpr qsizetype frameHeaderSize = 16;
 constexpr qint64 maximumControlPayloadBytes = 64 * 1024;
+constexpr qint64 maximumEditCommandPayloadBytes = 64LL * 1024LL * 1024LL;
 constexpr qint64 maximumFramePayloadBytes =
     RecentCanvasMaximumContainerBytes + maximumControlPayloadBytes;
 constexpr int maximumParticipants = 16;
 constexpr int maximumPendingInvitations = 16;
+constexpr qsizetype maximumStrokePointCount = 4096;
+constexpr qsizetype maximumLayerOrderCount = 4096;
+constexpr qsizetype maximumTextLength = 1024 * 1024;
 constexpr int connectionTimeoutMs = 8000;
 constexpr qsizetype uuidTextSize = 36;
 
@@ -42,7 +49,7 @@ enum class MessageType : quint8
 {
     Hello = 1,
     HelloAccepted = 2,
-    SnapshotProposal = 3,
+    EditCommand = 3,
     SnapshotState = 4,
     Participants = 5,
     Error = 6,
@@ -192,25 +199,494 @@ std::optional<QJsonObject> jsonObject(const QByteArray& payload)
     return document.object();
 }
 
-QByteArray snapshotProposalPayload(quint64 baseRevision, const QByteArray& snapshot)
+bool hasExactKeys(const QVariantMap& map, std::initializer_list<const char*> keys)
 {
-    QByteArray payload(static_cast<qsizetype>(sizeof(quint64)) + snapshot.size(),
-                       Qt::Uninitialized);
-    qToBigEndian<quint64>(baseRevision, reinterpret_cast<uchar*>(payload.data()));
-    std::memcpy(payload.data() + sizeof(quint64), snapshot.constData(),
-                static_cast<std::size_t>(snapshot.size()));
-    return payload;
-}
-
-bool decodeSnapshotProposal(const QByteArray& payload, quint64& baseRevision, QByteArray& snapshot)
-{
-    if (payload.size() <= static_cast<qsizetype>(sizeof(quint64)))
+    if (map.size() != static_cast<qsizetype>(keys.size()))
     {
         return false;
     }
-    baseRevision = qFromBigEndian<quint64>(reinterpret_cast<const uchar*>(payload.constData()));
-    snapshot = payload.mid(sizeof(quint64));
-    return true;
+    return std::all_of(keys.begin(), keys.end(),
+                       [&map](const char* key) { return map.contains(QString::fromLatin1(key)); });
+}
+
+bool isNumericVariant(const QVariant& value)
+{
+    switch (value.typeId())
+    {
+    case QMetaType::Double:
+    case QMetaType::Float:
+    case QMetaType::Int:
+    case QMetaType::UInt:
+    case QMetaType::LongLong:
+    case QMetaType::ULongLong:
+        return true;
+    default:
+        return false;
+    }
+}
+
+std::optional<double> boundedNumber(const QVariant& value, double minimum, double maximum)
+{
+    bool converted = false;
+    const double number = value.toDouble(&converted);
+    if (!isNumericVariant(value) || !converted || !std::isfinite(number) || number < minimum ||
+        number > maximum)
+    {
+        return std::nullopt;
+    }
+    return number;
+}
+
+std::optional<int> boundedInteger(const QVariant& value, int minimum, int maximum)
+{
+    const std::optional<double> number = boundedNumber(value, minimum, maximum);
+    if (!number || std::floor(*number) != *number)
+    {
+        return std::nullopt;
+    }
+    return static_cast<int>(*number);
+}
+
+std::optional<bool> strictBoolean(const QVariant& value)
+{
+    if (value.typeId() != QMetaType::Bool)
+    {
+        return std::nullopt;
+    }
+    return value.toBool();
+}
+
+std::optional<QString> boundedString(const QVariant& value, qsizetype maximumLength,
+                                     bool allowEmpty = false)
+{
+    if (value.typeId() != QMetaType::QString)
+    {
+        return std::nullopt;
+    }
+    const QString string = value.toString();
+    if ((!allowEmpty && string.isEmpty()) || string.size() > maximumLength)
+    {
+        return std::nullopt;
+    }
+    return string;
+}
+
+std::optional<QString> normalizedLayerKey(const QVariant& value)
+{
+    const std::optional<QString> key = boundedString(value, 32);
+    if (!key)
+    {
+        return std::nullopt;
+    }
+    if (*key == QStringLiteral("raster-canvas"))
+    {
+        return key;
+    }
+    if (!key->startsWith(QStringLiteral("object-")))
+    {
+        return std::nullopt;
+    }
+    bool converted = false;
+    const int objectId = key->mid(7).toInt(&converted);
+    if (!converted || objectId <= 0 || *key != QStringLiteral("object-%1").arg(objectId))
+    {
+        return std::nullopt;
+    }
+    return key;
+}
+
+std::optional<QString> normalizedColor(const QVariant& value)
+{
+    const std::optional<QString> color = boundedString(value, 9);
+    if (!color || !color->startsWith(QLatin1Char('#')) ||
+        (color->size() != 4 && color->size() != 7 && color->size() != 9))
+    {
+        return std::nullopt;
+    }
+    for (qsizetype index = 1; index < color->size(); ++index)
+    {
+        const QChar character = color->at(index).toLower();
+        const bool asciiDigit =
+            character >= QLatin1Char('0') && character <= QLatin1Char('9');
+        if (!asciiDigit && (character < QLatin1Char('a') || character > QLatin1Char('f')))
+        {
+            return std::nullopt;
+        }
+    }
+    return color->toLower();
+}
+
+std::optional<QVariantMap> normalizedEditCommand(const QVariantMap& command)
+{
+    const std::optional<QString> type = boundedString(command.value(QStringLiteral("type")), 32);
+    if (!type)
+    {
+        return std::nullopt;
+    }
+
+    if (*type == QStringLiteral("fill"))
+    {
+        const std::optional<QString> layerKey =
+            normalizedLayerKey(command.value(QStringLiteral("layerKey")));
+        const std::optional<double> x =
+            boundedNumber(command.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+        const std::optional<double> y =
+            boundedNumber(command.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+        const std::optional<QString> color =
+            normalizedColor(command.value(QStringLiteral("color")));
+        if (!hasExactKeys(command, {"type", "layerKey", "x", "y", "color"}) || !layerKey || !x ||
+            !y || !color)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("layerKey"), *layerKey},
+                           {QStringLiteral("x"), *x},
+                           {QStringLiteral("y"), *y},
+                           {QStringLiteral("color"), *color}};
+    }
+
+    if (*type == QStringLiteral("stroke"))
+    {
+        if (!hasExactKeys(command, {"type", "layerKey", "tool", "color", "size", "flow", "opacity",
+                                    "hardness", "spacing", "spacingRatio", "pressureMinimum",
+                                    "pressureCenter", "pressureMaximum", "pressureOpacity",
+                                    "stabilizer", "pressureSensitive", "points"}))
+        {
+            return std::nullopt;
+        }
+        const std::optional<QString> layerKey =
+            normalizedLayerKey(command.value(QStringLiteral("layerKey")));
+        const std::optional<QString> tool = boundedString(command.value(QStringLiteral("tool")), 8);
+        const std::optional<QString> color =
+            normalizedColor(command.value(QStringLiteral("color")));
+        const std::optional<double> size =
+            boundedNumber(command.value(QStringLiteral("size")), 0.01, 4096.0);
+        const std::optional<double> flow =
+            boundedNumber(command.value(QStringLiteral("flow")), 0.0, 1.0);
+        const std::optional<double> opacity =
+            boundedNumber(command.value(QStringLiteral("opacity")), 0.0, 1.0);
+        const std::optional<double> hardness =
+            boundedNumber(command.value(QStringLiteral("hardness")), 0.0, 1.0);
+        const std::optional<double> spacing =
+            boundedNumber(command.value(QStringLiteral("spacing")), 0.0, 4096.0);
+        const std::optional<double> spacingRatio =
+            boundedNumber(command.value(QStringLiteral("spacingRatio")), 0.0, 1.0);
+        const std::optional<double> pressureMinimum =
+            boundedNumber(command.value(QStringLiteral("pressureMinimum")), 0.0, 1.0);
+        const std::optional<double> pressureCenter =
+            boundedNumber(command.value(QStringLiteral("pressureCenter")), 0.0, 1.0);
+        const std::optional<double> pressureMaximum =
+            boundedNumber(command.value(QStringLiteral("pressureMaximum")), 0.0, 1.0);
+        const std::optional<bool> pressureOpacity =
+            strictBoolean(command.value(QStringLiteral("pressureOpacity")));
+        const std::optional<double> stabilizer =
+            boundedNumber(command.value(QStringLiteral("stabilizer")), 0.0, 1.0);
+        const std::optional<bool> pressureSensitive =
+            strictBoolean(command.value(QStringLiteral("pressureSensitive")));
+        const QVariantList points = command.value(QStringLiteral("points")).toList();
+        if (!layerKey || !tool ||
+            (*tool != QStringLiteral("brush") && *tool != QStringLiteral("eraser")) || !color ||
+            !size || !flow || !opacity || !hardness || !spacing || !spacingRatio ||
+            !pressureMinimum || !pressureCenter || !pressureMaximum || !pressureOpacity ||
+            !stabilizer || !pressureSensitive || *pressureMinimum > *pressureCenter ||
+            *pressureCenter > *pressureMaximum || points.size() < 2 ||
+            points.size() > maximumStrokePointCount)
+        {
+            return std::nullopt;
+        }
+
+        QVariantList normalizedPoints;
+        normalizedPoints.reserve(points.size());
+        for (const QVariant& pointValue : points)
+        {
+            const QVariantMap point = pointValue.toMap();
+            const std::optional<double> x =
+                boundedNumber(point.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+            const std::optional<double> y =
+                boundedNumber(point.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+            const std::optional<double> pressure =
+                boundedNumber(point.value(QStringLiteral("pressure")), 0.0, 1.0);
+            if (!hasExactKeys(point, {"x", "y", "pressure"}) || !x || !y || !pressure)
+            {
+                return std::nullopt;
+            }
+            normalizedPoints.append(QVariantMap{{QStringLiteral("x"), *x},
+                                                {QStringLiteral("y"), *y},
+                                                {QStringLiteral("pressure"), *pressure}});
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("layerKey"), *layerKey},
+                           {QStringLiteral("tool"), *tool},
+                           {QStringLiteral("color"), *color},
+                           {QStringLiteral("size"), *size},
+                           {QStringLiteral("flow"), *flow},
+                           {QStringLiteral("opacity"), *opacity},
+                           {QStringLiteral("hardness"), *hardness},
+                           {QStringLiteral("spacing"), *spacing},
+                           {QStringLiteral("spacingRatio"), *spacingRatio},
+                           {QStringLiteral("pressureMinimum"), *pressureMinimum},
+                           {QStringLiteral("pressureCenter"), *pressureCenter},
+                           {QStringLiteral("pressureMaximum"), *pressureMaximum},
+                           {QStringLiteral("pressureOpacity"), *pressureOpacity},
+                           {QStringLiteral("stabilizer"), *stabilizer},
+                           {QStringLiteral("pressureSensitive"), *pressureSensitive},
+                           {QStringLiteral("points"), normalizedPoints}};
+    }
+
+    if (*type == QStringLiteral("add-text"))
+    {
+        const std::optional<double> x =
+            boundedNumber(command.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+        const std::optional<double> y =
+            boundedNumber(command.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+        const std::optional<double> width =
+            boundedNumber(command.value(QStringLiteral("width")), 1.0, 10000000.0);
+        const std::optional<double> height =
+            boundedNumber(command.value(QStringLiteral("height")), 1.0, 10000000.0);
+        const std::optional<QString> text =
+            boundedString(command.value(QStringLiteral("text")), maximumTextLength);
+        const std::optional<double> fontSize =
+            boundedNumber(command.value(QStringLiteral("fontSize")), 1.0, 4096.0);
+        const std::optional<QString> color =
+            normalizedColor(command.value(QStringLiteral("color")));
+        if (!hasExactKeys(command,
+                          {"type", "x", "y", "width", "height", "text", "fontSize", "color"}) ||
+            !x || !y || !width || !height || !text || !fontSize || !color)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("x"), *x},
+                           {QStringLiteral("y"), *y},
+                           {QStringLiteral("width"), *width},
+                           {QStringLiteral("height"), *height},
+                           {QStringLiteral("text"), *text},
+                           {QStringLiteral("fontSize"), *fontSize},
+                           {QStringLiteral("color"), *color}};
+    }
+
+    if (*type == QStringLiteral("add-shape"))
+    {
+        const std::optional<double> x =
+            boundedNumber(command.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+        const std::optional<double> y =
+            boundedNumber(command.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+        const std::optional<double> width =
+            boundedNumber(command.value(QStringLiteral("width")), 1.0, 10000000.0);
+        const std::optional<double> height =
+            boundedNumber(command.value(QStringLiteral("height")), 1.0, 10000000.0);
+        const std::optional<QString> shape =
+            boundedString(command.value(QStringLiteral("shape")), 32);
+        const std::optional<QString> color =
+            normalizedColor(command.value(QStringLiteral("color")));
+        static const QSet<QString> validShapes{
+            QStringLiteral("rectangle"),    QStringLiteral("ellipse"),
+            QStringLiteral("triangle"),     QStringLiteral("diamond"),
+            QStringLiteral("star"),         QStringLiteral("rectanglebubble"),
+            QStringLiteral("ellipsebubble")};
+        if (!hasExactKeys(command, {"type", "x", "y", "width", "height", "shape", "color"}) || !x ||
+            !y || !width || !height || !shape || !validShapes.contains(*shape) || !color)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},     {QStringLiteral("x"), *x},
+                           {QStringLiteral("y"), *y},           {QStringLiteral("width"), *width},
+                           {QStringLiteral("height"), *height}, {QStringLiteral("shape"), *shape},
+                           {QStringLiteral("color"), *color}};
+    }
+
+    if (*type == QStringLiteral("transform-object"))
+    {
+        const std::optional<int> objectId = boundedInteger(
+            command.value(QStringLiteral("objectId")), 1, std::numeric_limits<int>::max());
+        const std::optional<double> x =
+            boundedNumber(command.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+        const std::optional<double> y =
+            boundedNumber(command.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+        const std::optional<double> width =
+            boundedNumber(command.value(QStringLiteral("width")), 1.0, 10000000.0);
+        const std::optional<double> height =
+            boundedNumber(command.value(QStringLiteral("height")), 1.0, 10000000.0);
+        if (!hasExactKeys(command, {"type", "objectId", "x", "y", "width", "height"}) ||
+            !objectId || !x || !y || !width || !height)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{
+            {QStringLiteral("type"), *type},   {QStringLiteral("objectId"), *objectId},
+            {QStringLiteral("x"), *x},         {QStringLiteral("y"), *y},
+            {QStringLiteral("width"), *width}, {QStringLiteral("height"), *height}};
+    }
+
+    if (*type == QStringLiteral("new-canvas"))
+    {
+        const std::optional<int> width =
+            boundedInteger(command.value(QStringLiteral("width")), 1, 8192);
+        const std::optional<int> height =
+            boundedInteger(command.value(QStringLiteral("height")), 1, 8192);
+        const std::optional<bool> infinite =
+            strictBoolean(command.value(QStringLiteral("infinite")));
+        if (!hasExactKeys(command, {"type", "width", "height", "infinite"}) || !width || !height ||
+            !infinite)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("width"), *width},
+                           {QStringLiteral("height"), *height},
+                           {QStringLiteral("infinite"), *infinite}};
+    }
+
+    if (*type == QStringLiteral("ensure-region"))
+    {
+        const std::optional<int> x =
+            boundedInteger(command.value(QStringLiteral("x")), std::numeric_limits<int>::min() + 1,
+                           std::numeric_limits<int>::max());
+        const std::optional<int> y =
+            boundedInteger(command.value(QStringLiteral("y")), std::numeric_limits<int>::min() + 1,
+                           std::numeric_limits<int>::max());
+        const std::optional<int> width =
+            boundedInteger(command.value(QStringLiteral("width")), 1, 10000000);
+        const std::optional<int> height =
+            boundedInteger(command.value(QStringLiteral("height")), 1, 10000000);
+        if (!hasExactKeys(command, {"type", "x", "y", "width", "height"}) || !x || !y || !width ||
+            !height)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("x"), *x},
+                           {QStringLiteral("y"), *y},
+                           {QStringLiteral("width"), *width},
+                           {QStringLiteral("height"), *height}};
+    }
+
+    if (*type == QStringLiteral("clear-canvas") || *type == QStringLiteral("add-layer"))
+    {
+        return hasExactKeys(command, {"type"})
+                   ? std::optional<QVariantMap>(QVariantMap{{QStringLiteral("type"), *type}})
+                   : std::nullopt;
+    }
+
+    if (*type == QStringLiteral("delete-layer") || *type == QStringLiteral("undo") ||
+        *type == QStringLiteral("redo"))
+    {
+        const std::optional<QString> layerKey =
+            normalizedLayerKey(command.value(QStringLiteral("layerKey")));
+        if (!hasExactKeys(command, {"type", "layerKey"}) || !layerKey)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("layerKey"), *layerKey}};
+    }
+
+    if (*type == QStringLiteral("rename-layer"))
+    {
+        const std::optional<QString> layerKey =
+            normalizedLayerKey(command.value(QStringLiteral("layerKey")));
+        const std::optional<QString> name =
+            boundedString(command.value(QStringLiteral("name")), 256);
+        if (!hasExactKeys(command, {"type", "layerKey", "name"}) || !layerKey || !name ||
+            name->trimmed().isEmpty())
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("layerKey"), *layerKey},
+                           {QStringLiteral("name"), name->trimmed()}};
+    }
+
+    if (*type == QStringLiteral("reorder-layers"))
+    {
+        const QVariantList layerKeys = command.value(QStringLiteral("layerKeys")).toList();
+        if (!hasExactKeys(command, {"type", "layerKeys"}) || layerKeys.isEmpty() ||
+            layerKeys.size() > maximumLayerOrderCount)
+        {
+            return std::nullopt;
+        }
+        QVariantList normalizedKeys;
+        QSet<QString> seenKeys;
+        for (const QVariant& keyValue : layerKeys)
+        {
+            const std::optional<QString> key = normalizedLayerKey(keyValue);
+            if (!key || seenKeys.contains(*key))
+            {
+                return std::nullopt;
+            }
+            seenKeys.insert(*key);
+            normalizedKeys.append(*key);
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("layerKeys"), normalizedKeys}};
+    }
+
+    if (*type == QStringLiteral("insert-image"))
+    {
+        const QByteArray data = command.value(QStringLiteral("data")).toByteArray();
+        const std::optional<double> x =
+            boundedNumber(command.value(QStringLiteral("x")), -10000000.0, 10000000.0);
+        const std::optional<double> y =
+            boundedNumber(command.value(QStringLiteral("y")), -10000000.0, 10000000.0);
+        const std::optional<bool> positioned =
+            strictBoolean(command.value(QStringLiteral("positioned")));
+        const std::optional<QString> name =
+            boundedString(command.value(QStringLiteral("name")), 256);
+        if (!hasExactKeys(command, {"type", "data", "x", "y", "positioned", "name"}) ||
+            command.value(QStringLiteral("data")).typeId() != QMetaType::QByteArray ||
+            data.isEmpty() || data.size() > maximumEditCommandPayloadBytes || !x || !y ||
+            !positioned || !name)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type},
+                           {QStringLiteral("data"), data},
+                           {QStringLiteral("x"), *x},
+                           {QStringLiteral("y"), *y},
+                           {QStringLiteral("positioned"), *positioned},
+                           {QStringLiteral("name"), *name}};
+    }
+
+    if (*type == QStringLiteral("open-raster"))
+    {
+        const QByteArray data = command.value(QStringLiteral("data")).toByteArray();
+        if (!hasExactKeys(command, {"type", "data"}) ||
+            command.value(QStringLiteral("data")).typeId() != QMetaType::QByteArray ||
+            data.isEmpty() || data.size() > maximumEditCommandPayloadBytes)
+        {
+            return std::nullopt;
+        }
+        return QVariantMap{{QStringLiteral("type"), *type}, {QStringLiteral("data"), data}};
+    }
+
+    return std::nullopt;
+}
+
+QByteArray encodeEditCommand(const QVariantMap& command)
+{
+    const std::optional<QVariantMap> normalized = normalizedEditCommand(command);
+    if (!normalized)
+    {
+        return {};
+    }
+    const QByteArray encoded = QCborValue::fromVariant(*normalized).toCbor();
+    return encoded.size() <= maximumEditCommandPayloadBytes ? encoded : QByteArray{};
+}
+
+std::optional<QVariantMap> decodeEditCommand(const QByteArray& payload)
+{
+    if (payload.isEmpty() || payload.size() > maximumEditCommandPayloadBytes)
+    {
+        return std::nullopt;
+    }
+    QCborParserError parseError;
+    const QCborValue value = QCborValue::fromCbor(payload, &parseError);
+    if (parseError.error != QCborError::NoError || !value.isMap())
+    {
+        return std::nullopt;
+    }
+    return normalizedEditCommand(value.toVariant().toMap());
 }
 
 QByteArray snapshotStatePayload(quint64 revision, const QString& originPeerId,
@@ -523,8 +999,6 @@ void LocalCanvasSession::stopSession()
     m_hostPeerId.clear();
     m_latestSnapshot.clear();
     m_latestOriginPeerId.clear();
-    m_queuedClientSnapshot.clear();
-    m_clientSnapshotPending = false;
     if (m_revision != 0)
     {
         m_revision = 0;
@@ -570,29 +1044,27 @@ bool LocalCanvasSession::publishSnapshot(const QByteArray& snapshot)
         setErrorString(tr("The canvas snapshot is invalid or too large."));
         return false;
     }
-    if (hosting())
+    if (!hosting())
     {
-        acceptSnapshot(snapshot, m_peerId);
-        setErrorString({});
-        return true;
+        return false;
     }
+    acceptSnapshot(snapshot, m_peerId);
+    setErrorString({});
+    return true;
+}
+
+bool LocalCanvasSession::submitEditCommand(const QVariantMap& command)
+{
     if (!connected() || !m_clientSocket)
     {
         return false;
     }
-    if (m_clientSnapshotPending)
+    const QByteArray payload = encodeEditCommand(command);
+    if (payload.isEmpty() || !writeFrame(m_clientSocket, MessageType::EditCommand, payload))
     {
-        m_queuedClientSnapshot = snapshot;
-        return true;
-    }
-
-    const QByteArray payload = snapshotProposalPayload(m_revision, snapshot);
-    if (!writeFrame(m_clientSocket, MessageType::SnapshotProposal, payload))
-    {
-        setErrorString(tr("The canvas update could not be sent."));
+        setErrorString(tr("The host canvas command could not be sent."));
         return false;
     }
-    m_clientSnapshotPending = true;
     setErrorString({});
     return true;
 }
@@ -1065,8 +1537,6 @@ void LocalCanvasSession::handleClientDisconnected()
     m_clientSocket = nullptr;
     m_connectTimer->stop();
     m_clientReceiveBuffer.clear();
-    m_clientSnapshotPending = false;
-    m_queuedClientSnapshot.clear();
     clearParticipants();
     if (m_stopping)
     {
@@ -1174,30 +1644,21 @@ void LocalCanvasSession::processHostFrame(QTcpSocket* socket, quint8 rawType,
         return;
     }
 
-    if (!iterator->accepted || type != MessageType::SnapshotProposal)
+    if (!iterator->accepted || type != MessageType::EditCommand)
     {
         disconnectHostPeer(socket, QStringLiteral("protocol"),
                            tr("The canvas connection sent an unexpected message."));
         return;
     }
 
-    quint64 baseRevision = 0;
-    QByteArray snapshot;
-    if (!decodeSnapshotProposal(payload, baseRevision, snapshot) || !validSnapshot(snapshot))
+    const std::optional<QVariantMap> command = decodeEditCommand(payload);
+    if (!command)
     {
-        disconnectHostPeer(socket, QStringLiteral("snapshot"),
-                           tr("The canvas update is invalid or too large."));
+        disconnectHostPeer(socket, QStringLiteral("command"),
+                           tr("The host canvas command is invalid or too large."));
         return;
     }
-    if (baseRevision != m_revision)
-    {
-        if (!m_latestSnapshot.isEmpty())
-        {
-            sendLatestSnapshot(socket);
-        }
-        return;
-    }
-    acceptSnapshot(snapshot, iterator->peerId);
+    emit editCommandReceived(*command, iterator->peerId);
 }
 
 void LocalCanvasSession::processClientFrame(quint8 rawType, const QByteArray& payload)
@@ -1283,14 +1744,6 @@ void LocalCanvasSession::processClientFrame(quint8 rawType, const QByteArray& pa
     }
     m_revision = incomingRevision;
     emit revisionChanged();
-    m_clientSnapshotPending = false;
-    if (originPeerId == m_peerId)
-    {
-        sendQueuedClientSnapshot();
-        return;
-    }
-
-    m_queuedClientSnapshot.clear();
     emit snapshotReceived(snapshot, incomingRevision, originPeerId);
 }
 
@@ -1327,17 +1780,6 @@ void LocalCanvasSession::sendLatestSnapshot(QTcpSocket* socket) const
     }
     writeFrame(socket, MessageType::SnapshotState,
                snapshotStatePayload(m_revision, m_latestOriginPeerId, m_latestSnapshot));
-}
-
-void LocalCanvasSession::sendQueuedClientSnapshot()
-{
-    if (m_queuedClientSnapshot.isEmpty())
-    {
-        return;
-    }
-    const QByteArray snapshot = std::move(m_queuedClientSnapshot);
-    m_queuedClientSnapshot.clear();
-    publishSnapshot(snapshot);
 }
 
 void LocalCanvasSession::disconnectHostPeer(QTcpSocket* socket, const QString& code,

@@ -13,7 +13,7 @@ publicly trusted Authenticode-signed release has been verified.
 - Platforms: Windows, macOS, and Linux source/build support
 - License: GNU AGPLv3
 - Price: commercial Vincent license sold through iisacc.com; source available under GNU AGPLv3
-- Privacy: account email and license key are used only for online license validation and a user-requested update grant; opening Preferences may explicitly read the stored email for an email-only fixed display. There is no telemetry, analytics, advertising, cloud document upload, remote polling, or automatic/background update check. When the user-controlled nearby-discovery setting is enabled, Vincent exchanges an ephemeral anonymous presence heartbeat only within the current LAN; it includes no profile, account, device name, or document data, only an invitation-capability Boolean and a temporary TCP port while the user explicitly shares a canvas. Selecting an opted-in nearby user from Members sends that target a one-hop invitation containing the inviter's profile name and temporary canvas endpoint. Acceptance or an explicit join transfers profile names and the complete canvas snapshot directly over the LAN without an Internet relay
+- Privacy: account email and license key are used only for online license validation and a user-requested update grant; opening Preferences may explicitly read the stored email for an email-only fixed display. There is no telemetry, analytics, advertising, cloud document upload, remote polling, or automatic/background update check. When the user-controlled nearby-discovery setting is enabled, Vincent exchanges an ephemeral anonymous presence heartbeat only within the current LAN; it includes no profile, account, device name, or document data, only an invitation-capability Boolean and a temporary TCP port while the user explicitly shares a canvas. Selecting an opted-in nearby user from Members sends that target a one-hop invitation containing the inviter's profile name and temporary canvas endpoint. After acceptance or an explicit join, participants send bounded edit commands to the host-owned canvas and only the host returns complete authoritative canvas snapshots directly over the LAN without an Internet relay
 - Public project URL: https://github.com/iisacc-Justmoong/Vincent
 - Source release URL:
   https://github.com/iisacc-Justmoong/Vincent/releases/tag/v5.1
@@ -37,8 +37,9 @@ nearby Vincent devices without sending profile, account, device-name, or
 document data. Users can explicitly share or join a canvas, or invite a
 specifically selected opted-in nearby user. Only that explicit invitation adds
 the inviter's profile name and endpoint; accepted sessions transfer profile
-names and canvas snapshots directly between the participating LAN devices
-without a cloud relay.
+names and bounded edit commands to the host-owned canvas; only the host returns
+authoritative canvas snapshots directly to participating LAN devices, without a
+cloud relay.
 
 ## Directory summary
 
@@ -75,8 +76,9 @@ Nearby Vincent discovery is confined to an anonymous one-hop LAN heartbeat and
 contains no profile, account, device-name, or document data, only an invitation
 capability and a temporary port while canvas sharing is active. Selecting an
 opted-in nearby user can send that target the inviter's profile name and endpoint;
-accepted or explicitly joined devices exchange profile names and canvas snapshots
-directly over that LAN, without a cloud relay.
+accepted or explicitly joined devices send profile names and bounded edit commands
+to the host-owned canvas; only the host returns authoritative snapshots directly
+over that LAN, without a cloud relay.
 
 Version 5.1 is available as complete AGPLv3 source. We are currently
 preparing the publicly trusted Windows distribution and would especially value

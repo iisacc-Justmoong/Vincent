@@ -23,6 +23,8 @@ Item {
     readonly property bool dialogActive: canvasToolBar.dialogActive
     readonly property bool textEditingActive: drawingSurface.textEditingActive || painterPage.layerRenameActive
     readonly property bool presentationMode: drawingSurface.presentationMode
+    readonly property bool participantUsesHostCanvas: Boolean(localCanvasSession && localCanvasSession.connected)
+    readonly property bool ownsAuthoritativeCanvas: !participantUsesHostCanvas
 
     property int topChromeReservedHeight: 0
     property var vm: null
@@ -42,6 +44,8 @@ Item {
     property bool recentCanvasTrackingEnabled: false
     property bool recentCanvasSaveInProgress: false
     property bool applyingRemoteCanvasSnapshot: false
+    property bool applyingParticipantEditCommand: false
+    property bool participantCanvasReady: false
 
     signal pageReady
     signal clipboardImagePasteFailed(string errorCode)
@@ -119,31 +123,60 @@ Item {
         onTriggered: painterPage.publishLocalCanvasSnapshotNow()
     }
 
+    Timer {
+        id: participantCanvasPublishTimer
+
+        interval: 0
+        repeat: false
+        onTriggered: painterPage.publishParticipantCanvasSnapshotNow()
+    }
+
     function handleCanvasSessionChanged() {
         painterPage.scheduleRecentCanvasSave();
         painterPage.scheduleLocalCanvasPublish();
     }
 
     function scheduleLocalCanvasPublish() {
-        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.active || painterPage.applyingRemoteCanvasSnapshot) {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.hosting || painterPage.applyingRemoteCanvasSnapshot || painterPage.applyingParticipantEditCommand) {
             return;
         }
         localCanvasPublishTimer.restart();
     }
 
     function publishLocalCanvasSnapshotNow() {
-        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.active || painterPage.applyingRemoteCanvasSnapshot || !drawingSurface.canvasItemReady) {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.hosting || painterPage.applyingRemoteCanvasSnapshot || painterPage.applyingParticipantEditCommand || !drawingSurface.canvasItemReady) {
             return false;
         }
         if (drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive) {
             localCanvasPublishTimer.restart();
             return false;
         }
+        participantCanvasPublishTimer.stop();
         return painterPage.localCanvasSession.publishSnapshot(drawingSurface.canvasSessionSnapshot());
+    }
+
+    function scheduleParticipantCanvasPublish() {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.hosting || painterPage.applyingRemoteCanvasSnapshot) {
+            return false;
+        }
+        participantCanvasPublishTimer.restart();
+        return true;
+    }
+
+    function publishParticipantCanvasSnapshotNow() {
+        if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.hosting || painterPage.applyingRemoteCanvasSnapshot || painterPage.applyingParticipantEditCommand || !drawingSurface.canvasItemReady) {
+            return false;
+        }
+        const snapshot = drawingSurface.canvasSessionSnapshot();
+        if (!snapshot || snapshot.length === 0) {
+            return false;
+        }
+        return painterPage.localCanvasSession.publishSnapshot(snapshot);
     }
 
     function applyRemoteCanvasSnapshot(snapshot) {
         localCanvasPublishTimer.stop();
+        painterPage.participantCanvasReady = false;
         painterPage.applyingRemoteCanvasSnapshot = true;
         const applied = drawingSurface.applyCanvasSessionSnapshot(snapshot);
         if (!applied) {
@@ -157,9 +190,14 @@ Item {
             return;
         }
         painterPage.applyingRemoteCanvasSnapshot = false;
-        if (success) {
-            painterPage.scheduleRecentCanvasSave();
+        painterPage.participantCanvasReady = Boolean(success && painterPage.participantUsesHostCanvas);
+    }
+
+    function submitParticipantEditCommand(command) {
+        if (!painterPage.participantUsesHostCanvas || !painterPage.participantCanvasReady || painterPage.applyingRemoteCanvasSnapshot || !painterPage.localCanvasSession) {
+            return false;
         }
+        return painterPage.localCanvasSession.submitEditCommand(command);
     }
 
     Connections {
@@ -169,20 +207,40 @@ Item {
             painterPage.publishLocalCanvasSnapshotNow();
         }
 
+        function onStateChanged() {
+            if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.connected) {
+                painterPage.participantCanvasReady = false;
+            }
+        }
+
         function onSnapshotReceived(snapshot, revision, originPeerId) {
             painterPage.applyRemoteCanvasSnapshot(snapshot);
+        }
+
+        function onEditCommandReceived(command, originPeerId) {
+            if (!painterPage.localCanvasSession || !painterPage.localCanvasSession.hosting || !drawingSurface.canvasItemReady) {
+                return;
+            }
+            localCanvasPublishTimer.stop();
+            painterPage.applyingParticipantEditCommand = true;
+            const applied = drawingSurface.applyHostEditCommand(command);
+            painterPage.applyingParticipantEditCommand = false;
+            if (applied) {
+                painterPage.scheduleRecentCanvasSave();
+                painterPage.scheduleParticipantCanvasPublish();
+            }
         }
     }
 
     function scheduleRecentCanvasSave() {
-        if (!painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress) {
+        if (!painterPage.ownsAuthoritativeCanvas || !painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress) {
             return;
         }
         recentCanvasSaveTimer.restart();
     }
 
     function saveRecentCanvasNow() {
-        if (!painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress || !drawingSurface.canvasItemReady) {
+        if (!painterPage.ownsAuthoritativeCanvas || !painterPage.recentCanvasTrackingEnabled || painterPage.recentCanvasSaveInProgress || !drawingSurface.canvasItemReady) {
             return false;
         }
         if (drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive) {
@@ -207,6 +265,10 @@ Item {
     }
 
     function flushRecentCanvasSave() {
+        if (!painterPage.ownsAuthoritativeCanvas) {
+            recentCanvasSaveTimer.stop();
+            return true;
+        }
         const activeEdit = drawingSurface.textEditingActive || drawingSurface.shapeDraggingActive || drawingSurface.drawableObjectTransformActive;
         if (!recentCanvasSaveTimer.running && !activeEdit) {
             return true;
@@ -286,6 +348,9 @@ Item {
     }
 
     function openRecentCanvas(fileUrl) {
+        if (painterPage.participantUsesHostCanvas) {
+            return false;
+        }
         const trackingWasEnabled = painterPage.recentCanvasTrackingEnabled;
         painterPage.recentCanvasTrackingEnabled = false;
         recentCanvasSaveTimer.stop();
@@ -318,19 +383,35 @@ Item {
     }
 
     function undoActiveRasterSurface() {
+        if (painterPage.participantUsesHostCanvas) {
+            return painterPage.submitParticipantEditCommand({
+                type: "undo",
+                layerKey: drawingSurface.currentLayerKey()
+            });
+        }
         const rasterSurface = drawingSurface.activeRasterSurface();
         if (rasterSurface) {
             rasterSurface.undo();
             painterPage.scheduleRecentCanvasSave();
+            return true;
         }
+        return false;
     }
 
     function redoActiveRasterSurface() {
+        if (painterPage.participantUsesHostCanvas) {
+            return painterPage.submitParticipantEditCommand({
+                type: "redo",
+                layerKey: drawingSurface.currentLayerKey()
+            });
+        }
         const rasterSurface = drawingSurface.activeRasterSurface();
         if (rasterSurface) {
             rasterSurface.redo();
             painterPage.scheduleRecentCanvasSave();
+            return true;
         }
+        return false;
     }
 
     function addLayer() {
@@ -542,6 +623,7 @@ Item {
                 brushPressureControlsOpacity: painterPage.vm ? painterPage.vm.brushPressureControlsOpacity : true
                 stabilizerStrength: painterPage.vm ? painterPage.vm.stabilizerStrength : 0
                 toolMode: painterPage.vm ? painterPage.vm.toolMode : "brush"
+                hostCanvasInputClient: painterPage.participantUsesHostCanvas
                 toolShortcutsEnabled: !painterPage.layerRenameActive && !canvasToolBar.dialogActive && !painterPage.presentationMode
                 shapeKind: painterPage.vm ? painterPage.vm.shapeKind : "rectangle"
                 textToolAccentColor: LV.Theme.primary
@@ -550,6 +632,7 @@ Item {
                 canvasHeight: painterPage.vm ? painterPage.vm.canvasHeight : 1
                 onToolShortcutRequested: tool => painterPage.setToolMode(tool)
                 onSessionChanged: painterPage.handleCanvasSessionChanged()
+                onHostEditCommandRequested: command => painterPage.submitParticipantEditCommand(command)
                 onSessionRestoreFinished: success => painterPage.finishRemoteCanvasRestore(success)
                 onImageDropSucceeded: {
                     painterPage.setToolMode("move");

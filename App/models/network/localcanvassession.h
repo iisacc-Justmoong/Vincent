@@ -68,6 +68,7 @@ class LocalCanvasSession final : public QObject
     Q_INVOKABLE void stopSession();
     Q_INVOKABLE void setLocalProfileName(const QString& profileName);
     Q_INVOKABLE bool publishSnapshot(const QByteArray& snapshot);
+    Q_INVOKABLE bool submitEditCommand(const QVariantMap& command);
     Q_INVOKABLE bool removeParticipant(const QString& participantPeerId);
     Q_INVOKABLE void setInvitationsAllowed(bool allowed);
     Q_INVOKABLE bool invitePeer(const QString& targetSessionId, const QString& profileName);
@@ -85,6 +86,7 @@ class LocalCanvasSession final : public QObject
     void snapshotRequested();
     void snapshotReceived(const QByteArray& snapshot, quint64 revision,
                           const QString& originPeerId);
+    void editCommandReceived(const QVariantMap& command, const QString& originPeerId);
 
   private:
     enum class SessionState
@@ -121,7 +123,6 @@ class LocalCanvasSession final : public QObject
     void processClientFrame(quint8 type, const QByteArray& payload);
     void acceptSnapshot(const QByteArray& snapshot, const QString& originPeerId);
     void sendLatestSnapshot(QTcpSocket* socket) const;
-    void sendQueuedClientSnapshot();
     void disconnectHostPeer(QTcpSocket* socket, const QString& code, const QString& message);
     void resetTransport();
 
@@ -135,7 +136,6 @@ class LocalCanvasSession final : public QObject
     QHash<QTcpSocket*, HostPeer> m_hostPeers;
     QByteArray m_clientReceiveBuffer;
     QByteArray m_latestSnapshot;
-    QByteArray m_queuedClientSnapshot;
     QVariantList m_participantProfiles;
     QVariantList m_pendingInvitations;
     QString m_ownSessionId;
@@ -147,7 +147,6 @@ class LocalCanvasSession final : public QObject
     QString m_latestOriginPeerId;
     SessionState m_state = SessionState::Idle;
     quint64 m_revision = 0;
-    bool m_clientSnapshotPending = false;
     bool m_stopping = false;
     bool m_invitationsAllowed = false;
 };

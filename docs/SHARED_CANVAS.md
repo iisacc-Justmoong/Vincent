@@ -116,19 +116,33 @@ cross the network only after a client joins. This is direct, unencrypted LAN TCP
 with no Internet relay or shared secret, so the feature is intended for a
 trusted local network.
 
-`LocalCanvasSession` transfers the same complete, SHA-256-checked `.vrc` bytes
-used by recent-session persistence. This includes the canonical iiSharedCanvas
+Only the host transfers the same complete, SHA-256-checked `.vrc` bytes used by
+recent-session persistence. This includes the canonical iiSharedCanvas
 document, additional raster-layer and inserted-image PNGs, editable text/shape
 metadata, object ordering, and background presence. QML exports it in memory;
 no temporary session file is needed for transport.
 
-The host is authoritative and assigns a monotonically increasing revision to
-each accepted whole-session snapshot. A client proposal is accepted only when
-its base revision still matches; otherwise the host returns its latest state.
-Edits are coalesced for 350 ms, with one in-flight and one newest queued client
-proposal. This prevents unbounded update queues but is not an object-level CRDT:
-simultaneous edits are resolved to the first snapshot the host accepts, and a
-stale editor is resynchronized to that state.
+The joined surface is an input client for the host canvas, not a second document
+owner. It remains command-blocked until the first authoritative host state has
+finished its queued QML restore. Pointer/tablet strokes are then captured with
+their pressure samples and current brush style without mutating the joined
+device's document. Fill, text, shape, transform, canvas, layer, undo/redo, and
+validated raster/image actions follow the same path as bounded semantic edit
+commands. The client cannot publish a `.vrc` snapshot and does not store a
+remote session as its Recent canvas.
+
+The host validates each command, applies it to the actual host
+`DrawingSurface`, and only then exports and broadcasts an authoritative `.vrc`
+state with the next monotonically increasing revision. A zero-interval queued
+publication lets newly created QML raster-layer surfaces exist before export
+and coalesces commands processed in the same event cycle. The host's own local
+edits retain the 350 ms publication debounce. Clients always restore host
+states, including the state produced from their own input.
+
+This is not an object-level CRDT. Commands are serialized in arrival order by
+the host canvas; overlapping absolute transforms therefore resolve to the last
+host-applied command. Host snapshots remain the sole canonical state and repair
+any stale participant view.
 
 Protocol frames are versioned and size bounded, non-LAN IPv4 addresses are
 rejected, and connection or incomplete-handshake attempts time out after eight
@@ -137,6 +151,6 @@ are rejected, and hosts accept at most 16 remote participants. The host
 can remove a participant, and stopping sharing disconnects all clients while
 withdrawing the discovery port.
 
-Large-document memory budgets, partial snapshot deltas, encrypted/authenticated
+Large-document memory budgets, partial host-state deltas, encrypted/authenticated
 LAN sessions, object-level concurrent merge, and physical multi-device package
 validation remain product-hardening gates.

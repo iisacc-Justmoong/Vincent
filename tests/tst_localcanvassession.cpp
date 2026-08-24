@@ -23,15 +23,16 @@ class tst_LocalCanvasSession : public QObject
     Q_OBJECT
 
   private slots:
-    void hostAndClientSynchronizeVersionedSnapshots();
+    void hostExecutesClientCommandsAndPublishesVersionedSnapshots();
     void invitationDecisionControlsCanvasConnection();
     void invalidSnapshotsAndEndpointsAreRejected();
 };
 
-void tst_LocalCanvasSession::hostAndClientSynchronizeVersionedSnapshots()
+void tst_LocalCanvasSession::hostExecutesClientCommandsAndPublishesVersionedSnapshots()
 {
     LocalCanvasSession host(nullptr);
     QSignalSpy hostSnapshotSpy(&host, &LocalCanvasSession::snapshotReceived);
+    QSignalSpy hostEditCommandSpy(&host, &LocalCanvasSession::editCommandReceived);
     QVERIFY(host.startHosting(QStringLiteral("Host Artist")));
     QVERIFY(host.hosting());
     QVERIFY(host.listenPort() > 0);
@@ -67,13 +68,38 @@ void tst_LocalCanvasSession::hostAndClientSynchronizeVersionedSnapshots()
         host.participantProfiles().first().toMap().value(QStringLiteral("profileName")).toString(),
         QStringLiteral("Guest Renamed"), 5000);
 
-    const QByteArray guestSnapshot = canvasSnapshot(QByteArrayLiteral("guest-edit-iisc"));
-    QVERIFY(client.publishSnapshot(guestSnapshot));
-    QTRY_COMPARE_WITH_TIMEOUT(hostSnapshotSpy.size(), 1, 5000);
-    QCOMPARE(hostSnapshotSpy.first().at(0).toByteArray(), guestSnapshot);
-    QCOMPARE(hostSnapshotSpy.first().at(2).toString(), client.peerId());
+    const QVariantMap fillCommand{{QStringLiteral("type"), QStringLiteral("fill")},
+                                  {QStringLiteral("layerKey"), QStringLiteral("raster-canvas")},
+                                  {QStringLiteral("x"), 24.0},
+                                  {QStringLiteral("y"), 32.0},
+                                  {QStringLiteral("color"), QStringLiteral("#336699")}};
+    QVERIFY(client.submitEditCommand(fillCommand));
+    QTRY_COMPARE_WITH_TIMEOUT(hostEditCommandSpy.size(), 1, 5000);
+    QCOMPARE(hostEditCommandSpy.first().at(0).toMap(), fillCommand);
+    QCOMPARE(hostEditCommandSpy.first().at(1).toString(), client.peerId());
+    QCOMPARE(host.revision(), quint64(1));
+    QCOMPARE(hostSnapshotSpy.size(), 0);
+
+    const QByteArray hostAppliedSnapshot =
+        canvasSnapshot(QByteArrayLiteral("host-applied-edit-iisc"));
+    QVERIFY(host.publishSnapshot(hostAppliedSnapshot));
     QTRY_COMPARE_WITH_TIMEOUT(host.revision(), quint64(2), 5000);
     QTRY_COMPARE_WITH_TIMEOUT(client.revision(), quint64(2), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(clientSnapshotSpy.size(), 2, 5000);
+    QCOMPARE(clientSnapshotSpy.last().at(0).toByteArray(), hostAppliedSnapshot);
+
+    const QByteArray forbiddenClientSnapshot =
+        canvasSnapshot(QByteArrayLiteral("client-owned-snapshot-must-not-upload"));
+    QVERIFY(!client.publishSnapshot(forbiddenClientSnapshot));
+    QCOMPARE(host.revision(), quint64(2));
+    QCOMPARE(hostSnapshotSpy.size(), 0);
+
+    QVERIFY(!client.submitEditCommand(
+        QVariantMap{{QStringLiteral("type"), QStringLiteral("unknown-command")}}));
+
+    QVariantMap nonAsciiColorCommand = fillCommand;
+    nonAsciiColorCommand.insert(QStringLiteral("color"), QStringLiteral("#１２３"));
+    QVERIFY(!client.submitEditCommand(nonAsciiColorCommand));
 
     QVERIFY(host.removeParticipant(client.peerId()));
     QTRY_VERIFY_WITH_TIMEOUT(!client.active(), 5000);

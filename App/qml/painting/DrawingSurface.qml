@@ -173,6 +173,8 @@ Rectangle {
     property bool persistRasterLayerSnapshots: true
     property bool recentCanvasRestoreInProgress: false
     property int recentCanvasRestoreGeneration: 0
+    property bool hostCanvasInputClient: false
+    property bool applyingHostEditCommand: false
     property bool drawableObjectTransformActive: false
     property string drawableObjectTransformMode: ""
     property string drawableObjectHoverHandleMode: ""
@@ -185,6 +187,7 @@ Rectangle {
     signal sessionRestoreFinished(bool success)
     signal imageDropSucceeded
     signal imageDropFailed(string errorCode)
+    signal hostEditCommandRequested(var command)
 
     onDrawableObjectsChanged: {
         if (!surface.recentCanvasRestoreInProgress) {
@@ -204,6 +207,194 @@ Rectangle {
 
     function effectiveToolMode() {
         return surface.temporaryCameraMode !== "" && !surface.textEditingActive ? surface.temporaryCameraMode : surface.toolMode;
+    }
+
+    function requestHostEditCommand(command) {
+        if (!surface.hostCanvasInputClient || surface.applyingHostEditCommand || !command) {
+            return false;
+        }
+        surface.hostEditCommandRequested(command);
+        return true;
+    }
+
+    function rasterSurfaceForLayerKey(layerKey) {
+        const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        if (normalizedKey === "raster-canvas") {
+            return surface.backgroundLayerPresent ? canvasSurface : null;
+        }
+        const drawableObject = drawableObjectForLayerKey(normalizedKey);
+        if (!drawableObject || drawableObject.type !== "layer") {
+            return null;
+        }
+        return rasterLayerItemById(drawableObject.id);
+    }
+
+    function remoteStrokeStyle() {
+        return {
+            tool: surface.effectiveToolMode(),
+            color: surface.brushColor.toString(),
+            size: surface.brushSize,
+            flow: surface.brushFlow,
+            opacity: surface.brushOpacity,
+            hardness: surface.brushHardness,
+            spacing: surface.brushSpacing,
+            spacingRatio: surface.brushSpacingRatio,
+            pressureMinimum: surface.pressureCurveMinimum,
+            pressureCenter: surface.pressureCurveCenter,
+            pressureMaximum: surface.pressureCurveMaximum,
+            pressureOpacity: surface.brushPressureControlsOpacity,
+            stabilizer: surface.stabilizerStrength
+        };
+    }
+
+    function requestRemoteStroke(layerKey, points, pressureSensitive) {
+        const style = remoteStrokeStyle();
+        return requestHostEditCommand({
+            type: "stroke",
+            layerKey: layerKey,
+            tool: style.tool,
+            color: style.color,
+            size: style.size,
+            flow: style.flow,
+            opacity: style.opacity,
+            hardness: style.hardness,
+            spacing: style.spacing,
+            spacingRatio: style.spacingRatio,
+            pressureMinimum: style.pressureMinimum,
+            pressureCenter: style.pressureCenter,
+            pressureMaximum: style.pressureMaximum,
+            pressureOpacity: style.pressureOpacity,
+            stabilizer: style.stabilizer,
+            pressureSensitive: Boolean(pressureSensitive),
+            points: points
+        });
+    }
+
+    function applyLayerKeyOrder(layerKeys) {
+        const keys = Array.isArray(layerKeys) ? layerKeys : [];
+        const rowByKey = {};
+        for (let index = 0; index < surface.layerHierarchyRows.length; ++index) {
+            const row = surface.layerHierarchyRows[index];
+            rowByKey[String(row.key || "")] = row;
+        }
+        const rows = [];
+        for (let index = 0; index < keys.length; ++index) {
+            const row = rowByKey[String(keys[index])];
+            if (!row) {
+                return false;
+            }
+            rows.push(row);
+        }
+        return applyLayerHierarchyOrder(rows);
+    }
+
+    function applyHostEditCommand(command) {
+        if (!command || surface.hostCanvasInputClient || surface.applyingHostEditCommand) {
+            return false;
+        }
+
+        surface.applyingHostEditCommand = true;
+        let applied = false;
+        try {
+            const type = String(command.type || "");
+            if (type === "stroke") {
+                const rasterSurface = rasterSurfaceForLayerKey(command.layerKey);
+                if (rasterSurface) {
+                    applied = rasterSurface.applyRemoteStroke(command, command.points || [], Boolean(command.pressureSensitive));
+                }
+            } else if (type === "fill") {
+                const rasterSurface = rasterSurfaceForLayerKey(command.layerKey);
+                applied = Boolean(rasterSurface && rasterSurface.fillAt(Number(command.x), Number(command.y), String(command.color)));
+            } else if (type === "add-text") {
+                appendDrawableObject({
+                    id: surface.nextDrawableObjectId++,
+                    type: "text",
+                    x: Number(command.x),
+                    y: Number(command.y),
+                    width: Number(command.width),
+                    height: Number(command.height),
+                    text: String(command.text),
+                    fontPixelSize: Number(command.fontSize),
+                    color: String(command.color)
+                });
+                applied = true;
+            } else if (type === "add-shape") {
+                appendDrawableObject({
+                    id: surface.nextDrawableObjectId++,
+                    type: "shape",
+                    x: Number(command.x),
+                    y: Number(command.y),
+                    width: Number(command.width),
+                    height: Number(command.height),
+                    shapeKind: String(command.shape),
+                    color: String(command.color)
+                });
+                applied = true;
+            } else if (type === "transform-object") {
+                const objectId = Number(command.objectId);
+                const currentObject = drawableObjectForLayerKey(layerKeyForDrawableObjectId(objectId));
+                if (drawableObjectIsTransformable(currentObject)) {
+                    const transformedObject = cloneDrawableObject(currentObject);
+                    transformedObject.x = Number(command.x);
+                    transformedObject.y = Number(command.y);
+                    transformedObject.width = Number(command.width);
+                    transformedObject.height = Number(command.height);
+                    applied = replaceDrawableObjectById(objectId, transformedObject);
+                    if (applied) {
+                        refreshDrawableObjectThumbnailSource(transformedObject);
+                        rebuildLayerHierarchyRows();
+                    }
+                }
+            } else if (type === "new-canvas") {
+                newCanvas(Number(command.width), Number(command.height), Boolean(command.infinite));
+                applied = true;
+            } else if (type === "clear-canvas") {
+                clearCanvas();
+                applied = true;
+            } else if (type === "ensure-region") {
+                if (canvasSurface.infiniteCanvas) {
+                    const growth = canvasSurface.ensureInfiniteCanvasRegion(Number(command.x), Number(command.y), Number(command.width), Number(command.height));
+                    if (growth && growth.changed) {
+                        surface.applyInfiniteCanvasGrowth(growth);
+                        applied = true;
+                    }
+                }
+            } else if (type === "add-layer") {
+                applied = addEmptyLayer() >= 0;
+            } else if (type === "delete-layer") {
+                applied = deleteLayerByKey(command.layerKey);
+            } else if (type === "rename-layer") {
+                applied = renameLayerByKey(command.layerKey, command.name);
+            } else if (type === "reorder-layers") {
+                applied = applyLayerKeyOrder(command.layerKeys);
+            } else if (type === "undo" || type === "redo") {
+                const rasterSurface = rasterSurfaceForLayerKey(command.layerKey);
+                if (rasterSurface) {
+                    if (type === "undo") {
+                        rasterSurface.undo();
+                    } else {
+                        rasterSurface.redo();
+                    }
+                    applied = true;
+                }
+            } else if (type === "insert-image") {
+                const maximumWidth = Math.max(1, canvasSurface.width * surface.imageInsertionMaximumCanvasRatio);
+                const maximumHeight = Math.max(1, canvasSurface.height * surface.imageInsertionMaximumCanvasRatio);
+                const imageObject = canvasSurface.remoteImageObject(command.data, maximumWidth, maximumHeight);
+                applied = insertImageObject(imageObject, Boolean(command.positioned) ? Number(command.x) : NaN, Boolean(command.positioned) ? Number(command.y) : NaN, String(command.name));
+            } else if (type === "open-raster") {
+                const imageObject = canvasSurface.remoteImageObject(command.data, 0, 0);
+                if (imageObject && String(imageObject.status || "") === "ready") {
+                    applied = openRaster(String(imageObject.source || ""));
+                }
+            }
+        } finally {
+            surface.applyingHostEditCommand = false;
+        }
+        if (applied) {
+            surface.sessionChanged();
+        }
+        return applied;
     }
 
     function setTemporaryCameraMode(mode) {
@@ -346,6 +537,16 @@ Rectangle {
             return false;
         }
 
+        if (surface.requestHostEditCommand({
+            type: "ensure-region",
+            x: Math.round(canvasSurface.canvasOriginX + localLeft),
+            y: Math.round(canvasSurface.canvasOriginY + localTop),
+            width: Math.round(localRight - localLeft),
+            height: Math.round(localBottom - localTop)
+        })) {
+            return true;
+        }
+
         surface.infiniteCanvasExpansionActive = true;
         const growth = canvasSurface.ensureInfiniteCanvasRegion(canvasSurface.canvasOriginX + localLeft, canvasSurface.canvasOriginY + localTop, localRight - localLeft, localBottom - localTop);
         if (growth && growth.changed) {
@@ -356,6 +557,14 @@ Rectangle {
     }
 
     function newCanvas(canvasWidth, canvasHeight, infiniteCanvas) {
+        if (surface.requestHostEditCommand({
+            type: "new-canvas",
+            width: Math.round(Number(canvasWidth)),
+            height: Math.round(Number(canvasHeight)),
+            infinite: infiniteCanvas === true
+        })) {
+            return true;
+        }
         cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
@@ -369,9 +578,15 @@ Rectangle {
         }
         canvasSurface.newCanvas(infiniteCanvas === true, 0, 0, surface.defaultInfiniteCanvasChunkSize);
         addDefaultDrawingLayer();
+        return true;
     }
 
     function clearCanvas() {
+        if (surface.requestHostEditCommand({
+            type: "clear-canvas"
+        })) {
+            return true;
+        }
         cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
@@ -381,14 +596,25 @@ Rectangle {
         syncCanvasItemSizeToWorkspace();
         canvasSurface.clearCanvas();
         addDefaultDrawingLayer();
+        return true;
     }
 
     function openRaster(fileUrl) {
+        const sourceUrl = fileUrl ? fileUrl.toString() : "";
+        if (surface.hostCanvasInputClient && !surface.applyingHostEditCommand) {
+            const encodedImage = canvasSurface.portableImageData(sourceUrl);
+            if (!encodedImage || Number(encodedImage.length || encodedImage.byteLength || 0) <= 0) {
+                return false;
+            }
+            return surface.requestHostEditCommand({
+                type: "open-raster",
+                data: encodedImage
+            });
+        }
         cancelPendingRecentCanvasRestore();
         cancelActiveText();
         cancelActiveShape();
         resetCanvasPan();
-        const sourceUrl = fileUrl ? fileUrl.toString() : "";
         if (sourceUrl.toLowerCase().endsWith(".psd") && openLayeredPsd(sourceUrl)) {
             return true;
         }
@@ -529,6 +755,22 @@ Rectangle {
         const originalHeight = Number(imageObject.originalHeight || objectHeight);
         if (source.length === 0 || !isFinite(objectWidth) || objectWidth <= 0 || !isFinite(objectHeight) || objectHeight <= 0 || !isFinite(originalWidth) || originalWidth <= 0 || !isFinite(originalHeight) || originalHeight <= 0) {
             return false;
+        }
+
+        if (surface.hostCanvasInputClient && !surface.applyingHostEditCommand) {
+            const encodedImage = canvasSurface.portableImageData(source);
+            if (!encodedImage || Number(encodedImage.length || encodedImage.byteLength || 0) <= 0) {
+                return false;
+            }
+            const positioned = isFinite(requestedCenterX) && isFinite(requestedCenterY);
+            return surface.requestHostEditCommand({
+                type: "insert-image",
+                data: encodedImage,
+                x: positioned ? Number(requestedCenterX) : 0,
+                y: positioned ? Number(requestedCenterY) : 0,
+                positioned: positioned,
+                name: String(imageObject.suggestedName || fallbackName)
+            });
         }
 
         const placement = imageInsertionPlacement(source, objectWidth, objectHeight, requestedCenterX, requestedCenterY);
@@ -729,17 +971,28 @@ Rectangle {
         const shouldCommit = committedText.trim().length > 0;
         surface.textEditingActive = false;
         if (shouldCommit) {
-            appendDrawableObject({
-                id: surface.nextDrawableObjectId++,
-                type: "text",
+            if (!surface.requestHostEditCommand({
+                type: "add-text",
                 x: textToolEditorFrame.x,
                 y: textToolEditorFrame.y,
                 width: textToolEditorFrame.width,
                 height: textToolEditorFrame.height,
                 text: committedText,
-                fontPixelSize: surface.textToolFontPixelSize,
+                fontSize: surface.textToolFontPixelSize,
                 color: surface.brushColor.toString()
-            });
+            })) {
+                appendDrawableObject({
+                    id: surface.nextDrawableObjectId++,
+                    type: "text",
+                    x: textToolEditorFrame.x,
+                    y: textToolEditorFrame.y,
+                    width: textToolEditorFrame.width,
+                    height: textToolEditorFrame.height,
+                    text: committedText,
+                    fontPixelSize: surface.textToolFontPixelSize,
+                    color: surface.brushColor.toString()
+                });
+            }
         }
         textToolEditor.text = "";
         textToolEditor.focus = false;
@@ -872,16 +1125,26 @@ Rectangle {
         surface.shapeDraggingActive = false;
         surface.shapeAspectLocked = false;
         if (bounds.width >= surface.shapeToolMinimumDragDistance && bounds.height >= surface.shapeToolMinimumDragDistance) {
-            appendDrawableObject({
-                id: surface.nextDrawableObjectId++,
-                type: "shape",
+            if (!surface.requestHostEditCommand({
+                type: "add-shape",
                 x: bounds.x,
                 y: bounds.y,
                 width: bounds.width,
                 height: bounds.height,
-                shapeKind: surface.shapeKind,
+                shape: surface.shapeKind,
                 color: surface.brushColor.toString()
-            });
+            })) {
+                appendDrawableObject({
+                    id: surface.nextDrawableObjectId++,
+                    type: "shape",
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width,
+                    height: bounds.height,
+                    shapeKind: surface.shapeKind,
+                    color: surface.brushColor.toString()
+                });
+            }
         }
         requestShapePreviewPaint();
     }
@@ -1368,6 +1631,11 @@ Rectangle {
     }
 
     function addEmptyLayer() {
+        if (surface.requestHostEditCommand({
+            type: "add-layer"
+        })) {
+            return -1;
+        }
         commitActiveText();
         cancelActiveShape();
         resetDrawableObjectTransform();
@@ -1447,6 +1715,12 @@ Rectangle {
 
     function deleteLayerByKey(layerKey) {
         const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        if (surface.requestHostEditCommand({
+            type: "delete-layer",
+            layerKey: normalizedKey
+        })) {
+            return true;
+        }
         if (normalizedKey === "raster-canvas") {
             return deleteBackgroundLayer();
         }
@@ -1482,6 +1756,13 @@ Rectangle {
         }
 
         const normalizedKey = layerKey === undefined || layerKey === null ? "" : String(layerKey);
+        if (surface.requestHostEditCommand({
+            type: "rename-layer",
+            layerKey: normalizedKey,
+            name: normalizedName
+        })) {
+            return true;
+        }
         const nextObjects = surface.drawableObjects.slice();
         for (let index = 0; index < nextObjects.length; ++index) {
             const drawableObject = nextObjects[index];
@@ -1500,6 +1781,19 @@ Rectangle {
 
     function applyLayerHierarchyOrder(layerRows) {
         const rows = Array.isArray(layerRows) ? layerRows : surface.layerHierarchyRows;
+        if (surface.hostCanvasInputClient && !surface.applyingHostEditCommand) {
+            const layerKeys = [];
+            for (let index = 0; index < rows.length; ++index) {
+                const row = rows[index];
+                if (row && (row.layerKind === "layer" || row.layerKind === "object" || row.layerKind === "raster")) {
+                    layerKeys.push(String(row.key || ""));
+                }
+            }
+            return surface.requestHostEditCommand({
+                type: "reorder-layers",
+                layerKeys: layerKeys
+            });
+        }
         const objectById = {};
         for (let index = 0; index < surface.drawableObjects.length; ++index) {
             const drawableObject = surface.drawableObjects[index];
@@ -1847,11 +2141,27 @@ Rectangle {
 
     function commitDrawableObjectTransform() {
         const drawableObject = selectedDrawableObject();
+        if (surface.hostCanvasInputClient && !surface.applyingHostEditCommand && drawableObject && surface.drawableObjectTransformOriginal) {
+            const transformedObject = cloneDrawableObject(drawableObject);
+            const authoritativeObject = cloneDrawableObject(surface.drawableObjectTransformOriginal);
+            replaceDrawableObjectById(authoritativeObject.id, authoritativeObject);
+            const requested = surface.requestHostEditCommand({
+                type: "transform-object",
+                objectId: transformedObject.id,
+                x: transformedObject.x,
+                y: transformedObject.y,
+                width: transformedObject.width,
+                height: transformedObject.height
+            });
+            resetDrawableObjectTransform();
+            return requested;
+        }
         if (drawableObject) {
             refreshDrawableObjectThumbnailSource(drawableObject);
             rebuildLayerHierarchyRows();
         }
         resetDrawableObjectTransform();
+        return drawableObject !== null;
     }
 
     function fillAt(pointX, pointY) {
@@ -1861,13 +2171,24 @@ Rectangle {
 
         commitActiveText();
         cancelActiveShape();
+        if (surface.requestHostEditCommand({
+            type: "fill",
+            layerKey: surface.currentLayerKey(),
+            x: Number(pointX),
+            y: Number(pointY),
+            color: surface.brushColor.toString()
+        })) {
+            return true;
+        }
         const rasterSurface = activeRasterSurface();
         if (!rasterSurface) {
             return;
         }
         if (rasterSurface.fillAt(pointX, pointY, surface.brushColor)) {
             surface.sessionChanged();
+            return true;
         }
+        return false;
     }
 
     function resetCanvasPan() {
@@ -2433,6 +2754,7 @@ Rectangle {
             toolMode: surface.backgroundLayerPresent && !surface.rasterLayerObjectSelected() ? surface.effectiveToolMode() : "move"
             documentViewModel: surface.documentViewModel
             viewId: surface.viewId
+            remoteInputMode: surface.hostCanvasInputClient
 
             Component.onCompleted: {
                 surface.canvasItemReady = true;
@@ -2452,6 +2774,7 @@ Rectangle {
             }
             onDroppedImageReady: (imageObject, dropX, dropY) => surface.insertDroppedImageObject(imageObject, dropX, dropY)
             onDroppedImageFailed: errorCode => surface.imageDropFailed(errorCode)
+            onRemoteStrokeRequested: (points, pressureSensitive) => surface.requestRemoteStroke("raster-canvas", points, pressureSensitive)
 
             DropArea {
                 id: canvasImageDropArea
@@ -2636,6 +2959,7 @@ Rectangle {
                         toolMode: surface.effectiveToolMode()
                         documentViewModel: surface.documentViewModel
                         viewId: surface.viewId
+                        remoteInputMode: surface.hostCanvasInputClient
 
                         onRasterContentChanged: {
                             surface.requestRasterLayerThumbnailRefresh(drawableObjectDelegate.rasterLayerObjectId);
@@ -2645,6 +2969,7 @@ Rectangle {
                                 surface.sessionChanged();
                             }
                         }
+                        onRemoteStrokeRequested: (points, pressureSensitive) => surface.requestRemoteStroke(surface.layerKeyForDrawableObjectId(drawableObjectDelegate.rasterLayerObjectId), points, pressureSensitive)
                     }
                 }
 
