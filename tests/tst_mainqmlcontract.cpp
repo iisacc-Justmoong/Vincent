@@ -638,10 +638,34 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QVERIFY(mainSource.contains(QStringLiteral("id: applicationMenuBar")));
     QVERIFY(mainSource.contains(QStringLiteral("implicitHeight: LV.Theme.controlHeightSm")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.button: window.windowColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.buttonText: LV.Theme.bodyColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.text: LV.Theme.bodyColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.disabled.text: LV.Theme.disabledColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("component ApplicationMenu: Controls.Menu")));
+    QCOMPARE(mainSource.count(QStringLiteral("ApplicationMenu {")), 7);
+    QVERIFY(mainSource.contains(QStringLiteral("component ApplicationMenuItem: Controls.MenuItem")));
+    QVERIFY(mainSource.contains(QStringLiteral("delegate: ApplicationMenuItem")));
+    QCOMPARE(mainSource.count(QStringLiteral("ApplicationMenuItem {")), 73);
+    QCOMPARE(mainSource.count(QStringLiteral("Controls.MenuItem {")), 1);
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "readonly property color menuTextColor: enabled ? LV.Theme.bodyColor : "
+        "LV.Theme.disabledColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.text: menuTextColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.windowText: menuTextColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.light: LV.Theme.surfaceAlt")));
+    QVERIFY(mainSource.contains(QStringLiteral("palette.midlight: LV.Theme.surfaceAlt")));
+    QVERIFY(mainSource.contains(QStringLiteral("font.family: LV.Theme.fontBody")));
+    QVERIFY(mainSource.contains(QStringLiteral("font.pixelSize: LV.Theme.textBody")));
+    QVERIFY(mainSource.contains(QStringLiteral("font.weight: LV.Theme.textBodyWeight")));
+    QVERIFY(mainSource.contains(QStringLiteral("font.styleName: LV.Theme.textBodyStyleName")));
+    QVERIFY(mainSource.contains(QStringLiteral("font.letterSpacing: LV.Theme.textBodyLetterSpacing")));
     QVERIFY(mainSource.contains(QStringLiteral("delegate: Controls.MenuBarItem")));
     QVERIFY(mainSource.contains(QStringLiteral("topPadding: LV.Theme.gap2")));
     QVERIFY(mainSource.contains(QStringLiteral("bottomPadding: LV.Theme.gap2")));
     QVERIFY(mainSource.contains(QStringLiteral("contentItem: LV.Label")));
+    QVERIFY(mainSource.contains(QStringLiteral("style: body")));
+    QVERIFY(mainSource.contains(QStringLiteral(
+        "color: applicationMenuBarItem.enabled ? LV.Theme.bodyColor : LV.Theme.disabledColor")));
     QVERIFY(mainSource.contains(QStringLiteral("color: window.windowColor")));
 
     const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");

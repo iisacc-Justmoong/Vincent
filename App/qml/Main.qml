@@ -60,6 +60,31 @@ LV.ApplicationWindow {
     readonly property string shortcutToggleFullScreen: Qt.platform.os === "osx" ? "Meta+Ctrl+F" : "F11"
     readonly property string shortcutPreferences: menuCommandModifier + "+,"
 
+    component ApplicationMenuItem: Controls.MenuItem {
+        readonly property color menuTextColor: enabled ? LV.Theme.bodyColor : LV.Theme.disabledColor
+
+        font.family: LV.Theme.fontBody
+        font.pixelSize: LV.Theme.textBody
+        font.weight: LV.Theme.textBodyWeight
+        font.styleName: LV.Theme.textBodyStyleName
+        font.letterSpacing: LV.Theme.textBodyLetterSpacing
+        palette.text: menuTextColor
+        palette.windowText: menuTextColor
+        palette.light: LV.Theme.surfaceAlt
+        palette.midlight: LV.Theme.surfaceAlt
+    }
+
+    component ApplicationMenu: Controls.Menu {
+        delegate: ApplicationMenuItem {}
+        font.family: LV.Theme.fontBody
+        font.pixelSize: LV.Theme.textBody
+        font.weight: LV.Theme.textBodyWeight
+        font.styleName: LV.Theme.textBodyStyleName
+        font.letterSpacing: LV.Theme.textBodyLetterSpacing
+        palette.text: LV.Theme.bodyColor
+        palette.disabled.text: LV.Theme.disabledColor
+    }
+
     Component.onCompleted: Qt.callLater(function () {
         window.canvasIncubationRequested = true;
     })
@@ -628,7 +653,7 @@ LV.ApplicationWindow {
         padding: LV.Theme.gapNone
         spacing: LV.Theme.gapNone
         palette.button: window.windowColor
-        palette.buttonText: LV.Theme.textPrimary
+        palette.buttonText: LV.Theme.bodyColor
         palette.mid: LV.Theme.surfaceAlt
 
         delegate: Controls.MenuBarItem {
@@ -642,7 +667,7 @@ LV.ApplicationWindow {
             contentItem: LV.Label {
                 text: applicationMenuBarItem.text
                 style: body
-                color: applicationMenuBarItem.enabled ? LV.Theme.textPrimary : LV.Theme.textOctonary
+                color: applicationMenuBarItem.enabled ? LV.Theme.bodyColor : LV.Theme.disabledColor
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
@@ -658,170 +683,170 @@ LV.ApplicationWindow {
             color: window.windowColor
         }
 
-        Controls.Menu {
+        ApplicationMenu {
             title: qsTr("File")
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: newCanvasAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: openImageAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: saveImageAsAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: clearCanvasAction
             }
 
             Controls.MenuSeparator {}
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: quitAction
             }
         }
 
-        Controls.Menu {
+        ApplicationMenu {
             title: qsTr("Edit")
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: preferencesAction
             }
 
             Controls.MenuSeparator {}
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: undoAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: redoAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: pasteImageAction
             }
 
             Controls.MenuSeparator {}
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: addLayerAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: deleteCurrentLayerAction
             }
 
             Controls.MenuSeparator {}
 
-            Controls.Menu {
+            ApplicationMenu {
                 title: qsTr("Tools")
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: brushToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: eraserToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: handPanToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: moveToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: zoomToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: shapeToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: fillToolAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: textToolAction
                 }
             }
 
-            Controls.Menu {
+            ApplicationMenu {
                 title: qsTr("Shape Kind")
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: rectangleShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: ellipseShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: triangleShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: diamondShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: starShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: rectangleBubbleShapeAction
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     action: ellipseBubbleShapeAction
                 }
             }
 
             Controls.MenuSeparator {}
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: decreaseBrushSizeAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: increaseBrushSizeAction
             }
         }
 
-        Controls.Menu {
+        ApplicationMenu {
             title: qsTr("Window")
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: fitCanvasToWindowAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: resetCanvasViewAction
             }
 
             Controls.MenuSeparator {}
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: minimizeWindowAction
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: toggleFullScreenAction
             }
         }
 
-        Controls.Menu {
+        ApplicationMenu {
             title: qsTr("Help")
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 action: checkForUpdatesAction
                 visible: VincentUpdateManager.selfUpdateSupported
             }
@@ -830,211 +855,211 @@ LV.ApplicationWindow {
                 visible: VincentUpdateManager.selfUpdateSupported
             }
 
-            Controls.Menu {
+            ApplicationMenu {
                 title: qsTr("Keyboard Shortcuts")
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("Application")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Preferences"), window.shortcutPreferences)
                     enabled: false
                 }
 
                 Controls.MenuSeparator {}
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("File")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("New Canvas"), window.shortcutNewCanvas)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Open Image"), window.shortcutOpenImage)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Save Image As"), window.shortcutSaveImageAs)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Clear Canvas"), window.shortcutClearCanvas)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Quit Vincent"), window.shortcutQuit)
                     enabled: false
                 }
 
                 Controls.MenuSeparator {}
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("Edit")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Undo"), window.shortcutUndo)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Redo"), window.shortcutRedo)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Paste Image"), window.shortcutPasteImage)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Add Layer"), window.shortcutAddLayer)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Delete Current Layer"), window.shortcutDeleteCurrentLayer)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Decrease Brush Size"), window.shortcutDecreaseBrushSize)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Increase Brush Size"), window.shortcutIncreaseBrushSize)
                     enabled: false
                 }
 
                 Controls.MenuSeparator {}
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("Tools")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Brush"), window.shortcutBrushTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Eraser"), window.shortcutEraserTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Hand Pan"), window.shortcutHandPanTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Move"), window.shortcutMoveTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Zoom"), window.shortcutZoomTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Shape"), window.shortcutShapeTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Fill"), window.shortcutFillTool)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Text"), window.shortcutTextTool)
                     enabled: false
                 }
 
                 Controls.MenuSeparator {}
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("Shape Kind")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Rectangle"), window.shortcutRectangleShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Ellipse"), window.shortcutEllipseShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Triangle"), window.shortcutTriangleShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Diamond"), window.shortcutDiamondShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Star"), window.shortcutStarShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Rectangle Bubble"), window.shortcutRectangleBubbleShape)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Ellipse Bubble"), window.shortcutEllipseBubbleShape)
                     enabled: false
                 }
 
                 Controls.MenuSeparator {}
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: qsTr("Window")
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Fit Canvas to Window"), window.shortcutFitCanvasToWindow)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Reset Canvas View"), window.shortcutResetCanvasView)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Minimize"), window.shortcutMinimizeWindow)
                     enabled: false
                 }
 
-                Controls.MenuItem {
+                ApplicationMenuItem {
                     text: window.shortcutReference(qsTr("Enter Full Screen"), window.shortcutToggleFullScreen)
                     enabled: false
                 }
             }
 
-            Controls.MenuItem {
+            ApplicationMenuItem {
                 text: qsTr("Vincent %1").arg(Qt.application.version)
                 enabled: false
             }

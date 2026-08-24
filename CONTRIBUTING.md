@@ -33,4 +33,4 @@ Run the complete test suite before submitting a pull request. New behavior shoul
 
 ## Windows release safety
 
-Unsigned MSI, ZIP, MSIX, and self-signed SignPath trial outputs are development-only artifacts. They must not be attached to a public release or presented as trusted downloads. A website MSI is publishable only after its outer MSI and nested `Vincent.exe` both pass the repository's trusted Authenticode and timestamp verification gates.
+Unsigned MSI, ZIP, MSIX, and self-signed SignPath trial outputs are development-only artifacts. Any Necessary workflow input created before service approval is development-only as well. They must not be attached to a public release or presented as trusted downloads. Never commit or print `NECESSARY_SIGN_TOKEN`; it belongs only in the GitHub Actions repository-secret store after the provider approves Vincent. A website MSI is publishable only after its outer MSI and nested `Vincent.exe` both pass the repository's trusted Authenticode, expected-Publisher, same-certificate, and RFC 3161 timestamp verification gates.

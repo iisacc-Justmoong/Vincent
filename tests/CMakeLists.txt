@@ -379,6 +379,30 @@ if(WIN32)
             ENVIRONMENT "${_vincent_test_environment}"
     )
 
+    add_test(
+            NAME tests_necessaryauthenticode
+            COMMAND "${_vincent_powershell_executable}"
+                    -NoProfile
+                    -ExecutionPolicy Bypass
+                    -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_necessaryauthenticode.ps1"
+                    -ScriptPath "${CMAKE_SOURCE_DIR}/tools/necessary-authenticode.ps1"
+    )
+    set_tests_properties(tests_necessaryauthenticode PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+
+    add_test(
+            NAME tests_necessarywindowsrelease
+            COMMAND "${_vincent_powershell_executable}"
+                    -NoProfile
+                    -ExecutionPolicy Bypass
+                    -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_necessarywindowsrelease.ps1"
+                    -ScriptPath "${CMAKE_SOURCE_DIR}/tools/necessary-windows-release.ps1"
+    )
+    set_tests_properties(tests_necessarywindowsrelease PROPERTIES
+            ENVIRONMENT "${_vincent_test_environment}"
+    )
+
     find_program(_vincent_pwsh_executable NAMES pwsh.exe)
     if(_vincent_pwsh_executable)
         add_test(
@@ -390,6 +414,28 @@ if(WIN32)
                         -ScriptPath "${CMAKE_SOURCE_DIR}/build-windows.ps1"
         )
         set_tests_properties(tests_windowsauthenticodepolicy_pwsh PROPERTIES
+                ENVIRONMENT "${_vincent_test_environment}"
+        )
+
+        add_test(
+                NAME tests_necessaryauthenticode_pwsh
+                COMMAND "${_vincent_pwsh_executable}"
+                        -NoProfile
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_necessaryauthenticode.ps1"
+                        -ScriptPath "${CMAKE_SOURCE_DIR}/tools/necessary-authenticode.ps1"
+        )
+        set_tests_properties(tests_necessaryauthenticode_pwsh PROPERTIES
+                ENVIRONMENT "${_vincent_test_environment}"
+        )
+
+        add_test(
+                NAME tests_necessarywindowsrelease_pwsh
+                COMMAND "${_vincent_pwsh_executable}"
+                        -NoProfile
+                        -File "${CMAKE_CURRENT_SOURCE_DIR}/tst_necessarywindowsrelease.ps1"
+                        -ScriptPath "${CMAKE_SOURCE_DIR}/tools/necessary-windows-release.ps1"
+        )
+        set_tests_properties(tests_necessarywindowsrelease_pwsh PROPERTIES
                 ENVIRONMENT "${_vincent_test_environment}"
         )
     endif()
@@ -454,6 +500,8 @@ if(WIN32)
             tests_linuxbuildworkflowcontract
             tests_windowsbuildworkflowcontract
             tests_windowsauthenticodepolicy
+            tests_necessaryauthenticode
+            tests_necessarywindowsrelease
             tests_windowsmsiauthoringcontract
             tests_windowsstorepackagecontract
             tests_windowsbinarycontract
