@@ -4,6 +4,7 @@ import QtQuick.Window as QtQuickWindow
 import LVRS 1.0 as LV
 import "./canvas" as CanvasViews
 import "./license" as LicenseViews
+import "./menus" as MenuViews
 import "./preferences" as PreferencesViews
 
 LV.ApplicationWindow {
@@ -645,10 +646,89 @@ LV.ApplicationWindow {
         onTriggered: window.exitPresentationMode()
     }
 
+    header: MenuViews.WindowsApplicationMenuBar {
+        id: windowsApplicationMenuBar
+        objectName: "windowsApplicationMenuBar"
+        visible: Qt.platform.os === "windows" && !window.presentationMode
+        height: visible ? implicitHeight : 0
+        barColor: window.windowColor
+        applicationVersion: Qt.application.version
+        updateSupported: VincentUpdateManager.selfUpdateSupported
+        menuActions: ({
+            "newCanvas": newCanvasAction,
+            "openImage": openImageAction,
+            "saveImageAs": saveImageAsAction,
+            "clearCanvas": clearCanvasAction,
+            "quit": quitAction,
+            "preferences": preferencesAction,
+            "checkForUpdates": checkForUpdatesAction,
+            "undo": undoAction,
+            "redo": redoAction,
+            "pasteImage": pasteImageAction,
+            "addLayer": addLayerAction,
+            "deleteCurrentLayer": deleteCurrentLayerAction,
+            "brushTool": brushToolAction,
+            "eraserTool": eraserToolAction,
+            "handPanTool": handPanToolAction,
+            "moveTool": moveToolAction,
+            "zoomTool": zoomToolAction,
+            "shapeTool": shapeToolAction,
+            "fillTool": fillToolAction,
+            "textTool": textToolAction,
+            "rectangleShape": rectangleShapeAction,
+            "ellipseShape": ellipseShapeAction,
+            "triangleShape": triangleShapeAction,
+            "diamondShape": diamondShapeAction,
+            "starShape": starShapeAction,
+            "rectangleBubbleShape": rectangleBubbleShapeAction,
+            "ellipseBubbleShape": ellipseBubbleShapeAction,
+            "decreaseBrushSize": decreaseBrushSizeAction,
+            "increaseBrushSize": increaseBrushSizeAction,
+            "fitCanvasToWindow": fitCanvasToWindowAction,
+            "resetCanvasView": resetCanvasViewAction,
+            "minimizeWindow": minimizeWindowAction,
+            "toggleFullScreen": toggleFullScreenAction
+        })
+        shortcutTexts: ({
+            "newCanvas": window.shortcutNewCanvas,
+            "openImage": window.shortcutOpenImage,
+            "saveImageAs": window.shortcutSaveImageAs,
+            "clearCanvas": window.shortcutClearCanvas,
+            "quit": window.shortcutQuit,
+            "preferences": window.shortcutPreferences,
+            "undo": window.shortcutUndo,
+            "redo": window.shortcutRedo,
+            "pasteImage": window.shortcutPasteImage,
+            "addLayer": window.shortcutAddLayer,
+            "deleteCurrentLayer": window.shortcutDeleteCurrentLayer,
+            "brushTool": window.shortcutBrushTool,
+            "eraserTool": window.shortcutEraserTool,
+            "handPanTool": window.shortcutHandPanTool,
+            "moveTool": window.shortcutMoveTool,
+            "zoomTool": window.shortcutZoomTool,
+            "shapeTool": window.shortcutShapeTool,
+            "fillTool": window.shortcutFillTool,
+            "textTool": window.shortcutTextTool,
+            "rectangleShape": window.shortcutRectangleShape,
+            "ellipseShape": window.shortcutEllipseShape,
+            "triangleShape": window.shortcutTriangleShape,
+            "diamondShape": window.shortcutDiamondShape,
+            "starShape": window.shortcutStarShape,
+            "rectangleBubbleShape": window.shortcutRectangleBubbleShape,
+            "ellipseBubbleShape": window.shortcutEllipseBubbleShape,
+            "decreaseBrushSize": window.shortcutDecreaseBrushSize,
+            "increaseBrushSize": window.shortcutIncreaseBrushSize,
+            "fitCanvasToWindow": window.shortcutFitCanvasToWindow,
+            "resetCanvasView": window.shortcutResetCanvasView,
+            "minimizeWindow": window.shortcutMinimizeWindow,
+            "toggleFullScreen": window.shortcutToggleFullScreen
+        })
+    }
+
     menuBar: Controls.MenuBar {
         id: applicationMenuBar
         objectName: "applicationMenuBar"
-        visible: !window.presentationMode
+        visible: Qt.platform.os !== "windows" && !window.presentationMode
         implicitHeight: LV.Theme.controlHeightSm
         padding: LV.Theme.gapNone
         spacing: LV.Theme.gapNone

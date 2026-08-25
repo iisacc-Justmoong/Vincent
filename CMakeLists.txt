@@ -278,6 +278,7 @@ qt_add_qml_module(Vincent
         VERSION ${VINCENT_QML_MODULE_VERSION}
         QML_FILES
         App/qml/Main.qml
+        App/qml/menus/WindowsApplicationMenuBar.qml
         App/qml/license/LicenseActivationPage.qml
         App/qml/preferences/PreferencesWindow.qml
         App/qml/canvas/PainterCanvasPage.qml

@@ -17,7 +17,7 @@ class tst_MainQmlContract : public QObject
     void presentationModeUsesFullScreenCanvasOnlyAndRestoresOnEscape();
     void canvasWheelZoomIsAvailableInEveryToolMode();
     void applicationWindowProvidesApplicationMenuBar();
-    void applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere();
+    void applicationMenuBarUsesLvrsContextMenusOnWindows();
     void applicationMenuAssignsShortcutContracts();
     void applicationProvidesProfilePreferencesWindow();
     void applicationActionsAreTheOnlyOwnersOfPortableShortcuts();
@@ -84,7 +84,10 @@ void tst_MainQmlContract::presentationModeUsesFullScreenCanvasOnlyAndRestoresOnE
     QVERIFY(mainSource.contains(QStringLiteral("id: exitPresentationModeAction")));
     QVERIFY(mainSource.contains(QStringLiteral("shortcut: \"Escape\"")));
     QVERIFY(mainSource.contains(QStringLiteral("enabled: window.presentationMode")));
-    QVERIFY(mainSource.contains(QStringLiteral("visible: !window.presentationMode")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: Qt.platform.os === \"windows\" && !window.presentationMode")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: Qt.platform.os !== \"windows\" && !window.presentationMode")));
     QVERIFY(mainSource.contains(
         QStringLiteral("onPresentationModeRequested: window.enterPresentationMode()")));
 
@@ -427,7 +430,8 @@ void tst_MainQmlContract::applicationWindowUsesOnlyTheMacOsFullSizeTitleBarDragR
         mainSource.contains(QStringLiteral("windowDragHandleEnabled: Qt.platform.os === \"osx\"")));
     QVERIFY(
         mainSource.contains(QStringLiteral("&& visibility !== QtQuickWindow.Window.FullScreen")));
-    QVERIFY(!mainSource.contains(QStringLiteral("Qt.platform.os !== \"windows\"")));
+    QVERIFY(!mainSource.contains(
+        QStringLiteral("windowDragHandleEnabled: Qt.platform.os !== \"windows\"")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleEnabled: true")));
     QVERIFY(!mainSource.contains(QStringLiteral("windowDragHandleHeight: 0")));
     QVERIFY(!mainSource.contains(
@@ -626,16 +630,37 @@ void tst_MainQmlContract::applicationWindowProvidesApplicationMenuBar()
         QStringLiteral("text: qsTr(\"Vincent %1\").arg(Qt.application.version)")));
 }
 
-void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWindowChromeElsewhere()
+void tst_MainQmlContract::applicationMenuBarUsesLvrsContextMenusOnWindows()
 {
     const QString mainQmlPath = QFINDTESTDATA("../App/qml/Main.qml");
+    const QString windowsMenuQmlPath =
+        QFINDTESTDATA("../App/qml/menus/WindowsApplicationMenuBar.qml");
+    const QString rootCMakePath = QFINDTESTDATA("../CMakeLists.txt");
     QVERIFY2(!mainQmlPath.isEmpty(), "Main.qml test data was not found");
+    QVERIFY2(!windowsMenuQmlPath.isEmpty(),
+             "WindowsApplicationMenuBar.qml test data was not found");
+    QVERIFY2(!rootCMakePath.isEmpty(), "CMakeLists.txt test data was not found");
 
-    QFile mainQml(mainQmlPath);
-    QVERIFY(mainQml.open(QIODevice::ReadOnly | QIODevice::Text));
-    const QString mainSource = QString::fromUtf8(mainQml.readAll());
+    auto readSource = [](const QString& path)
+    {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        {
+            return QString{};
+        }
+        return QString::fromUtf8(file.readAll());
+    };
+
+    const QString mainSource = readSource(mainQmlPath);
+    const QString windowsMenuSource = readSource(windowsMenuQmlPath);
+    const QString cmakeSource = readSource(rootCMakePath);
+    QVERIFY(!mainSource.isEmpty());
+    QVERIFY(!windowsMenuSource.isEmpty());
+    QVERIFY(!cmakeSource.isEmpty());
 
     QVERIFY(mainSource.contains(QStringLiteral("id: applicationMenuBar")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: Qt.platform.os !== \"windows\" && !window.presentationMode")));
     QVERIFY(mainSource.contains(QStringLiteral("implicitHeight: LV.Theme.controlHeightSm")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.button: window.windowColor")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.buttonText: LV.Theme.bodyColor")));
@@ -643,13 +668,14 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QVERIFY(mainSource.contains(QStringLiteral("palette.disabled.text: LV.Theme.disabledColor")));
     QVERIFY(mainSource.contains(QStringLiteral("component ApplicationMenu: Controls.Menu")));
     QCOMPARE(mainSource.count(QStringLiteral("ApplicationMenu {")), 7);
-    QVERIFY(mainSource.contains(QStringLiteral("component ApplicationMenuItem: Controls.MenuItem")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("component ApplicationMenuItem: Controls.MenuItem")));
     QVERIFY(mainSource.contains(QStringLiteral("delegate: ApplicationMenuItem")));
     QCOMPARE(mainSource.count(QStringLiteral("ApplicationMenuItem {")), 73);
     QCOMPARE(mainSource.count(QStringLiteral("Controls.MenuItem {")), 1);
-    QVERIFY(mainSource.contains(QStringLiteral(
-        "readonly property color menuTextColor: enabled ? LV.Theme.bodyColor : "
-        "LV.Theme.disabledColor")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("readonly property color menuTextColor: enabled ? LV.Theme.bodyColor : "
+                       "LV.Theme.disabledColor")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.text: menuTextColor")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.windowText: menuTextColor")));
     QVERIFY(mainSource.contains(QStringLiteral("palette.light: LV.Theme.surfaceAlt")));
@@ -658,7 +684,8 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QVERIFY(mainSource.contains(QStringLiteral("font.pixelSize: LV.Theme.textBody")));
     QVERIFY(mainSource.contains(QStringLiteral("font.weight: LV.Theme.textBodyWeight")));
     QVERIFY(mainSource.contains(QStringLiteral("font.styleName: LV.Theme.textBodyStyleName")));
-    QVERIFY(mainSource.contains(QStringLiteral("font.letterSpacing: LV.Theme.textBodyLetterSpacing")));
+    QVERIFY(
+        mainSource.contains(QStringLiteral("font.letterSpacing: LV.Theme.textBodyLetterSpacing")));
     QVERIFY(mainSource.contains(QStringLiteral("delegate: Controls.MenuBarItem")));
     QVERIFY(mainSource.contains(QStringLiteral("topPadding: LV.Theme.gap2")));
     QVERIFY(mainSource.contains(QStringLiteral("bottomPadding: LV.Theme.gap2")));
@@ -667,6 +694,96 @@ void tst_MainQmlContract::applicationMenuBarUsesNativeMacOsAndCompactThemedInWin
     QVERIFY(mainSource.contains(QStringLiteral(
         "color: applicationMenuBarItem.enabled ? LV.Theme.bodyColor : LV.Theme.disabledColor")));
     QVERIFY(mainSource.contains(QStringLiteral("color: window.windowColor")));
+    QVERIFY(mainSource.contains(QStringLiteral("import \"./menus\" as MenuViews")));
+    QVERIFY(mainSource.contains(QStringLiteral("header: MenuViews.WindowsApplicationMenuBar")));
+    QVERIFY(mainSource.contains(QStringLiteral("id: windowsApplicationMenuBar")));
+    QVERIFY(mainSource.contains(QStringLiteral("objectName: \"windowsApplicationMenuBar\"")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("visible: Qt.platform.os === \"windows\" && !window.presentationMode")));
+    QVERIFY(mainSource.contains(QStringLiteral("height: visible ? implicitHeight : 0")));
+    QVERIFY(mainSource.contains(QStringLiteral("barColor: window.windowColor")));
+    QVERIFY(mainSource.contains(
+        QStringLiteral("updateSupported: VincentUpdateManager.selfUpdateSupported")));
+
+    const QStringList windowsActionBindings = {
+        QStringLiteral("\"newCanvas\": newCanvasAction"),
+        QStringLiteral("\"preferences\": preferencesAction"),
+        QStringLiteral("\"brushTool\": brushToolAction"),
+        QStringLiteral("\"rectangleShape\": rectangleShapeAction"),
+        QStringLiteral("\"toggleFullScreen\": toggleFullScreenAction"),
+        QStringLiteral("\"checkForUpdates\": checkForUpdatesAction"),
+    };
+    for (const QString& binding : windowsActionBindings)
+    {
+        QVERIFY2(mainSource.contains(binding), qPrintable(binding + QStringLiteral(" is missing")));
+    }
+
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("import LVRS 1.0 as LV")));
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("component ApplicationContextMenu: LV.ContextMenu")));
+    QCOMPARE(windowsMenuSource.count(QStringLiteral("ApplicationContextMenu {")), 12);
+    QVERIFY(!windowsMenuSource.contains(QStringLiteral("Controls.Menu {")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("Component {")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("LV.MenuItem {")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("showIconSlot: false")));
+    QVERIFY(
+        windowsMenuSource.contains(QStringLiteral("itemDelegate: applicationMenuItemDelegate")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("itemWidth: LV.Theme.scaleMetric(220)")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("itemWidth: LV.Theme.scaleMetric(280)")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("Accessible.name: label")));
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("selected: action ? action.checked === true : false")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("trigger: \"globalPressed\"")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("includeUiHit: true")));
+    QVERIFY(
+        windowsMenuSource.contains(QStringLiteral("closePolicy: Controls.Popup.CloseOnEscape")));
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("onClicked: root.openTopLevelMenu(popupMenu, menuButton, true)")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("onHoveredChanged: {")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral("action.trigger();")));
+
+    const QStringList windowsContextMenuNames = {
+        QStringLiteral("windowsFileContextMenu"),
+        QStringLiteral("windowsEditContextMenu"),
+        QStringLiteral("windowsWindowContextMenu"),
+        QStringLiteral("windowsHelpContextMenu"),
+        QStringLiteral("windowsToolsContextMenu"),
+        QStringLiteral("windowsShapeKindContextMenu"),
+        QStringLiteral("windowsKeyboardShortcutsContextMenu"),
+        QStringLiteral("windowsShortcutFileContextMenu"),
+        QStringLiteral("windowsShortcutEditContextMenu"),
+        QStringLiteral("windowsShortcutToolsContextMenu"),
+        QStringLiteral("windowsShortcutShapeKindContextMenu"),
+        QStringLiteral("windowsShortcutWindowContextMenu"),
+    };
+    for (const QString& objectName : windowsContextMenuNames)
+    {
+        QVERIFY2(windowsMenuSource.contains(QStringLiteral("objectName: \"") + objectName +
+                                            QStringLiteral("\"")),
+                 qPrintable(objectName + QStringLiteral(" is missing")));
+    }
+
+    const qsizetype fileButtonIndex =
+        windowsMenuSource.indexOf(QStringLiteral("objectName: \"windowsFileMenuButton\""));
+    const qsizetype editButtonIndex =
+        windowsMenuSource.indexOf(QStringLiteral("objectName: \"windowsEditMenuButton\""));
+    const qsizetype windowButtonIndex =
+        windowsMenuSource.indexOf(QStringLiteral("objectName: \"windowsWindowMenuButton\""));
+    const qsizetype helpButtonIndex =
+        windowsMenuSource.indexOf(QStringLiteral("objectName: \"windowsHelpMenuButton\""));
+    QVERIFY(fileButtonIndex >= 0);
+    QVERIFY(editButtonIndex > fileButtonIndex);
+    QVERIFY(windowButtonIndex > editButtonIndex);
+    QVERIFY(helpButtonIndex > windowButtonIndex);
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("root.submenuEntry(qsTr(\"Tools\"), \"tools\", \"edit\")")));
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("root.submenuEntry(qsTr(\"Shape Kind\"), \"shapeKind\", \"edit\")")));
+    QVERIFY(windowsMenuSource.contains(QStringLiteral(
+        "root.submenuEntry(qsTr(\"Keyboard Shortcuts\"), \"keyboardShortcuts\", \"help\")")));
+    QVERIFY(windowsMenuSource.contains(
+        QStringLiteral("root.referenceEntry(qsTr(\"Preferences\"), \"preferences\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("App/qml/menus/WindowsApplicationMenuBar.qml")));
 
     const QString appEntryPath = QFINDTESTDATA("../App/main.cpp");
     QVERIFY2(!appEntryPath.isEmpty(), "App/main.cpp test data was not found");
