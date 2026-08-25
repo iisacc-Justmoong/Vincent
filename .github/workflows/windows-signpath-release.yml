@@ -61,6 +61,15 @@ jobs:
           path: _private/iiUpdateManager
           persist-credentials: false
 
+      - name: Check out pinned iiLicenseManager
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: iisacc-Justmoong/iiLicenseManager
+          ref: ${{ vars.IILICENSEMANAGER_COMMIT }}
+          token: ${{ secrets.IIUPDATEMANAGER_READ_TOKEN }}
+          path: _private/iiLicenseManager
+          persist-credentials: false
+
       - name: Require a tag for a signing request
         if: ${{ inputs.submit-for-signing }}
         shell: pwsh
@@ -122,7 +131,7 @@ jobs:
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
           $sharedCanvasSource = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
-          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
+          $licenseManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiLicenseManager"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/LVRS.git $lvrsSource
           git -C $lvrsSource checkout --detach $env:LVRS_COMMIT
@@ -130,11 +139,13 @@ jobs:
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiSharedCanvas.git $sharedCanvasSource
           git -C $sharedCanvasSource checkout --detach $env:IISHAREDCANVAS_COMMIT
-          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiLicenseManager.git $licenseManagerSource
-          git -C $licenseManagerSource checkout --detach $env:IILICENSEMANAGER_COMMIT
           $resolvedUpdateManagerCommit = (git -C $updateManagerSource rev-parse HEAD).Trim()
           if ($resolvedUpdateManagerCommit -cne $env:IIUPDATEMANAGER_COMMIT.ToLowerInvariant()) {
               throw "iiUpdateManager checkout does not match the pinned commit."
+          }
+          $resolvedLicenseManagerCommit = (git -C $licenseManagerSource rev-parse HEAD).Trim()
+          if ($resolvedLicenseManagerCommit -cne $env:IILICENSEMANAGER_COMMIT.ToLowerInvariant()) {
+              throw "iiLicenseManager checkout does not match the pinned commit."
           }
 
       - name: Build, test, and install pinned iiUpdateManager
@@ -170,7 +181,7 @@ jobs:
       - name: Build, test, and install pinned iiLicenseManager
         shell: pwsh
         run: |
-          $source = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
+          $source = Join-Path $env:GITHUB_WORKSPACE "_private\iiLicenseManager"
           $build = Join-Path $source "build"
           $prefix = Join-Path $env:USERPROFILE ".local\iiLicenseManager"
           $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) {

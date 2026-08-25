@@ -58,6 +58,15 @@ jobs:
           path: _private/iiUpdateManager
           persist-credentials: false
 
+      - name: Check out pinned iiLicenseManager
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: iisacc-Justmoong/iiLicenseManager
+          ref: ${{ vars.IILICENSEMANAGER_COMMIT }}
+          token: ${{ secrets.IIUPDATEMANAGER_READ_TOKEN }}
+          path: _private/iiLicenseManager
+          persist-credentials: false
+
       - name: Install matching Qt source modules
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
@@ -77,7 +86,7 @@ jobs:
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
           $sharedCanvasSource = Join-Path $env:RUNNER_WORKSPACE "iiSharedCanvas"
-          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
+          $licenseManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiLicenseManager"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
           $dependencyRoot = Join-Path $env:GITHUB_WORKSPACE "build\_deps"
           $psdSource = Join-Path $dependencyRoot "psd_sdk-src"
@@ -90,11 +99,13 @@ jobs:
           git -C $engineSource checkout --detach $env:IIPAINTENGINE_COMMIT
           git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiSharedCanvas.git $sharedCanvasSource
           git -C $sharedCanvasSource checkout --detach $env:IISHAREDCANVAS_COMMIT
-          git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiLicenseManager.git $licenseManagerSource
-          git -C $licenseManagerSource checkout --detach $env:IILICENSEMANAGER_COMMIT
           $resolvedUpdateManagerCommit = (git -C $updateManagerSource rev-parse HEAD).Trim()
           if ($resolvedUpdateManagerCommit -cne $env:IIUPDATEMANAGER_COMMIT.ToLowerInvariant()) {
               throw "iiUpdateManager checkout does not match the pinned commit."
+          }
+          $resolvedLicenseManagerCommit = (git -C $licenseManagerSource rev-parse HEAD).Trim()
+          if ($resolvedLicenseManagerCommit -cne $env:IILICENSEMANAGER_COMMIT.ToLowerInvariant()) {
+              throw "iiLicenseManager checkout does not match the pinned commit."
           }
           git clone --filter=blob:none https://github.com/MolecularMatters/psd_sdk.git $psdSource
           git -C $psdSource checkout --detach $env:PSD_SDK_COMMIT
@@ -106,7 +117,7 @@ jobs:
         run: |
           $qtSourceRoot = Join-Path (Split-Path -Parent $env:QT_ROOT_DIR) "Src"
           $updateManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiUpdateManager"
-          $licenseManagerSource = Join-Path $env:RUNNER_WORKSPACE "iiLicenseManager"
+          $licenseManagerSource = Join-Path $env:GITHUB_WORKSPACE "_private\iiLicenseManager"
           .\tools\new-corresponding-source.ps1 `
               -Version 6.0 `
               -VincentRevision $env:GITHUB_SHA `

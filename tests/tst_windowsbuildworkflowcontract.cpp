@@ -1,6 +1,7 @@
 #include <QFile>
 #include <QRegularExpression>
 #include <QString>
+#include <QStringList>
 #include <QtTest>
 
 namespace
@@ -30,6 +31,7 @@ private slots:
     void appEntryPointAvoidsNonExportedLvrsRuntimeSymbols();
     void appEntryPointShowsFinalGeometryOnlyOnce();
     void correspondingSourceToolDefinesImmutableReleaseContract();
+    void windowsWorkflowsAuthenticatePinnedPrivateManagers();
     void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
 };
@@ -74,6 +76,30 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
         ".\\tools\\new-corresponding-source.ps1 -Version 6.0 -VincentRevision v6.0")));
+}
+
+void tst_WindowsBuildWorkflowContract::windowsWorkflowsAuthenticatePinnedPrivateManagers()
+{
+    const QStringList workflowPaths = {
+        QFINDTESTDATA("../.github/workflows/windows-corresponding-source.yml"),
+        QFINDTESTDATA("../.github/workflows/windows-signpath-release.yml"),
+    };
+
+    for (const QString &workflowPath : workflowPaths) {
+        QVERIFY2(!workflowPath.isEmpty(), "A Windows release workflow was not found");
+        const QString workflow = readTextFile(workflowPath);
+        QVERIFY(!workflow.isEmpty());
+        QVERIFY(workflow.contains(QStringLiteral("name: Check out pinned iiUpdateManager")));
+        QVERIFY(workflow.contains(QStringLiteral("name: Check out pinned iiLicenseManager")));
+        QVERIFY(workflow.contains(QStringLiteral("repository: iisacc-Justmoong/iiLicenseManager")));
+        QVERIFY(workflow.contains(QStringLiteral("token: ${{ secrets.IIUPDATEMANAGER_READ_TOKEN }}")));
+        QVERIFY(workflow.contains(QStringLiteral("path: _private/iiLicenseManager")));
+        QVERIFY(workflow.contains(QStringLiteral("persist-credentials: false")));
+        QVERIFY(workflow.contains(QStringLiteral(
+            "if ($resolvedLicenseManagerCommit -cne $env:IILICENSEMANAGER_COMMIT.ToLowerInvariant())")));
+        QVERIFY(!workflow.contains(QStringLiteral(
+            "git clone --filter=blob:none https://github.com/iisacc-Justmoong/iiLicenseManager.git")));
+    }
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
