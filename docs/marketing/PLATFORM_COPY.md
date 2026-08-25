@@ -7,8 +7,8 @@ publicly trusted Authenticode-signed release has been verified.
 
 ## Canonical facts
 
-- Product: Vincent 5.1
-- Current source release: 5.1
+- Product: Vincent 6.0
+- Current source release: 6.0
 - Category: raster drawing, digital paper, handwriting, note-taking
 - Platforms: Windows, macOS, and Linux source/build support
 - License: GNU AGPLv3
@@ -16,7 +16,7 @@ publicly trusted Authenticode-signed release has been verified.
 - Privacy: account email and license key are used only for online license validation and a user-requested update grant; opening Preferences may explicitly read the stored email for an email-only fixed display. There is no telemetry, analytics, advertising, cloud document upload, remote polling, or automatic/background update check. When the user-controlled nearby-discovery setting is enabled, Vincent exchanges an ephemeral anonymous presence heartbeat only within the current LAN; it includes no profile, account, device name, or document data, only an invitation-capability Boolean and a temporary TCP port while the user explicitly shares a canvas. Selecting an opted-in nearby user from Members sends that target a one-hop invitation containing the inviter's profile name and temporary canvas endpoint. After acceptance or an explicit join, participants send bounded edit commands to the host-owned canvas and only the host returns complete authoritative canvas snapshots directly over the LAN without an Internet relay
 - Public project URL: https://github.com/iisacc-Justmoong/Vincent
 - Source release URL:
-  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v5.1
+  https://github.com/iisacc-Justmoong/Vincent/releases/tag/v6.0
 - Feedback URL:
   https://github.com/iisacc-Justmoong/Vincent/discussions/17
 - Windows testing URL:
@@ -43,7 +43,7 @@ cloud relay.
 
 ## Directory summary
 
-Vincent 5.1 is a Qt 6 desktop raster editor for drawing, handwriting, layered
+Vincent 6.0 is a Qt 6 desktop raster editor for drawing, handwriting, layered
 canvas work, and PSD-compatible import and export. Its local-first design keeps
 documents on the user's device; the app sends account-license credentials only
 for activation and a user-requested update, with no telemetry, advertising, or
@@ -80,7 +80,7 @@ accepted or explicitly joined devices send profile names and bounded edit comman
 to the host-owned canvas; only the host returns authoritative snapshots directly
 over that LAN, without a cloud relay.
 
-Version 5.1 is available as complete AGPLv3 source. We are currently
+Version 6.0 is available as complete AGPLv3 source. We are currently
 preparing the publicly trusted Windows distribution and would especially value
 feedback from artists, pen-tablet users, Qt developers, and Windows testers.
 

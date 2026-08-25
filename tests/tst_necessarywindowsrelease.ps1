@@ -92,7 +92,7 @@ try {
 
     [System.IO.File]::WriteAllText(
         (Join-Path $buildDirectory "CMakeCache.txt"),
-        "CMAKE_PROJECT_VERSION:STATIC=5.1`r`n"
+        "CMAKE_PROJECT_VERSION:STATIC=6.0`r`n"
     )
     foreach ($name in @("VincentProduct.wxs", "VincentRuntime.wxs", "VincentLicense.rtf")) {
         [System.IO.File]::WriteAllText((Join-Path $msiWorkDirectory $name), "verified MSI input")
@@ -247,7 +247,7 @@ try {
         -SigningToken "secret-token" `
         -TimestampUrl "http://timestamp.digicert.com"
 
-    $expectedFinalMsi = Join-Path $buildDirectory "Vincent-5.1-Windows.msi"
+    $expectedFinalMsi = Join-Path $buildDirectory "Vincent-6.0-Windows.msi"
     Assert-Condition ($result.File -ceq $expectedFinalMsi) `
         "The verified release was not published to the canonical versioned MSI path."
     Assert-Condition (Test-Path -LiteralPath $expectedFinalMsi -PathType Leaf) `

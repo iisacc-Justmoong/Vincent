@@ -1,4 +1,4 @@
-Vincent 5.1 - Third-Party Notices
+Vincent 6.0 - Third-Party Notices
 ====================================
 
 This distribution includes or links the components listed below. The complete

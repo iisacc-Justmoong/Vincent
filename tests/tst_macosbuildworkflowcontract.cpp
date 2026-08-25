@@ -45,7 +45,7 @@ class tst_MacOSBuildWorkflowContract : public QObject
     Q_OBJECT
 
 private slots:
-    void cmakeFixesApplicationVersionAt51();
+    void cmakeFixesApplicationVersionAt60();
     void cmakeRequiresRepositoryBuildDirectory();
     void cmakeAvoidsRedundantMacOSRuntimeRpaths();
     void localNetworkDiscoveryDeclaresPrivacyAndSandboxAccess();
@@ -57,7 +57,7 @@ private slots:
     void buildScriptFailsClosedOnMissingNotaryProfileBeforeBuild();
 };
 
-void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt51()
+void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt60()
 {
     const QString cmakePath = QFINDTESTDATA("../CMakeLists.txt");
     QVERIFY2(!cmakePath.isEmpty(), "CMakeLists.txt test data was not found");
@@ -73,13 +73,13 @@ void tst_MacOSBuildWorkflowContract::cmakeFixesApplicationVersionAt51()
     QVERIFY(infoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString infoPlistSource = QString::fromUtf8(infoPlist.readAll());
 
-    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 5.1 LANGUAGES C CXX)")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("project(Vincent VERSION 6.0 LANGUAGES C CXX)")));
     QVERIFY(cmakeSource.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
     const qsizetype deploymentTargetIndex = cmakeSource.indexOf(QStringLiteral("set(CMAKE_OSX_DEPLOYMENT_TARGET"));
-    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 5.1 LANGUAGES C CXX)"));
+    const qsizetype projectIndex = cmakeSource.indexOf(QStringLiteral("project(Vincent VERSION 6.0 LANGUAGES C CXX)"));
     QVERIFY(deploymentTargetIndex >= 0);
     QVERIFY(projectIndex > deploymentTargetIndex);
-    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"50100\")")));
+    QVERIFY(cmakeSource.contains(QStringLiteral("set(VINCENT_BUNDLE_VERSION \"60000\")")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_BUNDLE_VERSION \"${VINCENT_BUNDLE_VERSION}\"")));
     QVERIFY(cmakeSource.contains(QStringLiteral("MACOSX_BUNDLE_SHORT_VERSION_STRING \"${PROJECT_VERSION}\"")));
     QVERIFY(infoPlistSource.contains(QStringLiteral("<string>@PROJECT_VERSION@</string>")));
@@ -411,9 +411,9 @@ cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Appicon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>5.1</string>
+    <string>6.0</string>
     <key>CFBundleVersion</key>
-    <string>50100</string>
+    <string>60000</string>
 </dict>
 </plist>
 PLIST
@@ -480,9 +480,9 @@ case "${1:-}" in
         cat > "${3:-}/Distribution" <<DISTRIBUTION
 <installer-gui-script minSpecVersion="2" hostArchitectures="arm64">
 <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
-<bundle path="Vincent.app" CFBundleShortVersionString="5.1" CFBundleVersion="50100"/>
-<product id="$product_id" version="5.1"/>
-<pkg-ref id="com.iisacc.vincent.painter" version="5.1"/>
+<bundle path="Vincent.app" CFBundleShortVersionString="6.0" CFBundleVersion="60000"/>
+<product id="$product_id" version="6.0"/>
+<pkg-ref id="com.iisacc.vincent.painter" version="6.0"/>
 </installer-gui-script>
 DISTRIBUTION
         ;;

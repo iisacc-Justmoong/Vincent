@@ -25,7 +25,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "5.1"
+$Version = "6.0"
 $packageVersionParts = @($Version -split '\.')
 while ($packageVersionParts.Count -lt 4) {
     $packageVersionParts += "0"

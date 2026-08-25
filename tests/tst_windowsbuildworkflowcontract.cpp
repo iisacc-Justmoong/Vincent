@@ -73,7 +73,7 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY2(!buildGuidePath.isEmpty(), "docs/BUILD.md test data was not found");
     const QString buildGuide = readTextFile(buildGuidePath);
     QVERIFY(buildGuide.contains(QStringLiteral(
-        ".\\tools\\new-corresponding-source.ps1 -Version 5.1 -VincentRevision v5.1")));
+        ".\\tools\\new-corresponding-source.ps1 -Version 6.0 -VincentRevision v6.0")));
 }
 
 void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageContract()
@@ -92,7 +92,7 @@ void tst_WindowsBuildWorkflowContract::windowsBuildScriptDefinesRunnablePackageC
 
     QVERIFY(source.contains(QStringLiteral("#Requires -Version 5.1")));
     QVERIFY(source.contains(QStringLiteral("Set-StrictMode -Version Latest")));
-    QVERIFY(source.contains(QStringLiteral("$Version = \"5.1\"")));
+    QVERIFY(source.contains(QStringLiteral("$Version = \"6.0\"")));
     QVERIFY(source.contains(QStringLiteral("$BuildDir = Join-Path $RepositoryRoot \"build\"")));
     QVERIFY(source.contains(QStringLiteral("$SignedMsiPath = Join-Path $BuildDir \"Vincent-$Version-Windows.msi\"")));
     QVERIFY(!source.contains(QStringLiteral("cmake-build-debug")));
@@ -637,8 +637,8 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("PE import closure")));
     QVERIFY(source.contains(QStringLiteral("__cxa_thread_atexit")));
     QVERIFY(source.contains(QStringLiteral("dist/Vincent-Windows")));
-    QVERIFY(source.contains(QStringLiteral("dist/Vincent-5.1-Windows.zip")));
-    QVERIFY(source.contains(QStringLiteral("build/Vincent-5.1-Windows.msi")));
+    QVERIFY(source.contains(QStringLiteral("dist/Vincent-6.0-Windows.zip")));
+    QVERIFY(source.contains(QStringLiteral("build/Vincent-6.0-Windows.msi")));
     QVERIFY(source.contains(QStringLiteral("Program Files")));
     QVERIFY(source.contains(QStringLiteral("requires elevation")));
     QVERIFY(source.contains(QStringLiteral("defaults to the current user")));
@@ -682,7 +682,7 @@ void tst_WindowsBuildWorkflowContract::buildGuideDocumentsWindowsScript()
     QVERIFY(source.contains(QStringLiteral("VINCENT_STORE_IDENTITY_NAME")));
     QVERIFY(source.contains(QStringLiteral("Package/Identity/Publisher")));
     QVERIFY(source.contains(QStringLiteral("LocalMachine\\TrustedPeople")));
-    QVERIFY(source.contains(QStringLiteral("Vincent-5.1-Windows-Store-x64.msixupload")));
+    QVERIFY(source.contains(QStringLiteral("Vincent-6.0-Windows-Store-x64.msixupload")));
     QVERIFY(source.contains(QStringLiteral("runFullTrust")));
     QVERIFY(source.contains(QStringLiteral("Microsoft re-signs")));
 }
@@ -734,7 +734,7 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("signtool.exe")));
     QVERIFY(workflow.contains(QStringLiteral("Get-ChildItem")));
     QVERIFY(workflow.contains(QStringLiteral("Vincent-*-Windows.msi")));
-    QVERIFY(!workflow.contains(QStringLiteral("Vincent-5.1-Windows.msi")));
+    QVERIFY(!workflow.contains(QStringLiteral("Vincent-6.0-Windows.msi")));
     QVERIFY(workflow.contains(QStringLiteral("CMAKE_PROJECT_VERSION:STATIC=")));
     QVERIFY(workflow.contains(QStringLiteral(
         "$msiVersion = if ($expectedVersion -match '^\\d+\\.\\d+$') { "

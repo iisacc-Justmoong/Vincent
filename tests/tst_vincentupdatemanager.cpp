@@ -257,14 +257,14 @@ void tst_VincentUpdateManager::credentialProviderCancellationSuppressesLateSecre
 
 void tst_VincentUpdateManager::constructionDoesNotCheckAndOneManualCheckMakesOneRequest()
 {
-    ManifestServer server(QStringLiteral("5.1.0"));
+    ManifestServer server(QStringLiteral("6.0.0"));
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
     FakeCredentialStore store;
     LicenseManager licenseManager(QUrl(QStringLiteral("http://127.0.0.1/validate")),
                                   1000,
                                   &store);
     VincentUpdateManager updateManager(&licenseManager,
-                                       QStringLiteral("5.1"),
+                                       QStringLiteral("6.0"),
                                        server.manifestUrl(),
                                        server.grantUrl(),
                                        true);
@@ -286,7 +286,7 @@ void tst_VincentUpdateManager::constructionDoesNotCheckAndOneManualCheckMakesOne
 
 void tst_VincentUpdateManager::updateNowAloneReadsCredentialsAfterAnAvailableCheck()
 {
-    ManifestServer server(QStringLiteral("5.2.0"));
+    ManifestServer server(QStringLiteral("6.1.0"));
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
     FakeCredentialStore store;
     LicenseManager licenseManager(QUrl(QStringLiteral("http://127.0.0.1/validate")),
@@ -295,7 +295,7 @@ void tst_VincentUpdateManager::updateNowAloneReadsCredentialsAfterAnAvailableChe
     QTRY_COMPARE_WITH_TIMEOUT(store.readCount, 1, 1000);
 
     VincentUpdateManager updateManager(&licenseManager,
-                                       QStringLiteral("5.1"),
+                                       QStringLiteral("6.0"),
                                        server.manifestUrl(),
                                        server.grantUrl(),
                                        true);
@@ -328,7 +328,7 @@ void tst_VincentUpdateManager::updateNowAloneReadsCredentialsAfterAnAvailableChe
 
 void tst_VincentUpdateManager::storeManagedBuildRejectsSelfUpdateWithoutNetworkOrCredentialRead()
 {
-    ManifestServer server(QStringLiteral("5.2.0"));
+    ManifestServer server(QStringLiteral("6.1.0"));
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
     FakeCredentialStore store;
     LicenseManager licenseManager(QUrl(QStringLiteral("http://127.0.0.1/validate")),
@@ -337,7 +337,7 @@ void tst_VincentUpdateManager::storeManagedBuildRejectsSelfUpdateWithoutNetworkO
     QTRY_COMPARE_WITH_TIMEOUT(store.readCount, 1, 1000);
 
     VincentUpdateManager updateManager(&licenseManager,
-                                       QStringLiteral("5.1"),
+                                       QStringLiteral("6.0"),
                                        server.manifestUrl(),
                                        server.grantUrl(),
                                        false);

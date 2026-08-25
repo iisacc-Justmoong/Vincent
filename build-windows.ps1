@@ -36,7 +36,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Version = "5.1"
+$Version = "6.0"
 $UnsignedPublicReleaseExpiresAtUtc = [DateTimeOffset]::Parse("2027-01-01T00:00:00Z")
 $windowsVersionParts = @($Version -split '\.')
 while ($windowsVersionParts.Count -lt 4) {
