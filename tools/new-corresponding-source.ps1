@@ -20,9 +20,9 @@ param(
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$LvrsRevision = "8132a48e4c0788f0548bff20fd7089878a09c760",
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
-    [string]$IiPaintEngineRevision = "9979eae5f7925576ec2fb9f780ddbb0fcecf64dc",
+    [string]$IiPaintEngineRevision = "5ade15e24ce3a7eab25669144fdee668672b22d6",
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
-    [string]$IiSharedCanvasRevision = "2ceeb8c0cf81d01e9740df1635badc08d5a12ebe",
+    [string]$IiSharedCanvasRevision = "d2c41bf605725eb07b181587321f0ce910b9924d",
     [Parameter(Mandatory = $true)]
     [ValidatePattern("^[0-9a-fA-F]{40}$")]
     [string]$IiUpdateManagerRevision,

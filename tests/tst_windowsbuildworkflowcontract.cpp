@@ -53,7 +53,8 @@ void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableRe
     QVERIFY(source.contains(QStringLiteral(
         "throw \"Vincent release revision does not declare version $Version.\"")));
     QVERIFY(source.contains(QStringLiteral("8132a48e4c0788f0548bff20fd7089878a09c760")));
-    QVERIFY(source.contains(QStringLiteral("9979eae5f7925576ec2fb9f780ddbb0fcecf64dc")));
+    QVERIFY(source.contains(QStringLiteral("5ade15e24ce3a7eab25669144fdee668672b22d6")));
+    QVERIFY(source.contains(QStringLiteral("d2c41bf605725eb07b181587321f0ce910b9924d")));
     QVERIFY(source.contains(QStringLiteral("f51449543273cbf12058ae92b230e0c4209f5066")));
     QVERIFY(source.contains(QStringLiteral("qtbase")));
     QVERIFY(source.contains(QStringLiteral("qtdeclarative")));
@@ -733,7 +734,8 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("iisacc-Justmoong/iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("LVRS_COMMIT: 8132a48e4c0788f0548bff20fd7089878a09c760")));
-    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 9979eae5f7925576ec2fb9f780ddbb0fcecf64dc")));
+    QVERIFY(workflow.contains(QStringLiteral("IIPAINTENGINE_COMMIT: 5ade15e24ce3a7eab25669144fdee668672b22d6")));
+    QVERIFY(workflow.contains(QStringLiteral("IISHAREDCANVAS_COMMIT: d2c41bf605725eb07b181587321f0ce910b9924d")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned LVRS")));
     QVERIFY(workflow.contains(QStringLiteral("Build and install pinned iiPaintEngine")));
     QVERIFY(workflow.contains(QStringLiteral("-DLVRS_ENABLE_IPO=OFF")));
