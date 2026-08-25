@@ -125,19 +125,24 @@ no temporary session file is needed for transport.
 The joined surface is an input client for the host canvas, not a second document
 owner. It remains command-blocked until the first authoritative host state has
 finished its queued QML restore. Pointer/tablet strokes are then captured with
-their pressure samples and current brush style without mutating the joined
-device's document. Fill, text, shape, transform, canvas, layer, undo/redo, and
-validated raster/image actions follow the same path as bounded semantic edit
-commands. The client cannot publish a `.vrc` snapshot and does not store a
-remote session as its Recent canvas.
+their pressure samples and current brush style while iiSharedCanvas renders the
+same active stroke as a local-only live preview. Releasing the pointer cancels
+that preview back to the exact pre-stroke pixels and history before the bounded
+stroke command is sent to the host, so it never becomes a client-owned edit.
+Fill, text, shape, transform, canvas, layer, undo/redo, and validated
+raster/image actions follow the same semantic-command path without speculative
+document mutation. The client cannot publish a `.vrc` snapshot and does not
+store a remote session as its Recent canvas.
 
 The host validates each command, applies it to the actual host
 `DrawingSurface`, and only then exports and broadcasts an authoritative `.vrc`
 state with the next monotonically increasing revision. A zero-interval queued
 publication lets newly created QML raster-layer surfaces exist before export
 and coalesces commands processed in the same event cycle. The host's own local
-edits retain the 350 ms publication debounce. Clients always restore host
-states, including the state produced from their own input.
+edits retain the 350 ms publication debounce. Other devices therefore receive
+a participant stroke only after release, while its originating device sees the
+non-committing preview during input. Clients always restore host states,
+including the state produced from their own input.
 
 This is not an object-level CRDT. Commands are serialized in arrival order by
 the host canvas; overlapping absolute transforms therefore resolve to the last

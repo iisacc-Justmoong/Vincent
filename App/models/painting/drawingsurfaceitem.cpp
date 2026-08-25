@@ -2669,6 +2669,7 @@ void DrawingSurfaceItem::beginRemoteStrokeCapture(qreal pointX, qreal pointY, qr
     m_remoteStrokeActive = true;
     m_remoteStrokePressureSensitive = pressureSensitive;
     appendRemoteStrokeCapture(pointX, pointY, rawPressure);
+    beginRemoteStrokePreview(pointX, pointY, rawPressure, pressureSensitive);
 }
 
 bool DrawingSurfaceItem::appendRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure)
@@ -2689,6 +2690,7 @@ bool DrawingSurfaceItem::appendRemoteStrokeCapture(qreal pointX, qreal pointY, q
     {
         m_remoteStrokePoints.last() = point;
     }
+    appendRemoteStrokePreview(pointX, pointY, rawPressure);
     return true;
 }
 
@@ -2711,9 +2713,50 @@ void DrawingSurfaceItem::endRemoteStrokeCapture(qreal pointX, qreal pointY, qrea
 
 void DrawingSurfaceItem::clearRemoteStrokeCapture()
 {
+    cancelRemoteStrokePreview();
     m_remoteStrokeActive = false;
     m_remoteStrokePressureSensitive = false;
     m_remoteStrokePoints.clear();
+}
+
+QPointF DrawingSurfaceItem::remoteStrokeDocumentPosition(qreal pointX, qreal pointY) const
+{
+    const qreal currentZoom = zoom();
+    return {(pointX - panX()) / currentZoom + canvasOriginX(),
+            (pointY - panY()) / currentZoom + canvasOriginY()};
+}
+
+void DrawingSurfaceItem::beginRemoteStrokePreview(qreal pointX, qreal pointY, qreal rawPressure,
+                                                  bool pressureSensitive)
+{
+    const qreal previewPressure =
+        pressureSensitive ? qBound<qreal>(0.0, rawPressure, 1.0) : 1.0;
+    m_remoteStrokePreviewActive = iiSharedCanvas::CanvasItem::beginStrokeAt(
+        remoteStrokeDocumentPosition(pointX, pointY), previewPressure);
+}
+
+void DrawingSurfaceItem::appendRemoteStrokePreview(qreal pointX, qreal pointY, qreal rawPressure)
+{
+    if (!m_remoteStrokePreviewActive)
+    {
+        return;
+    }
+
+    const qreal previewPressure = m_remoteStrokePressureSensitive
+                                      ? qBound<qreal>(0.0, rawPressure, 1.0)
+                                      : 1.0;
+    iiSharedCanvas::CanvasItem::continueStrokeAt(remoteStrokeDocumentPosition(pointX, pointY),
+                                                 previewPressure);
+    m_remoteStrokePreviewActive = liveStrokeActive();
+}
+
+void DrawingSurfaceItem::cancelRemoteStrokePreview()
+{
+    if (m_remoteStrokePreviewActive && liveStrokeActive())
+    {
+        iiSharedCanvas::CanvasItem::cancelStroke();
+    }
+    m_remoteStrokePreviewActive = false;
 }
 
 bool DrawingSurfaceItem::commitText(qreal pointX, qreal pointY, qreal boxWidth, const QString& text,

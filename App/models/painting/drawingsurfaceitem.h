@@ -2,6 +2,7 @@
 
 #include <QColor>
 #include <QImage>
+#include <QPointF>
 #include <QSize>
 #include <QString>
 #include <QVariantList>
@@ -145,6 +146,11 @@ class DrawingSurfaceItem : public iiSharedCanvas::CanvasItem
     bool appendRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure);
     void endRemoteStrokeCapture(qreal pointX, qreal pointY, qreal rawPressure);
     void clearRemoteStrokeCapture();
+    [[nodiscard]] QPointF remoteStrokeDocumentPosition(qreal pointX, qreal pointY) const;
+    void beginRemoteStrokePreview(qreal pointX, qreal pointY, qreal rawPressure,
+                                  bool pressureSensitive);
+    void appendRemoteStrokePreview(qreal pointX, qreal pointY, qreal rawPressure);
+    void cancelRemoteStrokePreview();
     QMouseEvent makeMouseEvent(QEvent::Type eventType, qreal pointX, qreal pointY,
                                Qt::MouseButton button, Qt::MouseButtons buttons) const;
 
@@ -158,5 +164,6 @@ class DrawingSurfaceItem : public iiSharedCanvas::CanvasItem
     bool m_remoteInputMode = false;
     bool m_remoteStrokeActive = false;
     bool m_remoteStrokePressureSensitive = false;
+    bool m_remoteStrokePreviewActive = false;
     QVariantList m_remoteStrokePoints;
 };

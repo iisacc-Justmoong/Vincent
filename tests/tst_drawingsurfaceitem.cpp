@@ -30,6 +30,9 @@
 
 #include <iiSharedCanvas.h>
 
+#include <cstdint>
+#include <vector>
+
 #include "canvasdocumentviewmodel.h"
 #include "models/painting/drawingsurfaceitem.h"
 #include "paletteutils.h"
@@ -65,7 +68,7 @@ class tst_DrawingSurfaceItem : public QObject
     void renamesLayerRowsAndDrawableObjectMetadata();
     void layersExposeHierarchyRowsAndReorderDrawableObjects();
     void drawsAndSavesStroke();
-    void remoteInputCapturesStrokeWithoutMutatingClientDocument();
+    void remoteInputPreviewsStrokeWithoutCommittingClientDocument();
     void qmlRemoteParticipantRoutesMutationToHostCanvas();
     void rendersSharedRasterVectorTimelineDocument();
     void rasterToolsPreserveMixedSharedCanvasLayers();
@@ -3328,7 +3331,7 @@ void tst_DrawingSurfaceItem::drawsAndSavesStroke()
     QCOMPARE(saved.size(), QSize(128, 96));
 }
 
-void tst_DrawingSurfaceItem::remoteInputCapturesStrokeWithoutMutatingClientDocument()
+void tst_DrawingSurfaceItem::remoteInputPreviewsStrokeWithoutCommittingClientDocument()
 {
     PaletteUtils participantPaletteUtils;
     CanvasDocumentViewModel participantViewModel(&participantPaletteUtils);
@@ -3336,14 +3339,72 @@ void tst_DrawingSurfaceItem::remoteInputCapturesStrokeWithoutMutatingClientDocum
     participantItem.setWidth(128);
     participantItem.setHeight(96);
     participantItem.setDocumentViewModel(&participantViewModel);
+    participantItem.setBrushSize(12);
+    participantItem.setLivePreviewFrameIntervalMs(0);
     participantItem.setRemoteInputMode(true);
 
+    QQuickWindow previewWindow;
+    previewWindow.setColor(Qt::white);
+    previewWindow.setGeometry(0, 0, 128, 96);
+    participantItem.setParentItem(previewWindow.contentItem());
+    previewWindow.show();
+    QVERIFY2(QTest::qWaitForWindowExposed(&previewWindow, nativeWindowExposureTimeoutMs),
+             "The remote stroke preview window was not exposed before the compositor timeout");
+    QTRY_VERIFY_WITH_TIMEOUT(!participantItem.rendering(), 5000);
+
+    const RasterLayer* initialRaster = participantItem.selectedRasterPixels();
+    QVERIFY(initialRaster);
+    const std::vector<std::uint32_t> initialPixels = initialRaster->pixels;
+    QVERIFY(!participantItem.canUndo());
+
     QSignalSpy remoteStrokeSpy(&participantItem, &DrawingSurfaceItem::remoteStrokeRequested);
+    QSignalSpy previewRenderSpy(&participantItem, &DrawingSurfaceItem::renderCompleted);
+    QTest::qWait(100);
+    previewRenderSpy.clear();
     participantItem.beginStroke(10, 12, 0.4, true);
+    QVERIFY(participantItem.liveStrokeActive());
     QVERIFY(participantItem.appendStrokePoint(30, 32, 0.6, true));
+    QTRY_VERIFY_WITH_TIMEOUT(previewRenderSpy.size() > 0, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!participantItem.rendering(), 5000);
+    const RasterLayer* previewRaster = participantItem.selectedRasterPixels();
+    QVERIFY(previewRaster);
+    QVERIFY(previewRaster->pixels != initialPixels);
+    QCOMPARE(participantItem.strokeCount(), 0);
+    QTest::qWait(50);
+    const QImage activePreviewFrame = previewWindow.grabWindow();
+    QVERIFY(!activePreviewFrame.isNull());
+    const int activePreviewPixels = countLogicalAnnulusPixels(
+        activePreviewFrame, previewWindow.size(), QPointF(30, 32), 0, 8,
+        [](const QColor& pixel)
+        {
+            return pixel.alpha() > 200 && pixel.red() < 200 && pixel.green() < 200 &&
+                   pixel.blue() < 200;
+        });
+    QVERIFY2(activePreviewPixels > 0,
+             "The participant's active remote stroke did not render in its local window");
+
+    const int previewRenderCount = previewRenderSpy.size();
     participantItem.endStroke(50, 52, 0.8, true);
 
+    QVERIFY(!participantItem.liveStrokeActive());
+    QTRY_VERIFY_WITH_TIMEOUT(previewRenderSpy.size() > previewRenderCount, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(!participantItem.rendering(), 5000);
     QCOMPARE(participantItem.strokeCount(), 0);
+    const RasterLayer* restoredRaster = participantItem.selectedRasterPixels();
+    QVERIFY(restoredRaster);
+    QCOMPARE(restoredRaster->pixels, initialPixels);
+    QVERIFY(!participantItem.canUndo());
+    QTest::qWait(50);
+    const QImage restoredPreviewFrame = previewWindow.grabWindow();
+    QVERIFY(!restoredPreviewFrame.isNull());
+    const int restoredPreviewPixels = countLogicalAnnulusPixels(
+        restoredPreviewFrame, previewWindow.size(), QPointF(30, 32), 0, 8,
+        [](const QColor& pixel)
+        {
+            return pixel.alpha() > 200 && pixel.red() < 200 && pixel.green() < 200 &&
+                   pixel.blue() < 200;
+        });
+    QCOMPARE(restoredPreviewPixels, 0);
     QCOMPARE(remoteStrokeSpy.size(), 1);
     const QVariantList points = remoteStrokeSpy.first().at(0).toList();
     QCOMPARE(points.size(), 3);
@@ -3375,6 +3436,7 @@ void tst_DrawingSurfaceItem::remoteInputCapturesStrokeWithoutMutatingClientDocum
     QTRY_COMPARE(hostItem.strokeCount(), 1);
     QCOMPARE(participantItem.strokeCount(), 0);
     QVERIFY(participantItem.remoteInputMode());
+    participantItem.setParentItem(nullptr);
 }
 
 void tst_DrawingSurfaceItem::qmlRemoteParticipantRoutesMutationToHostCanvas()
