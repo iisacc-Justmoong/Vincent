@@ -25,7 +25,7 @@ Run the complete test suite before submitting a pull request. New behavior shoul
 ## Project rules
 
 - Follow the Qt and KDE coding guidelines, the repository `.clang-format`, four-space indentation, and Allman braces.
-- QML changes must use the `.local/LVRS/` framework and keep one root component per file.
+- QML changes must use the `.local/SDK/LVRS/` framework and keep one root component per file.
 - Keep modules replaceable, avoid circular dependencies, and do not make lower-level modules depend on higher-level modules.
 - Evaluate maintained, suitably licensed external libraries before implementing non-domain infrastructure locally.
 - Update relevant documentation and tests with every source change.

@@ -77,8 +77,8 @@ if(DEFINED ENV{CRAFTROOT})
     unset(_craft_prefix)
 endif()
 
-# 로컬 LVRS 설치 경로 힌트(.local) 우선 반영
-set(_vincent_lvrs_prefix "$ENV{HOME}/.local/LVRS")
+# 로컬 LVRS 설치 경로 힌트(.local/SDK) 우선 반영
+set(_vincent_lvrs_prefix "$ENV{HOME}/.local/SDK/LVRS")
 if(EXISTS "${_vincent_lvrs_prefix}/LVRSConfig.cmake")
     list(FIND CMAKE_PREFIX_PATH "${_vincent_lvrs_prefix}" _vincent_lvrs_index)
     if(_vincent_lvrs_index EQUAL -1)
@@ -88,8 +88,8 @@ if(EXISTS "${_vincent_lvrs_prefix}/LVRSConfig.cmake")
 endif()
 unset(_vincent_lvrs_prefix)
 
-# 로컬 iiPaintEngine 설치 경로 힌트(.local) 우선 반영
-set(_vincent_iipaintengine_prefix "$ENV{HOME}/.local/iiPaintEngine")
+# 로컬 iiPaintEngine 설치 경로 힌트(.local/SDK) 우선 반영
+set(_vincent_iipaintengine_prefix "$ENV{HOME}/.local/SDK/iiPaintEngine")
 if(EXISTS "${_vincent_iipaintengine_prefix}/lib/cmake/iiPaintEngine/iiPaintEngineConfig.cmake")
     list(FIND CMAKE_PREFIX_PATH "${_vincent_iipaintengine_prefix}" _vincent_iipaintengine_index)
     if(_vincent_iipaintengine_index EQUAL -1)
@@ -99,8 +99,8 @@ if(EXISTS "${_vincent_iipaintengine_prefix}/lib/cmake/iiPaintEngine/iiPaintEngin
 endif()
 unset(_vincent_iipaintengine_prefix)
 
-# 로컬 iiSharedCanvas 설치 경로 힌트(.local) 우선 반영
-set(_vincent_iisharedcanvas_prefix "$ENV{HOME}/.local/iiSharedCanvas")
+# 로컬 iiSharedCanvas 설치 경로 힌트(.local/SDK) 우선 반영
+set(_vincent_iisharedcanvas_prefix "$ENV{HOME}/.local/SDK/iiSharedCanvas")
 if(EXISTS "${_vincent_iisharedcanvas_prefix}/lib/cmake/iiSharedCanvas/iiSharedCanvasConfig.cmake")
     list(FIND CMAKE_PREFIX_PATH "${_vincent_iisharedcanvas_prefix}" _vincent_iisharedcanvas_index)
     if(_vincent_iisharedcanvas_index EQUAL -1)
@@ -110,8 +110,8 @@ if(EXISTS "${_vincent_iisharedcanvas_prefix}/lib/cmake/iiSharedCanvas/iiSharedCa
 endif()
 unset(_vincent_iisharedcanvas_prefix)
 
-# 로컬 iiUpdateManager 설치 경로 힌트(.local) 우선 반영
-set(_vincent_iiupdatemanager_prefix "$ENV{HOME}/.local/iiUpdateManager")
+# 로컬 iiUpdateManager 설치 경로 힌트(.local/SDK) 우선 반영
+set(_vincent_iiupdatemanager_prefix "$ENV{HOME}/.local/SDK/iiUpdateManager")
 if(EXISTS "${_vincent_iiupdatemanager_prefix}/lib/cmake/iiUpdateManager/iiUpdateManagerConfig.cmake")
     list(FIND CMAKE_PREFIX_PATH "${_vincent_iiupdatemanager_prefix}" _vincent_iiupdatemanager_index)
     if(_vincent_iiupdatemanager_index EQUAL -1)
@@ -121,8 +121,8 @@ if(EXISTS "${_vincent_iiupdatemanager_prefix}/lib/cmake/iiUpdateManager/iiUpdate
 endif()
 unset(_vincent_iiupdatemanager_prefix)
 
-# 로컬 iiLicenseManager 설치 경로 힌트(.local) 우선 반영
-set(_vincent_iilicensemanager_prefix "$ENV{HOME}/.local/iiLicenseManager")
+# 로컬 iiLicenseManager 설치 경로 힌트(.local/SDK) 우선 반영
+set(_vincent_iilicensemanager_prefix "$ENV{HOME}/.local/SDK/iiLicenseManager")
 if(EXISTS "${_vincent_iilicensemanager_prefix}/lib/cmake/iiLicenseManager/iiLicenseManagerConfig.cmake")
     list(FIND CMAKE_PREFIX_PATH "${_vincent_iilicensemanager_prefix}" _vincent_iilicensemanager_index)
     if(_vincent_iilicensemanager_index EQUAL -1)
@@ -147,7 +147,7 @@ if(BUILD_TESTING)
 endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
-find_package(iiSharedCanvas 0.1 CONFIG REQUIRED)
+find_package(iiSharedCanvas 0.8.0 EXACT CONFIG REQUIRED)
 find_package(iiUpdateManager 0.2 CONFIG REQUIRED)
 find_package(iiLicenseManager 0.2 CONFIG REQUIRED)
 
@@ -220,26 +220,26 @@ set(_vincent_local_dependency_runtime_paths)
 set(_vincent_local_dependency_runtime_candidates)
 if(APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
-            "$ENV{HOME}/.local/LVRS/platforms/macos/lib"
-            "$ENV{HOME}/.local/iiPaintEngine/platforms/macos/lib"
-            "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib"
-            "$ENV{HOME}/.local/iiLicenseManager/lib")
+            "$ENV{HOME}/.local/SDK/LVRS/platforms/macos/lib"
+            "$ENV{HOME}/.local/SDK/iiPaintEngine/platforms/macos/lib"
+            "$ENV{HOME}/.local/SDK/iiSharedCanvas/lib"
+            "$ENV{HOME}/.local/SDK/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/SDK/iiLicenseManager/lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND _vincent_local_dependency_runtime_candidates
-            "$ENV{HOME}/.local/LVRS/platforms/linux/lib"
-            "$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib"
-            "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib"
-            "$ENV{HOME}/.local/iiLicenseManager/lib")
+            "$ENV{HOME}/.local/SDK/LVRS/platforms/linux/lib"
+            "$ENV{HOME}/.local/SDK/iiPaintEngine/platforms/linux/lib"
+            "$ENV{HOME}/.local/SDK/iiSharedCanvas/lib"
+            "$ENV{HOME}/.local/SDK/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/SDK/iiLicenseManager/lib")
 endif()
 if(UNIX AND NOT APPLE)
     list(APPEND _vincent_local_dependency_runtime_candidates
-            "$ENV{HOME}/.local/LVRS/lib"
-            "$ENV{HOME}/.local/iiPaintEngine/lib"
-            "$ENV{HOME}/.local/iiSharedCanvas/lib"
-            "$ENV{HOME}/.local/iiUpdateManager/lib"
-            "$ENV{HOME}/.local/iiLicenseManager/lib")
+            "$ENV{HOME}/.local/SDK/LVRS/lib"
+            "$ENV{HOME}/.local/SDK/iiPaintEngine/lib"
+            "$ENV{HOME}/.local/SDK/iiSharedCanvas/lib"
+            "$ENV{HOME}/.local/SDK/iiUpdateManager/lib"
+            "$ENV{HOME}/.local/SDK/iiLicenseManager/lib")
 endif()
 foreach(_vincent_runtime_path IN LISTS _vincent_local_dependency_runtime_candidates)
     if(IS_DIRECTORY "${_vincent_runtime_path}")

@@ -15,9 +15,17 @@ coordinates and requests any newly visible region from
 only painted chunks store pixels.
 
 The application discovers the installed `iiSharedCanvas` CMake package from
-`$HOME/.local/iiSharedCanvas`. The package is linked alongside the current
+`$HOME/.local/SDK/iiSharedCanvas`. The package is linked alongside the current
 installed iiPaintEngine; the removed legacy `CanvasAdapter` is no longer part of
 the Vincent source or build contract.
+
+The installed package version is `0.8.0` and CMake requires that exact version.
+Native layers are `BitmapLayer` or `VectorLayer` alternatives; application code
+reads common IDs and transforms through `iiSharedCanvas::layerProperties()`.
+Keyframed test documents store their layer references in `Document::frames` and
+use `KeyframedSource::frameIndices`. The existing transform and document reopen
+tests verify that editing and selected raster-layer restoration keep working
+with this typed layer contract.
 
 The integration test exercises these application-level gates:
 

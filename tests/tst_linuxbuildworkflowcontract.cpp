@@ -34,13 +34,13 @@ void tst_LinuxBuildWorkflowContract::cmakeBuildsDeployableLinuxArchive()
     QVERIFY(source.contains(QStringLiteral("if(CMAKE_HOST_SYSTEM_NAME STREQUAL \"Darwin\" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)")));
     QVERIFY(source.contains(QStringLiteral("elseif(CMAKE_SYSTEM_NAME STREQUAL \"Linux\")\n"
                                             "    list(APPEND _vincent_local_dependency_runtime_candidates")));
-    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/LVRS/platforms/linux/lib")));
-    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiPaintEngine/platforms/linux/lib")));
-    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiSharedCanvas/lib")));
-    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiUpdateManager/lib")));
-    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/iiLicenseManager/lib")));
-    QVERIFY(!source.contains(QStringLiteral("$ENV{HOME}/.local/LVRS/platforms/macos\"\n"
-                                             "        \"$ENV{HOME}/.local/LVRS")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/LVRS/platforms/linux/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/iiPaintEngine/platforms/linux/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/iiSharedCanvas/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/iiUpdateManager/lib")));
+    QVERIFY(source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/iiLicenseManager/lib")));
+    QVERIFY(!source.contains(QStringLiteral("$ENV{HOME}/.local/SDK/LVRS/platforms/macos\"\n"
+                                             "        \"$ENV{HOME}/.local/SDK/LVRS")));
 
     QVERIFY(source.contains(QStringLiteral("install(TARGETS Vincent RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)")));
     QVERIFY(source.contains(QStringLiteral("set_property(TARGET Vincent PROPERTY\n"

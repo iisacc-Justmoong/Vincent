@@ -2782,31 +2782,31 @@ $WindeployQt = Join-Path $QtPrefix "bin\windeployqt.exe"
 $LVRSPrefix = Resolve-DependencyPrefix `
     -Name "LVRS" `
     -ConfiguredPrefix $LVRSPrefix `
-    -DefaultPrefix (Join-Path $HOME ".local\LVRS") `
+    -DefaultPrefix (Join-Path $HOME ".local\SDK\LVRS") `
     -ConfigRelativePaths @("LVRSConfig.cmake", "lib\cmake\LVRS\LVRSConfig.cmake", "share\cmake\LVRS\LVRSConfig.cmake")
 
 $IiPaintEnginePrefix = Resolve-DependencyPrefix `
     -Name "iiPaintEngine" `
     -ConfiguredPrefix $IiPaintEnginePrefix `
-    -DefaultPrefix (Join-Path $HOME ".local\iiPaintEngine") `
+    -DefaultPrefix (Join-Path $HOME ".local\SDK\iiPaintEngine") `
     -ConfigRelativePaths @("lib\cmake\iiPaintEngine\iiPaintEngineConfig.cmake", "iiPaintEngineConfig.cmake")
 
 $IiSharedCanvasPrefix = Resolve-DependencyPrefix `
     -Name "iiSharedCanvas" `
     -ConfiguredPrefix $IiSharedCanvasPrefix `
-    -DefaultPrefix (Join-Path $HOME ".local\iiSharedCanvas") `
+    -DefaultPrefix (Join-Path $HOME ".local\SDK\iiSharedCanvas") `
     -ConfigRelativePaths @("lib\cmake\iiSharedCanvas\iiSharedCanvasConfig.cmake", "iiSharedCanvasConfig.cmake")
 
 $IiUpdateManagerPrefix = Resolve-DependencyPrefix `
     -Name "iiUpdateManager" `
     -ConfiguredPrefix $IiUpdateManagerPrefix `
-    -DefaultPrefix (Join-Path $HOME ".local\iiUpdateManager") `
+    -DefaultPrefix (Join-Path $HOME ".local\SDK\iiUpdateManager") `
     -ConfigRelativePaths @("lib\cmake\iiUpdateManager\iiUpdateManagerConfig.cmake", "iiUpdateManagerConfig.cmake")
 
 $IiLicenseManagerPrefix = Resolve-DependencyPrefix `
     -Name "iiLicenseManager" `
     -ConfiguredPrefix $IiLicenseManagerPrefix `
-    -DefaultPrefix (Join-Path $HOME ".local\iiLicenseManager") `
+    -DefaultPrefix (Join-Path $HOME ".local\SDK\iiLicenseManager") `
     -ConfigRelativePaths @("lib\cmake\iiLicenseManager\iiLicenseManagerConfig.cmake", "iiLicenseManagerConfig.cmake")
 
 Write-Host "Qt: $QtPrefix"

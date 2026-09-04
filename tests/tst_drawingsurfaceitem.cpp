@@ -3534,28 +3534,22 @@ void tst_DrawingSurfaceItem::rendersSharedRasterVectorTimelineDocument()
     };
     rectangle.fill = SolidPaint{0xffffcc00U};
     mixed.assets.emplace_back(VectorAsset{"vector", {4, 4}, {std::move(rectangle)}});
-    mixed.layers.push_back({"background-layer",
-                            "Background",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"background"}});
-    mixed.layers.push_back(
-        {"motion-layer",
-         "Motion",
-         true,
-         1.0,
-         {},
-         RasterBlendMode::SourceOver,
-         KeyframedSource{ContentKind::Raster, {{0, "motion-0"}, {1, "motion-1"}}}});
-    mixed.layers.push_back({"vector-layer",
-                            "Vector",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"vector"}});
+    mixed.layers.emplace_back(BitmapLayer{
+        {"background-layer", "Background", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"background"},
+    });
+    mixed.layers.emplace_back(BitmapLayer{
+        {"motion-layer", "Motion", true, 1.0, {}, RasterBlendMode::SourceOver},
+        KeyframedSource{{0, 1}},
+    });
+    mixed.frames = {
+        {0, {{"motion-layer", "motion-0"}}},
+        {1, {{"motion-layer", "motion-1"}}},
+    };
+    mixed.layers.emplace_back(VectorLayer{
+        {"vector-layer", "Vector", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"vector"},
+    });
 
     QVERIFY(item.document());
     *item.document() = std::move(mixed);
@@ -3595,20 +3589,14 @@ void tst_DrawingSurfaceItem::rasterToolsPreserveMixedSharedCanvasLayers()
     };
     rectangle.fill = SolidPaint{0xffff3366U};
     mixed.assets.emplace_back(VectorAsset{"vector", {32, 32}, {std::move(rectangle)}});
-    mixed.layers.push_back({"paint-layer",
-                            "Paint",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"paint"}});
-    mixed.layers.push_back({"vector-layer",
-                            "Vector",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"vector"}});
+    mixed.layers.emplace_back(BitmapLayer{
+        {"paint-layer", "Paint", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"paint"},
+    });
+    mixed.layers.emplace_back(VectorLayer{
+        {"vector-layer", "Vector", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"vector"},
+    });
 
     QVERIFY(item.document());
     *item.document() = std::move(mixed);
@@ -3649,8 +3637,10 @@ void tst_DrawingSurfaceItem::rasterToolsRespectSelectedLayerTransform()
     AffineTransform layerTransform;
     layerTransform.translationX = 10.0;
     layerTransform.translationY = 5.0;
-    transformed.layers.push_back({"paint-layer", "Paint", true, 1.0, layerTransform,
-                                  RasterBlendMode::SourceOver, StaticSource{"paint"}});
+    transformed.layers.emplace_back(BitmapLayer{
+        {"paint-layer", "Paint", true, 1.0, layerTransform, RasterBlendMode::SourceOver},
+        StaticSource{"paint"},
+    });
 
     QVERIFY(item.document());
     *item.document() = std::move(transformed);
@@ -3692,20 +3682,14 @@ void tst_DrawingSurfaceItem::openingRasterReplacesMixedSharedCanvasDocument()
     };
     rectangle.fill = SolidPaint{0xffff3366U};
     mixed.assets.emplace_back(VectorAsset{"vector", {16, 16}, {std::move(rectangle)}});
-    mixed.layers.push_back({"paint-layer",
-                            "Paint",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"paint"}});
-    mixed.layers.push_back({"vector-layer",
-                            "Vector",
-                            true,
-                            1.0,
-                            {},
-                            RasterBlendMode::SourceOver,
-                            StaticSource{"vector"}});
+    mixed.layers.emplace_back(BitmapLayer{
+        {"paint-layer", "Paint", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"paint"},
+    });
+    mixed.layers.emplace_back(VectorLayer{
+        {"vector-layer", "Vector", true, 1.0, {}, RasterBlendMode::SourceOver},
+        StaticSource{"vector"},
+    });
     QVERIFY(item.document());
     *item.document() = std::move(mixed);
     QVERIFY(item.refresh());
@@ -3768,6 +3752,13 @@ void tst_DrawingSurfaceItem::roundTripsNativeSharedCanvasDocument()
     opened.setHeight(1);
     opened.setDocumentViewModel(&viewModel);
     QVERIFY(opened.openRaster(nativePath));
+    QVERIFY(opened.document());
+    QVERIFY(!opened.document()->layers.empty());
+    const auto& openedLayer = opened.document()->layers.front();
+    QVERIFY(std::holds_alternative<iiSharedCanvas::BitmapLayer>(openedLayer));
+    QCOMPARE(opened.selectedLayerId(),
+             QString::fromStdString(iiSharedCanvas::layerProperties(openedLayer).id));
+    QVERIFY(opened.selectedRasterPixels());
     QCOMPARE(opened.width(), 32.0);
     QCOMPARE(opened.height(), 24.0);
 
@@ -3890,6 +3881,13 @@ void tst_DrawingSurfaceItem::roundTripsRecentCanvasContainerWithEditableObjects(
         opened.setDocumentViewModel(&viewModel);
         const QVariantMap restored = opened.openRecentCanvas(recentPath);
         QVERIFY(restored.value(QStringLiteral("valid")).toBool());
+        QVERIFY(opened.document());
+        QVERIFY(!opened.document()->layers.empty());
+        const auto& openedLayer = opened.document()->layers.front();
+        QVERIFY(std::holds_alternative<iiSharedCanvas::BitmapLayer>(openedLayer));
+        QCOMPARE(opened.selectedLayerId(),
+                 QString::fromStdString(iiSharedCanvas::layerProperties(openedLayer).id));
+        QVERIFY(opened.selectedRasterPixels());
         QVERIFY(!restored.value(QStringLiteral("backgroundLayerPresent")).toBool());
         QCOMPARE(opened.width(), 32.0);
         QCOMPARE(opened.height(), 24.0);

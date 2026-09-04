@@ -132,7 +132,7 @@ std::optional<QTransform> documentToSelectedRasterTransform(const iiSharedCanvas
         return std::nullopt;
     }
 
-    const AffineTransform& transform = layer->transform;
+    const AffineTransform& transform = iiSharedCanvas::layerProperties(*layer).transform;
     const QTransform rasterToDocument(transform.m11, transform.m12, transform.m21, transform.m22,
                                       transform.translationX, transform.translationY);
     bool invertible = false;
@@ -2277,8 +2277,9 @@ QVariantMap DrawingSurfaceItem::importCanvasSession(const QByteArray& bytes)
         const iiSharedCanvas::Asset* asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
         if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster)
         {
+            const std::string& layerId = iiSharedCanvas::layerProperties(layer).id;
             selectLayer(
-                QString::fromUtf8(layer.id.data(), static_cast<qsizetype>(layer.id.size())));
+                QString::fromUtf8(layerId.data(), static_cast<qsizetype>(layerId.size())));
             break;
         }
     }
@@ -3254,8 +3255,9 @@ bool DrawingSurfaceItem::openSharedCanvasDocument(const QString& fileUrl)
         const iiSharedCanvas::Asset* asset = iiSharedCanvas::resolveAssetAt(*target, layer, 0);
         if (asset && iiSharedCanvas::contentKind(*asset) == iiSharedCanvas::ContentKind::Raster)
         {
+            const std::string& layerId = iiSharedCanvas::layerProperties(layer).id;
             selectLayer(
-                QString::fromUtf8(layer.id.data(), static_cast<qsizetype>(layer.id.size())));
+                QString::fromUtf8(layerId.data(), static_cast<qsizetype>(layerId.size())));
             break;
         }
     }

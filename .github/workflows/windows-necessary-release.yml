@@ -84,7 +84,7 @@ jobs:
         shell: pwsh
         run: |
           $lvrsSource = Join-Path $env:RUNNER_WORKSPACE "LVRS"
-          $lvrsPrefix = Join-Path $env:USERPROFILE ".local\LVRS"
+          $lvrsPrefix = Join-Path $env:USERPROFILE ".local\SDK\LVRS"
           $env:LVRS_BOOTSTRAP_QT_PREFIX_WINDOWS = $env:QT_ROOT_DIR
           $env:LVRS_BOOTSTRAP_FRAMEWORK_PLATFORMS = "windows"
           $lvrsArguments = @(
@@ -107,7 +107,7 @@ jobs:
         shell: pwsh
         run: |
           $engineSource = Join-Path $env:RUNNER_WORKSPACE "iiPaintEngine"
-          $enginePrefix = Join-Path $env:USERPROFILE ".local\iiPaintEngine"
+          $enginePrefix = Join-Path $env:USERPROFILE ".local\SDK\iiPaintEngine"
           $env:IIPAINTENGINE_PREFIX = $enginePrefix
           $env:IIPAINTENGINE_INSTALL_PLATFORMS = "windows"
           $env:IIPAINTENGINE_WINDOWS_QT_PREFIX = $env:QT_ROOT_DIR

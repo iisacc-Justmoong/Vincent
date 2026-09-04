@@ -34,7 +34,35 @@ private slots:
     void windowsWorkflowsAuthenticatePinnedPrivateManagers();
     void signPathWorkflowDefinesFreeWebsiteReleaseContract();
     void buildGuideDocumentsWindowsScript();
+    void windowsSdkPathsUseRelocatedInstallRoot();
 };
+
+void tst_WindowsBuildWorkflowContract::windowsSdkPathsUseRelocatedInstallRoot()
+{
+    const QStringList paths = {
+        QFINDTESTDATA("../build-windows.ps1"),
+        QFINDTESTDATA("../docs/BUILD.md"),
+        QFINDTESTDATA("../.github/workflows/windows-signpath-release.yml"),
+        QFINDTESTDATA("../.github/workflows/windows-necessary-release.yml"),
+    };
+    const QStringList packages = {
+        QStringLiteral("LVRS"), QStringLiteral("iiPaintEngine"),
+        QStringLiteral("iiSharedCanvas"), QStringLiteral("iiUpdateManager"),
+        QStringLiteral("iiLicenseManager"),
+    };
+
+    for (const QString &path : paths) {
+        QVERIFY2(!path.isEmpty(), "Windows SDK path contract input was not found");
+        QString source = readTextFile(path);
+        QVERIFY(!source.isEmpty());
+        source.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        QVERIFY2(source.contains(QStringLiteral(".local/SDK/LVRS")), qPrintable(path));
+        for (const QString &package : packages) {
+            const QString legacyPrefix = QStringLiteral(".local/") + package;
+            QVERIFY2(!source.contains(legacyPrefix), qPrintable(path + ": " + legacyPrefix));
+        }
+    }
+}
 
 void tst_WindowsBuildWorkflowContract::correspondingSourceToolDefinesImmutableReleaseContract()
 {
@@ -601,7 +629,7 @@ void tst_WindowsBuildWorkflowContract::appEntryPointAvoidsNonExportedLvrsRuntime
     QVERIFY(source.contains(QStringLiteral("QCoreApplication::applicationDirPath() + QStringLiteral(\"/qml\")")));
     QVERIFY(source.contains(QStringLiteral("const bool hasBundledLvrs")));
     QVERIFY(source.contains(QStringLiteral("if (!hasBundledLvrs && !lvrsHostPrefix.isEmpty())")));
-    QVERIFY(!source.contains(QStringLiteral(".local/LVRS/platforms")));
+    QVERIFY(!source.contains(QStringLiteral(".local/SDK/LVRS/platforms")));
     QVERIFY(source.contains(QStringLiteral("engine.loadFromModule(QStringLiteral(\"Vincent\"), QStringLiteral(\"Main\"))")));
     QVERIFY(source.contains(QStringLiteral("engine.singletonInstance<QObject *>(QStringLiteral(\"LVRS\"),")));
     QVERIFY(source.contains(QStringLiteral("QMetaObject::invokeMethod(registry,")));
@@ -795,7 +823,7 @@ void tst_WindowsBuildWorkflowContract::signPathWorkflowDefinesFreeWebsiteRelease
     QVERIFY2(!contributingPath.isEmpty(), "CONTRIBUTING.md test data was not found");
     const QString contributing = readTextFile(contributingPath);
     QVERIFY(contributing.contains(QStringLiteral("repository-local `build/` directory")));
-    QVERIFY(contributing.contains(QStringLiteral("QML changes must use the `.local/LVRS/` framework")));
+    QVERIFY(contributing.contains(QStringLiteral("QML changes must use the `.local/SDK/LVRS/` framework")));
     QVERIFY(contributing.contains(QStringLiteral("self-signed SignPath trial outputs are development-only artifacts")));
     QVERIFY(contributing.contains(QStringLiteral("outer MSI and nested `Vincent.exe`")));
 

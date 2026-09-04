@@ -253,9 +253,9 @@ CMAKE_PRESET=""               # 사용 시 preset의 binaryDir가 BUILD_DIR와 �
 CMAKE_GENERATOR="Ninja"       # Qt Quick + CMake + Ninja 전제
 declare -a CMAKE_EXTRA_ARGS
 CMAKE_EXTRA_ARGS=()
-IIUPDATEMANAGER_PREFIX="${IIUPDATEMANAGER_PREFIX:-${HOME}/.local/iiUpdateManager}"
+IIUPDATEMANAGER_PREFIX="${IIUPDATEMANAGER_PREFIX:-${HOME}/.local/SDK/iiUpdateManager}"
 CMAKE_EXTRA_ARGS+=("-DiiUpdateManager_DIR=${IIUPDATEMANAGER_PREFIX}/lib/cmake/iiUpdateManager")
-IILICENSEMANAGER_PREFIX="${IILICENSEMANAGER_PREFIX:-${HOME}/.local/iiLicenseManager}"
+IILICENSEMANAGER_PREFIX="${IILICENSEMANAGER_PREFIX:-${HOME}/.local/SDK/iiLicenseManager}"
 CMAKE_EXTRA_ARGS+=("-DiiLicenseManager_DIR=${IILICENSEMANAGER_PREFIX}/lib/cmake/iiLicenseManager")
 # 빌드 병렬도(빈 값이면 cmake 기본 동작)
 CMAKE_BUILD_PARALLEL=""       # 예: "12"

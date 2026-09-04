@@ -12,10 +12,10 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 - A macOS App Store provisioning profile that matches your bundle identifier.
 - Xcode command-line tools (`xcode-select --install`) and Transporter from the Mac App Store.
 - Qt toolchain (Core, Network, Qml, Quick, QuickControls2, Svg) available in your `PATH` so that `macdeployqt` is callable, plus Git for the pinned QtKeychain FetchContent checkout.
-- iiPaintEngine installed under `$HOME/.local/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
-- iiSharedCanvas 0.1 installed under `$HOME/.local/iiSharedCanvas` or selected with `IISHAREDCANVAS_PREFIX`, exporting `iiSharedCanvas::iiSharedCanvas`.
-- iiUpdateManager 0.2 installed under `$HOME/.local/iiUpdateManager` or selected with `IIUPDATEMANAGER_PREFIX`, exporting `iiUpdateManager::iiUpdateManager`.
-- iiLicenseManager 0.2 installed under `$HOME/.local/iiLicenseManager` or selected with `IILICENSEMANAGER_PREFIX`, exporting `iiLicenseManager::iiLicenseManager` and its installed libsodium third-party notice.
+- iiPaintEngine installed under `$HOME/.local/SDK/iiPaintEngine` or available through `CMAKE_PREFIX_PATH` as `iiPaintEngine::iiPaintEngine`.
+- iiSharedCanvas 0.8.0 (exact package version) installed under `$HOME/.local/SDK/iiSharedCanvas` or selected with `IISHAREDCANVAS_PREFIX`, exporting `iiSharedCanvas::iiSharedCanvas`.
+- iiUpdateManager 0.2 installed under `$HOME/.local/SDK/iiUpdateManager` or selected with `IIUPDATEMANAGER_PREFIX`, exporting `iiUpdateManager::iiUpdateManager`.
+- iiLicenseManager 0.2 installed under `$HOME/.local/SDK/iiLicenseManager` or selected with `IILICENSEMANAGER_PREFIX`, exporting `iiLicenseManager::iiLicenseManager` and its installed libsodium third-party notice.
 
 ## 1a. Automated macOS Build Script
 `./build.sh` defaults to the Developer ID distribution flow. It validates the Developer ID application and installer identities plus notarization credentials before configuring, builds in `build/`, runs `ctest --test-dir build --output-on-failure`, deploys the Qt runtime, signs the complete app tree with hardened runtime and a trusted timestamp, creates `dist/Vincent.pkg`, submits that package to Apple's notary service, staples the accepted ticket, and verifies the final package with `pkgutil`, `stapler`, and Gatekeeper. The canonical `dist/Vincent.pkg` path is published only by this signed and notarized flow.
@@ -30,7 +30,7 @@ After `macdeployqt`, the script removes absolute build-machine `LC_RPATH` entrie
 
 Each signed app stage also receives `IISACCDistributionChannel` in `Info.plist` before code signing: `direct` for local/Developer ID stages and `appstore` for the Mac App Store stage. Vincent treats the `appstore` marker or a non-empty App Store receipt as store-managed and suppresses the external updater. Windows Store/MSIX packaged context is detected at runtime through `GetCurrentPackageFullName` and is equally store-managed; direct ZIP/MSI builds remain eligible for the explicit manual updater.
 
-The macOS build RPATH contains only the platform-specific LVRS and iiPaintEngine runtime directories. Generic Unix `$HOME/.local/<dependency>/lib` fallback directories are limited to non-Apple Unix builds because adding both layouts on macOS leaves an unused absolute RPATH behind after `macdeployqt` rewrites the paths that actually resolved linked libraries.
+The macOS build RPATH contains only the platform-specific LVRS and iiPaintEngine runtime directories. Generic Unix `$HOME/.local/SDK/<dependency>/lib` fallback directories are limited to non-Apple Unix builds because adding both layouts on macOS leaves an unused absolute RPATH behind after `macdeployqt` rewrites the paths that actually resolved linked libraries.
 
 The portability audit accepts only the indented dependency rows from `otool -L`, so repeated filename headers for universal Mach-O architectures are not mistaken for dependencies. It also distinguishes a dylib's own `LC_ID_DYLIB` value from its dependency list, so an absolute self-identifier is not reported as an external dependency. Vincent does not link Qt SQL; `macdeployqt` may nevertheless copy the complete Qt SQL driver set while traversing QML imports, so the script removes `Contents/PlugIns/sqldrivers` before auditing and signing. This also prevents unused ODBC, PostgreSQL, or Mimer plugins from retaining machine-specific client-library paths.
 
@@ -73,15 +73,15 @@ xcrun notarytool store-credentials notary-main \
 Because `--password` is omitted, `notarytool` requests it through a secure prompt and validates the credentials before storing them in Keychain. Every Developer ID run also validates notarization credentials before configuring CMake, preventing a long signed build from ending at a missing or invalid profile.
 
 ## 1b. Windows Build, Package, and Current-User Install Script
-Run the Windows build from Windows PowerShell 5.1 or newer. The script expects Windows-built Qt, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager prefixes; macOS `.local` binaries cannot be reused on Windows. Set the prefix variables once per shell session:
+Run the Windows build from Windows PowerShell 5.1 or newer. The script expects Windows-built Qt, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager prefixes; macOS `.local` binaries cannot be reused on Windows. The default SDK installation root is `$HOME\.local\SDK`, matching the CMake hints, PowerShell build defaults, and Windows CI workflows. Explicit per-SDK prefix variables remain supported. Set them once per shell session:
 
 ```powershell
 $env:QT_PREFIX = "C:\Qt\6.8.3\mingw_64"
-$env:LVRS_PREFIX = "$HOME\.local\LVRS"
-$env:IIPAINTENGINE_PREFIX = "$HOME\.local\iiPaintEngine"
-$env:IISHAREDCANVAS_PREFIX = "$HOME\.local\iiSharedCanvas"
-$env:IIUPDATEMANAGER_PREFIX = "$HOME\.local\iiUpdateManager"
-$env:IILICENSEMANAGER_PREFIX = "$HOME\.local\iiLicenseManager"
+$env:LVRS_PREFIX = "$HOME\.local\SDK\LVRS"
+$env:IIPAINTENGINE_PREFIX = "$HOME\.local\SDK\iiPaintEngine"
+$env:IISHAREDCANVAS_PREFIX = "$HOME\.local\SDK\iiSharedCanvas"
+$env:IIUPDATEMANAGER_PREFIX = "$HOME\.local\SDK\iiUpdateManager"
+$env:IILICENSEMANAGER_PREFIX = "$HOME\.local\SDK\iiLicenseManager"
 ```
 
 The supported MinGW setup uses Qt's bundled CMake, Ninja, and MinGW tools on `PATH`. The vendored `psd_sdk` build treats `Psdminiz.c` as C++ because that upstream C file includes headers with C++ `static_assert` declarations; the narrow `-Wno-pragmas` exception applies only to that upstream target because the file is also included by other SDK translation units. Windows MinGW builds retain Release optimization, function/data sections, linker garbage collection, and release symbol stripping but disable IPO for Vincent and the PSD SDK: MinGW 13 does not propagate its LTO plugin consistently through Ninja's archive and generated-QML steps, which otherwise produces plugin diagnostics, serial LTRANS fallback, and unreliable links. Other toolchains continue to use the LVRS IPO policy. The current iiPaintEngine Qt adapter exposes the brush opacity toggle as `brushOpacityEnabled`, so QML and bridge code should not use the older `pressureToOpacityEnabled` property name.
@@ -490,7 +490,7 @@ If Dock or Launchpad still shows the old icon after the installed bundle is corr
 - Leverage `plutil -p` to inspect `Info.plist` after `macdeployqt` runs.
 - If Transporter rejects the upload due to missing `LC_VERSION_MIN_MACOSX`, make sure `CMAKE_OSX_DEPLOYMENT_TARGET` is set at configure time.
 - Should you require notarization for outside-the-store distribution, rerun codesigning with the same entitlements and submit via `xcrun notarytool`; App Store submissions do not need separate notarization.
-- If CLion reports `loading 'build.ninja': No such file or directory`, rerun CMake configure for the selected profile before building. The project also injects local build-tree rpaths for `$HOME/.local/LVRS` and `$HOME/.local/iiPaintEngine` so CLion and CTest can run without extra `DYLD_LIBRARY_PATH` setup.
+- If CLion reports `loading 'build.ninja': No such file or directory`, rerun CMake configure for the selected profile before building. The project also injects local build-tree rpaths for `$HOME/.local/SDK/LVRS` and `$HOME/.local/SDK/iiPaintEngine` so CLion and CTest can run without extra `DYLD_LIBRARY_PATH` setup.
 
 ## Linux Build and Packaging
 ```bash
