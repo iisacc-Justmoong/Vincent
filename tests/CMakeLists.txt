@@ -226,6 +226,7 @@ target_include_directories(tests_vincentupdatemanager PRIVATE
 )
 
 target_link_libraries(tests_vincentupdatemanager PRIVATE
+        iiAcountManager::iiAcountManager
         Qt6::Core
         Qt6::Network
         Qt6::Test

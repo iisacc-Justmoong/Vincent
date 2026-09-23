@@ -104,6 +104,12 @@ QByteArray httpResponse(int statusCode,
                         const QByteArray &contentType = QByteArrayLiteral("application/json"),
                         const QByteArray &extraHeaders = {})
 {
+    QByteArray wireBody = body;
+    const auto value = QJsonDocument::fromJson(body);
+    if (statusCode == 200 && value.isObject() && !value.object().contains("data") && !value.object().contains("errors")) {
+        const auto field = value.object().contains("activated") ? "activateLicense" : "validateLicense";
+        wireBody = QJsonDocument(QJsonObject{{"data", QJsonObject{{field, value.object()}}}}).toJson(QJsonDocument::Compact);
+    }
     const QByteArray reason = statusCode == 200
         ? QByteArrayLiteral("OK")
         : statusCode == 302
@@ -118,9 +124,9 @@ QByteArray httpResponse(int statusCode,
         + QByteArrayLiteral("\r\nCache-Control: no-store\r\nConnection: close\r\n")
         + extraHeaders
         + QByteArrayLiteral("Content-Length: ")
-        + QByteArray::number(body.size())
+        + QByteArray::number(wireBody.size())
         + QByteArrayLiteral("\r\n\r\n")
-        + body;
+        + wireBody;
     return response;
 }
 
@@ -148,7 +154,7 @@ public:
 
     [[nodiscard]] QUrl endpoint() const
     {
-        return QUrl(QStringLiteral("http://127.0.0.1:%1/api/account/license/validate")
+        return QUrl(QStringLiteral("http://127.0.0.1:%1/graphql")
                         .arg(serverPort()));
     }
 
@@ -552,7 +558,7 @@ void tst_LicenseManager::authoritativeInvalidStoredLicenseIsDeleted()
 {
     SingleResponseServer server(httpResponse(
         200,
-        QByteArrayLiteral(R"({"code":"INVALID_LICENSE","valid":false})")));
+        QByteArrayLiteral(R"({"code":"INVALID_LICENSE","valid":false,"productId":null})")));
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
     FakeCredentialStore store;
     store.readStatus = LicenseCredentialStore::ReadStatus::Found;
@@ -676,7 +682,7 @@ void tst_LicenseManager::successfulValidationPostsPrivateFixedContractAndUnlocks
     QVERIFY(headerEnd > 0);
     const QByteArray headers = request.left(headerEnd).toLower();
     const QByteArray requestBody = request.mid(headerEnd + 4);
-    QVERIFY(headers.startsWith(QByteArrayLiteral("post /api/account/license/validate http/1.1")));
+    QVERIFY(headers.startsWith(QByteArrayLiteral("post /graphql http/1.1")));
     QVERIFY(!headers.contains(validLicenseKey.toUtf8()));
     QVERIFY(headers.contains(QByteArrayLiteral("content-type: application/json")));
     QVERIFY(headers.contains(QByteArrayLiteral("accept: application/json")));
@@ -684,7 +690,8 @@ void tst_LicenseManager::successfulValidationPostsPrivateFixedContractAndUnlocks
 
     const QJsonDocument requestDocument = QJsonDocument::fromJson(requestBody);
     QVERIFY(requestDocument.isObject());
-    const QJsonObject requestObject = requestDocument.object();
+    QVERIFY(requestDocument.object().value("query").toString().contains("validateLicense(input: $input)"));
+    const QJsonObject requestObject = requestDocument.object().value("variables").toObject().value("input").toObject();
     QCOMPARE(requestObject.value(QStringLiteral("email")).toString(),
              QStringLiteral("verified@example.com"));
     QCOMPARE(requestObject.value(QStringLiteral("licenseKey")).toString(), validLicenseKey);
@@ -696,7 +703,7 @@ void tst_LicenseManager::invalidLicenseDecisionRemainsLocked()
 {
     SingleResponseServer server(httpResponse(
         200,
-        QByteArrayLiteral(R"({"code":"INVALID_LICENSE","valid":false})")));
+        QByteArrayLiteral(R"({"code":"INVALID_LICENSE","valid":false,"productId":null})")));
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
 
     FakeCredentialStore store;
@@ -717,6 +724,10 @@ void tst_LicenseManager::rejectsNonAuthoritativeResponses_data()
 {
     QTest::addColumn<QByteArray>("response");
 
+    QTest::newRow("graphql-partial-data")
+        << httpResponse(200, QByteArrayLiteral(R"({"data":{"validateLicense":{"valid":true,"productId":"vincent"}},"errors":[{"message":"Failed","extensions":{"status":503}}]})"));
+    QTest::newRow("graphql-null-result")
+        << httpResponse(200, QByteArrayLiteral(R"({"data":{"validateLicense":null}})"));
     QTest::newRow("server-error")
         << httpResponse(503, QByteArrayLiteral(R"({"valid":true,"productId":"vincent"})"));
     QTest::newRow("redirect")
