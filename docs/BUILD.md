@@ -20,7 +20,7 @@ This document captures the end-to-end steps needed to turn the `Vincent` build t
 ## 1a. Automated macOS Build Script
 `./build.sh` defaults to the Developer ID distribution flow. It validates the Developer ID application and installer identities plus notarization credentials before configuring, builds in `build/`, runs `ctest --test-dir build --output-on-failure`, deploys the Qt runtime, signs the complete app tree with hardened runtime and a trusted timestamp, creates `dist/Vincent.pkg`, submits that package to Apple's notary service, staples the accepted ticket, and verifies the final package with `pkgutil`, `stapler`, and Gatekeeper. The canonical `dist/Vincent.pkg` path is published only by this signed and notarized flow.
 
-Use `./build.sh local` for local development validation. Local mode signs `dist/Vincent.app` with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature, then creates the explicitly non-distributable `dist/Vincent-local-unsigned.pkg` and `dist/Vincent-appstore-local-unsigned.pkg`. It never overwrites `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg`. The component-built local and App Store package gates require the requested identifier and version on the Distribution `product`; only the legacy Developer ID `pkgbuild --package` flow validates that identity on its component `pkg-ref`, so an unrelated component cannot stand in for the current product identity.
+Use `./build.sh local` for local development validation. Local mode signs `build/Vincent.app` with `LOCAL_APP_CERT`, the first valid `Apple Development` identity, or an ad-hoc signature, then creates the explicitly non-distributable `dist/Vincent-local-unsigned.pkg` and `dist/Vincent-appstore-local-unsigned.pkg`. It never overwrites `dist/Vincent.pkg` or `dist/Vincent-appstore.pkg`. The component-built local and App Store package gates require the requested identifier and version on the Distribution `product`; only the legacy Developer ID `pkgbuild --package` flow validates that identity on its component `pkg-ref`, so an unrelated component cannot stand in for the current product identity.
 
 The macOS workflow is incremental and preserves `build/`, including the disconnected `psd_sdk` and QtKeychain FetchContent checkouts. Use `./build.sh --clean` for a clean Developer ID distribution build, or `./build.sh --clean local` for clean local validation, only after changing toolchains or when recovering a stale cache. Local packages keep symbols with `macdeployqt -no-strip`; Developer ID, Mac App Store, and combined distribution modes omit `-no-strip` so release bundles are stripped by the deployment tool. `MACDEPLOYQT_NO_STRIP=0|1` remains an explicit override.
 
@@ -410,20 +410,20 @@ cmake --build build --target Vincent
 If you need a different bundle identifier, update `BUNDLE_ID` in `CMakeLists.txt` before configuring. Adjust the deployment target if you need to support newer or older macOS releases.
 
 ## 3. Stage the App Bundle
-The built app lives under `build/Vincent.app`. Copy it to a staging directory (for example, `dist/Vincent.app`) so you can safely run deployment tools without touching your build tree.
+The built app lives under `build/Vincent.app`. Copy it to a staging directory (for example, `build/Vincent.app`) so you can safely run deployment tools without touching your build tree.
 
 ## 4. Embed Qt Frameworks
 Run `macdeployqt` in App Store mode to embed the required Qt frameworks and QML plugins:
 ```bash
-macdeployqt "dist/Vincent.app" \
+macdeployqt "build/Vincent.app" \
   -appstore-compliant \
   -qmldir=src/App/qml \
   -always-overwrite
 ```
-Verify that all `.framework` bundles now sit inside `dist/Vincent.app/Contents/Frameworks` and that `qt.conf` exists in `Contents/Resources/`.
+Verify that all `.framework` bundles now sit inside `build/Vincent.app/Contents/Frameworks` and that `qt.conf` exists in `Contents/Resources/`.
 
 ## 5. Prepare Metadata
-Update the generated `Info.plist` (inside `dist/Vincent.app/Contents/`) with:
+Update the generated `Info.plist` (inside `build/Vincent.app/Contents/`) with:
 - `CFBundleIdentifier` matching your bundle ID.
 - `CFBundleShortVersionString` set to marketing version `6.0` and `CFBundleVersion` set to the higher App Store build number `60000`.
 - `CFBundleIconFile` should resolve to the bundled `resources/Appicon.icns` file. Windows builds embed `resources/Appicon.ico` through the generated resource script.
@@ -437,19 +437,19 @@ Update the generated `Info.plist` (inside `dist/Vincent.app/Contents/`) with:
 codesign --force --options runtime \
   --entitlements packaging/macos/Vincent.entitlements \
   --sign "Apple Distribution: MUYEONG YUN (5U49ST9XZH)" \
-  "dist/Vincent.app"
+  "build/Vincent.app"
 ```
 Then validate the signature:
 ```bash
-codesign --verify --deep --strict "dist/Vincent.app"
-spctl --assess --type execute "dist/Vincent.app"
+codesign --verify --deep --strict "build/Vincent.app"
+spctl --assess --type execute "build/Vincent.app"
 ```
 If `spctl` warns about missing the hardened runtime, make sure `--options runtime` was passed.
 
 ## 8. Create the Installer Package
 ```bash
 productbuild \
-  --component "dist/Vincent.app" /Applications \
+  --component "build/Vincent.app" /Applications \
   --sign "Apple Installer: MUYEONG YUN (5U49ST9XZH)" \
   "dist/Vincent.pkg"
 ```
@@ -472,7 +472,7 @@ cmp resources/Appicon.icns /tmp/vincent-appstore-payload/com.iisacc.vincent.pain
 
 If the `cmp` command succeeds, the upload package contains the current app icon. Update or refresh the App Store Connect app record icon separately if Transporter continues to show the old store listing icon before delivery.
 
-If Dock or Launchpad still shows the old icon after the installed bundle is correct, remove stale `/Applications/Vincent.app` Dock entries and let LaunchServices re-register the rebuilt app. A pinned Dock item can continue pointing at an old or removed bundle path even after the workspace `dist/Vincent.app` has the new icon.
+If Dock or Launchpad still shows the old icon after the installed bundle is correct, remove stale `/Applications/Vincent.app` Dock entries and let LaunchServices re-register the rebuilt app. A pinned Dock item can continue pointing at an old or removed bundle path even after the workspace `build/Vincent.app` has the new icon.
 
 ## 9. Upload to App Store Connect
 1. Open Transporter.
@@ -486,7 +486,7 @@ If Dock or Launchpad still shows the old icon after the installed bundle is corr
 - Submit for review.
 
 ## Troubleshooting Tips
-- Use `otool -L dist/Vincent.app/Contents/MacOS/Vincent` to ensure no absolute paths to your build tree remain.
+- Use `otool -L build/Vincent.app/Contents/MacOS/Vincent` to ensure no absolute paths to your build tree remain.
 - Leverage `plutil -p` to inspect `Info.plist` after `macdeployqt` runs.
 - If Transporter rejects the upload due to missing `LC_VERSION_MIN_MACOSX`, make sure `CMAKE_OSX_DEPLOYMENT_TARGET` is set at configure time.
 - Should you require notarization for outside-the-store distribution, rerun codesigning with the same entitlements and submit via `xcrun notarytool`; App Store submissions do not need separate notarization.

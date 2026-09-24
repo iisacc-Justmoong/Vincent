@@ -127,7 +127,7 @@ void tst_MacOSBuildWorkflowContract::cmakeAvoidsRedundantMacOSRuntimeRpaths()
     QVERIFY(source.contains(QStringLiteral(
         "MACOSX_PACKAGE_LOCATION \"Resources/legal/iiLicenseManager\"")));
     QVERIFY(source.contains(QStringLiteral("VINCENT_IILICENSEMANAGER_THIRD_PARTY_NOTICES")));
-    QVERIFY(source.contains(QStringLiteral("find_package(iiSharedCanvas 0.10.1 EXACT CONFIG REQUIRED)")));
+    QVERIFY(source.contains(QStringLiteral("find_package(iiSharedCanvas 0.11.0 EXACT CONFIG REQUIRED)")));
     QVERIFY(source.contains(QStringLiteral("iiSharedCanvas::iiSharedCanvas")));
 }
 
@@ -403,6 +403,7 @@ exit 0
 APP
 chmod +x "$build_dir/Vincent.app/Contents/MacOS/Vincent"
 printf 'fake icon\n' > "$build_dir/Vincent.app/Contents/Resources/Appicon.icns"
+printf 'stale appstore profile\n' > "$build_dir/Vincent.app/Contents/embedded.provisionprofile"
 cat > "$build_dir/Vincent.app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -514,13 +515,15 @@ esac
     QVERIFY2(process.exitCode() == 0, qPrintable(output));
     QVERIFY2(!output.contains(QStringLiteral("unbound variable")), qPrintable(output));
     QVERIFY2(output.contains(QStringLiteral("done")), qPrintable(output));
-    QVERIFY2(!QDir(temp.filePath(QStringLiteral("dist/Vincent.app/Contents/PlugIns/sqldrivers"))).exists(),
+    QVERIFY2(!QDir(temp.filePath(QStringLiteral("build/Vincent.app/Contents/PlugIns/sqldrivers"))).exists(),
              qPrintable(output));
     QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-local-unsigned.pkg"))), qPrintable(output));
     QVERIFY2(QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore-local-unsigned.pkg"))), qPrintable(output));
     QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent.pkg"))), qPrintable(output));
     QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("dist/Vincent-appstore.pkg"))), qPrintable(output));
-    QFile stagedInfoPlist(temp.filePath(QStringLiteral("dist/Vincent.app/Contents/Info.plist")));
+    QVERIFY2(!QDir(temp.filePath(QStringLiteral("dist/Vincent.app"))).exists(), qPrintable(output));
+    QVERIFY2(!QFile::exists(temp.filePath(QStringLiteral("build/Vincent.app/Contents/embedded.provisionprofile"))), qPrintable(output));
+    QFile stagedInfoPlist(temp.filePath(QStringLiteral("build/Vincent.app/Contents/Info.plist")));
     QVERIFY(stagedInfoPlist.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString stagedInfoSource = QString::fromUtf8(stagedInfoPlist.readAll());
     QVERIFY(stagedInfoSource.contains(QStringLiteral("IISACCDistributionChannel")));

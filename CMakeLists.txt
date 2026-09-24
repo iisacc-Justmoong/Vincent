@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/single-app/Defaults.cmake")
 
 set(_vincent_required_build_dir "${CMAKE_SOURCE_DIR}/build")
 set(_vincent_actual_build_dir "${CMAKE_BINARY_DIR}")
@@ -147,7 +148,7 @@ if(BUILD_TESTING)
 endif()
 find_package(LVRS CONFIG REQUIRED)
 find_package(iiPaintEngine CONFIG REQUIRED)
-find_package(iiSharedCanvas 0.10.1 EXACT CONFIG REQUIRED)
+find_package(iiSharedCanvas 0.11.0 EXACT CONFIG REQUIRED)
 find_package(iiUpdateManager 0.2 CONFIG REQUIRED)
 find_package(iiAcountManager 0.2.8 CONFIG REQUIRED)
 find_package(iiLicenseManager 0.2 CONFIG REQUIRED)
@@ -597,10 +598,26 @@ if(APPLE)
     endif()
 endif()
 
-include(CPack)
+if(APPLE)
+    file(REMOVE "${CMAKE_BINARY_DIR}/CPackConfig.cmake" "${CMAKE_BINARY_DIR}/CPackSourceConfig.cmake")
+    add_custom_target(VincentPackage
+        COMMAND pkgbuild --component "$<TARGET_BUNDLE_DIR:Vincent>"
+            --install-location /Applications --identifier "${BUNDLE_ID}"
+            --version "${PROJECT_VERSION}" "${CMAKE_BINARY_DIR}/Vincent-${PROJECT_VERSION}.pkg"
+        DEPENDS Vincent VERBATIM)
+else()
+    include(CPack)
+endif()
 
 # Qt의 수동 마무리 훅
 qt_finalize_executable(Vincent)
 
 # 패키징·서명과 무관한 기본 요약
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
+
+# Apply after Qt/LVRS finalizers, which may enable bundles for test targets.
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/single-app/SingleApp.cmake")
+product_plain_executables("${CMAKE_SOURCE_DIR}" Vincent)
+cmake_language(DEFER CALL product_single_app Vincent "")
+
+product_deploy_app(Vincent "src/App/qml")
