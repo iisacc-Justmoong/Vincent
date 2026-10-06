@@ -2,6 +2,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QScopeGuard>
 #include <QSet>
 #include <QSize>
@@ -204,6 +205,9 @@ void tst_WindowsBinaryContract::versionResourceMatchesProjectVersion()
 void tst_WindowsBinaryContract::launchWindowSizeStaysConstant()
 {
     QProcess process;
+    auto environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("windows"));
+    process.setProcessEnvironment(environment);
     process.setProgram(executablePath());
     process.start();
     QVERIFY2(process.waitForStarted(5000), qPrintable(process.errorString()));
