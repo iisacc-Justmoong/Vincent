@@ -19,6 +19,9 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 project(Vincent VERSION 6.0 LANGUAGES C CXX)
+find_package(iiFileProvider 0.6 CONFIG REQUIRED HINTS "$ENV{IIFILEPROVIDER_PREFIX}" "$ENV{HOME}/.local/SDK/iiFileProvider")
+link_libraries(iiFileProvider::iiFileProvider)
+
 
 set(BUNDLE_ID "com.iisacc.vincent.painter")
 set(VINCENT_QML_MODULE_MAJOR "${PROJECT_VERSION_MAJOR}")
