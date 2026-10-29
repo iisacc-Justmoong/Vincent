@@ -1,0 +1,1368 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:a7b8e2f9b583e9225f6e9fc85b886ce6a67817b6f68b89149e3172e013315189",
+  "project": {
+    "id": "urn:iisacc:project:Product%2F.Deprecated%2FVincent",
+    "name": "Vincent",
+    "root": "Product/.Deprecated/Vincent",
+    "kind": "application"
+  },
+  "source": {
+    "path": "design-qa.md",
+    "sha256": "845c13e8bd51460a1d7fb4e29a41eb0aee6c94e4fdbe90d93560f17aa7d1a3d3",
+    "bytes": 8022,
+    "line_count": 179,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Document moved",
+    "role": "compatibility",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Document moved\n",
+      "level": 1,
+      "title": "Document moved"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "html",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "<!-- workspace-docs:redirect -->\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "The maintained document is [design-qa.md](docs/design-qa.md).\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "html",
+      "start_line": 7,
+      "end_line": 8,
+      "raw": "<a id=\"디자인-qa-2px-흰색-색상-선택기-테두리\"></a>\n[Continue to this section](docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-2px-%ED%9D%B0%EC%83%89-%EC%83%89%EC%83%81-%EC%84%A0%ED%83%9D%EA%B8%B0-%ED%85%8C%EB%91%90%EB%A6%AC).\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "html",
+      "start_line": 10,
+      "end_line": 11,
+      "raw": "<a id=\"비교대상\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81).\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "html",
+      "start_line": 13,
+      "end_line": 14,
+      "raw": "<a id=\"증거-및-정규화\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94).\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "html",
+      "start_line": 16,
+      "end_line": 17,
+      "raw": "<a id=\"조사-결과\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC).\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "html",
+      "start_line": 19,
+      "end_line": 20,
+      "raw": "<a id=\"필수-충실도-표면\"></a>\n[Continue to this section](docs/design-qa.md#%ED%95%84%EC%88%98-%EC%B6%A9%EC%8B%A4%EB%8F%84-%ED%91%9C%EB%A9%B4).\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "html",
+      "start_line": 22,
+      "end_line": 23,
+      "raw": "<a id=\"상호-작용-및-접근성\"></a>\n[Continue to this section](docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1).\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "html",
+      "start_line": 25,
+      "end_line": 26,
+      "raw": "<a id=\"비교-이력\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5).\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "html",
+      "start_line": 28,
+      "end_line": 29,
+      "raw": "<a id=\"구현-체크리스트\"></a>\n[Continue to this section](docs/design-qa.md#%EA%B5%AC%ED%98%84-%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8).\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "html",
+      "start_line": 31,
+      "end_line": 32,
+      "raw": "<a id=\"툴바-수평-패딩-후속-조치\"></a>\n[Continue to this section](docs/design-qa.md#%ED%88%B4%EB%B0%94-%EC%88%98%ED%8F%89-%ED%8C%A8%EB%94%A9-%ED%9B%84%EC%86%8D-%EC%A1%B0%EC%B9%98).\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "html",
+      "start_line": 34,
+      "end_line": 35,
+      "raw": "<a id=\"디자인-qa-프로필-아바타-아이콘-센터링\"></a>\n[Continue to this section](docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A1%9C%ED%95%84-%EC%95%84%EB%B0%94%ED%83%80-%EC%95%84%EC%9D%B4%EC%BD%98-%EC%84%BC%ED%84%B0%EB%A7%81).\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "html",
+      "start_line": 37,
+      "end_line": 38,
+      "raw": "<a id=\"비교대상-1\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81-1).\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "html",
+      "start_line": 40,
+      "end_line": 41,
+      "raw": "<a id=\"증거-및-정규화-1\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94-1).\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "html",
+      "start_line": 43,
+      "end_line": 44,
+      "raw": "<a id=\"조사-결과-1\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-1).\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "html",
+      "start_line": 46,
+      "end_line": 47,
+      "raw": "<a id=\"필수-충실도-표면-1\"></a>\n[Continue to this section](docs/design-qa.md#%ED%95%84%EC%88%98-%EC%B6%A9%EC%8B%A4%EB%8F%84-%ED%91%9C%EB%A9%B4-1).\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "html",
+      "start_line": 49,
+      "end_line": 50,
+      "raw": "<a id=\"상호-작용-및-접근성-1\"></a>\n[Continue to this section](docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1-1).\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "html",
+      "start_line": 52,
+      "end_line": 53,
+      "raw": "<a id=\"비교-이력-1\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5-1).\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "html",
+      "start_line": 55,
+      "end_line": 56,
+      "raw": "<a id=\"디자인-qa-원본-해상도-원형-프로필-자르기\"></a>\n[Continue to this section](docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%EC%9B%90%EB%B3%B8-%ED%95%B4%EC%83%81%EB%8F%84-%EC%9B%90%ED%98%95-%ED%94%84%EB%A1%9C%ED%95%84-%EC%9E%90%EB%A5%B4%EA%B8%B0).\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "html",
+      "start_line": 58,
+      "end_line": 59,
+      "raw": "<a id=\"비교대상-2\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81-2).\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 60,
+      "end_line": 60,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "html",
+      "start_line": 61,
+      "end_line": 62,
+      "raw": "<a id=\"증거-및-픽셀-계약\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%ED%94%BD%EC%85%80-%EA%B3%84%EC%95%BD).\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "html",
+      "start_line": 64,
+      "end_line": 65,
+      "raw": "<a id=\"조사-결과-2\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-2).\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 66,
+      "end_line": 66,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "html",
+      "start_line": 67,
+      "end_line": 68,
+      "raw": "<a id=\"상호-작용-및-접근성-2\"></a>\n[Continue to this section](docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1-2).\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "html",
+      "start_line": 70,
+      "end_line": 71,
+      "raw": "<a id=\"디자인-qa-프로필-이미지-컨텍스트-메뉴\"></a>\n[Continue to this section](docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A1%9C%ED%95%84-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8-%EB%A9%94%EB%89%B4).\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 72,
+      "end_line": 72,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "html",
+      "start_line": 73,
+      "end_line": 74,
+      "raw": "<a id=\"필요한-흐름\"></a>\n[Continue to this section](docs/design-qa.md#%ED%95%84%EC%9A%94%ED%95%9C-%ED%9D%90%EB%A6%84).\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "html",
+      "start_line": 76,
+      "end_line": 77,
+      "raw": "<a id=\"증거\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A6%9D%EA%B1%B0).\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 78,
+      "end_line": 78,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "html",
+      "start_line": 79,
+      "end_line": 80,
+      "raw": "<a id=\"조사-결과-3\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-3).\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "html",
+      "start_line": 82,
+      "end_line": 83,
+      "raw": "<a id=\"디자인-qa-프리젠테이션-레이저-단일-도트-및-부드러운-궤적-교정\"></a>\n[Continue to this section](docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A6%AC%EC%A0%A0%ED%85%8C%EC%9D%B4%EC%85%98-%EB%A0%88%EC%9D%B4%EC%A0%80-%EB%8B%A8%EC%9D%BC-%EB%8F%84%ED%8A%B8-%EB%B0%8F-%EB%B6%80%EB%93%9C%EB%9F%AC%EC%9A%B4-%EA%B6%A4%EC%A0%81-%EA%B5%90%EC%A0%95).\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "html",
+      "start_line": 85,
+      "end_line": 86,
+      "raw": "<a id=\"증거-및-정규화-2\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94-2).\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "html",
+      "start_line": 88,
+      "end_line": 89,
+      "raw": "<a id=\"조사-결과-4\"></a>\n[Continue to this section](docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-4).\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "html",
+      "start_line": 91,
+      "end_line": 92,
+      "raw": "<a id=\"비교-이력-2\"></a>\n[Continue to this section](docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5-2).\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 93,
+      "end_line": 93,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "html",
+      "start_line": 94,
+      "end_line": 95,
+      "raw": "<a id=\"design-qa-2px-white-color-picker-border\"></a>\n[Continue to this section](docs/design-qa.md#design-qa-2px-white-color-picker-border).\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "html",
+      "start_line": 97,
+      "end_line": 98,
+      "raw": "<a id=\"comparison-target\"></a>\n[Continue to this section](docs/design-qa.md#comparison-target).\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 99,
+      "end_line": 99,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "html",
+      "start_line": 100,
+      "end_line": 101,
+      "raw": "<a id=\"evidence-and-normalization\"></a>\n[Continue to this section](docs/design-qa.md#evidence-and-normalization).\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 102,
+      "end_line": 102,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "html",
+      "start_line": 103,
+      "end_line": 104,
+      "raw": "<a id=\"findings\"></a>\n[Continue to this section](docs/design-qa.md#findings).\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 105,
+      "end_line": 105,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "html",
+      "start_line": 106,
+      "end_line": 107,
+      "raw": "<a id=\"required-fidelity-surfaces\"></a>\n[Continue to this section](docs/design-qa.md#required-fidelity-surfaces).\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 108,
+      "end_line": 108,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "html",
+      "start_line": 109,
+      "end_line": 110,
+      "raw": "<a id=\"interaction-and-accessibility\"></a>\n[Continue to this section](docs/design-qa.md#interaction-and-accessibility).\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "html",
+      "start_line": 112,
+      "end_line": 113,
+      "raw": "<a id=\"comparison-history\"></a>\n[Continue to this section](docs/design-qa.md#comparison-history).\n"
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "html",
+      "start_line": 115,
+      "end_line": 116,
+      "raw": "<a id=\"implementation-checklist\"></a>\n[Continue to this section](docs/design-qa.md#implementation-checklist).\n"
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 117,
+      "end_line": 117,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "html",
+      "start_line": 118,
+      "end_line": 119,
+      "raw": "<a id=\"toolbar-horizontal-padding-follow-up\"></a>\n[Continue to this section](docs/design-qa.md#toolbar-horizontal-padding-follow-up).\n"
+    },
+    {
+      "id": "b000082",
+      "kind": "blank",
+      "start_line": 120,
+      "end_line": 120,
+      "raw": "\n"
+    },
+    {
+      "id": "b000083",
+      "kind": "html",
+      "start_line": 121,
+      "end_line": 122,
+      "raw": "<a id=\"design-qa-profile-avatar-icon-centering\"></a>\n[Continue to this section](docs/design-qa.md#design-qa-profile-avatar-icon-centering).\n"
+    },
+    {
+      "id": "b000084",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000085",
+      "kind": "html",
+      "start_line": 124,
+      "end_line": 125,
+      "raw": "<a id=\"comparison-target-1\"></a>\n[Continue to this section](docs/design-qa.md#comparison-target-1).\n"
+    },
+    {
+      "id": "b000086",
+      "kind": "blank",
+      "start_line": 126,
+      "end_line": 126,
+      "raw": "\n"
+    },
+    {
+      "id": "b000087",
+      "kind": "html",
+      "start_line": 127,
+      "end_line": 128,
+      "raw": "<a id=\"evidence-and-normalization-1\"></a>\n[Continue to this section](docs/design-qa.md#evidence-and-normalization-1).\n"
+    },
+    {
+      "id": "b000088",
+      "kind": "blank",
+      "start_line": 129,
+      "end_line": 129,
+      "raw": "\n"
+    },
+    {
+      "id": "b000089",
+      "kind": "html",
+      "start_line": 130,
+      "end_line": 131,
+      "raw": "<a id=\"findings-1\"></a>\n[Continue to this section](docs/design-qa.md#findings-1).\n"
+    },
+    {
+      "id": "b000090",
+      "kind": "blank",
+      "start_line": 132,
+      "end_line": 132,
+      "raw": "\n"
+    },
+    {
+      "id": "b000091",
+      "kind": "html",
+      "start_line": 133,
+      "end_line": 134,
+      "raw": "<a id=\"required-fidelity-surfaces-1\"></a>\n[Continue to this section](docs/design-qa.md#required-fidelity-surfaces-1).\n"
+    },
+    {
+      "id": "b000092",
+      "kind": "blank",
+      "start_line": 135,
+      "end_line": 135,
+      "raw": "\n"
+    },
+    {
+      "id": "b000093",
+      "kind": "html",
+      "start_line": 136,
+      "end_line": 137,
+      "raw": "<a id=\"interaction-and-accessibility-1\"></a>\n[Continue to this section](docs/design-qa.md#interaction-and-accessibility-1).\n"
+    },
+    {
+      "id": "b000094",
+      "kind": "blank",
+      "start_line": 138,
+      "end_line": 138,
+      "raw": "\n"
+    },
+    {
+      "id": "b000095",
+      "kind": "html",
+      "start_line": 139,
+      "end_line": 140,
+      "raw": "<a id=\"comparison-history-1\"></a>\n[Continue to this section](docs/design-qa.md#comparison-history-1).\n"
+    },
+    {
+      "id": "b000096",
+      "kind": "blank",
+      "start_line": 141,
+      "end_line": 141,
+      "raw": "\n"
+    },
+    {
+      "id": "b000097",
+      "kind": "html",
+      "start_line": 142,
+      "end_line": 143,
+      "raw": "<a id=\"design-qa-native-resolution-circular-profile-crop\"></a>\n[Continue to this section](docs/design-qa.md#design-qa-native-resolution-circular-profile-crop).\n"
+    },
+    {
+      "id": "b000098",
+      "kind": "blank",
+      "start_line": 144,
+      "end_line": 144,
+      "raw": "\n"
+    },
+    {
+      "id": "b000099",
+      "kind": "html",
+      "start_line": 145,
+      "end_line": 146,
+      "raw": "<a id=\"comparison-target-2\"></a>\n[Continue to this section](docs/design-qa.md#comparison-target-2).\n"
+    },
+    {
+      "id": "b000100",
+      "kind": "blank",
+      "start_line": 147,
+      "end_line": 147,
+      "raw": "\n"
+    },
+    {
+      "id": "b000101",
+      "kind": "html",
+      "start_line": 148,
+      "end_line": 149,
+      "raw": "<a id=\"evidence-and-pixel-contract\"></a>\n[Continue to this section](docs/design-qa.md#evidence-and-pixel-contract).\n"
+    },
+    {
+      "id": "b000102",
+      "kind": "blank",
+      "start_line": 150,
+      "end_line": 150,
+      "raw": "\n"
+    },
+    {
+      "id": "b000103",
+      "kind": "html",
+      "start_line": 151,
+      "end_line": 152,
+      "raw": "<a id=\"findings-2\"></a>\n[Continue to this section](docs/design-qa.md#findings-2).\n"
+    },
+    {
+      "id": "b000104",
+      "kind": "blank",
+      "start_line": 153,
+      "end_line": 153,
+      "raw": "\n"
+    },
+    {
+      "id": "b000105",
+      "kind": "html",
+      "start_line": 154,
+      "end_line": 155,
+      "raw": "<a id=\"interaction-and-accessibility-2\"></a>\n[Continue to this section](docs/design-qa.md#interaction-and-accessibility-2).\n"
+    },
+    {
+      "id": "b000106",
+      "kind": "blank",
+      "start_line": 156,
+      "end_line": 156,
+      "raw": "\n"
+    },
+    {
+      "id": "b000107",
+      "kind": "html",
+      "start_line": 157,
+      "end_line": 158,
+      "raw": "<a id=\"design-qa-profile-image-context-menu\"></a>\n[Continue to this section](docs/design-qa.md#design-qa-profile-image-context-menu).\n"
+    },
+    {
+      "id": "b000108",
+      "kind": "blank",
+      "start_line": 159,
+      "end_line": 159,
+      "raw": "\n"
+    },
+    {
+      "id": "b000109",
+      "kind": "html",
+      "start_line": 160,
+      "end_line": 161,
+      "raw": "<a id=\"required-flow\"></a>\n[Continue to this section](docs/design-qa.md#required-flow).\n"
+    },
+    {
+      "id": "b000110",
+      "kind": "blank",
+      "start_line": 162,
+      "end_line": 162,
+      "raw": "\n"
+    },
+    {
+      "id": "b000111",
+      "kind": "html",
+      "start_line": 163,
+      "end_line": 164,
+      "raw": "<a id=\"evidence\"></a>\n[Continue to this section](docs/design-qa.md#evidence).\n"
+    },
+    {
+      "id": "b000112",
+      "kind": "blank",
+      "start_line": 165,
+      "end_line": 165,
+      "raw": "\n"
+    },
+    {
+      "id": "b000113",
+      "kind": "html",
+      "start_line": 166,
+      "end_line": 167,
+      "raw": "<a id=\"findings-3\"></a>\n[Continue to this section](docs/design-qa.md#findings-3).\n"
+    },
+    {
+      "id": "b000114",
+      "kind": "blank",
+      "start_line": 168,
+      "end_line": 168,
+      "raw": "\n"
+    },
+    {
+      "id": "b000115",
+      "kind": "html",
+      "start_line": 169,
+      "end_line": 170,
+      "raw": "<a id=\"design-qa-presentation-laser-single-dot-and-smooth-trajectory-correction\"></a>\n[Continue to this section](docs/design-qa.md#design-qa-presentation-laser-single-dot-and-smooth-trajectory-correction).\n"
+    },
+    {
+      "id": "b000116",
+      "kind": "blank",
+      "start_line": 171,
+      "end_line": 171,
+      "raw": "\n"
+    },
+    {
+      "id": "b000117",
+      "kind": "html",
+      "start_line": 172,
+      "end_line": 173,
+      "raw": "<a id=\"evidence-and-normalization-2\"></a>\n[Continue to this section](docs/design-qa.md#evidence-and-normalization-2).\n"
+    },
+    {
+      "id": "b000118",
+      "kind": "blank",
+      "start_line": 174,
+      "end_line": 174,
+      "raw": "\n"
+    },
+    {
+      "id": "b000119",
+      "kind": "html",
+      "start_line": 175,
+      "end_line": 176,
+      "raw": "<a id=\"findings-4\"></a>\n[Continue to this section](docs/design-qa.md#findings-4).\n"
+    },
+    {
+      "id": "b000120",
+      "kind": "blank",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "\n"
+    },
+    {
+      "id": "b000121",
+      "kind": "html",
+      "start_line": 178,
+      "end_line": 179,
+      "raw": "<a id=\"comparison-history-2\"></a>\n[Continue to this section](docs/design-qa.md#comparison-history-2).\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Document moved",
+      "anchor": "document-moved",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000015",
+        "line": 19,
+        "text": "<a id=\"필수-충실도-표면\"></a>",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000033",
+        "line": 46,
+        "text": "<a id=\"필수-충실도-표면-1\"></a>",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000073",
+        "line": 106,
+        "text": "<a id=\"required-fidelity-surfaces\"></a>",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000073",
+        "line": 107,
+        "text": "[Continue to this section](docs/design-qa.md#required-fidelity-surfaces).",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000091",
+        "line": 133,
+        "text": "<a id=\"required-fidelity-surfaces-1\"></a>",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000091",
+        "line": 134,
+        "text": "[Continue to this section](docs/design-qa.md#required-fidelity-surfaces-1).",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000109",
+        "line": 160,
+        "text": "<a id=\"required-flow\"></a>",
+        "basis": "lexical_match",
+        "context": "html"
+      },
+      {
+        "block_id": "b000109",
+        "line": 161,
+        "text": "[Continue to this section](docs/design-qa.md#required-flow).",
+        "basis": "lexical_match",
+        "context": "html"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "design-qa.md",
+        "target": "docs/design-qa.md",
+        "kind": "relative",
+        "line": 5
+      },
+      {
+        "block_id": "b000007",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-2px-%ED%9D%B0%EC%83%89-%EC%83%89%EC%83%81-%EC%84%A0%ED%83%9D%EA%B8%B0-%ED%85%8C%EB%91%90%EB%A6%AC",
+        "kind": "relative",
+        "line": 8
+      },
+      {
+        "block_id": "b000009",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000011",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000013",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000015",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%ED%95%84%EC%88%98-%EC%B6%A9%EC%8B%A4%EB%8F%84-%ED%91%9C%EB%A9%B4",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000017",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000019",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000021",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EA%B5%AC%ED%98%84-%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8",
+        "kind": "relative",
+        "line": 29
+      },
+      {
+        "block_id": "b000023",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%ED%88%B4%EB%B0%94-%EC%88%98%ED%8F%89-%ED%8C%A8%EB%94%A9-%ED%9B%84%EC%86%8D-%EC%A1%B0%EC%B9%98",
+        "kind": "relative",
+        "line": 32
+      },
+      {
+        "block_id": "b000025",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A1%9C%ED%95%84-%EC%95%84%EB%B0%94%ED%83%80-%EC%95%84%EC%9D%B4%EC%BD%98-%EC%84%BC%ED%84%B0%EB%A7%81",
+        "kind": "relative",
+        "line": 35
+      },
+      {
+        "block_id": "b000027",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81-1",
+        "kind": "relative",
+        "line": 38
+      },
+      {
+        "block_id": "b000029",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94-1",
+        "kind": "relative",
+        "line": 41
+      },
+      {
+        "block_id": "b000031",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-1",
+        "kind": "relative",
+        "line": 44
+      },
+      {
+        "block_id": "b000033",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%ED%95%84%EC%88%98-%EC%B6%A9%EC%8B%A4%EB%8F%84-%ED%91%9C%EB%A9%B4-1",
+        "kind": "relative",
+        "line": 47
+      },
+      {
+        "block_id": "b000035",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1-1",
+        "kind": "relative",
+        "line": 50
+      },
+      {
+        "block_id": "b000037",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5-1",
+        "kind": "relative",
+        "line": 53
+      },
+      {
+        "block_id": "b000039",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%EC%9B%90%EB%B3%B8-%ED%95%B4%EC%83%81%EB%8F%84-%EC%9B%90%ED%98%95-%ED%94%84%EB%A1%9C%ED%95%84-%EC%9E%90%EB%A5%B4%EA%B8%B0",
+        "kind": "relative",
+        "line": 56
+      },
+      {
+        "block_id": "b000041",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90%EB%8C%80%EC%83%81-2",
+        "kind": "relative",
+        "line": 59
+      },
+      {
+        "block_id": "b000043",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%ED%94%BD%EC%85%80-%EA%B3%84%EC%95%BD",
+        "kind": "relative",
+        "line": 62
+      },
+      {
+        "block_id": "b000045",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-2",
+        "kind": "relative",
+        "line": 65
+      },
+      {
+        "block_id": "b000047",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%83%81%ED%98%B8-%EC%9E%91%EC%9A%A9-%EB%B0%8F-%EC%A0%91%EA%B7%BC%EC%84%B1-2",
+        "kind": "relative",
+        "line": 68
+      },
+      {
+        "block_id": "b000049",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A1%9C%ED%95%84-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8-%EB%A9%94%EB%89%B4",
+        "kind": "relative",
+        "line": 71
+      },
+      {
+        "block_id": "b000051",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%ED%95%84%EC%9A%94%ED%95%9C-%ED%9D%90%EB%A6%84",
+        "kind": "relative",
+        "line": 74
+      },
+      {
+        "block_id": "b000053",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A6%9D%EA%B1%B0",
+        "kind": "relative",
+        "line": 77
+      },
+      {
+        "block_id": "b000055",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-3",
+        "kind": "relative",
+        "line": 80
+      },
+      {
+        "block_id": "b000057",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%94%94%EC%9E%90%EC%9D%B8-qa-%ED%94%84%EB%A6%AC%EC%A0%A0%ED%85%8C%EC%9D%B4%EC%85%98-%EB%A0%88%EC%9D%B4%EC%A0%80-%EB%8B%A8%EC%9D%BC-%EB%8F%84%ED%8A%B8-%EB%B0%8F-%EB%B6%80%EB%93%9C%EB%9F%AC%EC%9A%B4-%EA%B6%A4%EC%A0%81-%EA%B5%90%EC%A0%95",
+        "kind": "relative",
+        "line": 83
+      },
+      {
+        "block_id": "b000059",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A6%9D%EA%B1%B0-%EB%B0%8F-%EC%A0%95%EA%B7%9C%ED%99%94-2",
+        "kind": "relative",
+        "line": 86
+      },
+      {
+        "block_id": "b000061",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EC%A1%B0%EC%82%AC-%EA%B2%B0%EA%B3%BC-4",
+        "kind": "relative",
+        "line": 89
+      },
+      {
+        "block_id": "b000063",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#%EB%B9%84%EA%B5%90-%EC%9D%B4%EB%A0%A5-2",
+        "kind": "relative",
+        "line": 92
+      },
+      {
+        "block_id": "b000065",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#design-qa-2px-white-color-picker-border",
+        "kind": "relative",
+        "line": 95
+      },
+      {
+        "block_id": "b000067",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-target",
+        "kind": "relative",
+        "line": 98
+      },
+      {
+        "block_id": "b000069",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#evidence-and-normalization",
+        "kind": "relative",
+        "line": 101
+      },
+      {
+        "block_id": "b000071",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#findings",
+        "kind": "relative",
+        "line": 104
+      },
+      {
+        "block_id": "b000073",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#required-fidelity-surfaces",
+        "kind": "relative",
+        "line": 107
+      },
+      {
+        "block_id": "b000075",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#interaction-and-accessibility",
+        "kind": "relative",
+        "line": 110
+      },
+      {
+        "block_id": "b000077",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-history",
+        "kind": "relative",
+        "line": 113
+      },
+      {
+        "block_id": "b000079",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#implementation-checklist",
+        "kind": "relative",
+        "line": 116
+      },
+      {
+        "block_id": "b000081",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#toolbar-horizontal-padding-follow-up",
+        "kind": "relative",
+        "line": 119
+      },
+      {
+        "block_id": "b000083",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#design-qa-profile-avatar-icon-centering",
+        "kind": "relative",
+        "line": 122
+      },
+      {
+        "block_id": "b000085",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-target-1",
+        "kind": "relative",
+        "line": 125
+      },
+      {
+        "block_id": "b000087",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#evidence-and-normalization-1",
+        "kind": "relative",
+        "line": 128
+      },
+      {
+        "block_id": "b000089",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#findings-1",
+        "kind": "relative",
+        "line": 131
+      },
+      {
+        "block_id": "b000091",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#required-fidelity-surfaces-1",
+        "kind": "relative",
+        "line": 134
+      },
+      {
+        "block_id": "b000093",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#interaction-and-accessibility-1",
+        "kind": "relative",
+        "line": 137
+      },
+      {
+        "block_id": "b000095",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-history-1",
+        "kind": "relative",
+        "line": 140
+      },
+      {
+        "block_id": "b000097",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#design-qa-native-resolution-circular-profile-crop",
+        "kind": "relative",
+        "line": 143
+      },
+      {
+        "block_id": "b000099",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-target-2",
+        "kind": "relative",
+        "line": 146
+      },
+      {
+        "block_id": "b000101",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#evidence-and-pixel-contract",
+        "kind": "relative",
+        "line": 149
+      },
+      {
+        "block_id": "b000103",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#findings-2",
+        "kind": "relative",
+        "line": 152
+      },
+      {
+        "block_id": "b000105",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#interaction-and-accessibility-2",
+        "kind": "relative",
+        "line": 155
+      },
+      {
+        "block_id": "b000107",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#design-qa-profile-image-context-menu",
+        "kind": "relative",
+        "line": 158
+      },
+      {
+        "block_id": "b000109",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#required-flow",
+        "kind": "relative",
+        "line": 161
+      },
+      {
+        "block_id": "b000111",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#evidence",
+        "kind": "relative",
+        "line": 164
+      },
+      {
+        "block_id": "b000113",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#findings-3",
+        "kind": "relative",
+        "line": 167
+      },
+      {
+        "block_id": "b000115",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#design-qa-presentation-laser-single-dot-and-smooth-trajectory-correction",
+        "kind": "relative",
+        "line": 170
+      },
+      {
+        "block_id": "b000117",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#evidence-and-normalization-2",
+        "kind": "relative",
+        "line": 173
+      },
+      {
+        "block_id": "b000119",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#findings-4",
+        "kind": "relative",
+        "line": 176
+      },
+      {
+        "block_id": "b000121",
+        "label": "Continue to this section",
+        "target": "docs/design-qa.md#comparison-history-2",
+        "kind": "relative",
+        "line": 179
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

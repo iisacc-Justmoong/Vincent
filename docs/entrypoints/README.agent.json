@@ -1,0 +1,1179 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7f2183fa3f23acdcdcb507ca8efe1d3d9057a33885f150a0afbffcd2ea39612c",
+  "project": {
+    "id": "urn:iisacc:project:Product%2F.Deprecated%2FVincent",
+    "name": "Vincent",
+    "root": "Product/.Deprecated/Vincent",
+    "kind": "application"
+  },
+  "source": {
+    "path": "README.md",
+    "sha256": "77dc34be4cae50de1d1f4a1cb6529837df36cff6e3a858359ef5a8fec81c0165",
+    "bytes": 20413,
+    "line_count": 130,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Vincent 6.0",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Vincent 6.0\n",
+      "level": 1,
+      "title": "Vincent 6.0"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "Vincent 6.0 is a private, local-first raster drawing app built with Qt 6 and\nQML. It provides a focused desktop canvas for drawing, handwriting, layered\nraster editing, and PSD-compatible import and export without accounts,\ntelemetry, advertising, or automatic network access.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "![Vincent 6.0 running on Windows with a sample raster artwork](docs/marketing/vincent-windows-editor.png)\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 10,
+      "end_line": 11,
+      "raw": "_Vincent 6.0 on Windows editing a sample raster artwork. The artwork is a\ndemonstration asset; the surrounding interface is the running application._\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "## System Requirements\n",
+      "level": 2,
+      "title": "System Requirements"
+    },
+    {
+      "id": "b000010",
+      "kind": "list",
+      "start_line": 14,
+      "end_line": 16,
+      "raw": "- macOS 12 or later (Apple Silicon or Intel)\n- Windows 10 or later when using the Windows package\n- Linux builds are available when provided by the release page\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "macOS 12 or later (Apple Silicon or Intel)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Windows 10 or later when using the Windows package",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Linux builds are available when provided by the release page",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000011",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "heading",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "## Install (macOS)\n",
+      "level": 2,
+      "title": "Install (macOS)"
+    },
+    {
+      "id": "b000013",
+      "kind": "list",
+      "start_line": 19,
+      "end_line": 21,
+      "raw": "1. Download `Vincent-6.0-macOS.pkg` from the latest release.\n2. Double-click the installer and follow the prompts to install Vincent 6.0 in Applications.\n3. Open Vincent 6.0 from Launchpad or the Applications folder.\n",
+      "items": [
+        {
+          "marker": "1.",
+          "text": "Download `Vincent-6.0-macOS.pkg` from the latest release.",
+          "checked": null
+        },
+        {
+          "marker": "2.",
+          "text": "Double-click the installer and follow the prompts to install Vincent 6.0 in Applications.",
+          "checked": null
+        },
+        {
+          "marker": "3.",
+          "text": "Open Vincent 6.0 from Launchpad or the Applications folder.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "## Install (macOS .app bundle)\n",
+      "level": 2,
+      "title": "Install (macOS .app bundle)"
+    },
+    {
+      "id": "b000016",
+      "kind": "list",
+      "start_line": 24,
+      "end_line": 26,
+      "raw": "1. Download `Vincent 6.0.app` from the release assets.\n2. Drag it into the Applications folder.\n3. Open Vincent 6.0 and allow any prompts to access files you select.\n",
+      "items": [
+        {
+          "marker": "1.",
+          "text": "Download `Vincent 6.0.app` from the release assets.",
+          "checked": null
+        },
+        {
+          "marker": "2.",
+          "text": "Drag it into the Applications folder.",
+          "checked": null
+        },
+        {
+          "marker": "3.",
+          "text": "Open Vincent 6.0 and allow any prompts to access files you select.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000017",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "heading",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "## Install (Linux)\n",
+      "level": 2,
+      "title": "Install (Linux)"
+    },
+    {
+      "id": "b000019",
+      "kind": "list",
+      "start_line": 29,
+      "end_line": 31,
+      "raw": "1. Download the `Vincent-6.0-Linux.tar.gz` release archive.\n2. Extract it and run `bin/Vincent` from the extracted folder.\n3. The archive carries the detected Qt, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager shared runtimes, QML modules, and Qt platform plugins. An installed tree also provides a `Terminal=false` desktop entry for launching only the GUI on X11 and Wayland.\n",
+      "items": [
+        {
+          "marker": "1.",
+          "text": "Download the `Vincent-6.0-Linux.tar.gz` release archive.",
+          "checked": null
+        },
+        {
+          "marker": "2.",
+          "text": "Extract it and run `bin/Vincent` from the extracted folder.",
+          "checked": null
+        },
+        {
+          "marker": "3.",
+          "text": "The archive carries the detected Qt, LVRS, iiPaintEngine, iiSharedCanvas, iiUpdateManager, and iiLicenseManager shared runtimes, QML modules, and Qt platform plugins. An installed tree also provides a `Terminal=false` desktop entry for launching only the GUI on X11 and Wayland.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "## Install (Windows)\n",
+      "level": 2,
+      "title": "Install (Windows)"
+    },
+    {
+      "id": "b000022",
+      "kind": "paragraph",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "The preferred public installation route is the Microsoft Store. A Store-delivered MSIX is certified and re-signed by Microsoft, so Windows users do not need Vincent's private development certificate and do not receive the unknown-publisher or SmartScreen warning associated with a self-signed download. The ZIP/MSI instructions below apply only when a separately Authenticode-signed non-Store release is offered.\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "list",
+      "start_line": 36,
+      "end_line": 39,
+      "raw": "1. Download `Vincent-6.0-Windows.zip` from the release assets.\n2. Confirm that the release also provides `Vincent-6.0-Windows.zip.sha256`, verify the archive hash, and check that the extracted `Vincent.exe` has a valid Authenticode signature whose Publisher subject or certificate thumbprint matches the identity stated in the authenticated release notes.\n3. Extract it to a writable folder such as `%LOCALAPPDATA%\\Programs\\Vincent`.\n4. Run `Vincent.exe`. It opens only the Vincent GUI; no terminal or console window is required.\n",
+      "items": [
+        {
+          "marker": "1.",
+          "text": "Download `Vincent-6.0-Windows.zip` from the release assets.",
+          "checked": null
+        },
+        {
+          "marker": "2.",
+          "text": "Confirm that the release also provides `Vincent-6.0-Windows.zip.sha256`, verify the archive hash, and check that the extracted `Vincent.exe` has a valid Authenticode signature whose Publisher subject or certificate thumbprint matches the identity stated in the authenticated release notes.",
+          "checked": null
+        },
+        {
+          "marker": "3.",
+          "text": "Extract it to a writable folder such as `%LOCALAPPDATA%\\Programs\\Vincent`.",
+          "checked": null
+        },
+        {
+          "marker": "4.",
+          "text": "Run `Vincent.exe`. It opens only the Vincent GUI; no terminal or console window is required.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000025",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "When the release also provides `Vincent-6.0-Windows.msi`, verify the adjacent checksum and the MSI's Authenticode Publisher before opening it. The Windows Installer 5 package uses the official `ALLUSERS=2` and `MSIINSTALLPERUSER=1` dual-context defaults, so 6.0 installs for the current user and upgrades the existing per-user 4.0.0 in the same installation context without a UAC prompt. Choose **Advanced** on a first installation to select current-user or all-users scope; all-users scope also exposes the destination directory, installs under native 64-bit Program Files by default, creates a shared shortcut, and requires elevation, while current-user scope stays under Local Application Data. The application files and context-aware Start Menu shortcut are installed together. A required installation-context marker keeps later upgrades in the registered scope and preserves the recorded install location; when Windows Installer detects a markerless per-user upgrade, it also locks that legacy upgrade to current-user scope. Packaging explicitly validates this model with ICE105. ProductCode is deterministic for the same version and architecture, so rebuilding unchanged 6.0 cannot register a duplicate product, while a different version or architecture receives a distinct identity. If both scope registrations are discovered, new installation and cross-context upgrade are rejected, but maintenance and removal remain available so the machine can be recovered. After that product is installed, opening the same MSI intentionally enters the standard Windows Installer maintenance flow instead of presenting another **Install** action. Use **Repair** to restore missing or damaged installed files and **Remove** to uninstall Vincent; the standard **Change** path displays the required installed feature state. Remove the installed product first only when changing installation scope or exercising a genuinely fresh first-installation flow.\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "Windows maintainers create a public package with `powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -Sign -SigningCertificateThumbprint <40-hex-thumbprint>`. Public packaging fails closed unless `-Sign` is supplied, and requires Windows SDK SignTool plus a currently valid Code Signing certificate with an accessible private key in `CurrentUser\\My` or the explicitly selected `LocalMachine\\My` store; when the certificate contains a Key Usage extension it must permit `DigitalSignature`. The release operator must obtain that certificate from a consumer-trusted code-signing CA or trusted signing service and publish its expected Publisher identity. Before any build work, the script rejects self-signed identities, builds the Code Signing chain with online revocation checking, and requires its terminal root to be present in Windows' `LocalMachine\\AuthRoot` public-root store. It signs Vincent-owned binaries with the selected identity, preserves valid timestamped vendor signatures, signs the remaining unsigned staged PE files after all binary mutations, and requires RFC 3161 timestamps plus Authenticode verification before promoting `dist/Vincent-6.0-Windows.zip` and its `.sha256` record from temporary names. `-CreateMsi` builds, validates without WiX warnings, and signs and verifies the MSI from a temporary path; when ZIP and MSI are requested together, the complete verified set replaces the last-known-good files in one rollback-capable publication step. A prepared/committed transaction journal records whether each canonical artifact existed before publication, so a retry removes half-published first-release files or restores the complete previous generation before any new build work starts. A machine-wide Vincent packaging mutex rejects concurrent invocations before they can compete for a build tree or journal, including when the same repository is reached through a path alias. Every public correction increments the release version; a local test package must opt in with `-AllowUnsignedPackage` and is named `Vincent-6.0-Windows-unsigned.*`. It is not a release asset. Use `-SkipPackage` for an unpackaged local build; use `-Clean -SkipPackage` for a clean-only local rebuild, or combine `-Clean` with the appropriate signed/explicitly unsigned package mode. Signed public builds cannot use `-SkipTests`.\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "paragraph",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "For the certificate-free public Store route, maintainers reserve the app in Partner Center, copy its exact reserved display name plus the three Product identity values, provide the corresponding-source URL/hash, and run `build-windows-store.ps1 -Mode Store`. The reserved name must populate both package and application display names; an unreserved value fails Partner Center validation. iiPaintEngine is licensed by its copyright holder as `AGPL-3.0-only`, and that exact text is staged with the package. The command creates the intentionally unsigned `dist/Vincent-6.0-Windows-Store-x64.msixupload`; Microsoft replaces the package signature after certification. The Store does not re-sign MSI or EXE submissions. See [docs/BUILD.md](docs/BUILD.md) for account onboarding, local self-signed MSIX validation, restricted-capability justification, and submission steps.\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "heading",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "## Code signing policy\n",
+      "level": 2,
+      "title": "Code signing policy"
+    },
+    {
+      "id": "b000033",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "Vincent is seeking free code signing provided by [SignPath.io](https://signpath.io/), with a certificate sponsored by [SignPath Foundation](https://signpath.org/). No SignPath Foundation certificate is currently active for Vincent. The prepared GitHub workflow must not submit a release signing request until the Foundation has explicitly approved the project and supplied the required identifiers. Windows website releases are built from this public repository on GitHub-hosted runners and require an authorized maintainer's manual signing approval. The unsigned `build/signpath-input` artifact and every self-signed trial artifact are development-only files; only a returned MSI whose container and nested `Vincent.exe` both have valid, timestamped SignPath Foundation Authenticode signatures may be published.\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "list",
+      "start_line": 51,
+      "end_line": 54,
+      "raw": "- Committer and reviewer: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)\n- Approver: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)\n- Privacy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Vincent currently performs local document editing and file selection only; it contains no telemetry, analytics, advertising, account login, or automatic network update client.\n- System changes: the MSI announces installation scope and destination, installs the application and Start Menu shortcut together, and provides standard Windows Installer repair and removal.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Committer and reviewer: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Approver: [iisacc-Justmoong](https://github.com/iisacc-Justmoong)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Privacy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Vincent currently performs local document editing and file selection only; it contains no telemetry, analytics, advertising, account login, or automatic network update client.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "System changes: the MSI announces installation scope and destination, installs the application and Start Menu shortcut together, and provides standard Windows Installer repair and removal.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000037",
+      "kind": "blank",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "paragraph",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "The externally signed website release is the single file `Vincent-6.0-Windows.msi`. Its embedded Authenticode signature supplies publisher identity and integrity, so users do not need a separate certificate or checksum file to install it.\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "paragraph",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "A valid trusted Authenticode signature replaces the Windows unknown-publisher identity with the certificate publisher, but Microsoft Defender SmartScreen also evaluates publisher reputation and per-file reputation, so a new release hash may still warn. A checksum proves file equality only when obtained through an authenticated release channel; it does not prove publisher identity by itself. Self-signed certificates are not suitable for public distribution. ZIP and MSI packaging also stages Vincent/LVRS and iiPaintEngine AGPL texts, psd_sdk/miniz, Pretendard, Qt, and MinGW legal materials plus Qt SPDX documents. Public signing still requires a publisher-controlled corresponding-source URL and SHA-256.\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 60,
+      "raw": "The generic Windows CPack target does not run Qt deployment, PE closure validation, or Authenticode signing. Its deliberately named `Vincent-6.0-Windows-unsigned-cpack-incomplete.zip` output is build-system diagnostics only and must never be published.\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "blank",
+      "start_line": 61,
+      "end_line": 61,
+      "raw": "\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "paragraph",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "The Windows executable is a native AMD64 PE32+ GUI-subsystem application, so its lifetime is owned by the Qt GUI event loop rather than a companion terminal. QML retains LVRS stock application-window geometry; before the first show, C++ measures that hidden framework size as the aspect-ratio source, requests a 1,280-logical-pixel width, derives the height from the measured ratio, and scales the pair down only when required by the screen's available area. No post-display resize runs while the heavier canvas page is activated through an asynchronous QML `Loader`, and the window remains user-resizable after launch. Executable resources include the application icon, Windows file/product version information, an `asInvoker` manifest, Windows 10/11 compatibility, Per-Monitor V2 DPI awareness, and long-path awareness. The Release staging pass verifies those native properties and the required runtime DLLs, rejects incompatible MinGW runtimes, strips only Vincent-owned MinGW binaries, omits unused Qt generic, Insight Tracker, SQL, Quick3D utility, software OpenGL, and runtime shader-compiler payloads, and removes a loose `qml/LVRS` copy because LVRS QML is already embedded in `LVRS.dll`.\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "Normal startup performs no startup-log file I/O. To diagnose launch timing from a GUI-subsystem build, set `VINCENT_STARTUP_TRACE=1` before running `Vincent.exe`; milestone records are then appended to `%TEMP%\\Vincent-startup.log`. A fatal failure to create the root QML object is recorded there even when tracing is disabled.\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "blank",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "heading",
+      "start_line": 66,
+      "end_line": 66,
+      "raw": "## Features at a Glance\n",
+      "level": 2,
+      "title": "Features at a Glance"
+    },
+    {
+      "id": "b000049",
+      "kind": "list",
+      "start_line": 67,
+      "end_line": 89,
+      "raw": "- iiPaintEngine-backed brush and eraser strokes with native pointer/tablet event handling and pressure-controlled brush opacity\n- Layered raster document model with a base raster canvas plus selectable transparent raster layers; blank documents start with `Background` plus a selected transparent `Layer 1`, each backed by its own iiPaintEngine surface and undo/redo state\n- Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, and every flat image open replaces the raster canvas at the source image dimensions without fitting the image into the previous canvas\n- Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects\n- Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata\n- LVRS-backed MVVM document state with a compact C++ canvas document view model\n- Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster\n- The application window exposes File, Edit, Window, and Help menus. Qt 6.8 uses the native macOS global menu bar, while Windows and Linux use a compact dark in-window menu bar whose 22-DIP height and background match the application; all variants preserve the existing canvas dialogs, undo/redo, layer actions, tool and shape selection, brush-size changes, canvas view controls, window controls, and complete shortcut reference entries\n- Platform builds use `resources/Appicon.icns` as the canonical macOS icon source and `resources/Appicon.ico` for Windows executable resources; run `tools/sync_app_icon_assets.sh` after replacing the macOS icon so the App Store/Xcode asset catalog stays in sync\n- Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus the current `Background` canvas layer when present, current raster layers, and current image/text/shape objects in bottom-to-top order so Photoshop presents `Background` at the bottom, with Vincent layer metadata embedded as XMP\n- A docked left-side LVRS hierarchy panel lists the background raster canvas and current image, shape, text, and raster layers; new blank canvases select the initial transparent `Layer 1` so brush strokes land on an editable layer immediately, double-clicking a layer name edits it inline, dragging rows changes layer order, and the plus/minus footer buttons create or remove layers, including the background layer; when `Background` is removed, the canvas shows a tiled PNG-style transparency grid\n- Layer creation uses an incremental visual model so adding many raster layers does not recreate existing layer surfaces or write PNG snapshots for unchanged layers\n- Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with a dense full-width top toolbar placed directly below the menu bar on Windows, toolbar-frame and button x-axis padding set to half the y-axis padding, a current-color swatch with 4x right-edge padding that opens the HSL color picker, and brush controls that also set text size and text color\n- Canvas cursors follow the effective tool: brush and eraser hide the system pointer and show a scene-graph vector circle whose diameter matches the current tool size at the active canvas zoom; subpixel footprints retain the exact circle and fall back to the system crosshair so the pointer cannot disappear; zoom and shape use a precision crosshair; text uses an I-beam; fill uses a pointing hand; pan uses open/closed hands; and move uses the arrow over empty canvas, four-way movement over object bodies, and directional resize cursors only over the selected object's resize handles\n- Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging; holding Space temporarily enters pan input without changing the selected tool\n- Zoom mode scales the canvas by dragging horizontally anywhere in the canvas workspace: right to zoom in, left to zoom out\n- Drag-to-insert solid shapes for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds\n- Inserted image, shape, and text objects are created as separate layer rows, can be selected with the move tool, dragged or resized past the canvas bounds from enlarged corner and edge transform handles while their visible pixels stay clipped to the canvas, Shift-dragged along the dominant straight movement axis, Shift-resized with their original aspect ratio, and deleted with Delete or Backspace before raster export\n- Global menu shortcuts cover every actionable menu item: Command/Ctrl+N/O/S for new/open/save-as, Command/Ctrl+Z and platform redo for history, Command/Ctrl+Shift+N/Delete for layer creation/deletion, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, [/] for brush size, and Command/Ctrl+0/1/M plus platform fullscreen for window controls. Tool shortcuts also support matching two-beolsik Korean key positions on the canvas.\n- Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting\n- LVRS solid chrome keeps native window controls. Windows and Linux use their native title bars without a redundant logical drag region or toolbar gap; macOS reserves the LVRS drag surface only for its full-size content title bar in normal-window mode and removes it in full screen\n- Initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible, while new canvases use the dimensions entered in the toolbar modal\n- Large new canvases are automatically zoomed down on creation so the full canvas remains visible inside the current workspace viewport\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "iiPaintEngine-backed brush and eraser strokes with native pointer/tablet event handling and pressure-controlled brush opacity",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Layered raster document model with a base raster canvas plus selectable transparent raster layers; blank documents start with `Background` plus a selected transparent `Layer 1`, each backed by its own iiPaintEngine surface and undo/redo state",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Image open flow through Qt image formats such as PNG, JPEG, BMP, GIF, WebP, and TIFF plus PSD files read through `psd_sdk`; importable 8-bit RGB/RGBA PSD layers reopen as Vincent raster layers, and every flat image open replaces the raster canvas at the source image dimensions without fitting the image into the previous canvas",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Raster save flow that composites the base canvas, current raster layers, and current image, text, and shape objects",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Internal PSD compatibility document layer that maps the raster canvas and current session objects into Photoshop-style layer records and XMP metadata",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "LVRS-backed MVVM document state with a compact C++ canvas document view model",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Toolbar file actions expose new canvas, open image, and save image buttons; new canvas opens a width/height modal before creating the raster",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "The application window exposes File, Edit, Window, and Help menus. Qt 6.8 uses the native macOS global menu bar, while Windows and Linux use a compact dark in-window menu bar whose 22-DIP height and background match the application; all variants preserve the existing canvas dialogs, undo/redo, layer actions, tool and shape selection, brush-size changes, canvas view controls, window controls, and complete shortcut reference entries",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Platform builds use `resources/Appicon.icns` as the canonical macOS icon source and `resources/Appicon.ico` for Windows executable resources; run `tools/sync_app_icon_assets.sh` after replacing the macOS icon so the App Store/Xcode asset catalog stays in sync",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Save image defaults to Photoshop PSD and also offers PNG, JPEG, BMP, WebP, and TIFF; PSD export writes a merged preview plus the current `Background` canvas layer when present, current raster layers, and current image/text/shape objects in bottom-to-top order so Photoshop presents `Background` at the bottom, with Vincent layer metadata embedded as XMP",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "A docked left-side LVRS hierarchy panel lists the background raster canvas and current image, shape, text, and raster layers; new blank canvases select the initial transparent `Layer 1` so brush strokes land on an editable layer immediately, double-clicking a layer name edits it inline, dragging rows changes layer order, and the plus/minus footer buttons create or remove layers, including the background layer; when `Background` is removed, the canvas shows a tiled PNG-style transparency grid",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Layer creation uses an incremental visual model so adding many raster layers does not recreate existing layer surfaces or write PNG snapshots for unchanged layers",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Pan, move, zoom, brush, eraser, shape, fill bucket, and paint-style text tools with a dense full-width top toolbar placed directly below the menu bar on Windows, toolbar-frame and button x-axis padding set to half the y-axis padding, a current-color swatch with 4x right-edge padding that opens the HSL color picker, and brush controls that also set text size and text color",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Canvas cursors follow the effective tool: brush and eraser hide the system pointer and show a scene-graph vector circle whose diameter matches the current tool size at the active canvas zoom; subpixel footprints retain the exact circle and fall back to the system crosshair so the pointer cannot disappear; zoom and shape use a precision crosshair; text uses an I-beam; fill uses a pointing hand; pan uses open/closed hands; and move uses the arrow over empty canvas, four-way movement over object bodies, and directional resize cursors only over the selected object's resize handles",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Pan mode moves the canvas in the workspace by grabbing it with the hand tool, using viewport-relative movement offsets for smoother dragging; holding Space temporarily enters pan input without changing the selected tool",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Zoom mode scales the canvas by dragging horizontally anywhere in the canvas workspace: right to zoom in, left to zoom out",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Drag-to-insert solid shapes for rectangle, ellipse, triangle, diamond, star, rectangle bubble, and ellipse bubble, with Shift-constrained 1:1 bounds",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Inserted image, shape, and text objects are created as separate layer rows, can be selected with the move tool, dragged or resized past the canvas bounds from enlarged corner and edge transform handles while their visible pixels stay clipped to the canvas, Shift-dragged along the dominant straight movement axis, Shift-resized with their original aspect ratio, and deleted with Delete or Backspace before raster export",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Global menu shortcuts cover every actionable menu item: Command/Ctrl+N/O/S for new/open/save-as, Command/Ctrl+Z and platform redo for history, Command/Ctrl+Shift+N/Delete for layer creation/deletion, B/E/H/V/Z/U/G/T for tools, Command/Ctrl+Alt+1..7 for shape kinds, [/] for brush size, and Command/Ctrl+0/1/M plus platform fullscreen for window controls. Tool shortcuts also support matching two-beolsik Korean key positions on the canvas.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Default brush hardness keeps iiPaintEngine's coverage-based edge anti-aliasing at its maximum app setting",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "LVRS solid chrome keeps native window controls. Windows and Linux use their native title bars without a redundant logical drag region or toolbar gap; macOS reserves the LVRS drag surface only for its full-size content title bar in normal-window mode and removes it in full screen",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Initial canvases are created inside the workspace with proportional top, side, and bottom margins so the dark workspace remains visible, while new canvases use the dimensions entered in the toolbar modal",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Large new canvases are automatically zoomed down on creation so the full canvas remains visible inside the current workspace viewport",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "heading",
+      "start_line": 91,
+      "end_line": 91,
+      "raw": "## Community and Contributing\n",
+      "level": 2,
+      "title": "Community and Contributing"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "list",
+      "start_line": 93,
+      "end_line": 96,
+      "raw": "- Join [GitHub Discussions](https://github.com/iisacc-Justmoong/Vincent/discussions) for general feedback, questions, and ideas.\n- Report reproducible defects through [GitHub Issues](https://github.com/iisacc-Justmoong/Vincent/issues).\n- Help validate Vincent 6.0 through the [Windows 10/11 testing issue](https://github.com/iisacc-Justmoong/Vincent/issues/18).\n- Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing code, QML, documentation, or release-workflow changes.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Join [GitHub Discussions](https://github.com/iisacc-Justmoong/Vincent/discussions) for general feedback, questions, and ideas.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Report reproducible defects through [GitHub Issues](https://github.com/iisacc-Justmoong/Vincent/issues).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Help validate Vincent 6.0 through the [Windows 10/11 testing issue](https://github.com/iisacc-Justmoong/Vincent/issues/18).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing code, QML, documentation, or release-workflow changes.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 97,
+      "end_line": 97,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "heading",
+      "start_line": 98,
+      "end_line": 98,
+      "raw": "## Testing\n",
+      "level": 2,
+      "title": "Testing"
+    },
+    {
+      "id": "b000056",
+      "kind": "fenced_code",
+      "start_line": 99,
+      "end_line": 103,
+      "raw": "```bash\ncmake -S . -B build -DBUILD_TESTING=ON\ncmake --build build --target Vincent tests_canvasdocumentviewmodel tests_drawingsurfaceitem\nctest --test-dir build --output-on-failure\n```\n",
+      "language": "bash",
+      "code": "cmake -S . -B build -DBUILD_TESTING=ON\ncmake --build build --target Vincent tests_canvasdocumentviewmodel tests_drawingsurfaceitem\nctest --test-dir build --output-on-failure\n",
+      "closed": true
+    },
+    {
+      "id": "b000057",
+      "kind": "blank",
+      "start_line": 104,
+      "end_line": 104,
+      "raw": "\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "heading",
+      "start_line": 105,
+      "end_line": 105,
+      "raw": "## Known Limitations\n",
+      "level": 2,
+      "title": "Known Limitations"
+    },
+    {
+      "id": "b000059",
+      "kind": "list",
+      "start_line": 106,
+      "end_line": 109,
+      "raw": "- PSD import reads 8-bit RGB/RGBA raster layers, layer names, bounds, opacity, visibility, Photoshop blend-mode keys, and Vincent XMP manifests when present; Photoshop smart objects, adjustment layers, layer effects, and editable text/vector reconstruction still fall back to raster compatibility data\n- Transformable image objects remain session overlays when present, while added paint layers own their own raster pixels for deletion and export\n- Palette is fixed to the built-in colors\n- Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "PSD import reads 8-bit RGB/RGBA raster layers, layer names, bounds, opacity, visibility, Photoshop blend-mode keys, and Vincent XMP manifests when present; Photoshop smart objects, adjustment layers, layer effects, and editable text/vector reconstruction still fall back to raster compatibility data",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Transformable image objects remain session overlays when present, while added paint layers own their own raster pixels for deletion and export",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Palette is fixed to the built-in colors",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Canvas dimensions are clamped to the supported raster size range when entered through the new-canvas modal",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 110,
+      "end_line": 110,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "html",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "<a id=\"로컬-sdk-경로\"></a>\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 112,
+      "end_line": 112,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "heading",
+      "start_line": 113,
+      "end_line": 113,
+      "raw": "### Local SDK path\n",
+      "level": 3,
+      "title": "Local SDK path"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 115,
+      "end_line": 115,
+      "raw": "The SDK source uses `Workspace/SDK`, the installer uses `~/.local/SDK/<package name>`. The CMake dependency hints and execution RPATH, `build.sh` license and update library default prefixes also follow this path. If the installation location changes, reconfigure CMake from `build/` and then run the full build and CTest.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 116,
+      "end_line": 116,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "heading",
+      "start_line": 117,
+      "end_line": 117,
+      "raw": "## Source layout\n",
+      "level": 2,
+      "title": "Source layout"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 118,
+      "end_line": 118,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "paragraph",
+      "start_line": 119,
+      "end_line": 119,
+      "raw": "Implementation files and their headers live together under `src/`. Existing feature and platform subdirectories retain their responsibilities. Build configuration, tests, documentation, resources, and maintenance scripts remain at the project root. Configure and build using the repository-local `build/` directory.\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 120,
+      "end_line": 120,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "paragraph",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "The local build uses iiSharedCanvas 0.10.1, matching the current SDK package.\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 122,
+      "end_line": 122,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "html",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "<!-- workspace-docs:readme:start -->\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "heading",
+      "start_line": 124,
+      "end_line": 124,
+      "raw": "## Documentation entry points\n",
+      "level": 2,
+      "title": "Documentation entry points"
+    },
+    {
+      "id": "b000075",
+      "kind": "blank",
+      "start_line": 125,
+      "end_line": 125,
+      "raw": "\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "list",
+      "start_line": 126,
+      "end_line": 129,
+      "raw": "- Human overview: this English `README.md`.\n- Agent instructions: [AGENT.md](AGENT.md).\n- Human documentation: [documentation index](docs/README.md).\n- Structured agent documentation: [agent index](docs/agent-index.json).\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Human overview: this English `README.md`.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Agent instructions: [AGENT.md](AGENT.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Human documentation: [documentation index](docs/README.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Structured agent documentation: [agent index](docs/agent-index.json).",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000077",
+      "kind": "html",
+      "start_line": 130,
+      "end_line": 130,
+      "raw": "<!-- workspace-docs:readme:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Vincent 6.0",
+      "anchor": "vincent-60",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "System Requirements",
+      "anchor": "system-requirements",
+      "start_line": 13
+    },
+    {
+      "block_id": "b000012",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Install (macOS)",
+      "anchor": "install-macos",
+      "start_line": 18
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Install (macOS .app bundle)",
+      "anchor": "install-macos-app-bundle",
+      "start_line": 23
+    },
+    {
+      "block_id": "b000018",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Install (Linux)",
+      "anchor": "install-linux",
+      "start_line": 28
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Install (Windows)",
+      "anchor": "install-windows",
+      "start_line": 33
+    },
+    {
+      "block_id": "b000032",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Code signing policy",
+      "anchor": "code-signing-policy",
+      "start_line": 47
+    },
+    {
+      "block_id": "b000048",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Features at a Glance",
+      "anchor": "features-at-a-glance",
+      "start_line": 66
+    },
+    {
+      "block_id": "b000051",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Community and Contributing",
+      "anchor": "community-and-contributing",
+      "start_line": 91
+    },
+    {
+      "block_id": "b000055",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Testing",
+      "anchor": "testing",
+      "start_line": 98
+    },
+    {
+      "block_id": "b000058",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Known Limitations",
+      "anchor": "known-limitations",
+      "start_line": 105
+    },
+    {
+      "block_id": "b000063",
+      "parent_id": "b000058",
+      "level": 3,
+      "title": "Local SDK path",
+      "anchor": "local-sdk-path",
+      "start_line": 113
+    },
+    {
+      "block_id": "b000067",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Source layout",
+      "anchor": "source-layout",
+      "start_line": 117
+    },
+    {
+      "block_id": "b000074",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Documentation entry points",
+      "anchor": "documentation-entry-points",
+      "start_line": 124
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000022",
+        "line": 34,
+        "text": "The preferred public installation route is the Microsoft Store. A Store-delivered MSIX is certified and re-signed by Microsoft, so Windows users do not need Vincent's private development certificate and do not receive the unknown-publisher or SmartScreen warning associated with a self-signed download. The ZIP/MSI instructions below apply only when a separately Authenticode-signed non-Store release is offered.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000024",
+        "line": 39,
+        "text": "4. Run `Vincent.exe`. It opens only the Vincent GUI; no terminal or console window is required.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000026",
+        "line": 41,
+        "text": "When the release also provides `Vincent-6.0-Windows.msi`, verify the adjacent checksum and the MSI's Authenticode Publisher before opening it. The Windows Installer 5 package uses the official `ALLUSERS=2` and `MSIINSTALLPERUSER=1` dual-context defaults, so 6.0 installs for the current user and upgrades the existing per-user 4.0.0 in the same installation context without a UAC prompt. Choose **Advanced** on a first installation to select current-user or all-users scope; all-users scope also exposes the destination directory, installs under native 64-bit Program Files by default, creates a shared shortcut, and requires elevation, while current-user scope stays under Local Application Data. The application files and context-aware Start Menu shortcut are installed together. A required installation-context marker keeps later upgrades in the registered scope and preserves the recorded install location; when Windows Installer detects a markerless per-user upgrade, it also locks that legacy upgrade to current-user scope. Packaging explicitly validates this model with ICE105. ProductCode is deterministic for the same version and architecture, so rebuilding unchanged 6.0 cannot register a duplicate product, while a different version or architecture receives a distinct identity. If both scope registrations are discovered, new installation and cross-context upgrade are rejected, but maintenance and removal remain available so the machine can be recovered. After that product is installed, opening the same MSI intentionally enters the standard Windows Installer maintenance flow instead of presenting another **Install** action. Use **Repair** to restore missing or damaged installed files and **Remove** to uninstall Vincent; the standard **Change** path displays the required installed feature state. Remove the installed product first only when changing installation scope or exercising a genuinely fresh first-installation flow.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000028",
+        "line": 43,
+        "text": "Windows maintainers create a public package with `powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1 -Sign -SigningCertificateThumbprint <40-hex-thumbprint>`. Public packaging fails closed unless `-Sign` is supplied, and requires Windows SDK SignTool plus a currently valid Code Signing certificate with an accessible private key in `CurrentUser\\My` or the explicitly selected `LocalMachine\\My` store; when the certificate contains a Key Usage extension it must permit `DigitalSignature`. The release operator must obtain that certificate from a consumer-trusted code-signing CA or trusted signing service and publish its expected Publisher identity. Before any build work, the script rejects self-signed identities, builds the Code Signing chain with online revocation checking, and requires its terminal root to be present in Windows' `LocalMachine\\AuthRoot` public-root store. It signs Vincent-owned binaries with the selected identity, preserves valid timestamped vendor signatures, signs the remaining unsigned staged PE files after all binary mutations, and requires RFC 3161 timestamps plus Authenticode verification before promoting `dist/Vincent-6.0-Windows.zip` and its `.sha256` record from temporary names. `-CreateMsi` builds, validates without WiX warnings, and signs and verifies the MSI from a temporary path; when ZIP and MSI are requested together, the complete verified set replaces the last-known-good files in one rollback-capable publication step. A prepared/committed transaction journal records whether each canonical artifact existed before publication, so a retry removes half-published first-release files or restores the complete previous generation before any new build work starts. A machine-wide Vincent packaging mutex rejects concurrent invocations before they can compete for a build tree or journal, including when the same repository is reached through a path alias. Every public correction increments the release version; a local test package must opt in with `-AllowUnsignedPackage` and is named `Vincent-6.0-Windows-unsigned.*`. It is not a release asset. Use `-SkipPackage` for an unpackaged local build; use `-Clean -SkipPackage` for a clean-only local rebuild, or combine `-Clean` with the appropriate signed/explicitly unsigned package mode. Signed public builds cannot use `-SkipTests`.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000030",
+        "line": 45,
+        "text": "For the certificate-free public Store route, maintainers reserve the app in Partner Center, copy its exact reserved display name plus the three Product identity values, provide the corresponding-source URL/hash, and run `build-windows-store.ps1 -Mode Store`. The reserved name must populate both package and application display names; an unreserved value fails Partner Center validation. iiPaintEngine is licensed by its copyright holder as `AGPL-3.0-only`, and that exact text is staged with the package. The command creates the intentionally unsigned `dist/Vincent-6.0-Windows-Store-x64.msixupload`; Microsoft replaces the package signature after certification. The Store does not re-sign MSI or EXE submissions. See [docs/BUILD.md](docs/BUILD.md) for account onboarding, local self-signed MSIX validation, restricted-capability justification, and submission steps.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000034",
+        "line": 49,
+        "text": "Vincent is seeking free code signing provided by [SignPath.io](https://signpath.io/), with a certificate sponsored by [SignPath Foundation](https://signpath.org/). No SignPath Foundation certificate is currently active for Vincent. The prepared GitHub workflow must not submit a release signing request until the Foundation has explicitly approved the project and supplied the required identifiers. Windows website releases are built from this public repository on GitHub-hosted runners and require an authorized maintainer's manual signing approval. The unsigned `build/signpath-input` artifact and every self-signed trial artifact are development-only files; only a returned MSI whose container and nested `Vincent.exe` both have valid, timestamped SignPath Foundation Authenticode signatures may be published.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000038",
+        "line": 56,
+        "text": "The externally signed website release is the single file `Vincent-6.0-Windows.msi`. Its embedded Authenticode signature supplies publisher identity and integrity, so users do not need a separate certificate or checksum file to install it.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000042",
+        "line": 60,
+        "text": "The generic Windows CPack target does not run Qt deployment, PE closure validation, or Authenticode signing. Its deliberately named `Vincent-6.0-Windows-unsigned-cpack-incomplete.zip` output is build-system diagnostics only and must never be published.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000044",
+        "line": 62,
+        "text": "The Windows executable is a native AMD64 PE32+ GUI-subsystem application, so its lifetime is owned by the Qt GUI event loop rather than a companion terminal. QML retains LVRS stock application-window geometry; before the first show, C++ measures that hidden framework size as the aspect-ratio source, requests a 1,280-logical-pixel width, derives the height from the measured ratio, and scales the pair down only when required by the screen's available area. No post-display resize runs while the heavier canvas page is activated through an asynchronous QML `Loader`, and the window remains user-resizable after launch. Executable resources include the application icon, Windows file/product version information, an `asInvoker` manifest, Windows 10/11 compatibility, Per-Monitor V2 DPI awareness, and long-path awareness. The Release staging pass verifies those native properties and the required runtime DLLs, rejects incompatible MinGW runtimes, strips only Vincent-owned MinGW binaries, omits unused Qt generic, Insight Tracker, SQL, Quick3D utility, software OpenGL, and runtime shader-compiler payloads, and removes a loose `qml/LVRS` copy because LVRS QML is already embedded in `LVRS.dll`.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000056",
+        "language": "bash",
+        "code": "cmake -S . -B build -DBUILD_TESTING=ON\ncmake --build build --target Vincent tests_canvasdocumentviewmodel tests_drawingsurfaceitem\nctest --test-dir build --output-on-failure\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "Vincent 6.0 running on Windows with a sample raster artwork",
+        "target": "docs/marketing/vincent-windows-editor.png",
+        "kind": "relative",
+        "line": 8
+      },
+      {
+        "block_id": "b000030",
+        "label": "docs/BUILD.md",
+        "target": "docs/BUILD.md",
+        "kind": "relative",
+        "line": 45
+      },
+      {
+        "block_id": "b000034",
+        "label": "SignPath.io",
+        "target": "https://signpath.io/",
+        "kind": "external",
+        "line": 49
+      },
+      {
+        "block_id": "b000034",
+        "label": "SignPath Foundation",
+        "target": "https://signpath.org/",
+        "kind": "external",
+        "line": 49
+      },
+      {
+        "block_id": "b000036",
+        "label": "iisacc-Justmoong",
+        "target": "https://github.com/iisacc-Justmoong",
+        "kind": "external",
+        "line": 51
+      },
+      {
+        "block_id": "b000036",
+        "label": "iisacc-Justmoong",
+        "target": "https://github.com/iisacc-Justmoong",
+        "kind": "external",
+        "line": 52
+      },
+      {
+        "block_id": "b000053",
+        "label": "GitHub Discussions",
+        "target": "https://github.com/iisacc-Justmoong/Vincent/discussions",
+        "kind": "external",
+        "line": 93
+      },
+      {
+        "block_id": "b000053",
+        "label": "GitHub Issues",
+        "target": "https://github.com/iisacc-Justmoong/Vincent/issues",
+        "kind": "external",
+        "line": 94
+      },
+      {
+        "block_id": "b000053",
+        "label": "Windows 10/11 testing issue",
+        "target": "https://github.com/iisacc-Justmoong/Vincent/issues/18",
+        "kind": "external",
+        "line": 95
+      },
+      {
+        "block_id": "b000053",
+        "label": "CONTRIBUTING.md",
+        "target": "CONTRIBUTING.md",
+        "kind": "relative",
+        "line": 96
+      },
+      {
+        "block_id": "b000076",
+        "label": "AGENT.md",
+        "target": "AGENT.md",
+        "kind": "relative",
+        "line": 127
+      },
+      {
+        "block_id": "b000076",
+        "label": "documentation index",
+        "target": "docs/README.md",
+        "kind": "relative",
+        "line": 128
+      },
+      {
+        "block_id": "b000076",
+        "label": "agent index",
+        "target": "docs/agent-index.json",
+        "kind": "relative",
+        "line": 129
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

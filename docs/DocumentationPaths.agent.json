@@ -1,0 +1,122 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:75ed7785dcbabc23111cc43233d583979272386df020b406fcca00a103d34278",
+  "project": {
+    "id": "urn:iisacc:project:Product%2F.Deprecated%2FVincent",
+    "name": "Vincent",
+    "root": "Product/.Deprecated/Vincent",
+    "kind": "application"
+  },
+  "source": {
+    "path": "docs/DocumentationPaths.md",
+    "sha256": "5a200cf7f191f69989eb3354db23bd77121f4971ea73db732201b476fe97266d",
+    "bytes": 822,
+    "line_count": 7,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "문서 경로 계약",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 문서 경로 계약\n",
+      "level": 1,
+      "title": "문서 경로 계약"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "사람용 영문 진입점은 루트 `README.md`이고 에이전트 진입점은 `AGENT.md`이다. 기여 지침의 원본은 [CONTRIBUTING.md](CONTRIBUTING.md)이며 루트의 기존 경로는 이동 안내로 유지한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "`tests/tst_windowsbuildworkflowcontract.cpp`의 문서 데이터는 `../docs/CONTRIBUTING.md`를 사용한다. 문서 이동 후에도 빌드 디렉터리, SDK 경로와 서명 정책에 관한 기존 검사가 원래 본문을 읽도록 한다. WorkspaceDocumentation의 C++23 문서 소비 검사도 실제 파일에서 같은 필수 문구를 검증한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "문서 경로 검증은 Windows CI 실행이나 배포 완료를 의미하지 않는다. 이 보존 프로젝트의 기존 Qt/KDE 의존성과 빌드 규칙은 해당 프로젝트의 기존 계약을 따른다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "문서 경로 계약",
+      "anchor": "문서-경로-계약",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "`tests/tst_windowsbuildworkflowcontract.cpp`의 문서 데이터는 `../docs/CONTRIBUTING.md`를 사용한다. 문서 이동 후에도 빌드 디렉터리, SDK 경로와 서명 정책에 관한 기존 검사가 원래 본문을 읽도록 한다. WorkspaceDocumentation의 C++23 문서 소비 검사도 실제 파일에서 같은 필수 문구를 검증한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 7,
+        "text": "문서 경로 검증은 Windows CI 실행이나 배포 완료를 의미하지 않는다. 이 보존 프로젝트의 기존 Qt/KDE 의존성과 빌드 규칙은 해당 프로젝트의 기존 계약을 따른다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "CONTRIBUTING.md",
+        "target": "CONTRIBUTING.md",
+        "kind": "relative",
+        "line": 3
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

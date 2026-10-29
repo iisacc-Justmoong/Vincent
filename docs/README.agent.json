@@ -1,0 +1,558 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:3711f76410d9b11a475814966af5c79f2facdd8243985c0b07eb245cddaf0b95",
+  "project": {
+    "id": "urn:iisacc:project:Product%2F.Deprecated%2FVincent",
+    "name": "Vincent",
+    "root": "Product/.Deprecated/Vincent",
+    "kind": "application"
+  },
+  "source": {
+    "path": "docs/README.md",
+    "sha256": "e335c1f70c286232b33dc79591bd177baa4a01b34aef4f243236e0c2492afacd",
+    "bytes": 1918,
+    "line_count": 29,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Vincent Documentation",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Vincent Documentation\n",
+      "level": 1,
+      "title": "Vincent Documentation"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "html",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "<!-- workspace-docs:document-map:start -->\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "heading",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "## Human and agent document map\n",
+      "level": 2,
+      "title": "Human and agent document map"
+    },
+    {
+      "id": "b000005",
+      "kind": "blank",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "paragraph",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "Markdown is the maintained human source. Agent JSON is a structured, source-traceable projection.\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "table",
+      "start_line": 8,
+      "end_line": 28,
+      "raw": "| Document | Agent JSON |\n| --- | --- |\n| [`AGENT.md`](../AGENT.md) | [JSON](entrypoints/AGENT.agent.json) |\n| [`AGENTS.md`](../AGENTS.md) | [JSON](entrypoints/AGENTS.agent.json) |\n| [`CONTRIBUTING.md`](../CONTRIBUTING.md) | [JSON](entrypoints/CONTRIBUTING.agent.json) |\n| [`Changelog.md`](../Changelog.md) | [JSON](entrypoints/Changelog.agent.json) |\n| [`README.md`](../README.md) | [JSON](entrypoints/README.agent.json) |\n| [`design-qa.md`](../design-qa.md) | [JSON](entrypoints/design-qa.agent.json) |\n| [`docs/BUILD.md`](BUILD.md) | [JSON](BUILD.agent.json) |\n| [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | [JSON](CONTRIBUTING.agent.json) |\n| [`docs/Changelog.md`](Changelog.md) | [JSON](Changelog.agent.json) |\n| [`docs/DocumentationPaths.md`](DocumentationPaths.md) | [JSON](DocumentationPaths.agent.json) |\n| [`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md) | [JSON](FILE_PROVIDER.agent.json) |\n| [`docs/SHARED_CANVAS.md`](SHARED_CANVAS.md) | [JSON](SHARED_CANVAS.agent.json) |\n| [`docs/SingleAppBuild.md`](SingleAppBuild.md) | [JSON](SingleAppBuild.agent.json) |\n| [`docs/WindowsValidation.md`](WindowsValidation.md) | [JSON](WindowsValidation.agent.json) |\n| [`docs/app_structure.md`](app_structure.md) | [JSON](app_structure.agent.json) |\n| [`docs/design-qa.md`](design-qa.md) | [JSON](design-qa.agent.json) |\n| [`docs/documentation-structure.md`](documentation-structure.md) | [JSON](documentation-structure.agent.json) |\n| [`docs/marketing/PLATFORM_COPY.md`](marketing/PLATFORM_COPY.md) | [JSON](marketing/PLATFORM_COPY.agent.json) |\n| [`resources/AppStore/6.0/README.md`](../resources/AppStore/6.0/README.md) | [JSON](mirrors/resources/AppStore/6.0/README.agent.json) |\n",
+      "columns": [
+        "Document",
+        "Agent JSON"
+      ],
+      "rows": [
+        [
+          "[`AGENT.md`](../AGENT.md)",
+          "[JSON](entrypoints/AGENT.agent.json)"
+        ],
+        [
+          "[`AGENTS.md`](../AGENTS.md)",
+          "[JSON](entrypoints/AGENTS.agent.json)"
+        ],
+        [
+          "[`CONTRIBUTING.md`](../CONTRIBUTING.md)",
+          "[JSON](entrypoints/CONTRIBUTING.agent.json)"
+        ],
+        [
+          "[`Changelog.md`](../Changelog.md)",
+          "[JSON](entrypoints/Changelog.agent.json)"
+        ],
+        [
+          "[`README.md`](../README.md)",
+          "[JSON](entrypoints/README.agent.json)"
+        ],
+        [
+          "[`design-qa.md`](../design-qa.md)",
+          "[JSON](entrypoints/design-qa.agent.json)"
+        ],
+        [
+          "[`docs/BUILD.md`](BUILD.md)",
+          "[JSON](BUILD.agent.json)"
+        ],
+        [
+          "[`docs/CONTRIBUTING.md`](CONTRIBUTING.md)",
+          "[JSON](CONTRIBUTING.agent.json)"
+        ],
+        [
+          "[`docs/Changelog.md`](Changelog.md)",
+          "[JSON](Changelog.agent.json)"
+        ],
+        [
+          "[`docs/DocumentationPaths.md`](DocumentationPaths.md)",
+          "[JSON](DocumentationPaths.agent.json)"
+        ],
+        [
+          "[`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md)",
+          "[JSON](FILE_PROVIDER.agent.json)"
+        ],
+        [
+          "[`docs/SHARED_CANVAS.md`](SHARED_CANVAS.md)",
+          "[JSON](SHARED_CANVAS.agent.json)"
+        ],
+        [
+          "[`docs/SingleAppBuild.md`](SingleAppBuild.md)",
+          "[JSON](SingleAppBuild.agent.json)"
+        ],
+        [
+          "[`docs/WindowsValidation.md`](WindowsValidation.md)",
+          "[JSON](WindowsValidation.agent.json)"
+        ],
+        [
+          "[`docs/app_structure.md`](app_structure.md)",
+          "[JSON](app_structure.agent.json)"
+        ],
+        [
+          "[`docs/design-qa.md`](design-qa.md)",
+          "[JSON](design-qa.agent.json)"
+        ],
+        [
+          "[`docs/documentation-structure.md`](documentation-structure.md)",
+          "[JSON](documentation-structure.agent.json)"
+        ],
+        [
+          "[`docs/marketing/PLATFORM_COPY.md`](marketing/PLATFORM_COPY.md)",
+          "[JSON](marketing/PLATFORM_COPY.agent.json)"
+        ],
+        [
+          "[`resources/AppStore/6.0/README.md`](../resources/AppStore/6.0/README.md)",
+          "[JSON](mirrors/resources/AppStore/6.0/README.agent.json)"
+        ]
+      ]
+    },
+    {
+      "id": "b000009",
+      "kind": "html",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "<!-- workspace-docs:document-map:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Vincent Documentation",
+      "anchor": "vincent-documentation",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000004",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Human and agent document map",
+      "anchor": "human-and-agent-document-map",
+      "start_line": 4
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000008",
+        "label": "`AGENT.md`",
+        "target": "../AGENT.md",
+        "kind": "relative",
+        "line": 10
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/AGENT.agent.json",
+        "kind": "relative",
+        "line": 10
+      },
+      {
+        "block_id": "b000008",
+        "label": "`AGENTS.md`",
+        "target": "../AGENTS.md",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/AGENTS.agent.json",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000008",
+        "label": "`CONTRIBUTING.md`",
+        "target": "../CONTRIBUTING.md",
+        "kind": "relative",
+        "line": 12
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/CONTRIBUTING.agent.json",
+        "kind": "relative",
+        "line": 12
+      },
+      {
+        "block_id": "b000008",
+        "label": "`Changelog.md`",
+        "target": "../Changelog.md",
+        "kind": "relative",
+        "line": 13
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/Changelog.agent.json",
+        "kind": "relative",
+        "line": 13
+      },
+      {
+        "block_id": "b000008",
+        "label": "`README.md`",
+        "target": "../README.md",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/README.agent.json",
+        "kind": "relative",
+        "line": 14
+      },
+      {
+        "block_id": "b000008",
+        "label": "`design-qa.md`",
+        "target": "../design-qa.md",
+        "kind": "relative",
+        "line": 15
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "entrypoints/design-qa.agent.json",
+        "kind": "relative",
+        "line": 15
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/BUILD.md`",
+        "target": "BUILD.md",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "BUILD.agent.json",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/CONTRIBUTING.md`",
+        "target": "CONTRIBUTING.md",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "CONTRIBUTING.agent.json",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/Changelog.md`",
+        "target": "Changelog.md",
+        "kind": "relative",
+        "line": 18
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "Changelog.agent.json",
+        "kind": "relative",
+        "line": 18
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/DocumentationPaths.md`",
+        "target": "DocumentationPaths.md",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "DocumentationPaths.agent.json",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/FILE_PROVIDER.md`",
+        "target": "FILE_PROVIDER.md",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "FILE_PROVIDER.agent.json",
+        "kind": "relative",
+        "line": 20
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/SHARED_CANVAS.md`",
+        "target": "SHARED_CANVAS.md",
+        "kind": "relative",
+        "line": 21
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "SHARED_CANVAS.agent.json",
+        "kind": "relative",
+        "line": 21
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/SingleAppBuild.md`",
+        "target": "SingleAppBuild.md",
+        "kind": "relative",
+        "line": 22
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "SingleAppBuild.agent.json",
+        "kind": "relative",
+        "line": 22
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/WindowsValidation.md`",
+        "target": "WindowsValidation.md",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "WindowsValidation.agent.json",
+        "kind": "relative",
+        "line": 23
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/app_structure.md`",
+        "target": "app_structure.md",
+        "kind": "relative",
+        "line": 24
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "app_structure.agent.json",
+        "kind": "relative",
+        "line": 24
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/design-qa.md`",
+        "target": "design-qa.md",
+        "kind": "relative",
+        "line": 25
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "design-qa.agent.json",
+        "kind": "relative",
+        "line": 25
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/documentation-structure.md`",
+        "target": "documentation-structure.md",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "documentation-structure.agent.json",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000008",
+        "label": "`docs/marketing/PLATFORM_COPY.md`",
+        "target": "marketing/PLATFORM_COPY.md",
+        "kind": "relative",
+        "line": 27
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "marketing/PLATFORM_COPY.agent.json",
+        "kind": "relative",
+        "line": 27
+      },
+      {
+        "block_id": "b000008",
+        "label": "`resources/AppStore/6.0/README.md`",
+        "target": "../resources/AppStore/6.0/README.md",
+        "kind": "relative",
+        "line": 28
+      },
+      {
+        "block_id": "b000008",
+        "label": "JSON",
+        "target": "mirrors/resources/AppStore/6.0/README.agent.json",
+        "kind": "relative",
+        "line": 28
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000008",
+        "columns": [
+          "Document",
+          "Agent JSON"
+        ],
+        "rows": [
+          [
+            "[`AGENT.md`](../AGENT.md)",
+            "[JSON](entrypoints/AGENT.agent.json)"
+          ],
+          [
+            "[`AGENTS.md`](../AGENTS.md)",
+            "[JSON](entrypoints/AGENTS.agent.json)"
+          ],
+          [
+            "[`CONTRIBUTING.md`](../CONTRIBUTING.md)",
+            "[JSON](entrypoints/CONTRIBUTING.agent.json)"
+          ],
+          [
+            "[`Changelog.md`](../Changelog.md)",
+            "[JSON](entrypoints/Changelog.agent.json)"
+          ],
+          [
+            "[`README.md`](../README.md)",
+            "[JSON](entrypoints/README.agent.json)"
+          ],
+          [
+            "[`design-qa.md`](../design-qa.md)",
+            "[JSON](entrypoints/design-qa.agent.json)"
+          ],
+          [
+            "[`docs/BUILD.md`](BUILD.md)",
+            "[JSON](BUILD.agent.json)"
+          ],
+          [
+            "[`docs/CONTRIBUTING.md`](CONTRIBUTING.md)",
+            "[JSON](CONTRIBUTING.agent.json)"
+          ],
+          [
+            "[`docs/Changelog.md`](Changelog.md)",
+            "[JSON](Changelog.agent.json)"
+          ],
+          [
+            "[`docs/DocumentationPaths.md`](DocumentationPaths.md)",
+            "[JSON](DocumentationPaths.agent.json)"
+          ],
+          [
+            "[`docs/FILE_PROVIDER.md`](FILE_PROVIDER.md)",
+            "[JSON](FILE_PROVIDER.agent.json)"
+          ],
+          [
+            "[`docs/SHARED_CANVAS.md`](SHARED_CANVAS.md)",
+            "[JSON](SHARED_CANVAS.agent.json)"
+          ],
+          [
+            "[`docs/SingleAppBuild.md`](SingleAppBuild.md)",
+            "[JSON](SingleAppBuild.agent.json)"
+          ],
+          [
+            "[`docs/WindowsValidation.md`](WindowsValidation.md)",
+            "[JSON](WindowsValidation.agent.json)"
+          ],
+          [
+            "[`docs/app_structure.md`](app_structure.md)",
+            "[JSON](app_structure.agent.json)"
+          ],
+          [
+            "[`docs/design-qa.md`](design-qa.md)",
+            "[JSON](design-qa.agent.json)"
+          ],
+          [
+            "[`docs/documentation-structure.md`](documentation-structure.md)",
+            "[JSON](documentation-structure.agent.json)"
+          ],
+          [
+            "[`docs/marketing/PLATFORM_COPY.md`](marketing/PLATFORM_COPY.md)",
+            "[JSON](marketing/PLATFORM_COPY.agent.json)"
+          ],
+          [
+            "[`resources/AppStore/6.0/README.md`](../resources/AppStore/6.0/README.md)",
+            "[JSON](mirrors/resources/AppStore/6.0/README.agent.json)"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

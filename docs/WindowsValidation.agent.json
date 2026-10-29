@@ -1,0 +1,93 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:6d466c676dbc94c8757385440d80b1821052c4fbcaf3f76c5786c66c929341e7",
+  "project": {
+    "id": "urn:iisacc:project:Product%2F.Deprecated%2FVincent",
+    "name": "Vincent",
+    "root": "Product/.Deprecated/Vincent",
+    "kind": "application"
+  },
+  "source": {
+    "path": "docs/WindowsValidation.md",
+    "sha256": "1e8afadcdaed2c1ca567004efda27d27afa0c09e6750bad40642a66ee8a318c7",
+    "bytes": 555,
+    "line_count": 5,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Windows 검증",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Windows 검증\n",
+      "level": 1,
+      "title": "Windows 검증"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "저장소가 지정한 iiSharedCanvas 0.11.0 의존성을 별도 설치 경로에 빌드하여 사용한다. 최신 SDK와 ABI를 혼합하지 않는다. Qt MinGW 키트와 Ninja로 `build/`에 빌드한다. GUI 검증은 Windows 플랫폼 플러그인에서 실제 창 생성과 정상 종료를 확인한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "문서 계약 테스트는 번역된 제목 대신 보존된 Markdown section ID와 실행 명령·API 이름을 검사한다. 영어 원문에 종속된 검사 때문에 한국어 설명서가 오탐되지 않도록 한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Windows 검증",
+      "anchor": "windows-검증",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 3,
+        "text": "저장소가 지정한 iiSharedCanvas 0.11.0 의존성을 별도 설치 경로에 빌드하여 사용한다. 최신 SDK와 ABI를 혼합하지 않는다. Qt MinGW 키트와 Ninja로 `build/`에 빌드한다. GUI 검증은 Windows 플랫폼 플러그인에서 실제 창 생성과 정상 종료를 확인한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

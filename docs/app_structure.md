@@ -326,6 +326,6 @@
 
 ## GraphQL 라이센스 권한
 
-`validateLicense(input: LicenseValidationInput!)` 는 `data.validateLicense` 를 반환합니다. 클라이언트는 `valid`, `code`, `productId`, `checkedAt`, 및 `expiresAt` 를 요청하며 공유 GraphQL 엔벨로프 파서에는 iiAcountManager 0.2.8 가 필요합니다. HTTP 200 오류 및 부분 데이터는 사용 불가능한 결정입니다: 앱 잠금 해제 또는 저장된 라이선스 삭제를 할 수 없습니다. 거짓 결과는 null productId 를 가질 수 있으며, 참 결과는 이 제품과 일치해야 합니다. 활성화 및 업데이트 권한은 업데이트된 SDK 를 사용합니다. 새 제품 빌드를 배포하기 전에 서버 GraphQL 를 배포해야 합니다.
+`validateLicense(input: LicenseValidationInput!)` 는 `data.validateLicense` 를 반환합니다. 클라이언트는 `valid`, `code`, `productId`, `checkedAt`, 및 `expiresAt` 를 요청하며 공유 GraphQL 엔벨로프 파서에는 iiAccountManager 0.2.8 가 필요합니다. HTTP 200 오류 및 부분 데이터는 사용 불가능한 결정입니다: 앱 잠금 해제 또는 저장된 라이선스 삭제를 할 수 없습니다. 거짓 결과는 null productId 를 가질 수 있으며, 참 결과는 이 제품과 일치해야 합니다. 활성화 및 업데이트 권한은 업데이트된 SDK 를 사용합니다. 새 제품 빌드를 배포하기 전에 서버 GraphQL 를 배포해야 합니다.
 
-빌드에서는 사용 가능한 경우 iiAcountManager에서 내보낸 QtKeychain 대상을 재사용하여 중복 종속성 대상을 방지합니다. 제품 라이센스/업데이트 테스트에서는 애플리케이션과 동일한 GraphQL 파서 및 종속성 그래프를 사용합니다.
+빌드에서는 사용 가능한 경우 iiAccountManager에서 내보낸 QtKeychain 대상을 재사용하여 중복 종속성 대상을 방지합니다. 제품 라이센스/업데이트 테스트에서는 애플리케이션과 동일한 GraphQL 파서 및 종속성 그래프를 사용합니다.
